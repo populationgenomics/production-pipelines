@@ -34,10 +34,14 @@ class JointGenotyping(CohortStage):
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
+            # full VCF output will have split multiallelics
             'vcf': to_path(self.prefix / 'full.vcf.gz'),
             'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
             'siteonly_part_pattern': str(
                 self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
+            ),
+            'siteonly_split_pattern': str(
+                self.prefix / 'split_parts' / 'part{idx}.vcf.gz'
             ),
         }
 
@@ -67,9 +71,17 @@ class JointGenotyping(CohortStage):
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
+        # vcf framents, stripped of genotypes
         out_siteonly_vcf_part_paths = [
             to_path(
                 self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)
+            )
+            for idx in range(scatter_count)
+        ]
+        # vcf fragments, multiallelic variants split
+        out_split_vcf_part_paths = [
+            to_path(
+                self.expected_outputs(cohort)['split_part_pattern'].format(idx=idx)
             )
             for idx in range(scatter_count)
         ]
@@ -77,7 +89,9 @@ class JointGenotyping(CohortStage):
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
             out_vcf_path=vcf_path,
+            out_split_vcf_part_paths=out_split_vcf_part_paths,
             out_siteonly_vcf_path=siteonly_vcf_path,
+            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
             gvcf_by_sgid=gvcf_by_sgid,
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
@@ -86,7 +100,6 @@ class JointGenotyping(CohortStage):
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
-            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
         )
         jobs.extend(jc_jobs)
         for job in jobs:
