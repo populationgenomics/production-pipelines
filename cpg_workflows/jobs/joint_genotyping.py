@@ -37,6 +37,7 @@ def make_joint_genotyping_jobs(
     gvcf_by_sgid: dict[str, GvcfPath],
     out_vcf_path: Path,
     out_split_vcf_part_paths: list[Path] | None = None,
+    out_split_sitesonly_vcf_part_paths: list[Path] | None = None,
     out_siteonly_vcf_path: Path,
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     tmp_bucket: Path,
@@ -204,6 +205,21 @@ def make_joint_genotyping_jobs(
         if split_multi_job:
             split_multi_job.depends_on(jobs[-1])
             jobs.append(split_multi_job)
+
+        # if requested, make a site-only VCF for this split fragment (for VEP)
+        if out_split_sitesonly_vcf_part_paths:
+            split_sitesonly_jc_vcf_path = out_split_sitesonly_vcf_part_paths[idx]
+            siteonly_j, siteonly_j_vcf = add_make_sitesonly_job(
+                b=b,
+                input_vcf=split_fragment,
+                output_vcf_path=out_split_sitesonly_vcf_part_paths[idx],
+                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            )
+
+            # depend on the previous job
+            if siteonly_j:
+                siteonly_j.depends_on(jobs[-1])
+                jobs.append(siteonly_j)
 
     if scatter_count > 1:
         logging.info(f'Queueing gather VCFs job')
