@@ -16,9 +16,10 @@ from cpg_workflows.workflow import (
 
 from ..resources import joint_calling_scatter_count
 from .joint_genotyping import JointGenotyping
+from .vqsr import Vqsr
 
 
-@stage(required_stages=JointGenotyping)
+@stage(required_stages=[Vqsr, JointGenotyping])
 class Vep(CohortStage):
     """
     Run VEP on a VCF.
@@ -39,6 +40,7 @@ class Vep(CohortStage):
         """
         Submit jobs.
         """
+        scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
         input_siteonly_vcf_part_paths = [
             to_path(
                 inputs.as_str(
@@ -52,9 +54,11 @@ class Vep(CohortStage):
 
         jobs = vep.add_vep_jobs(
             get_batch(),
+            input_siteonly_vcf_path=inputs.as_path(cohort, stage=Vqsr, key='siteonly'),
             input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
             out_path=self.expected_outputs(cohort)['ht'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),
-            job_attrs=self.get_job_attrs()
+            job_attrs=self.get_job_attrs(),
+            scatter_count=scatter_count,
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), jobs)
