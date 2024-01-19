@@ -245,15 +245,6 @@ class JobResource:
         """
         return self.get_ncpu() * self.machine_type.mem_gb_per_core
 
-    def get_java_mem_mb(self) -> int:
-        """
-        Calculate memory to pass to the `java -Xms` option.
-        Subtracts 1G to start a java VM, and converts to MB as the option doesn't
-        support fractions of GB.
-        """
-        # get_mem_gb() is usually decimal GB, but our value is used as binary MiB
-        return int(math.floor((self.get_mem_gb() - 1) * 953.6))
-
     def java_mem_options(self, overhead_gb: float = 1) -> str:
         """
         Returns -Xms -Xmx options to set Java JVM memory usage to use all the memory
