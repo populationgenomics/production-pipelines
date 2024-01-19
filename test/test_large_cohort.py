@@ -120,6 +120,7 @@ def create_config(
             'combiner': {
                 'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end']
             },
+            'pca_background': {'inf_ploidy_using_var': False},
         },
     )
 
