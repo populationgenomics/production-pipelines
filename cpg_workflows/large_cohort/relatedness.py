@@ -139,10 +139,7 @@ def _compute_sample_rankings(ht: hl.Table) -> hl.Table:
     @return: table ordered by rank, with the following row fields:
         `rank`, `filtered`
     """
-    use_only_variants = get_config()['large_cohort']['pca_background'].get(
-        'inf_ploidy_using_var', False
-    )
-    if use_only_variants:
+    if 'var_data_chr20_mean_dp' in ht.row:
         ranking_column = 'var_data_chr20_mean_dp'
     else:
         ranking_column = 'autosomal_mean_dp'

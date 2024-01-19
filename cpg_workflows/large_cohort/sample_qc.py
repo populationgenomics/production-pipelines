@@ -182,10 +182,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     # if `inf_ploidy_using_var` is set to True, then the coverage is computed
     # using only variants. Otherwise, the coverage is computed using reference blocks
     # and the column name subsequently changes
-    use_only_variants = get_config()['large_cohort']['pca_background'].get(
-        'inf_ploidy_using_var', False
-    )
-    if use_only_variants:
+    if 'var_data_chr20_mean_dp' in ht.row:
         autosomal_coverage_colname = 'var_data_chr20_mean_dp'
     else:
         autosomal_coverage_colname = 'autosomal_mean_dp'
