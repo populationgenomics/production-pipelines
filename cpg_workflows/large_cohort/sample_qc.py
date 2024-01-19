@@ -122,7 +122,7 @@ def impute_sex(
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
-    inf_ploidy_using_var = get_config()['large_cohort'].get(
+    inf_ploidy_using_var = get_config()['large_cohort']['pca_background'].get(
         'inf_ploidy_using_var', False
     )
     sex_ht = annotate_sex(
@@ -179,9 +179,19 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
 
     # Remove low-coverage samples
     # chrom 20 coverage is computed to infer sex and used here
+    # if `inf_ploidy_using_var` is set to True, then the coverage is computed
+    # using only variants. Otherwise, the coverage is computed using reference blocks
+    # and the column name subsequently changes
+    use_only_variants = get_config()['large_cohort']['pca_background'].get(
+        'inf_ploidy_using_var', False
+    )
+    if use_only_variants:
+        autosomal_coverage_colname = 'var_data_chr20_mean_dp'
+    else:
+        autosomal_coverage_colname = 'autosomal_mean_dp'
     ht = add_filter(
         ht,
-        ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
+        ht[autosomal_coverage_colname] < cutoffs['min_coverage'],
         'low_coverage',
     )
 
