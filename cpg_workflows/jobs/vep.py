@@ -21,9 +21,9 @@ from cpg_workflows.query_modules import vep
 
 def add_vep_jobs(
     b: Batch,
-    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
-    scatter_count: int,
+    input_vcf_path: Path | None = None,
+    scatter_count: int | None = None,
     input_siteonly_vcf_part_paths: list[Path] | None = None,
     out_path: Path | None = None,
     job_attrs: dict | None = None,
@@ -40,12 +40,6 @@ def add_vep_jobs(
         return []
 
     jobs: list[Job] = []
-    siteonly_vcf = b.read_input_group(
-        **{
-            'vcf.gz': str(input_siteonly_vcf_path),
-            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        }
-    )
 
     input_vcf_parts: list[hb.ResourceGroup] = []
     if input_siteonly_vcf_part_paths:
@@ -57,51 +51,68 @@ def add_vep_jobs(
                 )
             )
 
-    # If there is only one partition, we don't need to split the VCF
-    elif scatter_count == 1:
-        input_vcf_parts.append(siteonly_vcf)
-
-    else:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            job_attrs=job_attrs,
-            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
-
-        # Splitting variant calling by intervals
-        for idx in range(scatter_count):
-            subset_j = subset_vcf(
-                b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+    # otherwise take this whole VCF
+    elif input_vcf_path:
+        input_vcf_parts.append(
+            b.read_input_group(
+                **{
+                    'vcf.gz': str(input_siteonly_vcf_path),
+                    'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
+                }
             )
-            jobs.append(subset_j)
-            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-            input_vcf_parts.append(subset_j.output_vcf)
+        )
+
+    # TODO I would remove all this unused code...
+    # else:
+    #     intervals_j, intervals = get_intervals(
+    #         b=b,
+    #         scatter_count=scatter_count,
+    #         job_attrs=job_attrs,
+    #         output_prefix=tmp_prefix / f'intervals_{scatter_count}',
+    #     )
+    #     if intervals_j:
+    #         jobs.append(intervals_j)
+    #
+    #     # Splitting variant calling by intervals
+    #     for idx in range(scatter_count):
+    #         subset_j = subset_vcf(
+    #             b,
+    #             vcf=siteonly_vcf,
+    #             interval=intervals[idx],
+    #             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+    #         )
+    #         jobs.append(subset_j)
+    #         assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
+    #         input_vcf_parts.append(subset_j.output_vcf)
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
-    result_part_paths = []
-    for idx, resource in enumerate(input_vcf_parts):
-        if to_hail_table:
-            result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
-        else:
-            result_part_path = result_parts_bucket / f'part{idx + 1}.vcf.gz'
-        result_part_paths.append(result_part_path)
-        if can_reuse(result_part_path):
+
+    # one input, one output
+    if len(input_vcf_parts) == 1:
+        result_part_paths = [out_path]
+
+    # otherwise, create each result fragment
+    else:
+        result_part_paths = []
+        for idx, _input in enumerate(input_vcf_parts):
+            if to_hail_table:
+                result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
+            else:
+                result_part_path = result_parts_bucket / f'part{idx + 1}.vcf.gz'
+            result_part_paths.append(result_part_path)
+
+    for result_path, resource in zip(result_part_paths, input_vcf_parts):
+        if can_reuse(result_path):
             continue
 
-        # noinspection PyTypeChecker
         vep_one_job = vep_one(
             b,
             vcf=resource['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
-            out_path=result_part_paths[idx],
+            out_path=result_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
+
         if vep_one_job:
             jobs.append(vep_one_job)
 
@@ -114,19 +125,18 @@ def add_vep_jobs(
             depends_on=jobs,
         )
         gather_jobs = [j]
-    elif scatter_count != 1:
-        assert len(result_part_paths) == scatter_count
+
+    elif len(result_part_paths) != 1:
         gather_jobs = gather_vcfs(
             b=b,
             input_vcfs=result_part_paths,
             out_vcf_path=out_path,
         )
-    else:
-        print('no need to merge VCF results')
-        gather_jobs = []
+
     for j in gather_jobs:
         j.depends_on(*jobs)
         jobs.append(j)
+
     return jobs
 
 
