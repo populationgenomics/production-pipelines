@@ -89,7 +89,7 @@ class JointGenotyping(CohortStage):
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
             out_vcf_path=vcf_path,
-            out_split_vcf_part_paths=out_split_vcf_part_paths,
+            out_split_sitesonly_vcf_part_paths=out_split_vcf_part_paths,
             out_siteonly_vcf_path=siteonly_vcf_path,
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
