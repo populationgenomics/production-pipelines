@@ -83,9 +83,17 @@ def flag_related(
 ) -> hl.Table:
     """
     Rank samples and flag samples to drop so there is only one sample per family
-    left, with the highest rank in the family.
+    left, with the highest rank in the family. The ranking is based on either
+    'var_data_chr20_mean_dp' or 'autosomal_mean_dp' depending on which is present
+    in the `sample_qc_ht` table. The presence of either column is determined by
+    the 'inf_ploidy_using_var' parameter in the config toml.
 
-    `sample_qc_ht` has to have a `filters` and `var_data_chr20_mean_dp` columns.
+    @param relatedness_ht: table with relatedness information.
+    @param sample_qc_ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp`
+                         and `filters` fields.
+    @param out_relateds_to_drop_ht_path: path to write the output table of samples to drop.
+    @param tmp_prefix: path for temporary files.
+    @return: table of samples to drop, ordered by rank.
     """
     logging.info(f'Flagging related samples to drop')
     if can_reuse(out_relateds_to_drop_ht_path):
@@ -125,17 +133,22 @@ def flag_related(
 def _compute_sample_rankings(ht: hl.Table) -> hl.Table:
     """
     Orders samples by hard filters and coverage and adds rank, which is the lower,
-    the better.
+    the better. The ranking is based on either 'var_data_chr20_mean_dp' or
+    'autosomal_mean_dp' depending on the 'inf_ploidy_using_var' configuration.
 
-    @param ht: table with a `var_data_chr20_mean_dp` and `filters` fields.
+    @param ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp` and `filters` fields.
     @return: table ordered by rank, with the following row fields:
         `rank`, `filtered`
     """
+    if 'var_data_chr20_mean_dp' in ht.row:
+        ranking_column = 'var_data_chr20_mean_dp'
+    else:
+        ranking_column = 'autosomal_mean_dp'
     ht = ht.drop(*list(ht.globals.dtype.keys()))
     ht = ht.select(
-        'var_data_chr20_mean_dp',
+        ranking_column,
         filtered=hl.len(ht.filters) > 0,
     )
-    ht = ht.order_by(ht.filtered, hl.desc(ht.var_data_chr20_mean_dp))
+    ht = ht.order_by(ht.filtered, hl.desc(ht[ranking_column]))
     ht = ht.add_index(name='rank')
     return ht.key_by('s').select('filtered', 'rank')
