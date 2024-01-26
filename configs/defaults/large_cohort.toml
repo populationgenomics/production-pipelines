@@ -58,7 +58,6 @@ inferred_ancestry = false
 # Setting `variants_only_x_ploidy` and `variants_only_y_ploidy` to `False` (default value) causes
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
-inf_ploidy_using_var = false
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 

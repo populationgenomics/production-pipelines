@@ -85,8 +85,7 @@ def flag_related(
     Rank samples and flag samples to drop so there is only one sample per family
     left, with the highest rank in the family. The ranking is based on either
     'var_data_chr20_mean_dp' or 'autosomal_mean_dp' depending on which is present
-    in the `sample_qc_ht` table. The presence of either column is determined by
-    the 'inf_ploidy_using_var' parameter in the config toml.
+    in the `sample_qc_ht` table.
 
     @param relatedness_ht: table with relatedness information.
     @param sample_qc_ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp`

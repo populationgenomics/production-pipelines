@@ -176,9 +176,6 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
 
     # Remove low-coverage samples
     # chrom 20 coverage is computed to infer sex and used here
-    # if `inf_ploidy_using_var` is set to True, then the coverage is computed
-    # using only variants. Otherwise, the coverage is computed using reference blocks
-    # and the column name subsequently changes
     ht = add_filter(
         ht,
         ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
