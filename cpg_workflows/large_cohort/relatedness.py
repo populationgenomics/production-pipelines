@@ -133,22 +133,17 @@ def flag_related(
 def _compute_sample_rankings(ht: hl.Table) -> hl.Table:
     """
     Orders samples by hard filters and coverage and adds rank, which is the lower,
-    the better. The ranking is based on either 'var_data_chr20_mean_dp' or
-    'autosomal_mean_dp' depending on the 'inf_ploidy_using_var' configuration.
+    the better.
 
-    @param ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp` and `filters` fields.
+    @param ht: table with a `var_data_chr20_mean_dp` and `filters` fields.
     @return: table ordered by rank, with the following row fields:
         `rank`, `filtered`
     """
-    if 'var_data_chr20_mean_dp' in ht.row:
-        ranking_column = 'var_data_chr20_mean_dp'
-    else:
-        ranking_column = 'autosomal_mean_dp'
     ht = ht.drop(*list(ht.globals.dtype.keys()))
     ht = ht.select(
-        ranking_column,
+        'var_data_chr20_mean_dp',
         filtered=hl.len(ht.filters) > 0,
     )
-    ht = ht.order_by(ht.filtered, hl.desc(ht[ranking_column]))
+    ht = ht.order_by(ht.filtered, hl.desc(ht.var_data_chr20_mean_dp))
     ht = ht.add_index(name='rank')
     return ht.key_by('s').select('filtered', 'rank')
