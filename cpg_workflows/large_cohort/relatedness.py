@@ -83,9 +83,16 @@ def flag_related(
 ) -> hl.Table:
     """
     Rank samples and flag samples to drop so there is only one sample per family
-    left, with the highest rank in the family.
+    left, with the highest rank in the family. The ranking is based on either
+    'var_data_chr20_mean_dp' or 'autosomal_mean_dp' depending on which is present
+    in the `sample_qc_ht` table.
 
-    `sample_qc_ht` has to have a `filters` and `var_data_chr20_mean_dp` columns.
+    @param relatedness_ht: table with relatedness information.
+    @param sample_qc_ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp`
+                         and `filters` fields.
+    @param out_relateds_to_drop_ht_path: path to write the output table of samples to drop.
+    @param tmp_prefix: path for temporary files.
+    @return: table of samples to drop, ordered by rank.
     """
     logging.info(f'Flagging related samples to drop')
     if can_reuse(out_relateds_to_drop_ht_path):
