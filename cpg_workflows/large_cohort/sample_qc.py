@@ -21,8 +21,8 @@ def run(
     out_sample_qc_ht_path: Path,
     tmp_prefix: Path,
 ):
-    if can_reuse(out_sample_qc_ht_path, overwrite=True):
-        return hl.read_table(str(out_sample_qc_ht_path))
+    # if can_reuse(out_sample_qc_ht_path, overwrite=True):
+    #     return hl.read_table(str(out_sample_qc_ht_path))
 
     ht = initialise_sample_table()
 
@@ -35,15 +35,17 @@ def run(
 
     # Run Hail sample-QC stats:
     sqc_ht_path = tmp_prefix / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path, overwrite=True):
-        sqc_ht = hl.read_table(str(sqc_ht_path))
-    else:
-        # Filter to autosomes:
-        autosome_vds = hl.vds.filter_chromosomes(
-            vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
-        )
-        sqc_ht = hl.vds.sample_qc(autosome_vds)
-        sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
+    # if can_reuse(sqc_ht_path, overwrite=True):
+    #     sqc_ht = hl.read_table(str(sqc_ht_path))
+    # else:
+
+    # Filter to autosomes:
+    autosome_vds = hl.vds.filter_chromosomes(
+        vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
+    )
+    sqc_ht = hl.vds.sample_qc(autosome_vds)
+    sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
+
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
     logging.info('Sample QC table:')
     ht.describe()
@@ -172,9 +174,9 @@ def impute_sex(
     Impute sex based on coverage.
     """
     checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path), overwrite=True):
-        sex_ht = hl.read_table(str(checkpoint_path))
-        return ht.annotate(**sex_ht[ht.s])
+    # if can_reuse(str(checkpoint_path), overwrite=True):
+    #     sex_ht = hl.read_table(str(checkpoint_path))
+    #     return ht.annotate(**sex_ht[ht.s])
 
     # Load calling intervals
     seq_type = get_config()['workflow']['sequencing_type']
