@@ -104,8 +104,8 @@ def generate_sex_coverage_mt(
             not isinstance(calling_intervals.key[0].dtype, hl.tinterval) or
             calling_intervals.key[0].dtype.point_type != vds.reference_data.locus.dtype
     ):
-        raise ValueError(f"'impute_sex_chromosome_ploidy': expect calling_intervals to be list of intervals or"
-                         f" table with single key of type interval<locus>, found table with key: {key_dtype}")
+        raise ValueError(f'"impute_sex_chromosome_ploidy": expect calling_intervals to be list of intervals or '
+                         f'table with single key of type interval<locus>, found table with key: {key_dtype}')
 
     rg = vds.reference_data.locus.dtype.reference_genome
     par_boundaries = []

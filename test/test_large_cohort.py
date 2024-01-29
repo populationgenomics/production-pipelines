@@ -169,6 +169,10 @@ class TestAllLargeCohortMethods:
             'cpg_workflows.large_cohort.site_only_vcf.can_reuse',
             lambda x: False
         )
+        mocker.patch(
+            'cpg_workflows.large_cohort.sample_qc.can_reuse',
+            lambda x: False
+        )
 
         start_query_context()
 
