@@ -125,7 +125,7 @@ def generate_sex_coverage_mt(
     if can_reuse(checkpoint_path):
         calling_intervals = hl.read_matrix_table(str(checkpoint_path))
     else:
-        calling_intervals = calling_intervals.checkpoint(str(checkpoint_path), overwrite=True)
+        calling_intervals = calling_intervals.checkpoint(str(checkpoint_path))
 
     interval = calling_intervals.key[0]
     (any_bad_intervals, chrs_represented) = calling_intervals.aggregate(
@@ -158,7 +158,7 @@ def generate_sex_coverage_mt(
     if can_reuse(checkpoint_path):
         coverage = hl.read_matrix_table(str(checkpoint_path))
     else:
-        coverage = coverage.checkpoint(str(checkpoint_path), overwrite=True)
+        coverage = coverage.checkpoint(str(checkpoint_path))
 
     return coverage
 
