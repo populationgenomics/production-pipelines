@@ -3,7 +3,6 @@ Create Hail Batch jobs for joint genotyping.
 """
 
 import logging
-import math
 from enum import Enum
 
 import pandas as pd
@@ -12,14 +11,12 @@ from cpg_workflows.utils import can_reuse
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
 from cpg_utils import Path, to_path
 import hailtop.batch as hb
-from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
-from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
 from cpg_workflows.filetypes import GvcfPath
-
-from .vcf import gather_vcfs
-from .picard import get_intervals
+from cpg_workflows.jobs.vcf import gather_vcfs
+from cpg_workflows.jobs.picard import get_intervals
+from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
 
 
 class JointGenotyperTool(Enum):
@@ -38,9 +35,9 @@ def make_joint_genotyping_jobs(
     out_vcf_path: Path,
     out_split_vcf_part_paths: list[Path] | None = None,
     out_split_sitesonly_vcf_part_paths: list[Path] | None = None,
-    out_siteonly_vcf_path: Path,
+    out_siteonly_vcf_path: Path | None = None,
     out_siteonly_vcf_part_paths: list[Path] | None = None,
-    tmp_bucket: Path,
+    tmp_bucket: Path | None = None,
     # Default to GenotypeGVCFs because Gnarly is a bit weird, e.g. it adds <NON_REF>
     # variants with AC_adj annotations (other variants have AC):
     # bcftools view gs://cpg-fewgenomes-test/unittest/inputs/chr20/gnarly/joint-called-siteonly.vcf.gz | zgrep 7105364
@@ -111,6 +108,7 @@ def make_joint_genotyping_jobs(
     do_filter_excesshet = len(gvcf_by_sgid) >= 1000 and do_filter_excesshet
 
     for idx, interval in enumerate(intervals):
+        interval_jobs: list[Job] = []
         genomicsdb_path = (
             genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
         )
@@ -122,6 +120,9 @@ def make_joint_genotyping_jobs(
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
 
+        if import_gvcfs_j:
+            interval_jobs.append(import_gvcfs_j)
+
         jc_vcf_path = (
             (tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz')
             if scatter_count > 1
@@ -132,6 +133,7 @@ def make_joint_genotyping_jobs(
             if scatter_count > 1 and do_filter_excesshet
             else out_vcf_path
         )
+
         if out_siteonly_vcf_part_paths:
             siteonly_jc_vcf_path = out_siteonly_vcf_part_paths[idx]
         else:
@@ -141,7 +143,7 @@ def make_joint_genotyping_jobs(
                 else out_siteonly_vcf_path
             )
 
-        if out_split_vcf_part_paths
+        if out_split_vcf_part_paths:
             split_jc_vcf_path = out_split_vcf_part_paths[idx]
         else:
             split_jc_vcf_path = (
@@ -159,9 +161,8 @@ def make_joint_genotyping_jobs(
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
         if jc_vcf_j:
-            jobs.append(jc_vcf_j)
-            if import_gvcfs_j:
-                jc_vcf_j.depends_on(import_gvcfs_j)
+            jc_vcf_j.depends_on(*interval_jobs)
+            interval_jobs.append(jc_vcf_j)
 
         # For small callsets, we don't apply the ExcessHet filtering anyway
         if do_filter_excesshet:
@@ -173,9 +174,9 @@ def make_joint_genotyping_jobs(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
             )
             if excess_filter_j:
-                jobs.append(excess_filter_j)
-                if jc_vcf_j:
-                    excess_filter_j.depends_on(jc_vcf_j)
+                excess_filter_j.depends_on(*interval_jobs)
+                interval_jobs.append(excess_filter_j)
+
             unsplit_vcfs.append(excess_filter_jc_vcf)
         else:
             unsplit_vcfs.append(jc_vcf)
@@ -186,10 +187,13 @@ def make_joint_genotyping_jobs(
             output_vcf_path=siteonly_jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        # make add_make_sitesonly_job return the vcf file as apointer
+
+        # make add_make_sitesonly_job return the vcf file as a pointer
         siteonly_vcfs.append(siteonly_j_vcf)
+
         if siteonly_j:
-            jobs.append(siteonly_j)
+            siteonly_j.depends_on(*interval_jobs)
+            interval_jobs.append(siteonly_j)
 
         # split multi-allelics for all those VCF fragments
         # do this before gathering into one huge VCF
@@ -200,15 +204,15 @@ def make_joint_genotyping_jobs(
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
 
-        # make a job to split this fragment's multiallelic variantt
+        # make a job to split this fragment's multiallelic variants
         vcfs.append(split_fragment)
+
         if split_multi_job:
-            split_multi_job.depends_on(jobs[-1])
-            jobs.append(split_multi_job)
+            split_multi_job.depends_on(*interval_jobs)
+            interval_jobs.append(split_multi_job)
 
         # if requested, make a site-only VCF for this split fragment (for VEP)
         if out_split_sitesonly_vcf_part_paths:
-            split_sitesonly_jc_vcf_path = out_split_sitesonly_vcf_part_paths[idx]
             siteonly_j, siteonly_j_vcf = add_make_sitesonly_job(
                 b=b,
                 input_vcf=split_fragment,
@@ -218,36 +222,43 @@ def make_joint_genotyping_jobs(
 
             # depend on the previous job
             if siteonly_j:
-                siteonly_j.depends_on(jobs[-1])
-                jobs.append(siteonly_j)
+                siteonly_j.depends_on(*interval_jobs)
+                interval_jobs.append(siteonly_j)
+
+        # if we created new jobs, add the latest as a future DAG dependency
+        if interval_jobs:
+            jobs.append(interval_jobs[-1])
 
     if scatter_count > 1:
         logging.info(f'Queueing gather VCFs job')
-        jobs.extend(
-            gather_vcfs(
-                b,
-                input_vcfs=vcfs,
-                site_only=False,
-                sequencing_group_count=len(gvcf_by_sgid),
-                job_attrs=job_attrs,
-                out_vcf_path=out_vcf_path,
-            )
+
+        # gather the split VCFs with genotypes
+        split_gt_jobs = gather_vcfs(
+            b,
+            input_vcfs=vcfs,
+            site_only=False,
+            sequencing_group_count=len(gvcf_by_sgid),
+            job_attrs=job_attrs,
+            out_vcf_path=out_vcf_path,
         )
+        for job in split_gt_jobs:
+            job.depends_on(*jobs)
 
         logging.info(f'Queueing gather site-only VCFs job')
-        jobs.extend(
-            gather_vcfs(
-                b,
-                input_vcfs=siteonly_vcfs,
-                site_only=True,
-                job_attrs=job_attrs,
-                out_vcf_path=out_siteonly_vcf_path,
-            )
+        split_sitesonly_jobs = gather_vcfs(
+            b,
+            input_vcfs=siteonly_vcfs,
+            site_only=True,
+            job_attrs=job_attrs,
+            out_vcf_path=out_siteonly_vcf_path,
         )
+        for job in split_sitesonly_jobs:
+            job.depends_on(*jobs)
 
     jobs = [j for j in jobs if j is not None]
     for j in jobs:
         j.name = f'Joint genotyping: {j.name}'
+
     return jobs
 
 
@@ -255,7 +266,7 @@ def genomicsdb(
     b: hb.Batch,
     sample_map_bucket_path: Path,
     output_path: Path,
-    interval: Resource | None = None,
+    interval: hb.Resource | None = None,
     job_attrs: dict | None = None,
 ) -> Job | None:
     """

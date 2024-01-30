@@ -71,14 +71,16 @@ class JointGenotyping(CohortStage):
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
-        # vcf framents, stripped of genotypes
+
+        # vcf fragments, stripped of genotypes
         out_siteonly_vcf_part_paths = [
             to_path(
                 self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)
             )
             for idx in range(scatter_count)
         ]
-        # vcf fragments, multiallelic variants split
+
+        # vcf fragments, multiallelic variants split, stripped of genotypes
         out_split_vcf_part_paths = [
             to_path(
                 self.expected_outputs(cohort)['split_part_pattern'].format(idx=idx)
