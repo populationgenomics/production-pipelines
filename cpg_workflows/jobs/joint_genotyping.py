@@ -595,7 +595,7 @@ def add_split_multiallelics_job(
             }
         )
 
-    j = b.new_job('MakeSitesOnlyVcf', job_attrs or {} | {'tool': 'bcftools norm'})
+    j = b.new_job('SplitMultiAllelics', job_attrs or {} | {'tool': 'bcftools norm'})
     j.image(image_path('bcftools'))
     # this is only for a single fragment, so expect it to be small
     j.storage(get_config()['workflow'].get('splitting_gb', '10Gi'))
