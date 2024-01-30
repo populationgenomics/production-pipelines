@@ -46,7 +46,7 @@ class Vep(CohortStage):
                 inputs.as_str(
                     stage=JointGenotyping,
                     target=cohort,
-                    key='split_part_pattern',
+                    key='siteonly_split_part_pattern',
                 ).format(idx=idx)
             )
             for idx in range(scatter_count)
