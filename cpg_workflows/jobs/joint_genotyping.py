@@ -612,7 +612,7 @@ def add_split_multiallelics_job(
     j.command(
         command(
             f"""
-    bcftools norm -m -any -N {input_vcf} -Ozo {j.output_vcf['vcf.gz']}
+    bcftools norm -m -any -N {input_vcf} -Oz -o {j.output_vcf['vcf.gz']}
     tabix {j.output_vcf['vcf.gz']}
     """
         )
