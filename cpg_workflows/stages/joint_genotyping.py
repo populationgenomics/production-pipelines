@@ -40,8 +40,8 @@ class JointGenotyping(CohortStage):
             'siteonly_part_pattern': str(
                 self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'
             ),
-            'siteonly_split_pattern': str(
-                self.prefix / 'split_parts' / 'part{idx}.vcf.gz'
+            'siteonly_split_part_pattern': str(
+                self.prefix / 'siteonly_split_parts' / 'part{idx}.vcf.gz'
             ),
         }
 
@@ -72,18 +72,10 @@ class JointGenotyping(CohortStage):
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
 
-        # vcf fragments, stripped of genotypes
-        out_siteonly_vcf_part_paths = [
-            to_path(
-                self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx)
-            )
-            for idx in range(scatter_count)
-        ]
-
         # vcf fragments, multiallelic variants split, stripped of genotypes
         out_split_vcf_part_paths = [
             to_path(
-                self.expected_outputs(cohort)['split_part_pattern'].format(idx=idx)
+                self.expected_outputs(cohort)['siteonly_split_part_pattern'].format(idx=idx)
             )
             for idx in range(scatter_count)
         ]
@@ -91,9 +83,8 @@ class JointGenotyping(CohortStage):
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
             out_vcf_path=vcf_path,
-            out_split_sitesonly_vcf_part_paths=out_split_vcf_part_paths,
             out_siteonly_vcf_path=siteonly_vcf_path,
-            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
+            out_split_sitesonly_vcf_part_paths=out_split_vcf_part_paths,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
             gvcf_by_sgid=gvcf_by_sgid,
             tool=joint_genotyping.JointGenotyperTool.GnarlyGenotyper
