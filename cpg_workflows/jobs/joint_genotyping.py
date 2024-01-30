@@ -576,6 +576,7 @@ def add_make_sitesonly_job(
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
 
+
 def add_split_multiallelics_job(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
@@ -612,7 +613,7 @@ def add_split_multiallelics_job(
     j.command(
         command(
             f"""
-    bcftools norm -m -any -N {input_vcf} -Oz -o {j.output_vcf['vcf.gz']}
+    bcftools norm -m -any -N {input_vcf['vcf.gz']} -Oz -o {j.output_vcf['vcf.gz']}
     tabix {j.output_vcf['vcf.gz']}
     """
         )
