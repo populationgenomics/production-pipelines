@@ -61,7 +61,6 @@ class SampleQC(CohortStage):
             vds_path=inputs.as_path(cohort, Combiner),
             out_sample_qc_ht_path=self.expected_outputs(cohort),
             tmp_prefix=self.tmp_prefix,
-            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
