@@ -608,6 +608,7 @@ def add_split_multiallelics_job(
     # bcftools norm splits multiallelic variants
     # -m -any: split all multiallelic variant types
     # -N: don't left-align indels (NO Normalisation)
+    # bcftools sort to ensure consistent organisation of the resulting lines
     # -Oz: output compressed VCF
     # -o: output file
     j.command(
