@@ -1,16 +1,18 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
+
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
-    stage,
     CohortStage,
     StageInput,
     StageOutput,
     get_workflow,
+    stage,
 )
-from .genotype import Genotype
+
 from .. import get_batch
+from .genotype import Genotype
 
 
 @stage(required_stages=[Genotype])
@@ -26,8 +28,8 @@ class Combiner(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
         from cpg_workflows.large_cohort.combiner import run
+        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -52,17 +54,13 @@ class SampleQC(CohortStage):
         return get_workflow().prefix / 'sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.sample_qc import run
+        from cpg_workflows.large_cohort.sample_qc import sample_qc
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                vds_path=inputs.as_path(cohort, Combiner),
-                out_sample_qc_ht_path=self.expected_outputs(cohort),
-                tmp_prefix=self.tmp_prefix,
-            ),
+        j = sample_qc(
+            b=get_batch(),
+            vds_path=inputs.as_path(cohort, Combiner),
+            out_sample_qc_ht_path=self.expected_outputs(cohort),
+            tmp_prefix=self.tmp_prefix,
             depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
@@ -130,8 +128,8 @@ class Ancestry(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
         from cpg_workflows.large_cohort.ancestry_pca import run
+        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -177,8 +175,8 @@ class AncestryPlots(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
         from cpg_workflows.large_cohort.ancestry_plots import run
+        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
