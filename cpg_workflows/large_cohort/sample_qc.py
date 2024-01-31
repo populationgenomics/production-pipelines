@@ -8,21 +8,46 @@ import logging
 import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.hail_batch import genome_build, image_path, query_command, reference_path
 from gnomad.sample_qc.pipeline import annotate_sex
+from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
 
-def run(
+def sample_qc(
+    b: Batch,
     vds_path: Path,
     out_sample_qc_ht_path: Path,
     tmp_prefix: Path,
-):
+    job_attrs: dict | None = None,
+) -> Job:
     if can_reuse(out_sample_qc_ht_path, overwrite=True):
-        return hl.read_table(str(out_sample_qc_ht_path))
+        return []
 
+    sample_qc_j = b.new_job('Sample QC', (job_attrs or {}) | {'tool': 'hail query'})
+    sample_qc_j.image(image_path('cpg_workflows'))
+    sample_qc_j.command(
+        query_command(
+            __file__,
+            'run',
+            str(vds_path),
+            str(out_sample_qc_ht_path),
+            str(tmp_prefix),
+            setup_gcp=True,
+        )
+    )
+
+    return sample_qc_j
+
+
+def run(
+    vds_path,
+    out_sample_qc_ht_path,
+    tmp_prefix,
+):
     ht = initialise_sample_table()
 
     vds = hl.vds.read_vds(str(vds_path))
