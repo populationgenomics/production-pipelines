@@ -1,7 +1,7 @@
 """
 Test large-cohort workflow.
 """
-
+import os
 from os.path import exists
 from pathlib import Path
 
@@ -175,7 +175,7 @@ class TestAllLargeCohortMethods:
         sample_qc.run(
             vds_path=str(vds_path),
             out_sample_qc_ht_path=str(sample_qc_ht_path),
-            tmp_prefix=str(res_pref / 'tmp'),
+            tmp_prefix=os.path.join(res_pref, 'tmp'),
         )
 
         dense_mt_path = res_pref / 'dense.mt'
