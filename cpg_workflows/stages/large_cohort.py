@@ -1,5 +1,6 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import image_path, query_command
 
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
@@ -54,13 +55,21 @@ class SampleQC(CohortStage):
         return get_workflow().prefix / 'sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.sample_qc import sample_qc
+        from cpg_workflows.large_cohort import sample_qc
 
-        j = sample_qc(
-            b=get_batch(),
-            vds_path=inputs.as_path(cohort, Combiner),
-            out_sample_qc_ht_path=self.expected_outputs(cohort),
-            tmp_prefix=self.tmp_prefix,
+        j = get_batch.new_job(
+            'Sample QC', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+        )
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                sample_qc,
+                sample_qc.run.__name__,
+                str(inputs.as_path(cohort, Combiner)),
+                str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix),
+                setup_gcp=True,
+            )
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
