@@ -73,7 +73,7 @@ def create_config(
             'ancestry': {
                 'sites_table': (
                     gnomad_prefix / 'sample_qc-test' / 'pre_ld_pruning_qc_variants.ht'
-                    ),
+                ),
             },
             'gnomad': {
                 'tel_and_cent_ht': (
@@ -157,17 +157,12 @@ class TestAllLargeCohortMethods:
             lambda: _mock_cohort(conf.workflow.dataset),
         )
         # skip can_reuse, implicit skip of existence checks
+        mocker.patch('cpg_workflows.large_cohort.combiner.can_reuse', lambda x: False)
         mocker.patch(
-            'cpg_workflows.large_cohort.combiner.can_reuse',
-            lambda x: False
+            'cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False
         )
         mocker.patch(
-            'cpg_workflows.large_cohort.relatedness.can_reuse',
-            lambda x: False
-        )
-        mocker.patch(
-            'cpg_workflows.large_cohort.site_only_vcf.can_reuse',
-            lambda x: False
+            'cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False
         )
 
         start_query_context()
@@ -178,9 +173,9 @@ class TestAllLargeCohortMethods:
 
         sample_qc_ht_path = res_pref / 'sample_qc.ht'
         sample_qc.run(
-            vds_path=vds_path,
-            out_sample_qc_ht_path=sample_qc_ht_path,
-            tmp_prefix=res_pref / 'tmp',
+            vds_path=str(vds_path),
+            out_sample_qc_ht_path=str(sample_qc_ht_path),
+            tmp_prefix=str(res_pref / 'tmp'),
         )
 
         dense_mt_path = res_pref / 'dense.mt'
