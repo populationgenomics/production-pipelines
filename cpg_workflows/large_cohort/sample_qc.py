@@ -6,7 +6,7 @@ Add soft filters for samples.
 import logging
 
 import hail as hl
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, image_path, query_command, reference_path
 from gnomad.sample_qc.pipeline import annotate_sex
@@ -35,7 +35,7 @@ def run(
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
-    sqc_ht_path = Path(tmp_prefix) / 'sample_qc.ht'
+    sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
     if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
