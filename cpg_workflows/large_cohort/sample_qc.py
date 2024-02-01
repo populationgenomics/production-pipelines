@@ -17,37 +17,14 @@ from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
 
-def sample_qc(
-    b: Batch,
-    vds_path: Path,
-    out_sample_qc_ht_path: Path,
-    tmp_prefix: Path,
-    job_attrs: dict | None = None,
-) -> Job:
-    if can_reuse(out_sample_qc_ht_path, overwrite=True):
-        return []
-
-    sample_qc_j = b.new_job('Sample QC', (job_attrs or {}) | {'tool': 'hail query'})
-    sample_qc_j.image(image_path('cpg_workflows'))
-    sample_qc_j.command(
-        query_command(
-            __file__,
-            'run',
-            str(vds_path),
-            str(out_sample_qc_ht_path),
-            str(tmp_prefix),
-            setup_gcp=True,
-        )
-    )
-
-    return sample_qc_j
-
-
 def run(
     vds_path,
     out_sample_qc_ht_path,
     tmp_prefix,
 ):
+    if can_reuse(out_sample_qc_ht_path, overwrite=True):
+        return []
+
     ht = initialise_sample_table()
 
     vds = hl.vds.read_vds(str(vds_path))
