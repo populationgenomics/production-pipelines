@@ -8,10 +8,11 @@ import logging
 import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, genome_build
+from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
+
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
-from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(
@@ -128,7 +129,7 @@ def impute_sex(
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
         variants_only_x_ploidy=True,
-        variants_only_y_ploidy=True,
+        variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
