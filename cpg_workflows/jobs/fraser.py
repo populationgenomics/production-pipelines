@@ -464,7 +464,7 @@ def fraser_init(
 
 def fraser_count_split_reads_one_sample(
     b: hb.Batch,
-    fds: hb.ResourceGroup,
+    fds: hb.ResourceFile,
     sample_id: str,
     bam: hb.ResourceFile,
     cohort_name: str,
@@ -536,7 +536,7 @@ def fraser_count_split_reads_one_sample(
 
 def fraser_merge_split_reads(
     b: hb.Batch,
-    fds: hb.ResourceGroup,
+    fds: hb.ResourceFile,
     cohort_name: str,
     split_counts_dict: dict[str, hb.ResourceFile],
     bams: list[hb.ResourceFile],
@@ -643,7 +643,7 @@ def fraser_merge_split_reads(
 
 def fraser_count_non_split_reads_one_sample(
     b: hb.Batch,
-    fds: hb.ResourceGroup,
+    fds: hb.ResourceFile,
     cohort_name: str,
     split_counts: hb.ResourceGroup,
     sample_id: str,
@@ -721,7 +721,7 @@ def fraser_count_non_split_reads_one_sample(
 
 def fraser_merge_non_split_reads(
     b: hb.Batch,
-    fds: hb.ResourceGroup,
+    fds: hb.ResourceFile,
     cohort_name: str,
     non_spliced_counts_dict: dict[str, hb.ResourceFile],
     split_counts: hb.ResourceGroup,

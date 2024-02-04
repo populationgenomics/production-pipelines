@@ -2,18 +2,12 @@
 Perform aberrant splicing analysis with FRASER.
 """
 
-import logging
-from hailtop.batch import ResourceGroup
-from hailtop.batch.job import Job
 from cpg_utils import Path
-from cpg_utils.config import get_config
 from cpg_workflows import get_batch
 from cpg_workflows.workflow import (
     stage,
     StageInput,
     StageOutput,
-    SequencingGroup,
-    SequencingGroupStage,
     Cohort,
     CohortStage,
 )
@@ -22,7 +16,6 @@ from cpg_workflows.filetypes import (
     CramPath,
 )
 from cpg_workflows.stages.trim_align import TrimAlignRNA
-from cpg_workflows.jobs import bam_to_cram
 from cpg_workflows.jobs import fraser
 
 
