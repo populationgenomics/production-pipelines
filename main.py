@@ -34,6 +34,7 @@ from cpg_workflows.stages.happy_validation import (
 )
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
+from cpg_workflows.stages.fraser import Fraser
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -56,7 +57,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MergeBatchSites
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
-    'rare_disease_rnaseq': [Outrider],
+    'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre],
 }
 
