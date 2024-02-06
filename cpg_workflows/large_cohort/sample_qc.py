@@ -1,27 +1,21 @@
 """
-Impute sex.
-Add soft filters for samples.
+Impute sex. Add soft filters for samples.
 """
 
 import logging
 
 import hail as hl
+from gnomad.sample_qc.pipeline import annotate_sex
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, image_path, query_command, reference_path
-from gnomad.sample_qc.pipeline import annotate_sex
-from hailtop.batch import Batch
-from hailtop.batch.job import Job
+from cpg_utils.hail_batch import genome_build, reference_path
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
 
-def run(
-    vds_path: str,
-    out_sample_qc_ht_path: str,
-    tmp_prefix: str,
-):
+def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
 
     if can_reuse(out_sample_qc_ht_path, overwrite=True):
         return []
