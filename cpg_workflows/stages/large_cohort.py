@@ -56,7 +56,7 @@ class SampleQC(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
 
-        j = get_batch.new_job(
+        j = get_batch().new_job(
             'Sample QC', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
         )
         j.image(image_path('cpg_workflows'))
