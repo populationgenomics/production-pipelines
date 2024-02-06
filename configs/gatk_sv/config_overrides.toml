@@ -17,7 +17,6 @@ run_module_metrics = false
 
 # resource overrides for indirect workflows
 
-
 [sub_workflow_overrides.EXAMPLE.SubWorkflow.runtime_attr_overrides]
 
 ## during MakeCohortVcf, we need to override the resource requirements for the
