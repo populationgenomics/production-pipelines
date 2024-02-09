@@ -391,7 +391,7 @@ def merge_calls(
     sg_vcfs: list[str],
     docker_image: str,
     job_attrs: dict[str, str],
-    output_path: Path,
+    output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files

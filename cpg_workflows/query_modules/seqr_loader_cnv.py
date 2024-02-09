@@ -1,13 +1,14 @@
 """
 Hail Query functions for seqr loader; SV edition.
 """
-
+import datetime
 import logging
 
 import hail as hl
 
+from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos
+from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local, download_gencode_gene_id_mapping
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
@@ -25,6 +26,20 @@ NON_GENE_PREDICTIONS = {
     'PREDICTED_NONCODING_SPAN',
 }
 
+
+def parse_genes(gene_col: hl.expr.StringExpression) -> hl.expr.SetExpression:
+    """
+    Convert a string-ified gene list to a set()
+    """
+    return hl.set(gene_col.split(',').filter(
+        lambda gene: ~hl.set({'None', 'null', 'NA', ''}).contains(gene)
+    ).map(
+        lambda gene: gene.split(r'\.')[0]
+    ))
+
+
+def hl_agg_collect_set_union(gene_col: hl.expr.SetExpression) -> hl.expr.SetExpression:
+    return hl.flatten(hl.agg.collect_as_set(gene_col))
 
 def annotate_cohort_gcnv(
     vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
@@ -80,6 +95,63 @@ def annotate_cohort_gcnv(
         gnomad_svs_AN=hl.missing('float64'),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         svType=mt.alleles[1].replace('[<>]', ''),
+    )
+
+    # get the Gene-Symbol mapping dict
+    gene_id_mapping_file = download_gencode_gene_id_mapping(
+        get_config().get('gencode_release', '42')
+    )
+    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
+
+    # OK, NOW IT'S BUSINESS TIME
+    conseq_predicted_gene_cols = [
+        gene_col
+        for gene_col in mt.info
+        if (
+                gene_col.startswith(CONSEQ_PREDICTED_PREFIX)
+                and gene_col not in NON_GENE_PREDICTIONS
+        )
+    ]
+    mt = mt.annotate_rows(
+        # this expected mt.variant_name to be present, and it's not
+        # variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
+        # start=mt.locus.position,
+        # end=mt.info.END,
+        geneIds=hl.set(hl.filter(
+            hl.is_defined,
+            [
+                mt.info[gene_col] for gene_col in conseq_predicted_gene_cols
+            ]
+        ).flatmap(lambda x: x))
+
+    )
+
+    lof_genes = hl.set(mt.info.PREDICTED_LOF)
+    major_consequence_genes = lof_genes | hl.set(mt.info.PREDICTED_COPY_GAIN)
+    mt = mt.annotate_rows(
+        sortedTranscriptConsequences=hl.map(
+            lambda gene: hl.Struct(
+                gene_id=gene_id_mapping.get(gene, hl.missing(hl.tstr)),
+                major_consequence=hl.or_missing(
+                    major_consequence_genes.contains(gene),
+                    hl.if_else(
+                        lof_genes.contains(gene),
+                        "LOF",
+                        "COPY_GAIN",
+                    ),
+                ),
+            ),
+            mt.geneIds,
+        )
+    )
+
+    # more changes incorporating some of those attributes
+    mt = mt.annotate_rows(
+        # this expected mt.variant_name to be present, and it's not
+        variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
+        start=mt.locus.position,
+        end=mt.info.END,
+
     )
 
     # save those changes
