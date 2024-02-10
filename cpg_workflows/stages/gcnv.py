@@ -370,7 +370,7 @@ class AnnotateCNVVcfWithStrvctvre(
 @stage(
     required_stages=AnnotateCNVVcfWithStrvctvre,
     analysis_type='sv',
-    analysis_keys=['annotated_vcf'],
+    analysis_keys=['mt'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
 class AnnotateGCNVCohortForSeqr(CohortStage):
