@@ -16,7 +16,6 @@ from cpg_workflows.utils import read_hail, checkpoint_hail
 GENE_SYMBOL = 'gene_symbol'
 GENE_ID = 'gene_id'
 MAJOR_CONSEQUENCE = 'major_consequence'
-PASS = 'PASS'
 
 # Used to filter mt.info fields.
 CONSEQ_PREDICTED_PREFIX = 'PREDICTED_'
@@ -95,7 +94,15 @@ def annotate_cohort_gcnv(
         gnomad_svs_AN=hl.missing('float64'),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         svType=mt.alleles[1].replace('[<>]', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        xpos=get_expr_for_xpos(mt.locus),
+        xstart=get_expr_for_xpos(mt.locus),
+        xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
     )
+
+    # save those changes
+    mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
     gene_id_mapping_file = download_gencode_gene_id_mapping(
@@ -103,7 +110,7 @@ def annotate_cohort_gcnv(
     )
     gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
-    # OK, NOW IT'S BUSINESS TIME
+    # find all the column names which contain Gene symbols
     conseq_predicted_gene_cols = [
         gene_col
         for gene_col in mt.info
@@ -112,18 +119,39 @@ def annotate_cohort_gcnv(
                 and gene_col not in NON_GENE_PREDICTIONS
         )
     ]
+
+    # bank all those symbols before overwriting them - may not be required
+    # might have to drop this for the Seqr ingest
+    mt = mt.annotate_rows(
+        geneSymbols=hl.set(hl.filter(
+            hl.is_defined,
+            [
+                mt.info[gene_col] for gene_col in conseq_predicted_gene_cols
+            ]
+        ).flatmap(lambda x: x))
+    )
+
+    # overwrite symbols with ENSG IDs in these columns
+    # not sure why this is required, I think SV annotation came out
+    # with ENSGs from the jump, but this is all symbols
+    for col_name in conseq_predicted_gene_cols:
+        mt = mt.annotate_rows(
+            info=mt.info.annotate(
+                **{
+                    col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])
+                }
+            )
+        )
+
     mt = mt.annotate_rows(
         # this expected mt.variant_name to be present, and it's not
-        # variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
-        # start=mt.locus.position,
-        # end=mt.info.END,
+        variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
         geneIds=hl.set(hl.filter(
             hl.is_defined,
             [
                 mt.info[gene_col] for gene_col in conseq_predicted_gene_cols
             ]
         ).flatmap(lambda x: x))
-
     )
 
     lof_genes = hl.set(mt.info.PREDICTED_LOF)
@@ -131,7 +159,7 @@ def annotate_cohort_gcnv(
     mt = mt.annotate_rows(
         sortedTranscriptConsequences=hl.map(
             lambda gene: hl.Struct(
-                gene_id=gene_id_mapping.get(gene, hl.missing(hl.tstr)),
+                gene_id=gene,
                 major_consequence=hl.or_missing(
                     major_consequence_genes.contains(gene),
                     hl.if_else(
@@ -145,219 +173,17 @@ def annotate_cohort_gcnv(
         )
     )
 
-    # more changes incorporating some of those attributes
+    # transcriptConsequenceTerms
+    default_consequences = [hl.format('gCNV_%s', mt.svType)]
+    gene_major_consequences = hl.array(hl.set(
+        mt.sortedTranscriptConsequences
+        .filter(lambda x: hl.is_defined(x.major_consequence))
+        .map(lambda x: x.major_consequence)
+    ))
     mt = mt.annotate_rows(
-        # this expected mt.variant_name to be present, and it's not
-        variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
-        start=mt.locus.position,
-        end=mt.info.END,
-
-    )
-
-    # save those changes
-    mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
-
-    # OK, NOW IT'S BUSINESS TIME
-    conseq_predicted_gene_cols = [
-        gene_col
-        for gene_col in mt.info
-        if (
-            gene_col.startswith(CONSEQ_PREDICTED_PREFIX)
-            and gene_col not in NON_GENE_PREDICTIONS
-        )
-    ]
-
-    # register a chain file
-    liftover_path = reference_path('liftover_38_to_37')
-    rg37 = hl.get_reference('GRCh37')
-    rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(liftover_path), rg37)
-
-    # annotate with mapped genes
-    # Note I'm adding a Flake8 noqa for B023 (loop variable gene_col unbound)
-    # I've experimented in a notebook and this seems to perform as expected
-    # The homologous small variant seqr_loader method performs a similar function
-    # but in a slightly more complicated way (mediated by a method in the S-L-P
-    # codebase, so as not to trigger Flake8 evaluation)
-    # pos/contig/xpos sourced from
-    # seqr-loading-pipelines...luigi_pipeline/lib/model/seqr_mt_schema.py#L12
-    mt = mt.annotate_rows(
-        sortedTranscriptConsequences=hl.filter(
-            hl.is_defined,
-            [
-                mt.info[gene_col].map(
-                    lambda gene: hl.struct(
-                        **{
-                            GENE_SYMBOL: gene,
-                            GENE_ID: gene_id_mapping.get(gene, hl.missing(hl.tstr)),
-                            MAJOR_CONSEQUENCE: gene_col.replace(  # noqa: B023
-                                CONSEQ_PREDICTED_PREFIX, '', 1
-                            ),
-                        }
-                    )
-                )
-                for gene_col in conseq_predicted_gene_cols
-            ],
-        ).flatmap(lambda x: x),
-        contig=mt.locus.contig.replace('^chr', ''),
-        start=mt.locus.position,
-        pos=mt.locus.position,
-        xpos=get_expr_for_xpos(mt.locus),
-        xstart=get_expr_for_xpos(mt.locus),
-        xstop=get_expr_for_xpos(mt.end_locus),
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
-        rg37_locus_end=hl.or_missing(
-            mt.end_locus.position
-            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
-            hl.liftover(
-                hl.locus(
-                    mt.end_locus.contig,
-                    mt.end_locus.position,
-                    reference_genome='GRCh38',
-                ),
-                'GRCh37',
-            ),
-        ),
-        svType=mt.sv_types[0],
-        sv_type_detail=hl.if_else(
-            mt.sv_types[0] == 'CPX',
-            mt.info.CPX_TYPE,
-            hl.or_missing(
-                (mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1),
-                mt.sv_types[1],
-            ),
-        ),
-        variantId=mt.rsid,
-        docId=mt.rsid[0:512],
-    )
-
-    # and some more annotation stuff
-    mt = mt.annotate_rows(
-        transcriptConsequenceTerms=hl.set(
-            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
-                [mt.sv_types[0]]
-            )
-        ),
-        geneIds=hl.set(
-            mt.sortedTranscriptConsequences.filter(
-                lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
-            ).map(lambda x: x[GENE_ID])
-        ),
-        rsid=hl.missing('tstr'),
+        transcriptConsequenceTerms=gene_major_consequences.extend(default_consequences),
+        docId=mt.variantId[0:512],
     )
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
-
-
-def annotate_dataset_sv(mt_path: str, out_mt_path: str):
-    """
-    load the stuff specific to samples in this dataset
-    do this after subsetting to specific samples
-
-    Removing the current logic around comparing genotypes to a previous
-    callset - doesn't fit with the current implementation
-
-    Args:
-        mt_path (str): path to the annotated MatrixTable
-        out_mt_path (str): and where do you want it to end up?
-    """
-
-    logging.info('Annotating genotypes')
-
-    mt = read_hail(mt_path)
-    is_called = hl.is_defined(mt.GT)
-    num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    # was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
-    # prev_num_alt = hl.if_else(
-    #     was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
-    # )
-    # concordant_genotype = num_alt == prev_num_alt
-    # discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
-    # novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
-    mt = mt.annotate_rows(
-        genotypes=hl.agg.collect(
-            hl.struct(
-                sample_id=mt.s,
-                gq=mt.GQ,
-                cn=mt.RD_CN,
-                num_alt=num_alt,
-                # prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                # prev_call=hl.or_missing(
-                #     is_called, was_previously_called & concordant_genotype
-                # ),
-                # new_call=hl.or_missing(
-                #     is_called, ~was_previously_called | novel_genotype
-                # ),
-            )
-        )
-    )
-
-    def _genotype_filter_samples(fn):
-        # Filter on the genotypes.
-        return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
-
-    # top level - decorator
-    def _capture_i_decorator(func):
-        # call the returned_function(i) which locks in the value of i
-        def _inner_filter(i):
-            # the _genotype_filter_samples will call this _func with g
-            def _func(g):
-                return func(i, g)
-
-            return _func
-
-        return _inner_filter
-
-    @_capture_i_decorator
-    def _filter_num_alt(i, g):
-        return i == g.num_alt
-
-    @_capture_i_decorator
-    def _filter_samples_gq(i, g):
-        return (g.gq >= i) & (g.gq < i + 10)
-
-    @_capture_i_decorator
-    def _filter_sample_cn(i, g):
-        return g.cn == i
-
-    # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
-    # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
-    mt = mt.annotate_rows(
-        # omit samples field for GATKSV callsets. Leaving this here as likely needed
-        # for gCNV specific callsets (maybe)
-        # samples=_genotype_filter_samples(lambda g: True),
-        # samples_new_alt=_genotype_filter_samples(
-        #     lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
-        # ),
-        samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
-        samples_num_alt=hl.struct(
-            **{
-                '%i' % i: _genotype_filter_samples(_filter_num_alt(i))
-                for i in range(1, 3, 1)
-            }
-        ),
-        samples_gq_sv=hl.struct(
-            **{
-                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(
-                    _filter_samples_gq(i)
-                )
-                for i in range(0, 90, 10)
-            }
-        ),
-        # As per `samples` field, I beleive CN stats should only be generated for gCNV only
-        # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,
-        # presumably because this genotype is only asigned when this CN is alt (ie on chrX)
-        # samples_cn=hl.struct(
-        #     **{
-        #         f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
-        #         for i in range(0, 4, 1)
-        #     },
-        #     gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
-        # ),
-    )
-
-    logging.info('Genotype fields annotated')
-    mt.describe()
-    mt.write(out_mt_path, overwrite=True)
-    logging.info(f'Written  SV MT to {out_mt_path}')

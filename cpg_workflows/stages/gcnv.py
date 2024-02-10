@@ -373,7 +373,7 @@ class AnnotateCNVVcfWithStrvctvre(
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
-class AnnotateCohortForSeqr(CohortStage):
+class AnnotateGCNVCohortForSeqr(CohortStage):
     """
     Rearrange the annotations across the cohort to suit Seqr
     """

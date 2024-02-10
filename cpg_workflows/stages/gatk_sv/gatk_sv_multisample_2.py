@@ -696,7 +696,7 @@ class AnnotateDatasetSv(DatasetStage):
             'mt': (
                 dataset.prefix()
                 / 'mt'
-                / f'{get_workflow().output_version}-{dataset.name}.mt'
+                / f'SV-{get_workflow().output_version}-{dataset.name}.mt'
             ),
         }
 
