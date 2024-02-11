@@ -236,6 +236,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
         samples=_genotype_filter_samples(lambda g: True),
+        # dubious about this annotation - expected field is qs, I'm using gq, derived from CNQ
         samples_qs=hl.struct(
             **{
                 ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(lambda g: ((g.gq >= i) & (g.gq < i+10)))
