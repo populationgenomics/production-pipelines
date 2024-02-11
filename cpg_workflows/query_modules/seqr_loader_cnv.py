@@ -238,10 +238,10 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
         samples=_genotype_filter_samples(lambda g: True),
         samples_qs=hl.struct(
             **{
-                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(lambda g: ((g.qs >= i) & (g.qs < i+10)))
+                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(lambda g: ((g.gq >= i) & (g.gq < i+10)))
                 for i in range(0, 1000, 10)
             }, **{
-                "gt_1000": _genotype_filter_samples(lambda g: g.qs >= 1000)
+                "gt_1000": _genotype_filter_samples(lambda g: g.gq >= 1000)
             }
         ),
         samples_cn=hl.struct(
