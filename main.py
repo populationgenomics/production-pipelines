@@ -31,6 +31,7 @@ from cpg_workflows.stages.gcnv import (
     AnnotateDatasetCNV,
     GermlineCNVCalls,
     FastCombineGCNVs,
+    MtToEsCNV
 )
 from cpg_workflows.stages.aip import GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML
 from cpg_workflows.stages.stripy import Stripy
@@ -65,7 +66,15 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
-    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre, AnnotateGCNVCohortForSeqr, AnnotateDatasetCNV],
+    'gcnv': [
+        GermlineCNVCalls,
+        FastCombineGCNVs,
+        AnnotateCNV,
+        AnnotateCNVVcfWithStrvctvre,
+        AnnotateGCNVCohortForSeqr,
+        AnnotateDatasetCNV,
+        MtToEsCNV
+    ],
 }
 
 
