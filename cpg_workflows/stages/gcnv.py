@@ -426,7 +426,7 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
     analysis_type='cnv',
     analysis_keys=['mt']
 )
-class AnnotateDatasetSv(DatasetStage):
+class AnnotateDatasetCNV(DatasetStage):
     """
     Subset the MT to be this Dataset only
     Then work up all the genotype values

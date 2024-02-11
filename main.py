@@ -28,6 +28,7 @@ from cpg_workflows.stages.gcnv import (
     AnnotateCNV,
     AnnotateCNVVcfWithStrvctvre,
     AnnotateGCNVCohortForSeqr,
+    AnnotateDatasetCNV,
     GermlineCNVCalls,
     FastCombineGCNVs,
 )
@@ -64,7 +65,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
-    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre, AnnotateGCNVCohortForSeqr],
+    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre, AnnotateGCNVCohortForSeqr, AnnotateDatasetCNV],
 }
 
 
