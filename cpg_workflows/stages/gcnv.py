@@ -13,10 +13,12 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.targets import SequencingGroup, Cohort
-from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
+    get_workflow,
     stage,
     CohortStage,
+    Dataset,
+    DatasetStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
@@ -253,7 +255,7 @@ class FastCombineGCNVs(CohortStage):
 
 @stage(
     required_stages=FastCombineGCNVs,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
 )
@@ -313,7 +315,7 @@ def _gcnv_srvctvre_meta(
 
 @stage(
     required_stages=AnnotateCNV,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['strvctvre_vcf'],
     update_analysis_meta=_gcnv_srvctvre_meta
 )
@@ -369,7 +371,7 @@ class AnnotateCNVVcfWithStrvctvre(
 
 @stage(
     required_stages=AnnotateCNVVcfWithStrvctvre,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['mt'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
@@ -417,3 +419,63 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
             data=self.expected_outputs(cohort),
             jobs=j,
         )
+
+
+@stage(
+    required_stages=AnnotateGCNVCohortForSeqr,
+    analysis_type='cnv',
+    analysis_keys=['mt']
+)
+class AnnotateDatasetSv(DatasetStage):
+    """
+    Subset the MT to be this Dataset only
+    Then work up all the genotype values
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict:
+        """
+        Expected to generate a matrix table
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'
+            ),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Subsets the whole MT to this cohort only
+        Then brings a range of genotype data into row annotations
+
+        Args:
+            dataset (Dataset): SGIDs specific to this dataset/project
+            inputs ():
+        """
+
+        assert dataset.cohort
+        mt_path = inputs.as_path(
+            target=dataset.cohort, stage=AnnotateGCNVCohortForSeqr, key='mt'
+        )
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
+        )
+
+        jobs = gcnv.annotate_dataset_jobs_cnv(
+            b=get_batch(),
+            mt_path=mt_path,
+            sgids=dataset.get_sequencing_group_ids(),
+            out_mt_path=self.expected_outputs(dataset)['mt'],
+            tmp_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
+        )
+
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
+
+

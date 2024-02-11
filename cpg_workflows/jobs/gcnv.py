@@ -4,19 +4,20 @@ Jobs that implement GATK-gCNV.
 
 from collections.abc import Iterable
 
-import hailtop.batch as hb
+from hailtop.batch.batch import Batch
 from hailtop.batch.job import Job
 from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, query_command
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
 from cpg_workflows.utils import can_reuse
 
 
 def prepare_intervals(
-    b: hb.Batch,
+    b: Batch,
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
@@ -77,7 +78,7 @@ def prepare_intervals(
 
 
 def collect_read_counts(
-    b: hb.Batch,
+    b: Batch,
     intervals_path: Path,
     cram_path: CramPath,
     job_attrs: dict[str, str],
@@ -114,7 +115,7 @@ def collect_read_counts(
     return [j]
 
 
-def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
+def _counts_input_args(b: Batch, counts_paths: Iterable[Path]) -> str:
     args = ''
     for f in counts_paths:
         counts = b.read_input_group(
@@ -129,7 +130,7 @@ def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
 
 
 def filter_and_determine_ploidy(
-    b: hb.Batch,
+    b: Batch,
     ploidy_priors_path: Path,
     preprocessed_intervals_path: Path,
     annotated_intervals_path: Path,
@@ -212,7 +213,7 @@ def shard_basenames():
 
 
 def shard_gcnv(
-    b: hb.Batch,
+    b: Batch,
     annotated_intervals_path: Path,
     filtered_intervals_path: Path,
     ploidy_calls_path: Path,
@@ -270,7 +271,7 @@ def shard_gcnv(
 
 
 def postprocess_calls(
-    b: hb.Batch,
+    b: Batch,
     ploidy_calls_path: Path,
     shard_paths: dict[str, Path],
     sample_index: int,
@@ -341,7 +342,7 @@ def postprocess_calls(
 
 
 def fix_intervals_vcf(
-    b: hb.Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
+    b: Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
 ):
     """
     Note: the reheader loop is only required until the closure and
@@ -387,7 +388,7 @@ def fix_intervals_vcf(
 
 
 def merge_calls(
-    b: hb.Batch,
+    b: Batch,
     sg_vcfs: list[str],
     docker_image: str,
     job_attrs: dict[str, str],
@@ -523,3 +524,58 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
     with open(output_file, 'w') as f:
         f.writelines(headers)
         f.writelines(others)
+
+
+def annotate_dataset_jobs_cnv(
+    b: Batch,
+    mt_path: Path,
+    sgids: list[str],
+    out_mt_path: Path,
+    tmp_prefix: Path,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None
+) -> list[Job]:
+    """
+    Split mt by dataset and annotate dataset-specific fields (only for those datasets
+    that will be loaded into Seqr).
+    """
+    assert sgids
+    sgids_list_path = tmp_prefix / 'sgid-list.txt'
+    if not get_config()['workflow'].get('dry_run', False):
+        with sgids_list_path.open('w') as f:
+            f.write(','.join(sgids))
+
+    subset_mt_path = tmp_prefix / 'cohort-subset.mt'
+
+    subset_j = b.new_job(
+        f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
+    )
+    subset_j.image(image_path('cpg_workflows'))
+    subset_j.command(
+        query_command(
+            seqr_loader,
+            seqr_loader.subset_mt_to_samples.__name__,
+            str(mt_path),
+            sgids,
+            str(subset_mt_path),
+            setup_gcp=True,
+        )
+    )
+    if depends_on:
+        subset_j.depends_on(*depends_on)
+
+    annotate_j = b.new_job(
+        f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
+    )
+    annotate_j.image(image_path('cpg_workflows'))
+    annotate_j.command(
+        query_command(
+            seqr_loader_cnv,
+            seqr_loader_cnv.annotate_dataset_sv.__name__,
+            str(subset_mt_path),
+            str(out_mt_path),
+            setup_gcp=True,
+        )
+    )
+    annotate_j.depends_on(subset_j)
+    return [subset_j, annotate_j]

@@ -12,11 +12,6 @@ from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
 
-# I'm just going to go ahead and steal these constants from their seqr loader
-GENE_SYMBOL = 'gene_symbol'
-GENE_ID = 'gene_id'
-MAJOR_CONSEQUENCE = 'major_consequence'
-
 # Used to filter mt.info fields.
 CONSEQ_PREDICTED_PREFIX = 'PREDICTED_'
 NON_GENE_PREDICTIONS = {
@@ -188,3 +183,79 @@ def annotate_cohort_gcnv(
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
+
+
+def annotate_dataset_sv(mt_path: str, out_mt_path: str):
+    """
+    process data specific to samples in this dataset
+    do this after sub-setting to specific samples
+
+    Args:
+        mt_path (str): path to the annotated MatrixTable
+        out_mt_path (str): and where do you want it to end up?
+    """
+
+    logging.info('Annotating genotypes')
+
+    mt = read_hail(mt_path)
+
+    mt = mt.annotate_rows(
+        genotypes=hl.agg.collect(
+            hl.struct(
+                sample_id=mt.s,
+                gq=mt.CNQ,
+                cn=mt.CN,
+                end=mt.end,
+                num_exon=hl.missing('int32'),
+                start=mt.start,
+                geneIds=mt.geneIds,
+            )
+        )
+    )
+
+    def _genotype_filter_samples(fn):
+        # Filter on the genotypes.
+        return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
+
+    # top level - decorator
+    def _capture_i_decorator(func):
+        # call the returned_function(i) which locks in the value of i
+        def _inner_filter(i):
+            # the _genotype_filter_samples will call this _func with g
+            def _func(g):
+                return func(i, g)
+
+            return _func
+
+        return _inner_filter
+
+    @_capture_i_decorator
+    def _filter_sample_cn(i, g):
+        return g.cn == i
+
+    # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/gcnv_mt_schema.py
+    mt = mt.annotate_rows(
+        samples=_genotype_filter_samples(lambda g: True),
+        samples_qs=hl.struct(
+            **{
+                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(lambda g: ((g.qs >= i) & (g.qs < i+10)))
+                for i in range(0, 1000, 10)
+            }, **{
+                "gt_1000": _genotype_filter_samples(lambda g: g.qs >= 1000)
+            }
+        ),
+        samples_cn=hl.struct(
+            **{
+                str(i): _genotype_filter_samples(_filter_sample_cn(i))
+                for i in range(0, 4, 1)
+            },
+            **{
+                "gte_4": _genotype_filter_samples(lambda g: g.cn >= 4)
+            }
+        )
+    )
+
+    logging.info('Genotype fields annotated')
+    mt.describe()
+    mt.write(out_mt_path, overwrite=True)
+    logging.info(f'Written gCNV MT to {out_mt_path}')
