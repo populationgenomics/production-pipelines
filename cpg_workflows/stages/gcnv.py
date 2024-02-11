@@ -378,7 +378,7 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
     Rearrange the annotations across the cohort to suit Seqr
     """
 
-    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
         # convert temp path to str to avoid checking existence
         return {
             'tmp_prefix': str(self.tmp_prefix),
@@ -417,5 +417,3 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
             data=self.expected_outputs(cohort),
             jobs=j,
         )
-
-
