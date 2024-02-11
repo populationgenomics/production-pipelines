@@ -546,23 +546,24 @@ def annotate_dataset_jobs_cnv(
             f.write(','.join(sgids))
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
-
-    subset_j = b.new_job(
-        f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
-    subset_j.image(image_path('cpg_workflows'))
-    subset_j.command(
-        query_command(
-            seqr_loader,
-            seqr_loader.subset_mt_to_samples.__name__,
-            str(mt_path),
-            sgids,
-            str(subset_mt_path),
-            setup_gcp=True,
+    subset_j: Job | None = None
+    if not subset_mt_path.exists():
+        subset_j = b.new_job(
+            f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
         )
-    )
-    if depends_on:
-        subset_j.depends_on(*depends_on)
+        subset_j.image(image_path('cpg_workflows'))
+        subset_j.command(
+            query_command(
+                seqr_loader,
+                seqr_loader.subset_mt_to_samples.__name__,
+                str(mt_path),
+                sgids,
+                str(subset_mt_path),
+                setup_gcp=True,
+            )
+        )
+        if depends_on:
+            subset_j.depends_on(*depends_on)
 
     annotate_j = b.new_job(
         f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
@@ -577,5 +578,6 @@ def annotate_dataset_jobs_cnv(
             setup_gcp=True,
         )
     )
-    annotate_j.depends_on(subset_j)
+    if subset_j:
+        annotate_j.depends_on(subset_j)
     return [subset_j, annotate_j]
