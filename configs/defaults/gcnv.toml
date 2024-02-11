@@ -18,3 +18,14 @@ sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/s
 # github.com/broadinstitute/gatk-sv/blob/main/inputs/templates/test/AnnotateVcf/AnnotateVcf.json.tmpl#L4-L8
 external_af_population = ['ALL', 'AFR', 'AMR', 'EAS', 'EUR']
 external_af_ref_bed_prefix = 'gnomad_v2.1_sv'
+noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
+strvctvre_phylop = 'gs://cpg-common-test/references/hg38.phyloP100way.bw'
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
