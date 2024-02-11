@@ -40,6 +40,7 @@ def parse_genes(gene_col: hl.expr.StringExpression) -> hl.expr.SetExpression:
 def hl_agg_collect_set_union(gene_col: hl.expr.SetExpression) -> hl.expr.SetExpression:
     return hl.flatten(hl.agg.collect_as_set(gene_col))
 
+
 def annotate_cohort_gcnv(
     vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
 ):
@@ -145,7 +146,7 @@ def annotate_cohort_gcnv(
 
     mt = mt.annotate_rows(
         # this expected mt.variant_name to be present, and it's not
-        variantId=hl.format(f"%s_%s_{datetime.date.today():%m%d%Y}", mt.rsid, mt.svType),
+        variantId=hl.format(f'%s_%s_{datetime.date.today():%m%d%Y}', mt.rsid, mt.svType),
         geneIds=hl.set(hl.filter(
             hl.is_defined,
             [
@@ -164,8 +165,8 @@ def annotate_cohort_gcnv(
                     major_consequence_genes.contains(gene),
                     hl.if_else(
                         lof_genes.contains(gene),
-                        "LOF",
-                        "COPY_GAIN",
+                        'LOF',
+                        'COPY_GAIN',
                     ),
                 ),
             ),
