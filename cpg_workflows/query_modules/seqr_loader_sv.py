@@ -83,7 +83,7 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
     )
 
 
-def get_expr_for_xpos(locus: hl.LocusExpression) -> hl.Int64Expression:
+def get_expr_for_xpos(locus: hl.LocusExpression | hl.StructExpression) -> hl.Int64Expression:
     """Genomic position represented as a single number = contig_number * 10**9 + position.
     This represents chrom:pos more compactly and allows for easier sorting.
     """
@@ -152,37 +152,28 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     Returns:
         the gene lookup dictionary as a Hail DictExpression
     """
-
     gene_id_mapping = {}
     logging.info(f'Loading {gtf_path}')
-
     with gzip.open(gtf_path, 'rt') as gencode_file:
-
         # iterate over this file and do all the things
         for i, line in enumerate(gencode_file):
             line = line.rstrip('\r\n')
             if not line or line.startswith('#'):
                 continue
             fields = line.split('\t')
-
             if len(fields) != len(GENCODE_FILE_HEADER):
                 raise ValueError(f'Unexpected number of fields on line #{i}: {fields}')
-
             record = dict(zip(GENCODE_FILE_HEADER, fields))
-
             if record['feature_type'] != 'gene':
                 continue
-
             # parse info field
             info_fields_list = [
                 x.strip().split() for x in record['info'].split(';') if x != ''
             ]
             info_fields = {k: v.strip('"') for k, v in info_fields_list}
-
             gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split(
                 '.'
             )[0]
-
     logging.info('Completed ingestion of gene-ID mapping')
     return hl.literal(gene_id_mapping)
 
