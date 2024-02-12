@@ -3,6 +3,7 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+skip_es_index_for_datasets = ['vcgs-clinical']
 
 [references.gatk_sv]
 # This model is trained on the All Of Us dataset. If this is used in any published work,

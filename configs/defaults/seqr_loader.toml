@@ -3,6 +3,7 @@ name = 'seqr_loader'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 status_reporter = 'metamist'
+skip_es_index_for_datasets = ['vcgs-clinical']
 
 # Use GnarlyGenotyper instead of GenotypeGVCFs
 use_gnarly = false

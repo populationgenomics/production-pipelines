@@ -771,8 +771,15 @@ class MtToEsSv(DatasetStage):
         Uses analysis-runner's dataproc helper to run a hail query script
         """
         if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
+            (
+                es_datasets := get_config()['workflow'].get(
+                    'create_es_index_for_datasets'
+                )
+            )
+            and dataset.name not in es_datasets
+        ) or dataset.name in get_config()['workflow'].get(
+            'skip_es_index_for_datasets', []
+        ):
             # Skipping dataset that wasn't explicitly requested to upload to ES
             return self.make_outputs(dataset)
 

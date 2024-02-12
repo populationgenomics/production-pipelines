@@ -274,8 +274,15 @@ class MtToEs(DatasetStage):
         Transforms the MT into a Seqr index, requires Dataproc
         """
         if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
+            (
+                es_datasets := get_config()['workflow'].get(
+                    'create_es_index_for_datasets'
+                )
+            )
+            and dataset.name not in es_datasets
+        ) or dataset.name in get_config()['workflow'].get(
+            'skip_es_index_for_datasets', []
+        ):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
