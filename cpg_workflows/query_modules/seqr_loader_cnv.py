@@ -7,7 +7,7 @@ import logging
 import hail as hl
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local, download_gencode_gene_id_mapping
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
@@ -19,21 +19,6 @@ NON_GENE_PREDICTIONS = {
     'PREDICTED_NONCODING_BREAKPOINT',
     'PREDICTED_NONCODING_SPAN',
 }
-
-
-def parse_genes(gene_col: hl.expr.StringExpression) -> hl.expr.SetExpression:
-    """
-    Convert a string-ified gene list to a set()
-    """
-    return hl.set(gene_col.split(',').filter(
-        lambda gene: ~hl.set({'None', 'null', 'NA', ''}).contains(gene)
-    ).map(
-        lambda gene: gene.split(r'\.')[0]
-    ))
-
-
-def hl_agg_collect_set_union(gene_col: hl.expr.SetExpression) -> hl.expr.SetExpression:
-    return hl.flatten(hl.agg.collect_as_set(gene_col))
 
 
 def annotate_cohort_gcnv(
