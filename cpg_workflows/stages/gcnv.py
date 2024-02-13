@@ -486,7 +486,7 @@ def _gatk_gcnv_index_meta(
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'seqr-dataset-type': 'SV'}
+    return {'seqr-dataset-type': 'CNV'}
 
 
 @stage(
