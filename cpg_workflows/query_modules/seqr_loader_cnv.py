@@ -180,6 +180,8 @@ def annotate_cohort_gcnv(
         transcriptConsequenceTerms=gene_major_consequences.extend(default_consequences),
         docId=mt.variantId[0:512],
     )
+    # drop the variant_qc. Can't trust it NAN values
+    mt = mt.drop('variant_qc')
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
@@ -255,7 +257,6 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
             }
         )
     )
-
     logging.info('Genotype fields annotated')
     mt.describe()
     mt.write(out_mt_path, overwrite=True)
