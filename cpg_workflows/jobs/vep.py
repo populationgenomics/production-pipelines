@@ -154,6 +154,7 @@ def gather_vep_json_to_ht(
             str(out_path),
             vep_version,
             setup_gcp=True,
+            init_batch_args={'worker_memory': 'highmem'},
         )
     )
     return j
