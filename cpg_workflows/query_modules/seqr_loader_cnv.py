@@ -53,7 +53,7 @@ def annotate_cohort_gcnv(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
-        datasetType='CNV',
+        datasetType='SV',
         sampleType='WES'
     )
 

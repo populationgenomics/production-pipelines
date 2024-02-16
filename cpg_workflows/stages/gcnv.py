@@ -411,7 +411,6 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
             )
         )
 
-        # todo is this necessary?
         if depends_on := inputs.get_jobs(cohort):
             j.depends_on(*depends_on)
 
