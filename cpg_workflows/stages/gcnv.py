@@ -2,16 +2,18 @@
 Stages that implement GATK-gCNV.
 """
 
-from cpg_utils import Path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
-from cpg_utils.hail_batch import get_batch, image_path
+from cpg_utils.hail_batch import get_batch, image_path, query_command
 from cpg_workflows.jobs import gcnv
+from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.targets import SequencingGroup, Cohort
+from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     stage,
     CohortStage,
@@ -300,8 +302,24 @@ class AnnotateCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-@stage(required_stages=AnnotateCNV)
-class AnnotateCNVVcfWithStrvctvre(CohortStage):
+def _gcnv_srvctvre_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, str]:
+    """
+    Callable, adds custom analysis object meta attribute
+    """
+    return {'type': 'gCNV-STRVCTCRE-annotated'}
+
+
+@stage(
+    required_stages=AnnotateCNV,
+    analysis_type='sv',
+    analysis_keys=['strvctvre_vcf'],
+    update_analysis_meta=_gcnv_srvctvre_meta
+)
+class AnnotateCNVVcfWithStrvctvre(
+    CohortStage
+):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'strvctvre_vcf': self.prefix / 'cnv_strvctvre_annotated.vcf.bgz',
@@ -330,20 +348,72 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         )['vcf']
 
         strv_job.declare_resource_group(
-            output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
+            output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
         )
 
         # run strvctvre
         strv_job.command(
             f'python StrVCTVRE.py '
             f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
+            f'-o {strv_job.output_vcf["vcf.bgz"]} '
             f'-f vcf '
             f'-p {phylop_in_batch}'
         )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
         get_batch().write_output(
-            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
+            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.bgz', '')
         )
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
+
+
+@stage(
+    required_stages=AnnotateCNVVcfWithStrvctvre,
+    analysis_type='sv',
+    analysis_keys=['mt'],
+    update_analysis_meta=_gcnv_srvctvre_meta,
+)
+class AnnotateGCNVCohortForSeqr(CohortStage):
+    """
+    Rearrange the annotations across the cohort to suit Seqr
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+        # convert temp path to str to avoid checking existence
+        return {
+            'tmp_prefix': str(self.tmp_prefix),
+            'mt': self.prefix / 'gcnv_annotated_cohort.mt'
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
+        """
+
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        )
+        j = get_batch().new_job(f'annotate gCNV cohort', self.get_job_attrs(cohort))
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                seqr_loader_cnv,
+                seqr_loader_cnv.annotate_cohort_gcnv.__name__,
+                str(vcf_path),
+                str(self.expected_outputs(cohort)['mt']),
+                str(checkpoint_prefix),
+                setup_gcp=True,
+            )
+        )
+
+        # todo is this necessary?
+        if depends_on := inputs.get_jobs(cohort):
+            j.depends_on(*depends_on)
+
+        return self.make_outputs(
+            cohort,
+            data=self.expected_outputs(cohort),
+            jobs=j,
+        )

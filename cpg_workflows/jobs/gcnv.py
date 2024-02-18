@@ -391,7 +391,7 @@ def merge_calls(
     sg_vcfs: list[str],
     docker_image: str,
     job_attrs: dict[str, str],
-    output_path: Path,
+    output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files
@@ -488,8 +488,8 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 # but do insert additional INFO field lines
                 if line.startswith('##INFO=<ID=END'):
                     headers.extend([
-                        '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="SV Type">\n',
-                        '##INFO=<ID=SVLEN,Number=1,Type=Integer,Description="SV Length">\n']
+                        '##INFO=<ID=SVTYPE,Number=.,Type=String,Description="SV Type">\n',
+                        '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="SV Length">\n']
                     )
             # for non-header lines
             else:
