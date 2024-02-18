@@ -1,31 +1,28 @@
 """
-Impute sex.
-Add soft filters for samples.
+Impute sex. Add soft filters for samples.
 """
 
 import logging
 
 import hail as hl
-from cpg_utils import Path
+from gnomad.sample_qc.pipeline import annotate_sex
+
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from gnomad.sample_qc.pipeline import annotate_sex
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 
 
-def run(
-    vds_path: Path,
-    out_sample_qc_ht_path: Path,
-    tmp_prefix: Path,
-):
+def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
+
     if can_reuse(out_sample_qc_ht_path, overwrite=True):
-        return hl.read_table(str(out_sample_qc_ht_path))
+        return []
 
     ht = initialise_sample_table()
 
-    vds = hl.vds.read_vds(str(vds_path))
+    vds = hl.vds.read_vds(vds_path)
 
     # Remove centromeres and telomeres:
     tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
@@ -33,7 +30,7 @@ def run(
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
-    sqc_ht_path = tmp_prefix / 'sample_qc.ht'
+    sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
     if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
@@ -48,12 +45,12 @@ def run(
     ht.describe()
 
     logging.info('Run sex imputation')
-    sex_ht = impute_sex(vds, ht, tmp_prefix)
+    sex_ht = impute_sex(vds, ht, to_path(tmp_prefix))
     ht = ht.annotate(**sex_ht[ht.s])
 
     logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
-    ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
+    ht.checkpoint(out_sample_qc_ht_path, overwrite=True)
 
 
 def initialise_sample_table() -> hl.Table:
