@@ -78,7 +78,7 @@ if __name__ == '__main__':
     one_big_df = pd.concat(dataframes)
 
     # now make some batches
-    batches = batch_sgs(one_big_df, min_batch_size=200, max_batch_size=300)
+    batches = batch_sgs(one_big_df, min_batch_size=40, max_batch_size=300)
 
     with to_path(args.o).open('w') as f:
         f.write(json.dumps(batches, indent=2))
