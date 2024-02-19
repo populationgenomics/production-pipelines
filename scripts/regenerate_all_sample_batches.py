@@ -72,7 +72,7 @@ if __name__ == '__main__':
         this_df.columns = [x.replace('#', '') for x in this_df.columns]
 
         # filter to the PCR-state SGs we're interested in
-        this_df = this_df.query('ID in @sample_ids')
+        this_df = this_df.query('ID in @all_sg_ids')
         dataframes.append(this_df)
 
     one_big_df = pd.concat(dataframes)
