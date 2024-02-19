@@ -75,7 +75,7 @@ if __name__ == '__main__':
         this_df = this_df.query('ID in @all_sg_ids')
         dataframes.append(this_df)
 
-    one_big_df = pd.concat(dataframes).drop_duplicates(inplace=True)
+    one_big_df = pd.concat(dataframes).drop_duplicates()
 
     if len(one_big_df) == 0:
         raise ValueError('No samples found in the QC tables')
