@@ -28,23 +28,41 @@ class Combiner(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
-        from cpg_workflows.large_cohort.combiner import run
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from cpg_workflows.large_cohort import combiner
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                out_vds_path=self.expected_outputs(cohort),
-                tmp_prefix=self.tmp_prefix,
-            ),
-            autoscaling_policy=(
-                get_config()['hail']
-                .get('dataproc', {})
-                .get('combiner_autoscaling_policy')
-            ),
-            depends_on=inputs.get_jobs(cohort),
+        # from cpg_workflows.large_cohort.combiner import run
+        # from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+
+        j = get_batch().new_job(
+            'Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
         )
+
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                combiner,
+                combiner.run.__name__,
+                str(inputs.as_path(cohort, Genotype)),
+                str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix),
+                setup_gcp=True,
+            )
+        )
+
+        # j = dataproc_job(
+        #     job_name=self.__class__.__name__,
+        #     function=run,
+        #     function_path_args=dict(
+        #         out_vds_path=self.expected_outputs(cohort),
+        #         tmp_prefix=self.tmp_prefix,
+        #     ),
+        #     autoscaling_policy=(
+        #         get_config()['hail']
+        #         .get('dataproc', {})
+        #         .get('combiner_autoscaling_policy')
+        #     ),
+        #     depends_on=inputs.get_jobs(cohort),
+        # )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
