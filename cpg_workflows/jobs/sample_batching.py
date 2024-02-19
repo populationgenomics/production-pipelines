@@ -107,8 +107,8 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
             {
                 'sequencing_groups': sample_ids.ID.tolist(),
                 'size': len(sample_ids),
-                'mf_ratio': len(md_sex_cov['male'][cov])
-                / len(md_sex_cov['female'][cov]),
+                'mf_ratio': len(md_sex_cov['male'][cov]) or 1
+                / len(md_sex_cov['female'][cov]) or 1,
                 'coverage_medians': sample_ids.median_coverage.tolist(),
             }
         )
