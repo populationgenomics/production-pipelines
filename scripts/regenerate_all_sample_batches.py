@@ -17,7 +17,6 @@ from argparse import ArgumentParser
 from metamist.graphql import gql, query
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
 from cpg_workflows.jobs.sample_batching import batch_sgs
 
 
@@ -56,6 +55,7 @@ if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('-i', help='Path to the QC tables', nargs='+', required=True)
     parser.add_argument('-p', help='Names of all relevant projects', nargs='+', required=True)
+    parser.add_argument('-o', help='Where to write the output', required=True)
     args, unknown = parser.parse_known_args()
 
     if unknown:
@@ -79,3 +79,6 @@ if __name__ == '__main__':
 
     # now make some batches
     batches = batch_sgs(one_big_df, min_batch_size=200, max_batch_size=300)
+
+    with to_path(args.o).open('w') as f:
+        f.write(json.dumps(batches, indent=2))
