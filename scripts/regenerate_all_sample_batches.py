@@ -71,14 +71,17 @@ if __name__ == '__main__':
         this_df = pd.read_csv(each, sep='\t', low_memory=False)
         this_df.columns = [x.replace('#', '') for x in this_df.columns]
 
-        # filter to the PCR-state SGs we're interested in
+        # filter to the active SGs we're interested in
         this_df = this_df.query('ID in @all_sg_ids')
         dataframes.append(this_df)
 
-    one_big_df = pd.concat(dataframes)
+    one_big_df = pd.concat(dataframes).drop_duplicates(inplace=True)
+
+    if len(one_big_df) == 0:
+        raise ValueError('No samples found in the QC tables')
 
     # now make some batches
-    batches = batch_sgs(one_big_df, min_batch_size=40, max_batch_size=300)
+    batches = batch_sgs(one_big_df, min_batch_size=200, max_batch_size=300)
 
     with to_path(args.o).open('w') as f:
-        f.write(json.dumps(batches, indent=2))
+        f.write(json.dumps(batches, indent=4))
