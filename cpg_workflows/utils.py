@@ -37,10 +37,10 @@ def read_hail(path):
 
 
 def checkpoint_hail(
-        t: hl.Table | hl.MatrixTable,
-        file_name: str,
-        checkpoint_prefix: str | None = None,
-        allow_reuse=False
+    t: hl.Table | hl.MatrixTable,
+    file_name: str,
+    checkpoint_prefix: str | None = None,
+    allow_reuse=False,
 ):
     """
     checkpoint method
@@ -103,8 +103,10 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
 
     if path.suffix in ['.mt', '.ht']:
         path /= '_SUCCESS'
+        logging.info(f'Checking for _SUCCESS file in {path}')
     if path.suffix in ['.vds']:
         path /= 'variant_data/_SUCCESS'
+        logging.info(f'Checking for variant_data/_SUCCESS file in {path}')
 
     if verbose:
         # noinspection PyBroadException
