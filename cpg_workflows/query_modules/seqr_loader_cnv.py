@@ -81,6 +81,7 @@ def annotate_cohort_gcnv(
         xpos=get_expr_for_xpos(mt.locus),
         xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
+        num_exon=1
     )
 
     # save those changes
@@ -194,7 +195,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 gq=mt.CNQ,
                 cn=mt.CN,
                 end=mt.end,
-                num_exon=hl.missing('int32'),
+                num_exon=mt.num_exon,
                 start=mt.start,
                 geneIds=mt.geneIds,
             )
