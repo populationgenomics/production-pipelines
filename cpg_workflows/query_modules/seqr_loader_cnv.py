@@ -63,6 +63,9 @@ def annotate_cohort_gcnv(
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
         sc=mt.variant_qc.AC[0],
         sf=mt.variant_qc.AF[0],
         sn=mt.variant_qc.AN,
@@ -75,8 +78,6 @@ def annotate_cohort_gcnv(
         gnomad_svs_AN=hl.missing('float64'),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         svType=mt.alleles[1].replace('[<>]', ''),
-        start=mt.locus.position,
-        pos=mt.locus.position,
         xpos=get_expr_for_xpos(mt.locus),
         xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
