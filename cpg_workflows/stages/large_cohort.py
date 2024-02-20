@@ -79,17 +79,21 @@ class DenseSubset(CohortStage):
         return get_workflow().prefix / 'dense_subset.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.dense_subset import run
+        from cpg_workflows.large_cohort import dense_subset
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                vds_path=inputs.as_path(cohort, Combiner),
-                out_dense_mt_path=self.expected_outputs(cohort),
-            ),
-            depends_on=inputs.get_jobs(cohort),
+        j = get_batch().new_job(
+            'Dense Subset', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                dense_subset,
+                dense_subset.run.__name__,
+                str(inputs.as_path(cohort, Combiner)),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            )
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
