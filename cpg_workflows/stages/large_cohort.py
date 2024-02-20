@@ -2,7 +2,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, query_command
 
-from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
@@ -31,20 +30,6 @@ class Combiner(CohortStage):
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-        # from cpg_workflows.large_cohort.combiner import run
-        # from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        # gvcf_by_sgid = {
-        #     sequencing_group.id: GvcfPath(
-        #         inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf')
-        #     )
-        #     for sequencing_group in cohort.get_sequencing_groups()
-        # }
-        # gvcf_out_path = self.tmp_prefix / 'gvcf_list' / '.txt'
-        # with gvcf_out_path.open('w') as f:
-        #     for _, gvcf in gvcf_by_sgid.items():
-        #         f.write(f'{gvcf}\n')
-        # combine all of these GVCFs into a single VDS using combiner
-
         j = get_batch().new_job(
             'Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
         )
@@ -54,27 +39,11 @@ class Combiner(CohortStage):
             query_command(
                 combiner,
                 combiner.run.__name__,
-                # str(inputs.as_path(cohort, Genotype)),
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
             )
         )
-
-        # j = dataproc_job(
-        #     job_name=self.__class__.__name__,
-        #     function=run,
-        #     function_path_args=dict(
-        #         out_vds_path=self.expected_outputs(cohort),
-        #         tmp_prefix=self.tmp_prefix,
-        #     ),
-        #     autoscaling_policy=(
-        #         get_config()['hail']
-        #         .get('dataproc', {})
-        #         .get('combiner_autoscaling_policy')
-        #     ),
-        #     depends_on=inputs.get_jobs(cohort),
-        # )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
