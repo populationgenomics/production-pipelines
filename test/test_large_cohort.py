@@ -180,8 +180,8 @@ class TestAllLargeCohortMethods:
 
         dense_mt_path = res_pref / 'dense.mt'
         dense_subset.run(
-            vds_path=vds_path,
-            out_dense_mt_path=dense_mt_path,
+            vds_path=str(vds_path),
+            out_dense_mt_path=str(dense_mt_path),
         )
 
         relateds_to_drop_ht_path = res_pref / 'relateds_to_drop.ht'

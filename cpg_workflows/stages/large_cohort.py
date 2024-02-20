@@ -90,8 +90,8 @@ class DenseSubset(CohortStage):
             query_command(
                 dense_subset,
                 dense_subset.run.__name__,
-                inputs.as_path(cohort, Combiner),
-                self.expected_outputs(cohort),
+                str(inputs.as_path(cohort, Combiner)),
+                str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             )
         )
