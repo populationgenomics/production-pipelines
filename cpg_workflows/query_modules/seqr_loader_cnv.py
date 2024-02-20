@@ -61,7 +61,7 @@ def annotate_cohort_gcnv(
     mt = hl.variant_qc(mt)
 
     # reimplementation of
-    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
+    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
         contig=mt.locus.contig.replace('^chr', ''),
         start=mt.locus.position,
