@@ -588,7 +588,10 @@ class Stage(Generic[TargetT], ABC):
             assert isinstance(project_name, str)
 
             # bump name to include `-test`
-            if get_config()['workflow']['access_level'] == 'test' and 'test' not in project_name:
+            if (
+                get_config()['workflow']['access_level'] == 'test'
+                and 'test' not in project_name
+            ):
                 project_name = f'{project_name}-test'
 
             for analysis_output in analysis_outputs:
@@ -607,7 +610,8 @@ class Stage(Generic[TargetT], ABC):
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
-                    job_attr=self.get_job_attrs(target) | {'stage': self.name, 'tool': 'metamist'},
+                    job_attr=self.get_job_attrs(target)
+                    | {'stage': self.name, 'tool': 'metamist'},
                     meta=outputs.meta,
                     update_analysis_meta=self.update_analysis_meta,
                     tolerate_missing_output=self.tolerate_missing_output,
@@ -709,19 +713,28 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
+            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
+            logging.info('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out)
+            logging.info(
+                f'Checking if {paths} from expected output {expected_out} exist'
+            )
             if not paths:
+                logging.info(f'{expected_out} is not reusable. No paths found.')
                 return False, None
 
             if first_missing_path := next((p for p in paths if not exists(p)), None):
+                logging.info(
+                    f'{expected_out} is not reusable, {first_missing_path} is missing'
+                )
                 return False, first_missing_path
 
             return True, None
@@ -801,7 +814,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
-                tolerate_missing_output=tolerate_missing_output
+                tolerate_missing_output=tolerate_missing_output,
             )
 
         return wrapper_stage
