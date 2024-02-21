@@ -47,12 +47,7 @@ class PrepareIntervals(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
-
-        jobs = gcnv.prepare_intervals(
-            get_batch(),
-            self.get_job_attrs(cohort),
-            outputs,
-        )
+        jobs = gcnv.prepare_intervals(self.get_job_attrs(cohort), outputs)
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
@@ -81,7 +76,6 @@ class CollectReadCounts(SequencingGroupStage):
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
         jobs = gcnv.collect_read_counts(
-            get_batch(),
             inputs.as_path(seqgroup.dataset, PrepareIntervals, 'preprocessed'),
             seqgroup.cram,
             self.get_job_attrs(seqgroup),
@@ -111,7 +105,6 @@ class DeterminePloidy(CohortStage):
         prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
         jobs = gcnv.filter_and_determine_ploidy(
-            get_batch(),
             str(reference_path('gatk_sv/contig_ploidy_priors')),
             # get_config()['workflow'].get('ploidy_priors'),
             prep_intervals['preprocessed'],
@@ -132,9 +125,7 @@ class GermlineCNV(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            name: self.prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()
-        }
+        return {name: self.prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
@@ -199,8 +190,10 @@ class GCNVJointSegmentation(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         return {
-            'clustered_vcf': self.prefix / f'{cohort.name}.JointClusteredSegments.vcf.gz',
-            'clustered_vcf_idx': self.prefix / f'{cohort.name}.JointClusteredSegments.vcf.gz.tbi',
+            'clustered_vcf': self.prefix
+            / f'{cohort.name}.JointClusteredSegments.vcf.gz',
+            'clustered_vcf_idx': self.prefix
+            / f'{cohort.name}.JointClusteredSegments.vcf.gz.tbi',
             'pedigree': str(self.tmp_prefix / 'pedigree.ped'),
             'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
         }
@@ -243,7 +236,6 @@ class GCNVJointSegmentation(CohortStage):
             job_attrs=self.get_job_attrs(cohort),
         )
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
-
 
 
 # @stage(required_stages=GermlineCNVCalls)
