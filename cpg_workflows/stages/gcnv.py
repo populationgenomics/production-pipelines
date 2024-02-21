@@ -112,7 +112,7 @@ class DeterminePloidy(CohortStage):
 
         jobs = gcnv.filter_and_determine_ploidy(
             get_batch(),
-            str(reference_path('gatk_sv/contig_ploidy_priors.tsv')),
+            str(reference_path('gatk_sv/contig_ploidy_priors')),
             # get_config()['workflow'].get('ploidy_priors'),
             prep_intervals['preprocessed'],
             prep_intervals['annotated'],
