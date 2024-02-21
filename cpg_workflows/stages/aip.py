@@ -542,5 +542,5 @@ class GenerateSeqrFile(DatasetStage):
 
         # write the results out
         expected_out = self.expected_outputs(dataset)
-        get_batch().write_output(job.out_json, str(expected_out["seqr_file"]))
+        get_batch().write_output(job.out_json, str(expected_out['seqr_file']))
         return self.make_outputs(dataset, data=expected_out, jobs=job)
