@@ -215,9 +215,7 @@ class MakeSiteOnlyVcf(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        # from cpg_workflows.large_cohort.site_only_vcf import run
         from cpg_workflows.large_cohort import site_only_vcf
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = get_batch().new_job(
             'MakeSiteOnlyVcf', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
@@ -237,25 +235,6 @@ class MakeSiteOnlyVcf(CohortStage):
             )
         )
 
-        # j = dataproc_job(
-        #     job_name=self.__class__.__name__,
-        #     function=run,
-        #     function_path_args=dict(
-        #         vds_path=inputs.as_path(cohort, Combiner),
-        #         sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-        #         relateds_to_drop_ht_path=inputs.as_path(
-        #             cohort, Relatedness, key='relateds_to_drop'
-        #         ),
-        #         out_vcf_path=self.expected_outputs(cohort)['vcf'],
-        #         tmp_prefix=self.tmp_prefix,
-        #     ),
-        #     depends_on=inputs.get_jobs(cohort),
-        #     # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
-        #     # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
-        #     # `huge_disk` (also used in the AS-VQSR VCF-gather job)
-        #     worker_boot_disk_size=200,
-        #     secondary_worker_boot_disk_size=200,
-        # )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
