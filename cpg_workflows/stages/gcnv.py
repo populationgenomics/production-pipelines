@@ -100,19 +100,21 @@ class DeterminePloidy(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'filtered': self.tmp_prefix / f'{cohort.name}.filtered.interval_list',
-            'calls': self.tmp_prefix / f'{cohort.name}-ploidy-calls.tar.gz',
-            'model': self.tmp_prefix / f'{cohort.name}-ploidy-model.tar.gz',
+            'filtered': self.prefix / f'{cohort.name}.filtered.interval_list',
+            'calls': self.prefix / f'{cohort.name}-ploidy-calls.tar.gz',
+            'model': self.prefix / f'{cohort.name}-ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
 
+        prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
+
         jobs = gcnv.filter_and_determine_ploidy(
             get_batch(),
             get_config()['workflow'].get('ploidy_priors'),
-            inputs.as_path(cohort, PrepareIntervals, 'preprocessed'),
-            inputs.as_path(cohort, PrepareIntervals, 'annotated'),
+            prep_intervals['preprocessed'],
+            prep_intervals['annotated'],
             inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
             self.get_job_attrs(cohort),
             outputs,
@@ -130,17 +132,18 @@ class GermlineCNV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            name: self.tmp_prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()
+            name: self.prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
+        determine_ploidy = inputs.as_dict(cohort, DeterminePloidy)
+        prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
         jobs = gcnv.shard_gcnv(
-            get_batch(),
-            inputs.as_path(cohort, PrepareIntervals, 'annotated'),
-            inputs.as_path(cohort, DeterminePloidy, 'filtered'),
-            inputs.as_path(cohort, DeterminePloidy, 'calls'),
+            prep_intervals['annotated'],
+            determine_ploidy['filtered'],
+            determine_ploidy['calls'],
             inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
             self.get_job_attrs(cohort),
             outputs,
@@ -174,8 +177,7 @@ class GermlineCNVCalls(SequencingGroupStage):
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
 
-        jobs = gcnv.postprocess_calls(
-            get_batch(),
+        jobs = gcnv.postprocess_calls_1(
             inputs.as_path(seqgroup.dataset, DeterminePloidy, 'calls'),
             inputs.as_dict(seqgroup.dataset, GermlineCNV),
             # FIXME get the sample index via sample_name.txt files instead

@@ -10,7 +10,7 @@ from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path
+from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse
 
@@ -212,7 +212,6 @@ def shard_basenames():
 
 
 def shard_gcnv(
-    b: hb.Batch,
     annotated_intervals_path: Path,
     filtered_intervals_path: Path,
     ploidy_calls_path: Path,
@@ -220,10 +219,10 @@ def shard_gcnv(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    annotated_intervals = b.read_input(str(annotated_intervals_path))
-    filtered_intervals = b.read_input(str(filtered_intervals_path))
-    ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
-    counts_input_args = _counts_input_args(b, counts_paths)
+    annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
+    filtered_intervals = get_batch().read_input(str(filtered_intervals_path))
+    ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
+    counts_input_args = _counts_input_args(get_batch(), counts_paths)
 
     jobs: list[Job] = []
 
@@ -231,7 +230,7 @@ def shard_gcnv(
         if can_reuse(output_paths[name]):
             continue
 
-        j = b.new_job(
+        j = get_batch().new_job(
             'Call germline CNVs',
             job_attrs
             | {
@@ -263,21 +262,20 @@ def shard_gcnv(
         j.shard_tarball.add_extension('.tar.gz')
 
         j.command(command(cmd))
-        b.write_output(j.shard_tarball, str(output_paths[name]))
+        get_batch().write_output(j.shard_tarball, str(output_paths[name]))
         jobs.append(j)
 
     return jobs
 
 
-def postprocess_calls(
-    b: hb.Batch,
+def postprocess_calls_1(
     ploidy_calls_path: Path,
     shard_paths: dict[str, Path],
     sample_index: int,
     job_attrs: dict[str, str],
     output_prefix: str,
-) -> list[Job]:
-    j = b.new_job(
+) -> Job:
+    j = get_batch().new_job(
         'Postprocess gCNV calls',
         job_attrs
         | {
@@ -287,9 +285,9 @@ def postprocess_calls(
     j.image(image_path('gatk_gcnv'))
     j.storage('12Gi')  # TODO revisit limits
 
-    reference = fasta_res_group(b)
+    reference = fasta_res_group(get_batch())
 
-    ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
+    ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
 
     unpack_cmds = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
 
@@ -335,9 +333,9 @@ def postprocess_calls(
 
     j.command(command([*unpack_cmds, postprocess_cmd, tabix_cmd], setup_gcp=True))
 
-    b.write_output(j.output, output_prefix)
+    get_batch().write_output(j.output, output_prefix)
 
-    return [j]
+    return j
 
 
 def fix_intervals_vcf(
