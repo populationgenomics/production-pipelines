@@ -6,13 +6,14 @@ from collections.abc import Iterable
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
-from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
+from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup, Resource
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import reference_path
+from cpg_workflows.utils import can_reuse, chunks
 
 
 def prepare_intervals(
@@ -38,7 +39,7 @@ def prepare_intervals(
     )
 
     if sequencing_type == 'exome':
-        intervals = b.read_input(get_config()['workflow'].get('intervals_path'))
+        intervals = b.read_input(str(reference_path('broad/exome_calling_interval_lists')))
         preprocess_cmd = f"""
         gatk PreprocessIntervals \\
           --reference {reference.base} --intervals {intervals} {exclude_intervals_args} \\
@@ -339,25 +340,24 @@ def postprocess_calls_1(
 
 
 def fix_intervals_vcf(
-    b: hb.Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
+    interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
 ):
     """
     Note: the reheader loop is only required until the closure and
     adoption of https://github.com/broadinstitute/gatk/pull/8621
     Args:
-        b (the batch instance):
         interval_vcf (Path): the individual intervals VCF
     Returns:
         the Job doing the work
     """
-    reheader_job = b.new_job('Reheader intervals VCF', job_attrs | {'tool': 'bcftools'})
+    reheader_job = get_batch().new_job('Reheader intervals VCF', job_attrs | {'tool': 'bcftools'})
     reheader_job.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
     )
     reheader_job.image(image_path('bcftools')).storage('1Gi')
 
     # read the Intervals VCF for this SG ID
-    input_vcf = b.read_input(str(interval_vcf))
+    input_vcf = get_batch().read_input(str(interval_vcf))
 
     # pull the header into a temp file
     reheader_job.command(f'bcftools view -h {input_vcf} > header')
@@ -379,13 +379,112 @@ def fix_intervals_vcf(
     reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
 
     # get the output root to write to, and write both VCF and index
-    b.write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
+    get_batch().write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
 
     return reheader_job
 
 
+def joint_segment_vcfs(
+        segment_vcfs: list[ResourceFile],
+        pedigree: ResourceFile,
+        reference:ResourceGroup,
+        intervals: ResourceFile,  # hmm,
+        job_attrs: dict,
+) -> tuple[Job, Resource]:
+    """
+    This job will run the joint segmentation step of the gCNV workflow
+    Takes individual Segment VCFs and merges them into a single VCF
+    Depending on the config setting workflow.num_samples_per_scatter_block
+    this may be conducted in hierarchical 2-step, with intermediate merges
+    being conducted, then a merge of those intermediates
+
+    Returns:
+        the job that does the work, and the resulting resource group of VCF & index
+    """
+    job = get_batch().new_job(f'Joint Segmentation', job_attrs | {'tool': 'gatk'})
+    job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    job.image(image_path('gatk_gcnv'))
+    job.memory('8Gi')
+    job.command(f"""
+    set -e
+    gatk --java-options "-Xmx6000m" JointGermlineCNVSegmentation \\
+    -R {reference.base} -O {job.output["vcf.gz"]} {' -V '.join(segment_vcfs)} --model-call-intervals {intervals} -ped {pedigree}
+    tabix {job.output["vcf.gz"]}
+    """)
+    return job, job.output
+
+
+def run_joint_segmentation(
+    segment_vcfs: list[str],
+    pedigree: str,
+    intervals: str,
+    tmp_prefix: str,
+    output_path: Path,
+    job_attrs: dict[str, str] | None = None,
+) -> list[Job]:
+    """
+    This job will run the joint segmentation step of the gCNV workflow
+    Takes individual Segment VCFs and merges them into a single VCF
+    Depending on the config setting workflow.num_samples_per_scatter_block
+    this may be conducted in hierarchical 2-step, with intermediate merges
+    being conducted, then a merge of those intermediates
+
+    Returns:
+
+    """
+
+    if can_reuse(output_path):
+        return []
+
+    jobs = []
+
+    pedigree_in_batch = get_batch().read_input(pedigree)
+    intervals_in_batch = get_batch().read_input(intervals)
+
+    # find the number of samples to shove into each scatter block
+    sams_per_block = get_config()['workflow']['num_samples_per_scatter_block']
+
+    reference = fasta_res_group(get_batch())
+
+    chunked_vcfs = []
+
+    # if we have more samples to process than the block size, condense
+    if len(segment_vcfs) > sams_per_block:
+        for subchunk_index, chunk_vcfs in enumerate(chunks(segment_vcfs, sams_per_block)):
+            # create a new job for each chunk
+            # read these files into this batch
+            local_vcfs = [get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf for vcf in chunk_vcfs]
+            job, vcf_group = joint_segment_vcfs(
+                local_vcfs,
+                pedigree=pedigree_in_batch,
+                reference=reference,
+                intervals=intervals_in_batch,
+                job_attrs=job_attrs or {} | {'title':f'sub-chunk_{subchunk_index}'}
+            )
+            chunked_vcfs.append(vcf_group)
+            get_batch().write_output(vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}')
+            jobs.append(job)
+
+    # else, just read those into the batch
+    else:
+        chunked_vcfs = [get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf for vcf in segment_vcfs]
+
+    # second round of condensing output
+    job, vcf_group = joint_segment_vcfs(
+        chunked_vcfs,
+        pedigree=pedigree_in_batch,
+        reference=reference,
+        intervals=intervals_in_batch,
+        job_attrs=job_attrs or {} | {'title': f'all-chunks'}
+    )
+    jobs.append(job)
+
+    # write the final output file
+    get_batch().write_output(vcf_group, f'{str(output_path).removesuffix(".vcf.gz")}')
+    return jobs
+
+
 def merge_calls(
-    b: hb.Batch,
     sg_vcfs: list[str],
     docker_image: str,
     job_attrs: dict[str, str],
@@ -397,7 +496,6 @@ def merge_calls(
     and edit the SVLEN and SVTYPE attributes into each row
 
     Args:
-        b (batch):
         sg_vcfs (list[str]): paths to all individual VCFs
         docker_image (str): docker image to use
         job_attrs (dict): any params to atach to the job
@@ -409,7 +507,7 @@ def merge_calls(
 
     assert sg_vcfs, 'No VCFs to merge'
 
-    merge_job = b.new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
+    merge_job = get_batch().new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
     merge_job.image(docker_image)
 
     # this should be made reactive, in case we scale past 10GB
@@ -418,7 +516,7 @@ def merge_calls(
     batch_vcfs = []
     for each_vcf in sg_vcfs:
         batch_vcfs.append(
-            b.read_input_group(
+            get_batch().read_input_group(
                 **{
                     'vcf.gz': each_vcf,
                     'vcf.gz.tbi': f'{each_vcf}.tbi',
@@ -437,12 +535,12 @@ def merge_calls(
     )
 
     # create a python job to do the file content updates
-    pyjob = b.new_python_job('Update VCF content')
+    pyjob = get_batch().new_python_job('Update VCF content')
     pyjob.storage('10Gi')
     pyjob.call(update_vcf_attributes, merge_job.tmp_vcf, pyjob.output)
 
     # a third job just to tidy up
-    third_job = b.new_job('bgzip and tabix')
+    third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
@@ -454,7 +552,7 @@ def merge_calls(
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
-    b.write_output(third_job.output, output_no_suffix)
+    get_batch().write_output(third_job.output, output_no_suffix)
     return [merge_job, pyjob, third_job]
 
 

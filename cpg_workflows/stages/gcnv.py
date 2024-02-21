@@ -4,7 +4,7 @@ Stages that implement GATK-gCNV.
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
-from cpg_utils.hail_batch import get_batch, image_path, query_command
+from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
@@ -112,7 +112,8 @@ class DeterminePloidy(CohortStage):
 
         jobs = gcnv.filter_and_determine_ploidy(
             get_batch(),
-            get_config()['workflow'].get('ploidy_priors'),
+            str(reference_path('gatk_sv/contig_ploidy_priors.tsv')),
+            # get_config()['workflow'].get('ploidy_priors'),
             prep_intervals['preprocessed'],
             prep_intervals['annotated'],
             inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
@@ -188,7 +189,7 @@ class GermlineCNVCalls(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=GermlineCNVCalls)
+@stage(required_stages=[GermlineCNVCalls, PrepareIntervals])
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -197,10 +198,52 @@ class GCNVJointSegmentation(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
-        ...
+        return {
+            'clustered_vcf': self.prefix / f'{cohort.name}.JointClusteredSegments.vcf.gz',
+            'clustered_vcf_idx': self.prefix / f'{cohort.name}.JointClusteredSegments.vcf.gz.tbi',
+            'pedigree': str(self.tmp_prefix / 'pedigree.ped'),
+            'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        ...
+        """
+        So, this is a tricksy lil monster -
+        Conducts a semi-heirarchical merge of the individual VCFs
+        - First merge the segment files in blocks, to produce intermediate merges
+        - Then merge those intermediate merges to produce the final result
+
+        Args:
+            cohort ():
+            inputs ():
+
+        Returns:
+
+        """
+
+        # get the list of individual Segment VCFs
+        cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
+        all_vcfs = [
+            str(cnv_vcfs[sgid]['segments'])
+            for sgid in cohort.get_sequencing_group_ids()
+        ]
+
+        # get the intervals
+        intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
+
+        expected_out = self.expected_outputs(cohort)
+
+        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+
+        jobs = gcnv.run_joint_segmentation(
+            all_vcfs,
+            str(ped_path),
+            intervals=str(intervals),
+            tmp_prefix=expected_out['tmp_prefix'],
+            output_path=expected_out['clustered_vcf'],
+            job_attrs=self.get_job_attrs(cohort),
+        )
+        return self.make_outputs(cohort, data=expected_out, jobs=jobs)
+
 
 
 # @stage(required_stages=GermlineCNVCalls)
