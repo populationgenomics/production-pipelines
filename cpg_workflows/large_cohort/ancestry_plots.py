@@ -227,7 +227,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     if plot_name:
         pca_suffix = plot_name.replace('-', '_')
     gtf_ht = hl.experimental.import_gtf(
-        str(reference_path('gatk-sv/protein_coding_gtf')),
+        str(reference_path('gatk_sv/protein_coding_gtf')),
         reference_genome=genome_build(),
         skip_invalid_contigs=True,
         min_partitions=12,
