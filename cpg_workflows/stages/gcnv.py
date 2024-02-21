@@ -41,8 +41,8 @@ class PrepareIntervals(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'preprocessed': self.prefix / f'{cohort.name}.preprocessed.interval_list',
-            'annotated': self.prefix / f'{cohort.name}.annotated.tsv',
+            'preprocessed': self.prefix / 'preprocessed.interval_list',
+            'annotated': self.prefix / 'annotated_intervals.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -94,9 +94,9 @@ class DeterminePloidy(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'filtered': self.prefix / f'{cohort.name}.filtered.interval_list',
-            'calls': self.prefix / f'{cohort.name}-ploidy-calls.tar.gz',
-            'model': self.prefix / f'{cohort.name}-ploidy-model.tar.gz',
+            'filtered': self.prefix / 'filtered.interval_list',
+            'calls': self.prefix / 'ploidy-calls.tar.gz',
+            'model': self.prefix / 'ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -191,9 +191,9 @@ class GCNVJointSegmentation(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         return {
             'clustered_vcf': self.prefix
-            / f'{cohort.name}.JointClusteredSegments.vcf.gz',
+            / 'JointClusteredSegments.vcf.gz',
             'clustered_vcf_idx': self.prefix
-            / f'{cohort.name}.JointClusteredSegments.vcf.gz.tbi',
+            / 'JointClusteredSegments.vcf.gz.tbi',
             'pedigree': str(self.tmp_prefix / 'pedigree.ped'),
             'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
         }
