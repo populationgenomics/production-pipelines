@@ -76,7 +76,11 @@ def run(
 
     # Key samples by their external IDs
     use_external_id = get_config()['large_cohort']['use_external_id']
-    ht = key_by_external_id(scores_ht, sample_ht) if use_external_id else scores_ht.cache()
+    ht = (
+        key_by_external_id(scores_ht, sample_ht)
+        if use_external_id
+        else scores_ht.cache()
+    )
 
     # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
@@ -90,18 +94,30 @@ def run(
     sample_names = ht.s.collect()
     datasets = ht.dataset.collect()
     use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
-    # if the inferred ancestry is set to true in the config, annotate the PCA with the 
+    # if the inferred ancestry is set to true in the config, annotate the PCA with the
     # inferred population ancestry (calculated in the ancestry_pca.py script
-    superpopulation_label = ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
-    population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
+    superpopulation_label = (
+        ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
+    )
+    population_label = (
+        ht.training_pop.collect() if use_inferred else ht.population.collect()
+    )
     # Change 'none' values to dataset name
     analysis_dataset_name = get_config()['workflow']['dataset']
-    workflow_dataset = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
+    workflow_dataset = get_config()['workflow'].get(
+        'input_datasets', [analysis_dataset_name]
+    )
     # join dataset names with underscore, in case there are multiple
     workflow_dataset = '_'.join(workflow_dataset)
-    superpopulation_label = [workflow_dataset if x is None else x for x in superpopulation_label]
+    superpopulation_label = [
+        workflow_dataset if x is None else x for x in superpopulation_label
+    ]
     population_label = [workflow_dataset if x is None else x for x in population_label]
-    is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
+    is_training = (
+        ht.is_training.collect()
+        if use_inferred
+        else [False] * len(ht.is_training.collect())
+    )
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
         ('superpopulation', 'Superpopulation', superpopulation_label),
@@ -173,7 +189,8 @@ def _plot_pca(
                 samples=sample_names,
                 dataset=datasets,
                 is_training=[
-                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training
+                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v)
+                    for v in is_training
                 ],
             )
         )
@@ -210,7 +227,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     if plot_name:
         pca_suffix = plot_name.replace('-', '_')
     gtf_ht = hl.experimental.import_gtf(
-        str(reference_path('broad/protein_coding_gtf')),
+        str(reference_path('gatk-sv/protein_coding_gtf')),
         reference_genome=genome_build(),
         skip_invalid_contigs=True,
         min_partitions=12,
