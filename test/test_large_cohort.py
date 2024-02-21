@@ -100,7 +100,7 @@ def create_config(
                     / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
                 ),
             },
-            'gatk-sv': {
+            'gatk_sv': {
                 'protein_coding_gtf': (
                     broad_prefix
                     / 'sv-resources'
