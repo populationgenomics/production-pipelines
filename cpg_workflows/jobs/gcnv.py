@@ -429,7 +429,7 @@ def joint_segment_vcfs(
         {vcf_string} \\
         --model-call-intervals {intervals} \\
         -ped {pedigree}
-    tabix {job.output["vcf.gz"]}
+    # tabix {job.output["vcf.gz"]}
     """
     )
     return job, job.output
