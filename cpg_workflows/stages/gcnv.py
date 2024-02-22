@@ -196,7 +196,7 @@ class GCNVJointSegmentation(CohortStage):
             / 'JointClusteredSegments.vcf.gz',
             'clustered_vcf_idx': self.prefix
             / 'JointClusteredSegments.vcf.gz.tbi',
-            'pedigree': str(self.tmp_prefix / 'pedigree.ped'),
+            'pedigree': self.tmp_prefix / 'pedigree.ped',
             'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
         }
 
@@ -239,6 +239,20 @@ class GCNVJointSegmentation(CohortStage):
         )
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
 
+
+# @stage(required_stages=GCNVJointSegmentation)
+# class PostProcessClusteredBreakpoints(SequencingGroupStage):
+#     """
+#     following joint segmentation, we need to post-process the clustered breakpoints
+#     this recalculates each sample's quality scores based on new breakpoints, and
+#     filters low QS or high AF calls
+#     https://github.com/broadinstitute/gatk/blob/master/scripts/cnv_wdl/germline/joint_call_exome_cnvs.wdl#L113
+#     """
+#
+#     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+#
+#
+#     ...
 
 # @stage(required_stages=GermlineCNVCalls)
 # class PrepareVcfsForMerge(SequencingGroupStage):
