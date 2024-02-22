@@ -400,7 +400,7 @@ def joint_segment_vcfs(
     reference: ResourceGroup,
     intervals: ResourceFile,  # hmm,
     job_attrs: dict,
-) -> tuple[Job, Resource]:
+) -> tuple[Job, ResourceGroup]:
     """
     This job will run the joint segmentation step of the gCNV workflow
     Takes individual Segment VCFs and merges them into a single VCF
@@ -420,6 +420,8 @@ def joint_segment_vcfs(
     vcf_string = ''
     for each_vcf in segment_vcfs:
         vcf_string += f' -V {each_vcf}'
+
+    # this already creates a tabix index
     job.command(
         f"""
     set -e
@@ -429,7 +431,6 @@ def joint_segment_vcfs(
         {vcf_string} \\
         --model-call-intervals {intervals} \\
         -ped {pedigree}
-    # tabix {job.output["vcf.gz"]}
     """
     )
     return job, job.output
@@ -488,7 +489,7 @@ def run_joint_segmentation(
                 intervals=intervals_in_batch,
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
             )
-            chunked_vcfs.append(vcf_group)
+            chunked_vcfs.append(vcf_group['vcf'])
             get_batch().write_output(
                 vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}'
             )
