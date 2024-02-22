@@ -417,11 +417,18 @@ def joint_segment_vcfs(
     )
     job.image(image_path('gatk_gcnv'))
     job.memory('8Gi')
+    vcf_string = ''
+    for each_vcf in segment_vcfs:
+        vcf_string += f' -V {each_vcf}'
     job.command(
         f"""
     set -e
     gatk --java-options "-Xmx6000m" JointGermlineCNVSegmentation \\
-    -R {reference.base} -O {job.output["vcf.gz"]} {' -V '.join(segment_vcfs)} --model-call-intervals {intervals} -ped {pedigree}
+        -R {reference.base} \\
+        -O {job.output["vcf.gz"]} \\
+        {vcf_string} \\
+        --model-call-intervals {intervals} \\
+        -ped {pedigree}
     tabix {job.output["vcf.gz"]}
     """
     )
