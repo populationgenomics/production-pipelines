@@ -37,7 +37,8 @@ class Vqsr(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        Submit jobs.
+        This job takes the site-only VCF from the JointGenotyping stage with no
+        multiallelic variant splitting required
         """
         siteonly_vcf_path = inputs.as_path(
             stage=JointGenotyping, target=cohort, key='siteonly'
