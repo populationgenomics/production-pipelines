@@ -399,6 +399,7 @@ def joint_segment_vcfs(
     pedigree: ResourceFile,
     reference: ResourceGroup,
     intervals: ResourceFile,  # hmm,
+    title: str,
     job_attrs: dict,
 ) -> tuple[Job, ResourceGroup]:
     """
@@ -488,6 +489,7 @@ def run_joint_segmentation(
                 reference=reference,
                 intervals=intervals_in_batch,
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
+                title=f'sub-chunk_{subchunk_index}'
             )
             chunked_vcfs.append(vcf_group['vcf.gz'])
             get_batch().write_output(
@@ -509,6 +511,7 @@ def run_joint_segmentation(
         reference=reference,
         intervals=intervals_in_batch,
         job_attrs=job_attrs or {} | {'title': f'all-chunks'},
+        title=f'all-chunks'
     )
     jobs.append(job)
 
