@@ -429,7 +429,7 @@ def joint_segment_vcfs(
 
 
 def run_joint_segmentation(
-    segment_vcfs: list[str],
+    segment_vcfs: list[ResourceFile],
     pedigree: str,
     intervals: str,
     tmp_prefix: str,
@@ -469,8 +469,9 @@ def run_joint_segmentation(
         ):
             # create a new job for each chunk
             # read these files into this batch
+            print(chunk_vcfs)
             local_vcfs = [
-                get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf
+                get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi')['vcf']
                 for vcf in chunk_vcfs
             ]
             job, vcf_group = joint_segment_vcfs(
