@@ -227,7 +227,8 @@ class GCNVJointSegmentation(CohortStage):
 
         expected_out = self.expected_outputs(cohort)
 
-        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        # ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        ped_path = 'gs://cpg-seqr-test-tmp/exome/gcnv/a48b821c7e32352a0e683f7164bd3bee61144c_119/GCNVJointSegmentation/pedigree.ped'
 
         jobs = gcnv.run_joint_segmentation(
             all_vcfs,
