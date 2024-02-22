@@ -227,10 +227,10 @@ class MakeSiteOnlyVcf(CohortStage):
             query_command(
                 site_only_vcf,
                 site_only_vcf.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
-                str(inputs.as_path(cohort, SampleQC)),
-                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(self.expected_outputs(cohort)['vcf']),
+                inputs.as_path(cohort, Combiner),
+                inputs.as_path(cohort, SampleQC),
+                inputs.as_path(cohort, Relatedness, key='relateds_to_drop'),
+                self.expected_outputs(cohort)['vcf'],
                 str(self.tmp_prefix),
                 setup_gcp=True,
             )
