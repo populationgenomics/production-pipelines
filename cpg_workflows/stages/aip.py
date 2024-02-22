@@ -529,6 +529,7 @@ class GenerateSeqrFile(DatasetStage):
             return self.make_outputs(dataset, data={}, jobs=[], skipped=True)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
+        input_localised = get_batch().read_input(str(moi_inputs))
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'AIP Prep for Seqr: {dataset.name}')
@@ -537,7 +538,7 @@ class GenerateSeqrFile(DatasetStage):
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             f'python3 helpers/minimise_output_for_seqr.py '
-            f'{moi_inputs} {job.out_json} --external_map {lookup_in_batch}'
+            f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
         )
 
         # write the results out
