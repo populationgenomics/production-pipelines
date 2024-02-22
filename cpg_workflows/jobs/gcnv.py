@@ -412,7 +412,9 @@ def joint_segment_vcfs(
     Returns:
         the job that does the work, and the resulting resource group of VCF & index
     """
-    job = get_batch().new_job(f'Joint Segmentation', job_attrs | {'tool': 'gatk'})
+    job = get_batch().new_job(
+        f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'}
+    )
     job.declare_resource_group(
         output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
@@ -489,7 +491,7 @@ def run_joint_segmentation(
                 reference=reference,
                 intervals=intervals_in_batch,
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
-                title=f'sub-chunk_{subchunk_index}'
+                title=f'sub-chunk_{subchunk_index}',
             )
             chunked_vcfs.append(vcf_group['vcf.gz'])
             get_batch().write_output(
@@ -511,7 +513,7 @@ def run_joint_segmentation(
         reference=reference,
         intervals=intervals_in_batch,
         job_attrs=job_attrs or {} | {'title': f'all-chunks'},
-        title=f'all-chunks'
+        title='all-chunks',
     )
     jobs.append(job)
 
