@@ -5,6 +5,7 @@ Stages that implement GATK-gCNV.
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
+from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
@@ -168,10 +169,11 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
+        determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
 
         jobs = gcnv.postprocess_calls_1(
-            inputs.as_path(seqgroup.dataset, DeterminePloidy, 'calls'),
-            inputs.as_dict(seqgroup.dataset, GermlineCNV),
+            determine_ploidy['calls'],
+            inputs.as_dict(get_cohort(), GermlineCNV),
             # FIXME get the sample index via sample_name.txt files instead
             seqgroup.dataset.get_sequencing_group_ids().index(seqgroup.id),
             self.get_job_attrs(seqgroup),
