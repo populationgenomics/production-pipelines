@@ -6,7 +6,7 @@ Convert to site-only table and annotate with AS fields.
 import logging
 
 import hail as hl
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from gnomad.utils.sparse_mt import default_compute_info
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
@@ -24,11 +24,11 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    vds_path = Path(vds_path)
-    sample_qc_ht_path = Path(sample_qc_ht_path)
-    relateds_to_drop_ht_path = Path(relateds_to_drop_ht_path)
-    out_vcf_path = Path(out_vcf_path)
-    tmp_prefix = Path(tmp_prefix)
+    vds_path = to_path(vds_path)
+    sample_qc_ht_path = to_path(sample_qc_ht_path)
+    relateds_to_drop_ht_path = to_path(relateds_to_drop_ht_path)
+    out_vcf_path = to_path(out_vcf_path)
+    tmp_prefix = to_path(tmp_prefix)
 
     site_only_ht_path = tmp_prefix / 'site_only.ht'
     site_only_ht = vds_to_site_only_ht(
