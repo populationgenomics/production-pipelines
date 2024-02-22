@@ -7,21 +7,28 @@ import logging
 
 import hail as hl
 from cpg_utils import Path
-from cpg_workflows.utils import can_reuse
-from gnomad.utils.vcf import adjust_vcf_incompatible_types
 from gnomad.utils.sparse_mt import default_compute_info
+from gnomad.utils.vcf import adjust_vcf_incompatible_types
+
+from cpg_workflows.utils import can_reuse
 
 
 def run(
-    vds_path: Path,
-    sample_qc_ht_path: Path,
-    relateds_to_drop_ht_path: Path,
-    out_vcf_path: Path,
-    tmp_prefix: Path,
+    vds_path: str,
+    sample_qc_ht_path: str,
+    relateds_to_drop_ht_path: str,
+    out_vcf_path: str,
+    tmp_prefix: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
+
+    vds_path = Path(vds_path)
+    sample_qc_ht_path = Path(sample_qc_ht_path)
+    relateds_to_drop_ht_path = Path(relateds_to_drop_ht_path)
+    out_vcf_path = Path(out_vcf_path)
+    tmp_prefix = Path(tmp_prefix)
 
     site_only_ht_path = tmp_prefix / 'site_only.ht'
     site_only_ht = vds_to_site_only_ht(
