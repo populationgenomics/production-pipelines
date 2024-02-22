@@ -20,8 +20,8 @@ class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if vds_version := get_config()['workflow'].get('vds_version'):
             vds_version = slugify(vds_version)
-            if not vds_version.startswith('v'):
-                vds_version = f'v{vds_version}'
+            # if not vds_version.startswith('v'):
+            #     vds_version = f'v{vds_version}'
 
         vds_version = vds_version or get_workflow().output_version
         return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
