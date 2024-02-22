@@ -489,7 +489,7 @@ def run_joint_segmentation(
                 intervals=intervals_in_batch,
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
             )
-            chunked_vcfs.append(vcf_group['vcf'])
+            chunked_vcfs.append(vcf_group['vcf.gz'])
             get_batch().write_output(
                 vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}'
             )
