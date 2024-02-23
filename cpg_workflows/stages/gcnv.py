@@ -171,7 +171,7 @@ class GermlineCNVCalls(SequencingGroupStage):
         outputs = self.expected_outputs(seqgroup)
         determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
 
-        jobs = gcnv.postprocess_calls_1(
+        jobs = gcnv.postprocess_calls(
             determine_ploidy['calls'],
             inputs.as_dict(get_cohort(), GermlineCNV),
             # FIXME get the sample index via sample_name.txt files instead
@@ -228,6 +228,7 @@ class GCNVJointSegmentation(CohortStage):
         expected_out = self.expected_outputs(cohort)
 
         # ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        # this is a placeholder due to the mismatched sample IDs in test
         ped_path = 'gs://cpg-seqr-test-tmp/exome/gcnv/a48b821c7e32352a0e683f7164bd3bee61144c_119/GCNVJointSegmentation/pedigree.ped'
 
         jobs = gcnv.run_joint_segmentation(
@@ -241,13 +242,15 @@ class GCNVJointSegmentation(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
 
 
-@stage(required_stages=GCNVJointSegmentation)
+@stage(required_stages=[GCNVJointSegmentation, GermlineCNVCalls])
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
     following joint segmentation, we need to post-process the clustered breakpoints
     this recalculates each sample's quality scores based on new breakpoints, and
     filters low QS or high AF calls
     https://github.com/broadinstitute/gatk/blob/master/scripts/cnv_wdl/germline/joint_call_exome_cnvs.wdl#L113
+
+    This is done as another pass through PostprocessGermlineCNVCalls, with prior/clustered results
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
@@ -263,7 +266,25 @@ class RecalculateClusteredQuality(SequencingGroupStage):
     def queue_jobs(
         self, sequencing_group: SequencingGroup, inputs: StageInput
     ) -> StageOutput:
-        ...
+        expected_out = self.expected_outputs(sequencing_group)
+
+        # get the clustered VCF from the previous stage
+        joint_seg = inputs.as_dict(get_cohort(), GCNVJointSegmentation)
+
+        determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
+        gcnv_call_inputs = inputs.as_dict(sequencing_group, GermlineCNVCalls)
+
+        jobs = gcnv.postprocess_calls(
+            determine_ploidy['calls'],
+            inputs.as_dict(get_cohort(), GermlineCNV),
+            # FIXME get the sample index via sample_name.txt files instead
+            sequencing_group.dataset.get_sequencing_group_ids().index(sequencing_group.id),
+            self.get_job_attrs(sequencing_group),
+            output_prefix=str(self.prefix / sequencing_group.id),
+            clustered_vcf=str(joint_seg['clustered_vcf']),
+            intervals_vcf=str(gcnv_call_inputs['intervals']),
+        )
+        return self.make_outputs(sequencing_group, data=expected_out, jobs=jobs)
 
 
 # @stage(required_stages=GermlineCNVCalls)

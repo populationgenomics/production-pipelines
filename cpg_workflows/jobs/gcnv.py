@@ -277,13 +277,20 @@ def shard_gcnv(
     return jobs
 
 
-def postprocess_calls_1(
+def postprocess_calls(
     ploidy_calls_path: Path,
     shard_paths: dict[str, Path],
     sample_index: int,
     job_attrs: dict[str, str],
     output_prefix: str,
+    clustered_vcf: str | None = None,
+    intervals_vcf: str | None = None,
+    qc_file: str | None = None,
 ) -> Job:
+
+    if any([clustered_vcf, intervals_vcf, qc_file]):
+        assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
+
     j = get_batch().new_job(
         'Postprocess gCNV calls',
         job_attrs
@@ -298,12 +305,12 @@ def postprocess_calls_1(
 
     ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
 
-    unpack_cmds = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
+    batch_job_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
 
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        unpack_cmds.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
+        batch_job_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
 
@@ -323,7 +330,11 @@ def postprocess_calls_1(
         }
     )
 
-    postprocess_cmd = f"""
+    clustered_vcf_string = f'--clustered-breakpoints {clustered_vcf}' if clustered_vcf else ''
+    intervals_vcf_string = f'--input-intervals-vcf {intervals_vcf}' if intervals_vcf else ''
+    reference_string = f'-R {reference.base}' if clustered_vcf else ''
+
+    batch_job_commands.append(f"""
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
@@ -331,16 +342,38 @@ def postprocess_calls_1(
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
-      --output-denoised-copy-ratios {j.output['ratios.tsv']}
-    """
+      --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
+      {clustered_vcf_string} {intervals_vcf_string} {reference_string}
+    """)
 
     # index the output VCFs
-    tabix_cmd = f"""
+    batch_job_commands.append(f"""
     tabix {j.output['intervals.vcf.gz']}
     tabix {j.output['segments.vcf.gz']}
-    """
+    """)
 
-    j.command(command([*unpack_cmds, postprocess_cmd, tabix_cmd], setup_gcp=True))
+    if clustered_vcf:
+        max_events = get_config()['workflow']['gncv_max_events']
+        max_pass_events = get_config()['workflow']['gncv_max_pass_events']
+        # do some additional stuff to determine pass/fail
+        batch_job_commands.append(f"""
+        #use wc instead of grep -c so zero count isn't non-zero exit
+        #use grep -P to recognize tab character
+        NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
+        NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l)
+        if [ $NUM_SEGMENTS -lt {max_events} ]; then
+            if [ $NUM_PASS_SEGMENTS -lt {max_pass_events} ]; then
+              echo "PASS" >> {j.qc_file}
+            else
+              echo "EXCESSIVE_NUMBER_OF_PASS_EVENTS" >> {j.qc_file}
+            fi
+        else
+            echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
+        fi
+        """)
+        get_batch().write_output(j.qc_file, qc_file)
+
+    j.command(command(batch_job_commands, setup_gcp=True))
 
     get_batch().write_output(j.output, output_prefix)
 
@@ -440,7 +473,7 @@ def joint_segment_vcfs(
 
 
 def run_joint_segmentation(
-    segment_vcfs: list[ResourceFile],
+    segment_vcfs: list[str],
     pedigree: str,
     intervals: str,
     tmp_prefix: str,
@@ -474,13 +507,13 @@ def run_joint_segmentation(
     chunked_vcfs = []
 
     # if we have more samples to process than the block size, condense
+    # this is done by calling an intermediate round of VCF segmenting
     if len(segment_vcfs) > sams_per_block:
         for subchunk_index, chunk_vcfs in enumerate(
             chunks(segment_vcfs, sams_per_block)
         ):
             # create a new job for each chunk
             # read these files into this batch
-            print(chunk_vcfs)
             local_vcfs = [
                 get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi')['vcf']
                 for vcf in chunk_vcfs
@@ -499,14 +532,14 @@ def run_joint_segmentation(
             )
             jobs.append(job)
 
-    # else, just read those into the batch
+    # else, all vcf files into the batch
     else:
         chunked_vcfs = [
             get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf
             for vcf in segment_vcfs
         ]
 
-    # second round of condensing output
+    # second round of condensing output - produces one single file
     job, vcf_group = joint_segment_vcfs(
         chunked_vcfs,
         pedigree=pedigree_in_batch,
@@ -517,7 +550,7 @@ def run_joint_segmentation(
     )
     jobs.append(job)
 
-    # write the final output file
+    # write the final output file group (VCF & index)
     get_batch().write_output(vcf_group, f'{str(output_path).removesuffix(".vcf.gz")}')
     return jobs
 
