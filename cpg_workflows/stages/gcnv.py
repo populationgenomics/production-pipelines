@@ -242,7 +242,7 @@ class GCNVJointSegmentation(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
 
 
-@stage(required_stages=[GCNVJointSegmentation, GermlineCNVCalls, DeterminePloidy])
+@stage(required_stages=[GCNVJointSegmentation, GermlineCNV, GermlineCNVCalls, DeterminePloidy])
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
     following joint segmentation, we need to post-process the clustered breakpoints
