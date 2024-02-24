@@ -337,7 +337,8 @@ def postprocess_calls(
     reference_string = f'-R {reference.base}' if clustered_vcf else ''
 
     j.command(f"""
-    OUTS=dirname {j.output['intervals.vcf.gz']}
+    ls $BATCH_TMPDIR
+    OUTS=$(dirname {j.output['intervals.vcf.gz']})
     ls -l $OUTS
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
