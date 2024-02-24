@@ -305,14 +305,16 @@ def postprocess_calls(
 
     ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
 
-    batch_job_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
+    gcp_related_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
 
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        batch_job_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
+        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
+
+    j.command(command(gcp_related_commands, setup_gcp=True))
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
     allosomal_contigs_args = ' '.join(
@@ -334,7 +336,9 @@ def postprocess_calls(
     intervals_vcf_string = f'--input-intervals-vcf {intervals_vcf}' if intervals_vcf else ''
     reference_string = f'-R {reference.base}' if clustered_vcf else ''
 
-    batch_job_commands.append(f"""
+    j.command(f"""
+    OUTS=dirname {j.output['intervals.vcf.gz']}
+    ls -l $OUTS
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
@@ -347,7 +351,7 @@ def postprocess_calls(
     """)
 
     # index the output VCFs
-    batch_job_commands.append(f"""
+    j.command(f"""
     tabix {j.output['intervals.vcf.gz']}
     tabix {j.output['segments.vcf.gz']}
     """)
@@ -356,7 +360,7 @@ def postprocess_calls(
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
         # do some additional stuff to determine pass/fail
-        batch_job_commands.append(f"""
+        j.command(f"""
         #use wc instead of grep -c so zero count isn't non-zero exit
         #use grep -P to recognize tab character
         NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
@@ -371,15 +375,9 @@ def postprocess_calls(
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
         """)
-
-    j.command(command(batch_job_commands, setup_gcp=True))
+        get_batch().write_output(j.qc_file, qc_file)
 
     get_batch().write_output(j.output, output_prefix)
-
-    # the resource only exists once the command has been issued with
-    # job.command()
-    if qc_file:
-        get_batch().write_output(j.qc_file, qc_file)
 
     return j
 
