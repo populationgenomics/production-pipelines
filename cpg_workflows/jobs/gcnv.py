@@ -305,14 +305,14 @@ def postprocess_calls(
 
     ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
 
-    gcp_related_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
+    gcp_related_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR/inputs']
 
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
-        model_shard_args += f' --model-shard-path $BATCH_TMPDIR/{name}-model'
-        calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
+        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
+        model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
+        calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
 
     j.command(command(gcp_related_commands, setup_gcp=True))
 
@@ -339,7 +339,9 @@ def postprocess_calls(
     j.command(f"""
     ls $BATCH_TMPDIR
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
-    ls -l $OUTS
+    BATCH_OUTS=$(dirname $OUTS)
+    ls -l $BATCH_OUTS
+    mkdir $OUTS
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
