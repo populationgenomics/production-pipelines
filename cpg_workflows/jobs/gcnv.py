@@ -371,11 +371,15 @@ def postprocess_calls(
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
         """)
-        get_batch().write_output(j.qc_file, qc_file)
 
     j.command(command(batch_job_commands, setup_gcp=True))
 
     get_batch().write_output(j.output, output_prefix)
+
+    # the resource only exists once the command has been issued with
+    # job.command()
+    if qc_file:
+        get_batch().write_output(j.qc_file, qc_file)
 
     return j
 
