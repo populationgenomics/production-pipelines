@@ -283,6 +283,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
             output_prefix=str(self.prefix / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
             intervals_vcf=str(gcnv_call_inputs['intervals']),
+            qc_file=str(expected_out['qc_status_file']),
         )
         return self.make_outputs(sequencing_group, data=expected_out, jobs=jobs)
 
