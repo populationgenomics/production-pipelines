@@ -211,37 +211,35 @@ class AncestryPlots(CohortStage):
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'vcf': get_workflow().prefix / 'dp_siteonly.vcf.bgz',
-            'tbi': get_workflow().prefix / 'dp_siteonly.vcf.bgz.tbi',
+            'vcf': get_workflow().prefix / 'no_dp_siteonly.vcf.bgz',
+            'tbi': get_workflow().prefix / 'no_dp_siteonly.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.site_only_vcf import run
+        from cpg_workflows.large_cohort import site_only_vcf
 
         output_prefix = get_workflow().prefix
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                vds_path=inputs.as_path(cohort, Combiner),
-                sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, key='relateds_to_drop'
-                ),
-                out_vcf_path=self.expected_outputs(cohort)['vcf'],
-                tmp_prefix=self.tmp_prefix,
-                output_prefix=output_prefix,
-                dp_status='dp',
-            ),
-            depends_on=inputs.get_jobs(cohort),
-            # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
-            # 10 samples take 2.3G, 400 samples take 60G, which roughly matches
-            # `huge_disk` (also used in the AS-VQSR VCF-gather job)
-            worker_boot_disk_size=200,
-            secondary_worker_boot_disk_size=200,
+        j = get_batch().new_job(
+            'MakeSiteOnlyVcf', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
         )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                site_only_vcf,
+                site_only_vcf.run.__name__,
+                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, SampleQC)),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['vcf']),
+                str(self.tmp_prefix),
+                str(output_prefix),
+                'no_dp',
+                setup_gcp=True,
+            )
+        )
+
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
