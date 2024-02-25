@@ -232,7 +232,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 ),
                 out_vcf_path=self.expected_outputs(cohort)['vcf'],
                 tmp_prefix=self.tmp_prefix,
-                output_prefix=str(output_prefix),
+                output_prefix=output_prefix,
                 dp_status='dp',
             ),
             depends_on=inputs.get_jobs(cohort),

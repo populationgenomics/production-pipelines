@@ -14,24 +14,24 @@ from cpg_workflows.utils import can_reuse
 
 
 def run(
-    vds_path: str,
-    sample_qc_ht_path: str,
-    relateds_to_drop_ht_path: str,
-    out_vcf_path: str,
-    tmp_prefix: str,
-    output_prefix: str,
+    vds_path: Path,
+    sample_qc_ht_path: Path,
+    relateds_to_drop_ht_path: Path,
+    out_vcf_path: Path,
+    tmp_prefix: Path,
+    output_prefix: Path,
     dp_status: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    vds_path = to_path(vds_path)
-    sample_qc_ht_path = to_path(sample_qc_ht_path)
-    relateds_to_drop_ht_path = to_path(relateds_to_drop_ht_path)
-    out_vcf_path = to_path(out_vcf_path)
-    tmp_prefix = to_path(tmp_prefix)
-    output_prefix = to_path(output_prefix)
+    # vds_path = to_path(vds_path)
+    # sample_qc_ht_path = to_path(sample_qc_ht_path)
+    # relateds_to_drop_ht_path = to_path(relateds_to_drop_ht_path)
+    # out_vcf_path = to_path(out_vcf_path)
+    # tmp_prefix = to_path(tmp_prefix)
+    # output_prefix = to_path(output_prefix)
 
     site_only_ht_path = output_prefix / f'{dp_status}_site_only.ht'
     site_only_ht = vds_to_site_only_ht(
