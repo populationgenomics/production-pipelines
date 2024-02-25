@@ -356,15 +356,11 @@ def postprocess_calls(
       {extra_args}
     """)
 
-    # index the output VCFs
+    # index the output VCFs - GATK does this already?
+    # or maybe it only generates indexes when the clustered input is provided
     j.command(f"""
-    if ! [ -f "{j.output['intervals.vcf.gz']}.tbi" ]; then
-        tabix {j.output['intervals.vcf.gz']}
-    fi
-
-    if ! [ -f "{j.output['segments.vcf.gz']}.tbi" ]; then
-        tabix {j.output['segments.vcf.gz']}
-    fi
+    tabix -f {j.output['intervals.vcf.gz']}
+    tabix -f {j.output['segments.vcf.gz']}
     """)
 
     if clustered_vcf:
