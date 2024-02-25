@@ -19,6 +19,7 @@ def run(
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
     tmp_prefix: str,
+    output_prefix: str,
     dp_status: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
@@ -30,6 +31,7 @@ def run(
     relateds_to_drop_ht_path = to_path(relateds_to_drop_ht_path)
     out_vcf_path = to_path(out_vcf_path)
     tmp_prefix = to_path(tmp_prefix)
+    output_prefix = to_path(output_prefix)
 
     site_only_ht_path = tmp_prefix / f'{dp_status}_site_only.ht'
     site_only_ht = vds_to_site_only_ht(
