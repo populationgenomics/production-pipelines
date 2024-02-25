@@ -33,7 +33,7 @@ def run(
     tmp_prefix = to_path(tmp_prefix)
     output_prefix = to_path(output_prefix)
 
-    site_only_ht_path = tmp_prefix / f'{dp_status}_site_only.ht'
+    site_only_ht_path = output_prefix / f'{dp_status}_site_only.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
