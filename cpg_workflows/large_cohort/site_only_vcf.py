@@ -19,6 +19,7 @@ def run(
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
     tmp_prefix: str,
+    dp_status: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
@@ -30,7 +31,7 @@ def run(
     out_vcf_path = to_path(out_vcf_path)
     tmp_prefix = to_path(tmp_prefix)
 
-    site_only_ht_path = tmp_prefix / 'site_only.ht'
+    site_only_ht_path = tmp_prefix / f'{dp_status}_site_only.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
