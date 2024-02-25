@@ -358,8 +358,13 @@ def postprocess_calls(
 
     # index the output VCFs
     j.command(f"""
-    tabix {j.output['intervals.vcf.gz']}
-    tabix {j.output['segments.vcf.gz']}
+    if ! [ -f "{j.output['intervals.vcf.gz']}.tbi" ]; then
+        tabix {j.output['intervals.vcf.gz']}
+    fi
+
+    if ! [ -f "{j.output['segments.vcf.gz']}.tbi" ]; then
+        tabix {j.output['segments.vcf.gz']}
+    fi
     """)
 
     if clustered_vcf:
