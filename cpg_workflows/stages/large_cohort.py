@@ -232,6 +232,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
+                dp_status='dp',
                 setup_gcp=True,
             )
         )
