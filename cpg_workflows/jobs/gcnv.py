@@ -334,8 +334,8 @@ def postprocess_calls(
 
     extra_args = ''
     if clustered_vcf:
-        local_clusters = get_batch().read_input(clustered_vcf)
-        local_intervals = get_batch().read_input(intervals_vcf)
+        local_clusters = get_batch().read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi').vcf
+        local_intervals = get_batch().read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi').vcf
         extra_args += f"""--clustered-breakpoints {local_clusters} \\
          --input-intervals-vcf {local_intervals} \\
           -R {reference.base}
