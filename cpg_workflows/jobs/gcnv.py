@@ -337,14 +337,12 @@ def postprocess_calls(
     reference_string = f'-R {reference.base}' if clustered_vcf else ''
 
     j.command(f"""
-    ls $BATCH_TMPDIR
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
     BATCH_OUTS=$(dirname $OUTS)
-    ls -l $BATCH_OUTS
     mkdir $OUTS
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
-      --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
+      --contig-ploidy-calls $BATCH_TMPDIR/inputs/ploidy-calls \\
       {model_shard_args} {calls_shard_args} \\
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
