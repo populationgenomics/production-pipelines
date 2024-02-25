@@ -332,9 +332,14 @@ def postprocess_calls(
         }
     )
 
-    clustered_vcf_string = f'--clustered-breakpoints {clustered_vcf}' if clustered_vcf else ''
-    intervals_vcf_string = f'--input-intervals-vcf {intervals_vcf}' if intervals_vcf else ''
-    reference_string = f'-R {reference.base}' if clustered_vcf else ''
+    extra_args = ''
+    if clustered_vcf:
+        local_clusters = get_batch().read_input(clustered_vcf)
+        local_intervals = get_batch().read_input(intervals_vcf)
+        extra_args += f"""--clustered-breakpoints {local_clusters} \\
+         --input-intervals-vcf {local_intervals} \\
+          -R {reference.base}
+        """
 
     j.command(f"""
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
@@ -348,7 +353,7 @@ def postprocess_calls(
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
       --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
-      {clustered_vcf_string} {intervals_vcf_string} {reference_string}
+      {extra_args}
     """)
 
     # index the output VCFs
