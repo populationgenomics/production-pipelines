@@ -126,8 +126,9 @@ class TestMultiQC:
             out_html_path=(tmp_path / 'out_html_path'),
         )
 
-        assert (tmp_path / 'multiqc-file-list.txt').exists()
-        with open((tmp_path / 'multiqc-file-list.txt'), 'r') as f:
+        file_list_filepath = f'{dataset.alignment_inputs_hash()}_multiqc-file-list.txt'
+        assert (tmp_path / file_list_filepath).exists()
+        with open((tmp_path / file_list_filepath), 'r') as f:
             f_content = f.read()
             for path in paths:
                 assert str(path) in f_content
@@ -194,7 +195,9 @@ class TestMultiQC:
             sg.target_id: sg.participant_id
             for sg in dataset._sequencing_group_by_id.values()
         }
-        sample_map_path = tmp_path / 'rename-sample-map.tsv'
+        sample_map_path = (
+            tmp_path / f'{dataset.alignment_inputs_hash()}_rename-sample-map.tsv'
+        )
 
         _ = multiqc(
             b=batch,
