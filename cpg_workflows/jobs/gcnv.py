@@ -637,7 +637,9 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 original_start = int(l_split[1])
 
                 # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
-                original_info = d = dict(el.split('=') for el in l_split[7].split(';'))
+                original_info: dict[str, str] = dict(
+                    el.split('=') for el in l_split[7].split(';')
+                )
 
                 # steal the END integer
                 end_int = int(original_info['END'])
@@ -653,7 +655,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 l_split[2] = f'CNV_{chrom}_{start}_{end_int}_{alt_allele}'
 
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
-                original_info['SVLEN'] = end_int - original_start
+                original_info['SVLEN'] = str(end_int - original_start)
                 l_split[7] = ';'.join(f'{k}={v}' for k, v in original_info.items())
 
                 # put it together and what have you got?

@@ -3,7 +3,7 @@ Stages that implement GATK-gCNV.
 """
 
 from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.config import try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
@@ -14,7 +14,6 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.targets import SequencingGroup, Cohort
-from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     stage,
     CohortStage,
@@ -190,7 +189,7 @@ class GCNVJointSegmentation(CohortStage):
     takes the individual VCFs and runs the joint segmentation step
     """
 
-    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, str | Path]:
         return {
             'clustered_vcf': self.prefix / 'JointClusteredSegments.vcf.gz',
             'clustered_vcf_idx': self.prefix / 'JointClusteredSegments.vcf.gz.tbi',
