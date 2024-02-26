@@ -579,10 +579,15 @@ def merge_calls(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0'
     )
 
+    # now normlise the result, splitting multiallelics
+    merge_job.command(
+        f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}'
+    )
+
     # create a python job to do the file content updates
     pyjob = get_batch().new_python_job('Update VCF content')
     pyjob.storage('10Gi')
-    pyjob.call(update_vcf_attributes, merge_job.tmp_vcf, pyjob.output)
+    pyjob.call(update_vcf_attributes, merge_job.tmp_vcf_split, pyjob.output)
 
     # a third job just to tidy up
     third_job = get_batch().new_job('bgzip and tabix')
