@@ -436,10 +436,11 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         strv_job.command(
             f'python StrVCTVRE.py '
             f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.bgz"]} '
+            f'-o temp.vcf '
             f'-f vcf '
             f'-p {phylop_in_batch}'
         )
+        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
         get_batch().write_output(
