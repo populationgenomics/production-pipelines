@@ -4,13 +4,11 @@ Jobs that implement GATK-gCNV.
 
 from collections.abc import Iterable
 
-import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import (
     JobResourceFile,
     ResourceFile,
-    ResourceGroup,
-    Resource,
+    ResourceGroup
 )
 
 from cpg_utils import Path
@@ -389,53 +387,6 @@ def postprocess_calls(
     return j
 
 
-def fix_intervals_vcf(interval_vcf: Path, job_attrs: dict[str, str], output_path: Path):
-    """
-    Note: the reheader loop is only required until the closure and
-    adoption of https://github.com/broadinstitute/gatk/pull/8621
-    Args:
-        interval_vcf (Path): the individual intervals VCF
-    Returns:
-        the Job doing the work
-    """
-    reheader_job = get_batch().new_job(
-        'Reheader intervals VCF', job_attrs | {'tool': 'bcftools'}
-    )
-    reheader_job.declare_resource_group(
-        output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
-    )
-    reheader_job.image(image_path('bcftools')).storage('1Gi')
-
-    # read the Intervals VCF for this SG ID
-    input_vcf = get_batch().read_input(str(interval_vcf))
-
-    # pull the header into a temp file
-    reheader_job.command(f'bcftools view -h {input_vcf} > header')
-
-    # sed command to swap Integer GT to String in-place
-    reheader_job.command(
-        r"sed -i 's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
-    )
-
-    # apply the new header
-    reheader_job.command(f'bcftools reheader -h header {input_vcf} -o temp.vcf.bgz')
-
-    # split multiallelics (CNV calls are DEL/DUP at all loci)
-    reheader_job.command(
-        f'bcftools norm -m - temp.vcf.bgz | bgzip -c > {reheader_job.output["vcf.bgz"]}'
-    )
-
-    # and index with tabix
-    reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
-
-    # get the output root to write to, and write both VCF and index
-    get_batch().write_output(
-        reheader_job.output, str(output_path).removesuffix('.vcf.bgz')
-    )
-
-    return reheader_job
-
-
 def joint_segment_vcfs(
     segment_vcfs: list[ResourceFile],
     pedigree: ResourceFile,
@@ -638,10 +589,9 @@ def merge_calls(
 def update_vcf_attributes(input_tmp: str, output_file: str):
     """
     A Python method to call as a PythonJob, edits content of the VCF
-    - Add 2 new INFO sections in the header, SVTYPE and SVLEN
-    - Use the Alt-allele post splitting to find DUP/DEL for each line
+    - INFO.SVLEN exists in header, but not populated on variant rows
     - Use the END value (in INFO) to determine CNV Length (SVLEN)
-    - Update the ID field to be unique for each line
+    - Update the ID field to be appropriate for each line
     - Expand the INFO in each line
     - write the file back out to the specified path
 
@@ -660,40 +610,38 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
             # don't alter current header lines
             if line.startswith('#'):
                 headers.append(line)
-                # but do insert additional INFO field lines
-                if line.startswith('##INFO=<ID=END'):
-                    headers.extend(
-                        [
-                            '##INFO=<ID=SVTYPE,Number=.,Type=String,Description="SV Type">\n',
-                            '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="SV Length">\n',
-                        ]
-                    )
             # for non-header lines
             else:
                 # split on tabs
                 l_split = line.split('\t')
+
+                # don't bother with null/WT/missing alleles
+                if l_split[4] == '.':
+                    continue
+
                 original_start = int(l_split[1])
 
-                # e.g. END=12345
-                # this will be added back in upon export
-                original_end = l_split[7]
+                # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
+                original_info = d = dict(el.split('=') for el in  l_split[7].split(';'))
 
-                # steal the END integer (only current INFO field, int)
-                end_int = int(original_end.removeprefix('END='))
+                # steal the END integer
+                end_int = int(original_info['END'])
 
                 # e.g. <DEL> -> DEL
                 alt_allele = l_split[4][1:-1]
 
-                # grab the original ID
-                original_id = l_split[2]
+                # replace compound ID original ID
+                chrom = l_split[0]
+                start = l_split[1]
 
                 # make this unique after splitting (include alt allele)
-                l_split[2] = f'{original_id}_{alt_allele}'
+                l_split[2] = f'CNV_{chrom}_{start}_{end_int}_{alt_allele}'
 
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
+                original_info['SVLEN'] = end_int - original_start
                 l_split[
                     7
-                ] = f'SVTYPE={alt_allele};SVLEN={end_int - original_start};{original_end}'
+                ] = ';'.join(f'{k}={v}' for k, v in original_info.items())
 
                 # put it together and what have you got?
                 # bippidy boppidy boo
