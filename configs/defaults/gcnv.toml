@@ -24,3 +24,4 @@ sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/s
 external_af_population = ['ALL', 'AFR', 'AMR', 'EAS', 'EUR']
 external_af_ref_bed_prefix = 'gnomad_v2.1_sv'
 noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
+strvctvre_phylop = 'gs://cpg-common-test/references/hg38.phyloP100way.bw'
