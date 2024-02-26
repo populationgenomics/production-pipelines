@@ -255,11 +255,11 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.genotyped_intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.genotyped_intervals.vcf.gz.tbi',
-            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.genotyped_segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.genotyped_segments.vcf.gz.tbi',
-            'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.denoised_copy_ratios.tsv',
+            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz',
+            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
+            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.segments.vcf.gz',
+            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.segments.vcf.gz.tbi',
+            'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.ratios.tsv',
             'qc_status_file': self.prefix / f'{sequencing_group.id}.qc_status.txt',
         }
 
