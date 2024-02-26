@@ -83,7 +83,7 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
     )
 
 
-def get_expr_for_xpos(locus: hl.LocusExpression) -> hl.Int64Expression:
+def get_expr_for_xpos(locus: hl.LocusExpression | hl.StructExpression) -> hl.Int64Expression:
     """Genomic position represented as a single number = contig_number * 10**9 + position.
     This represents chrom:pos more compactly and allows for easier sorting.
     """
@@ -152,37 +152,28 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     Returns:
         the gene lookup dictionary as a Hail DictExpression
     """
-
     gene_id_mapping = {}
     logging.info(f'Loading {gtf_path}')
-
     with gzip.open(gtf_path, 'rt') as gencode_file:
-
         # iterate over this file and do all the things
         for i, line in enumerate(gencode_file):
             line = line.rstrip('\r\n')
             if not line or line.startswith('#'):
                 continue
             fields = line.split('\t')
-
             if len(fields) != len(GENCODE_FILE_HEADER):
                 raise ValueError(f'Unexpected number of fields on line #{i}: {fields}')
-
             record = dict(zip(GENCODE_FILE_HEADER, fields))
-
             if record['feature_type'] != 'gene':
                 continue
-
             # parse info field
             info_fields_list = [
                 x.strip().split() for x in record['info'].split(';') if x != ''
             ]
             info_fields = {k: v.strip('"') for k, v in info_fields_list}
-
             gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split(
                 '.'
             )[0]
-
     logging.info('Completed ingestion of gene-ID mapping')
     return hl.literal(gene_id_mapping)
 
@@ -213,6 +204,24 @@ def annotate_cohort_sv(
         force_bgz=True,
     )
 
+    # add attributes required for Seqr
+    mt = mt.annotate_globals(
+        sourceFilePath=vcf_path,
+        genomeVersion=genome_build().replace('GRCh', ''),
+        hail_version=hl.version(),
+        datasetType='SV',
+    )
+    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
+        # Map to Seqr-style string
+        # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
+        mt = mt.annotate_globals(
+            sampleType={
+                'genome': 'WGS',
+                'exome': 'WES',
+                'single_cell': 'RNA',
+            }.get(sequencing_type, ''),
+        )
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
@@ -223,7 +232,7 @@ def annotate_cohort_sv(
         end_locus=hl.if_else(
             hl.is_defined(mt.info.END2),
             hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-            hl.struct(contig=mt.locus.contig, position=mt.info.END)
+            hl.struct(contig=mt.locus.contig, position=mt.info.END),
         ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
@@ -231,14 +240,10 @@ def annotate_cohort_sv(
         gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
         gnomad_svs_AC=hl.missing('float64'),
         gnomad_svs_AN=hl.missing('float64'),
-        StrVCTVRE_score=hl.missing('float64'),
         # I DON'T HAVE THESE ANNOTATIONS
         # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
         # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
-        # StrVCTVRE_score=hl.or_missing(
-        #     hl.is_defined(mt.info.StrVCTVRE_score),
-        #     hl.parse_float(mt.info.StrVCTVRE_score),
-        # ),
+        StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         filters=hl.or_missing(  # hopefully this plays nicely
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
             > 0,
@@ -284,6 +289,8 @@ def annotate_cohort_sv(
     # The homologous small variant seqr_loader method performs a similar function
     # but in a slightly more complicated way (mediated by a method in the S-L-P
     # codebase, so as not to trigger Flake8 evaluation)
+    # pos/contig/xpos sourced from
+    # seqr-loading-pipelines...luigi_pipeline/lib/model/seqr_mt_schema.py#L12
     mt = mt.annotate_rows(
         sortedTranscriptConsequences=hl.filter(
             hl.is_defined,
@@ -302,13 +309,26 @@ def annotate_cohort_sv(
                 for gene_col in conseq_predicted_gene_cols
             ],
         ).flatmap(lambda x: x),
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        xpos=get_expr_for_xpos(mt.locus),
+        xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(mt.end_locus),
         rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
         rg37_locus_end=hl.or_missing(
-            mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
-            hl.liftover(hl.locus(mt.end_locus.contig, mt.end_locus.position, reference_genome='GRCh38'), 'GRCh37'),
+            mt.end_locus.position
+            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
+            hl.liftover(
+                hl.locus(
+                    mt.end_locus.contig,
+                    mt.end_locus.position,
+                    reference_genome='GRCh38',
+                ),
+                'GRCh37',
+            ),
         ),
-        syType=mt.sv_types[0],
+        svType=mt.sv_types[0],
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
@@ -333,6 +353,7 @@ def annotate_cohort_sv(
                 lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
             ).map(lambda x: x[GENE_ID])
         ),
+        rsid=hl.missing('tstr'),
     )
 
     # write this output
@@ -343,10 +364,10 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     """
     load the stuff specific to samples in this dataset
     do this after subsetting to specific samples
-    unsure how relevant that is in this case, but who knows
-    This whole section relies heavily on CONC_ST, an annotation we don't have
-    Hopefully this field will appear once we have SV concordance implemented
-    CONC_ST: seqr-loading-pipelines...luigi_pipeline/lib/model/sv_mt_schema.py#L223
+
+    Removing the current logic around comparing genotypes to a previous
+    callset - doesn't fit with the current implementation
+
     Args:
         mt_path (str): path to the annotated MatrixTable
         out_mt_path (str): and where do you want it to end up?
@@ -356,14 +377,14 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
 
     mt = read_hail(mt_path)
     is_called = hl.is_defined(mt.GT)
-    was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
     num_alt = hl.if_else(is_called, mt.GT.n_alt_alleles(), -1)
-    prev_num_alt = hl.if_else(
-        was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
-    )
-    concordant_genotype = num_alt == prev_num_alt
-    discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
-    novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
+    # was_previously_called = hl.is_defined(mt.CONC_ST) & ~mt.CONC_ST.contains('EMPTY')
+    # prev_num_alt = hl.if_else(
+    #     was_previously_called, PREVIOUS_GENOTYPE_N_ALT_ALLELES[hl.set(mt.CONC_ST)], -1
+    # )
+    # concordant_genotype = num_alt == prev_num_alt
+    # discordant_genotype = (num_alt != prev_num_alt) & (prev_num_alt > 0)
+    # novel_genotype = (num_alt != prev_num_alt) & (prev_num_alt == 0)
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
@@ -371,13 +392,13 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 gq=mt.GQ,
                 cn=mt.RD_CN,
                 num_alt=num_alt,
-                prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
-                prev_call=hl.or_missing(
-                    is_called, was_previously_called & concordant_genotype
-                ),
-                new_call=hl.or_missing(
-                    is_called, ~was_previously_called | novel_genotype
-                ),
+                # prev_num_alt=hl.or_missing(discordant_genotype, prev_num_alt),
+                # prev_call=hl.or_missing(
+                #     is_called, was_previously_called & concordant_genotype
+                # ),
+                # new_call=hl.or_missing(
+                #     is_called, ~was_previously_called | novel_genotype
+                # ),
             )
         )
     )
@@ -413,10 +434,12 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/sv_mt_schema.py#L221
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/seqr_mt_schema.py#L251
     mt = mt.annotate_rows(
-        samples=_genotype_filter_samples(lambda g: True),
-        samples_new_alt=_genotype_filter_samples(
-            lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
-        ),
+        # omit samples field for GATKSV callsets. Leaving this here as likely needed
+        # for gCNV specific callsets (maybe)
+        # samples=_genotype_filter_samples(lambda g: True),
+        # samples_new_alt=_genotype_filter_samples(
+        #     lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
+        # ),
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(
             **{
@@ -432,13 +455,16 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 for i in range(0, 90, 10)
             }
         ),
-        samples_cn=hl.struct(
-            **{
-                f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
-                for i in range(0, 4, 1)
-            },
-            gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
-        ),
+        # As per `samples` field, I beleive CN stats should only be generated for gCNV only
+        # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,
+        # presumably because this genotype is only asigned when this CN is alt (ie on chrX)
+        # samples_cn=hl.struct(
+        #     **{
+        #         f'{i}': _genotype_filter_samples(_filter_sample_cn(i))
+        #         for i in range(0, 4, 1)
+        #     },
+        #     gte_4=_genotype_filter_samples(lambda g: g.cn >= 4),
+        # ),
     )
 
     logging.info('Genotype fields annotated')

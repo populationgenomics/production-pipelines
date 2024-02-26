@@ -1,5 +1,6 @@
 [workflow]
 name = 'large_cohort'
+scatter_count = 50
 scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
@@ -7,7 +8,7 @@ ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
@@ -29,9 +30,10 @@ num_pcs = 4
 # demanding higher resources for all operations as standard. Examples below
 
 [large_cohort]
-# Parameters for reladness inference
-max_kin = 0.2  # maximum kin threshold to be considered unrelated in relatedness check (second degree)
-# As in hail docs https://hail.is/docs/0.2/methods/relatedness.html, 0.25
+# Kinship threshold to consider two samples as related.
+# the default threshold for second degree relatives in gnomAD is 0.1:
+# https://github.com/broadinstitute/gnomad_methods/blob/382fc2c7976d58cc8983cc4c9f0df5d8d5f9fae3/gnomad/sample_qc/relatedness.py#L195
+max_kin = 0.1  
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
@@ -51,6 +53,11 @@ pca_plot_name = 'hgdp_1kg_sites'
 # set whether PCA output labels are from given population names, or random forest
 # inferred population labels
 inferred_ancestry = false
+# Whether or not to infer ploidy using the variant data:
+# Using variant sites only for ploidy calculations causes ChrY ploidy inflation.
+# Setting `variants_only_x_ploidy` and `variants_only_y_ploidy` to `False` (default value) causes
+# function to use reference blocks for ploidy calculations
+# https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 
@@ -74,4 +81,3 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
-predetermined_qc_variants = "gs://cpg-hgdp-1kg-test/vds/pruned_variants.ht/"

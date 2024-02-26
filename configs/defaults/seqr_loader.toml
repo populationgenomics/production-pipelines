@@ -10,9 +10,12 @@ use_gnarly = false
 # Use allele-specific annotations for VQSR
 use_as_vqsr = true
 
+# Version of VEP to use, currently operational: 105, 110
+vep_version = '110'
+
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
@@ -71,3 +74,11 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+# temporary overrides until we rename images/config
+[images]
+vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
+
+[references]
+vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"

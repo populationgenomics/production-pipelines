@@ -1,10 +1,31 @@
-[resource_overrides]
-
 # location for any required resource overrides
-
-[resource_overrides.GatherSampleEvidence]
+# these are applied directly to the named workflow
 
 # resource overrides for the GatherSampleEvidence stage
-
-[resource_overrides.GatherSampleEvidence.runtime_attr_wham]
+[resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part1]
 mem_gb = 7.5
+[resource_overrides.GatherSampleEvidence.runtime_attr_wham]
+mem_gb = 16
+# resource overrides for the GatherSampleEvidence stage
+[resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part2]
+mem_gb = 7.5
+
+# resource overrides for the EvidenceQC stage
+[resource_overrides.EvidenceQC.wgd_build_runtime_attr]
+disk_gb = 40
+
+[resource_overrides.EvidenceQC.runtime_attr_mediancov]
+disk_gb = 200
+
+[resource_overrides.MakeCohortVcf]
+run_module_metrics = false
+
+# resource overrides for indirect workflows
+
+[sub_workflow_overrides.EXAMPLE.SubWorkflow.runtime_attr_overrides]
+
+## during MakeCohortVcf, we need to override the resource requirements for the
+## MakeCohortVcfMetrics sub-workflow
+#[sub_workflow_overrides.MakeCohortVcf.MakeCohortVcfMetrics.runtime_attr_vcf_metrics]
+#mem_gb = 20
+#disk_gb = 40

@@ -22,9 +22,8 @@ def add_background(
     """
     Add background dataset samples to the dense MT and sample QC HT.
     """
-    qc_variants_ht = hl.read_table(
-        str(reference_path('gnomad/predetermined_qc_variants'))
-    )
+    sites_table = get_config()['references']['ancestry']['sites_table']
+    qc_variants_ht = hl.read_table(sites_table)
     dense_mt = (
         dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     )

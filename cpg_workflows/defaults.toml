@@ -32,7 +32,7 @@
 
 # Map of stages to lists of sequencing groups, to skip for specific stages
 #[workflow.skip_stages_for_sgs]
-#CramQC = ['CPG13409']
+#CramQC = ['CPGaaa']
 
 # Name of the workflow (to prefix output paths)
 #name =
@@ -69,7 +69,7 @@ check_expected_outputs = true
 
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
-# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPG01234.cram
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
 # Calling intervals (defauls to whole genome intervals)
@@ -84,6 +84,13 @@ reblock_gq_bands = [20, 30, 40]
 # Will skip any communication with Metamist, Hail Batch, and Cloud Storage, so
 # the code can be run without permissions.
 #dry_run = true
+
+# if this argument is set to True, the GQL queries executed during pipeline
+# startup will be printed into the Hail Batch logs. These logs are substantial
+# blocks of text, and contain all query results in JSON format. By default the
+# behaviour is to hide this information from logging files.
+# This is relevant in cpg_workflows.metamist.gql_query_optional_logging
+#log_metamist = true
 
 # Map internally used validation sample external_id to truth sample names
 [validation.sample_map]
@@ -104,6 +111,9 @@ delete_scratch_on_exit = false
 # haplotype caller overrides, see production-pipelines PR#381
 # defaults in code are 40 for genomes, none for exomes
 #haplotypecaller_storage = 80
+
+# Use highmem machine type for alignment step
+# align_use_highmem = true
 
 [mito_snv]
 # Example config for broad wdl found here:

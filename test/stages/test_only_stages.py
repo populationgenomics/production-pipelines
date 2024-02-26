@@ -3,9 +3,10 @@ Test building stages DAG.
 """
 
 import pytest
+from cpg_utils.hail_batch import get_batch, reset_batch
 from pytest_mock import MockFixture
 
-from cpg_workflows.workflow import WorkflowError, get_batch, stage
+from cpg_workflows.workflow import WorkflowError, stage
 
 from .. import set_config
 from . import TestStage, run_workflow
@@ -78,7 +79,6 @@ def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_st
     conf = create_config(tmp_path, allow_missing_outputs_for_stages=['A'])
     set_config(conf, tmp_path / 'config.toml')
     run_workflow(mocker, stages=[C1, C2])
-
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage
     assert get_batch().job_by_stage['B1']['job_n'] == 1

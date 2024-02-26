@@ -5,28 +5,24 @@ Reimplemented version of;
 https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/MitochondriaPipeline.wdl
 
 """
-from typing import Any
 
 import hailtop.batch as hb
-from hailtop.batch.job import Job
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch, reference_path
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align
 from cpg_workflows.stages.cram_qc import CramQC
-from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
-    stage,
+    SequencingGroup,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
-    SequencingGroup,
+    stage,
 )
-
 
 MITO_REF = {
     'dict': str(reference_path('gnomad_mito/dict')),
@@ -52,8 +48,12 @@ SHIFTED_MITO_REF = {
 }
 
 CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': str(reference_path('gnomad_mito/shifted_control_region_interval')),
-    'non_control_region':  str(reference_path('gnomad_mito/non_control_region_interval')),
+    'control_region_shifted': str(
+        reference_path('gnomad_mito/shifted_control_region_interval')
+    ),
+    'non_control_region': str(
+        reference_path('gnomad_mito/non_control_region_interval')
+    ),
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
@@ -270,9 +270,7 @@ class RealignMito(SequencingGroupStage):
         )
 
 
-@stage(
-    required_stages=[RealignMito, CramQC]
-)
+@stage(required_stages=[RealignMito, CramQC])
 class GenotypeMito(SequencingGroupStage):
     """
     Call SNVs in the mitochondrial genome of a single sequencing_group.
@@ -511,7 +509,10 @@ class MitoReport(SequencingGroupStage):
         web = sequencing_group.dataset.web_prefix()
         return {
             'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.gz',
-            'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
+            'mitoreport': web
+            / 'mito'
+            / f'mitoreport-{sequencing_group.id}'
+            / 'index.html',
         }
 
     def queue_jobs(
@@ -521,12 +522,12 @@ class MitoReport(SequencingGroupStage):
         jobs = []
 
         vep_j = vep.vep_one(
-                    get_batch(),
-                    vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
-                    out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
-                    out_format='vcf',
-                    job_attrs=self.get_job_attrs(sequencing_group),
-                )
+            get_batch(),
+            vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
+            out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            out_format='vcf',
+            job_attrs=self.get_job_attrs(sequencing_group),
+        )
         if vep_j:
             jobs.append(vep_j)
 

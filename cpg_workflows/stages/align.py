@@ -2,19 +2,19 @@
 Stage that generates a CRAM file.
 """
 import logging
-from cloudpathlib import CloudPath
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch
+
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
     SequencingGroup,
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
 
 
@@ -28,9 +28,14 @@ class Align(SequencingGroupStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
+        if sequencing_group.cram:
+            cram_path = sequencing_group.cram
+        else:
+            cram_path = sequencing_group.make_cram_path()
+
         return {
-            'cram': sequencing_group.make_cram_path().path,
-            'crai': sequencing_group.make_cram_path().index_path,
+            'cram': cram_path.path,
+            'crai': cram_path.index_path,
         }
 
     def queue_jobs(
@@ -78,5 +83,5 @@ class Align(SequencingGroupStage):
                 )  # return empty output
             else:
                 return self.make_outputs(
-                    target=sequencing_group, error_msg=f'No alignment input found'
+                    target=sequencing_group, error_msg='No alignment input found'
                 )

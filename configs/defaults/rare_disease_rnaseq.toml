@@ -1,0 +1,10 @@
+[workflow]
+sequencing_type = "transcriptome"
+
+[trim]
+adapter_type = "ILLUMINA_TRUSEQ"
+
+[references.star]
+ref_dir = "gs://cpg-common-main/references/star/2.7.10b/hg38"
+gtf = "gs://cpg-common-main/references/star/hg38/hg38.gtf"
+fasta = "gs://cpg-common-main/references/star/hg38/hg38.fa"

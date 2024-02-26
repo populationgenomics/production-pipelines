@@ -1,9 +1,7 @@
 """
 Utility functions and constants.
 """
-
 import logging
-import hail as hl
 import re
 import string
 import sys
@@ -11,14 +9,14 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
-from os.path import join
+from os.path import basename, dirname, join
 from random import choices
-from typing import cast, Union
+from typing import Union, cast
 
-from hailtop.batch import ResourceFile
-
+import hail as hl
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
+from hailtop.batch import ResourceFile
 
 
 def read_hail(path):
@@ -38,35 +36,42 @@ def read_hail(path):
     return t
 
 
-def checkpoint_hail(t, file_name: str, checkpoint_prefix: str | None = None):
-    if checkpoint_prefix:
-        path = join(checkpoint_prefix, file_name)
-        if can_reuse(path):
-            t = read_hail(str(path))
-        else:
-            t.write(str(path), overwrite=True)
-            logging.info(f'Wrote checkpoint {path}')
-            t = read_hail(str(path))
-    return t
-
-
-def missing_from_pre_collected(test: set[Path], known: set[Path]) -> Path | None:
+def checkpoint_hail(
+        t: hl.Table | hl.MatrixTable,
+        file_name: str,
+        checkpoint_prefix: str | None = None,
+        allow_reuse=False
+):
     """
-    Check if a path exists in a set of known paths.
-
-    This is useful when checking if a path exists in a set of paths that were
-    already collected. This method has been included to permit simple mocking
+    checkpoint method
+    provide with a path and a prefix (GCP directory, can be None)
+    allow_reuse sets whether the checkpoint can be reused - we
+    typically want to avoid reuse, as it means we're continuing a previous
+    failure from an unknown state
 
     Args:
-        test (set[Path]): all the files we want to check
-        known (set[Path]): all the files we know about
-
-    Returns:
-        Path | None: the first path that is missing from the known set, or None
-            Path is arbitrary, as the set is unordered
-            None indicates No missing files
+        t (hl.Table | hl.MatrixTable):
+        file_name (str): name for this checkpoint
+        checkpoint_prefix (str): path to the checkpoint directory
+        allow_reuse (bool): whether to permit reuse of an existing checkpoint
     """
-    return next((p for p in test if p not in known), None)
+
+    # drop the schema here
+    t.describe()
+
+    # log the current number of partitions
+    logging.info(f'Checkpointing object as {t.n_partitions()} partitions')
+
+    if checkpoint_prefix is None:
+        return t
+
+    path = join(checkpoint_prefix, file_name)
+    if can_reuse(path) and allow_reuse:
+        logging.info(f'Re-using {path}')
+        return read_hail(path)
+
+    logging.info(f'Checkpointing {path}')
+    return t.checkpoint(path, overwrite=True)
 
 
 @lru_cache
@@ -104,14 +109,45 @@ def exists_not_cached(path: Path | str, verbose: bool = True) -> bool:
     if verbose:
         # noinspection PyBroadException
         try:
-            res = path.exists()
+            res = check_exists_path(path)
+
+        # a failure to detect the parent folder causes a crash
+        # instead stick to a core responsibility -
+        # existence = False
+        except FileNotFoundError as fnfe:
+            logging.error(f'Failed checking {path}')
+            logging.error(f'{fnfe}')
+            return False
         except BaseException:
             traceback.print_exc()
             logging.error(f'Failed checking {path}')
             sys.exit(1)
         logging.debug(f'Checked {path} [' + ('exists' if res else 'missing') + ']')
         return res
-    return path.exists()
+
+    return check_exists_path(path)
+
+
+def check_exists_path(test_path: Path) -> bool:
+    """
+    Check whether a path exists using a cached per-directory listing.
+    NB. reversion to Strings prevents a get call, which is typically
+    forbidden to local users - this prevents this method being used in the
+    metamist audit processes
+    """
+    return basename(str(test_path)) in get_contents_of_path(dirname(str(test_path)))
+
+
+@lru_cache
+def get_contents_of_path(test_path: str) -> set[str]:
+    """
+    Get the contents of a GCS path, returning non-complete paths, eg:
+
+        get_contents_of_path('gs://my-bucket/my-dir/')
+        'my-file.txt'
+
+    """
+    return {f.name for f in to_path(test_path.rstrip('/')).iterdir()}
 
 
 def can_reuse(

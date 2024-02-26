@@ -5,23 +5,25 @@ from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    CohortStage,
-    StageInputNotFoundError,
-    Cohort,
-    SequencingGroupStage,
-    get_workflow,
-)
+from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
-from .joint_genotyping import JointGenotyping
-from .. import get_cohort, get_batch
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    SequencingGroupStage,
+    StageInput,
+    StageInputNotFoundError,
+    StageOutput,
+    get_workflow,
+    stage,
+)
+
+from .. import get_cohort
 from ..jobs.happy import happy
 from ..targets import SequencingGroup
+from .joint_genotyping import JointGenotyping
 
 
 @stage(required_stages=JointGenotyping)
@@ -123,8 +125,9 @@ class JointVcfHappy(SequencingGroupStage):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
     import json
+
+    from cloudpathlib import CloudPath
 
     with CloudPath(output_path).open() as f:
         d = json.load(f)
@@ -151,19 +154,19 @@ class JointVcfMultiQC(CohortStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-
+        h = get_workflow().output_version
         return {
-            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / 'multiqc.html',
+            'html': cohort.analysis_dataset.web_prefix()
+            / 'qc'
+            / 'jc'
+            / h
+            / 'multiqc.html',
             'json': cohort.analysis_dataset.prefix()
             / 'qc'
             / 'jc'
-            / get_workflow().output_version
+            / h
             / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix()
-            / 'qc'
-            / 'jc'
-            / get_workflow().output_version
-            / '.checks',
+            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

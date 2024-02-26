@@ -41,9 +41,10 @@ def test_last_stages(mocker: MockFixture, tmp_path):
     dry_run = true
     """
     set_config(conf, tmp_path / 'config.toml')
-    run_workflow(mocker)
 
-    from cpg_workflows.workflow import get_batch
+    from cpg_utils.hail_batch import get_batch
+
+    run_workflow(mocker)
 
     print('Job by stage:', get_batch().job_by_stage)
     assert 'A' not in get_batch().job_by_stage

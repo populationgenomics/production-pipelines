@@ -2,6 +2,7 @@
 Test large-cohort workflow.
 """
 
+import os
 from os.path import exists
 from pathlib import Path
 
@@ -70,6 +71,11 @@ def create_config(
         },
         references={
             'genome_build': 'GRCh38',
+            'ancestry': {
+                'sites_table': (
+                    gnomad_prefix / 'sample_qc-test' / 'pre_ld_pruning_qc_variants.ht'
+                ),
+            },
             'gnomad': {
                 'tel_and_cent_ht': (
                     gnomad_prefix
@@ -93,20 +99,19 @@ def create_config(
                     / 'mills'
                     / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
                 ),
-                'predetermined_qc_variants': (
-                    gnomad_prefix / 'sample_qc' / 'pre_ld_pruning_qc_variants.ht'
-                ),
             },
-            'broad': {
-                'genome_calling_interval_lists': (
-                    broad_prefix / 'wgs_calling_regions.hg38.interval_list'
-                ),
+            'gatk_sv': {
                 'protein_coding_gtf': (
                     broad_prefix
                     / 'sv-resources'
                     / 'resources'
                     / 'v1'
                     / 'MANE.GRCh38.v0.95.select_ensembl_genomic.gtf'
+                ),
+            },
+            'broad': {
+                'genome_calling_interval_lists': (
+                    broad_prefix / 'wgs_calling_regions.hg38.interval_list'
                 ),
             },
         },
@@ -154,6 +159,14 @@ class TestAllLargeCohortMethods:
             'cpg_workflows.inputs.create_cohort',
             lambda: _mock_cohort(conf.workflow.dataset),
         )
+        # skip can_reuse, implicit skip of existence checks
+        mocker.patch('cpg_workflows.large_cohort.combiner.can_reuse', lambda x: False)
+        mocker.patch(
+            'cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False
+        )
+        mocker.patch(
+            'cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False
+        )
 
         start_query_context()
 
@@ -163,15 +176,15 @@ class TestAllLargeCohortMethods:
 
         sample_qc_ht_path = res_pref / 'sample_qc.ht'
         sample_qc.run(
-            vds_path=vds_path,
-            out_sample_qc_ht_path=sample_qc_ht_path,
-            tmp_prefix=res_pref / 'tmp',
+            vds_path=str(vds_path),
+            out_sample_qc_ht_path=str(sample_qc_ht_path),
+            tmp_prefix=os.path.join(res_pref, 'tmp'),
         )
 
         dense_mt_path = res_pref / 'dense.mt'
         dense_subset.run(
-            vds_path=vds_path,
-            out_dense_mt_path=dense_mt_path,
+            vds_path=str(vds_path),
+            out_dense_mt_path=str(dense_mt_path),
         )
 
         relateds_to_drop_ht_path = res_pref / 'relateds_to_drop.ht'

@@ -2,30 +2,32 @@
 single-sample components of the GATK SV workflow
 """
 import logging
+from random import randint
 from typing import Any
 
 from cpg_utils import Path
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import (
-    stage,
-    SequencingGroupStage,
-    StageOutput,
-    StageInput,
-    SequencingGroup,
-    Cohort,
-    CohortStage,
-)
-from cpg_workflows.jobs import sample_batching
+from cpg_utils.hail_batch import get_batch
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 
+from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    CromwellJobSizes,
+    SV_CALLERS,
+    _sv_individual_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
     get_references,
-    _sv_individual_meta,
-    SV_CALLERS,
 )
-from cpg_utils.config import get_config
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    SequencingGroup,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput,
+    stage,
+)
 
 
 @stage(
@@ -95,15 +97,15 @@ class GatherSampleEvidence(SequencingGroupStage):
         """
         assert sequencing_group.cram, sequencing_group
 
-        input_dict: dict[str, Any] = {
-            'bam_or_cram_file': str(sequencing_group.cram),
-            'bam_or_cram_index': str(sequencing_group.cram) + '.crai',
-            'sample_id': sequencing_group.id,
-            'reference_fasta': str(get_fasta()),
-            'reference_index': str(get_fasta()) + '.fai',
-            'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'reference_version': '38',
-        }
+        input_dict: dict[str, Any] = dict(
+            bam_or_cram_file=str(sequencing_group.cram),
+            bam_or_cram_index=str(sequencing_group.cram) + '.crai',
+            sample_id=sequencing_group.id,
+            reference_fasta=str(get_fasta()),
+            reference_index=str(get_fasta()) + '.fai',
+            reference_dict=str(get_fasta().with_suffix('.dict')),
+            reference_version='38',
+        )
 
         input_dict |= get_images(
             [
@@ -131,18 +133,23 @@ class GatherSampleEvidence(SequencingGroupStage):
             ]
         )
 
-        # find any additional arguments to pass to Cromwell
-        if override := get_config()['resource_overrides'].get('GatherSampleEvidence'):
-            input_dict |= override
-
         expected_d = self.expected_outputs(sequencing_group)
 
         # billing labels!
+        # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
+        # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
-            'dataset': sequencing_group.dataset.name,
-            'sequencing_group': sequencing_group.id,
+            'dataset': sequencing_group.dataset.name,  # already lowercase
+            'sequencing-group': sequencing_group.id.lower(),  # cpg123123
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
         }
 
+        # add some max-polling interval jitter for each sample
+        # cromwell_status_poll_interval is a number (int, seconds)
+        # this is used to determine how often to poll Cromwell for completion status
+        # we alter the per-sample maximum to be between 5 and 30 minutes for this
+        # long-running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=sequencing_group.dataset,
@@ -151,6 +158,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             expected_out_dict=expected_d,
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
+            job_size=CromwellJobSizes.LARGE,
         )
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
@@ -209,17 +217,28 @@ class EvidenceQC(CohortStage):
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
+
+        # runs for approx 5 hours, depending on sample count
         jobs = add_gatk_sv_jobs(
             batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
+@stage(
+    required_stages=EvidenceQC,
+    analysis_type='sv',
+    analysis_keys=['batch_json_negative', 'batch_json_positive'],
+    tolerate_missing_output=True,
+)
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
@@ -238,7 +257,10 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'pcr_{pcr_status}_batches.json'}
+        return {
+            'batch_json_positive': self.prefix / 'pcr_positive_batches.json',
+            'batch_json_negative': self.prefix / 'pcr_negative_batches.json',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         expected = self.expected_outputs(cohort)
@@ -249,10 +271,12 @@ class CreateSampleBatches(CohortStage):
                 'exome': [sg.id for sg in cohort.get_sequencing_groups()]
             }
         # within exomes, divide into PCR- and all other sequencing groups
+        # this logic is currently invalid, as pcr_status isn't populated
+        # TODO resolve issue #575
         else:
             sequencing_group_types = {'positive': [], 'negative': []}
             for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'unknown') == 'negative':
+                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
                     sequencing_group_types['negative'].append(sequencing_group.id)
                 else:
                     sequencing_group_types['positive'].append(sequencing_group.id)
@@ -277,7 +301,7 @@ class CreateSampleBatches(CohortStage):
                 sample_batching.partition_batches,
                 inputs.as_dict(cohort, EvidenceQC)['qc_table'],
                 sequencing_groups,
-                expected['batch_json'],
+                expected[f'batch_json_{status}'],
                 min_batch_size,
                 max_batch_size,
             )

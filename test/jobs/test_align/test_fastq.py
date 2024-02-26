@@ -119,7 +119,7 @@ class TestDragmap:
             r'dragen-os -r \${BATCH_TMPDIR}/inputs/\w+'
             r' -1 \$BATCH_TMPDIR/R1\.fq\.gz -2 \$BATCH_TMPDIR/R2\.fq\.gz'
             fr'.*--RGID {sg.id} --RGSM {sg.id}'
-            r' \| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam'
+            r'.* \| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam'
         )
 
         for job in align_jobs:
