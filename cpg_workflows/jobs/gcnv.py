@@ -42,7 +42,7 @@ def prepare_intervals(
 
     if sequencing_type == 'exome':
         intervals = get_batch().read_input(
-            str(reference_path('broad/exome_calling_interval_lists'))
+            get_config()['workflow'].get('intervals_path')
         )
         preprocess_cmd = f"""
         gatk PreprocessIntervals \\
