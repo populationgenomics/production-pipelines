@@ -192,10 +192,8 @@ class GCNVJointSegmentation(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         return {
-            'clustered_vcf': self.prefix
-            / 'JointClusteredSegments.vcf.gz',
-            'clustered_vcf_idx': self.prefix
-            / 'JointClusteredSegments.vcf.gz.tbi',
+            'clustered_vcf': self.prefix / 'JointClusteredSegments.vcf.gz',
+            'clustered_vcf_idx': self.prefix / 'JointClusteredSegments.vcf.gz.tbi',
             'pedigree': self.tmp_prefix / 'pedigree.ped',
             'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
         }
@@ -242,7 +240,14 @@ class GCNVJointSegmentation(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
 
 
-@stage(required_stages=[GCNVJointSegmentation, GermlineCNV, GermlineCNVCalls, DeterminePloidy])
+@stage(
+    required_stages=[
+        GCNVJointSegmentation,
+        GermlineCNV,
+        GermlineCNVCalls,
+        DeterminePloidy,
+    ]
+)
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
     following joint segmentation, we need to post-process the clustered breakpoints
@@ -255,10 +260,14 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
-            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.segments.vcf.gz.tbi',
+            'genotyped_intervals_vcf': self.prefix
+            / f'{sequencing_group.id}.intervals.vcf.gz',
+            'genotyped_intervals_vcf_index': self.prefix
+            / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
+            'genotyped_segments_vcf': self.prefix
+            / f'{sequencing_group.id}.segments.vcf.gz',
+            'genotyped_segments_vcf_index': self.prefix
+            / f'{sequencing_group.id}.segments.vcf.gz.tbi',
             'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.ratios.tsv',
             'qc_status_file': self.prefix / f'{sequencing_group.id}.qc_status.txt',
         }
@@ -278,7 +287,9 @@ class RecalculateClusteredQuality(SequencingGroupStage):
             determine_ploidy['calls'],
             inputs.as_dict(get_cohort(), GermlineCNV),
             # FIXME get the sample index via sample_name.txt files instead
-            sequencing_group.dataset.get_sequencing_group_ids().index(sequencing_group.id),
+            sequencing_group.dataset.get_sequencing_group_ids().index(
+                sequencing_group.id
+            ),
             self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
@@ -385,11 +396,9 @@ def _gcnv_srvctvre_meta(
     required_stages=AnnotateCNV,
     analysis_type='sv',
     analysis_keys=['strvctvre_vcf'],
-    update_analysis_meta=_gcnv_srvctvre_meta
+    update_analysis_meta=_gcnv_srvctvre_meta,
 )
-class AnnotateCNVVcfWithStrvctvre(
-    CohortStage
-):
+class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'strvctvre_vcf': self.prefix / 'cnv_strvctvre_annotated.vcf.bgz',
@@ -418,7 +427,10 @@ class AnnotateCNVVcfWithStrvctvre(
         )['vcf']
 
         strv_job.declare_resource_group(
-            output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+            output_vcf={
+                'vcf.bgz': '{root}.vcf.bgz',
+                'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+            }
         )
 
         # run strvctvre
@@ -432,7 +444,8 @@ class AnnotateCNVVcfWithStrvctvre(
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
         get_batch().write_output(
-            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.bgz', '')
+            strv_job.output_vcf,
+            str(expected_d['strvctvre_vcf']).replace('.vcf.bgz', ''),
         )
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
@@ -452,7 +465,7 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
         # convert temp path to str to avoid checking existence
         return {
             'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'gcnv_annotated_cohort.mt'
+            'mt': self.prefix / 'gcnv_annotated_cohort.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -460,7 +473,9 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
         Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = inputs.as_path(
+            target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf'
+        )
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'

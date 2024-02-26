@@ -5,17 +5,12 @@ Jobs that implement GATK-gCNV.
 from collections.abc import Iterable
 
 from hailtop.batch.job import Job
-from hailtop.batch.resource import (
-    JobResourceFile,
-    ResourceFile,
-    ResourceGroup
-)
+from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import reference_path
 from cpg_workflows.utils import can_reuse, chunks
 
 
@@ -287,7 +282,11 @@ def postprocess_calls(
 ) -> Job:
 
     if any([clustered_vcf, intervals_vcf, qc_file]):
-        assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
+        assert all([clustered_vcf, intervals_vcf, qc_file]), [
+            clustered_vcf,
+            intervals_vcf,
+            qc_file,
+        ]
 
     j = get_batch().new_job(
         'Postprocess gCNV calls',
@@ -308,7 +307,9 @@ def postprocess_calls(
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
+        gcp_related_commands.append(
+            f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs'
+        )
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
 
@@ -332,14 +333,23 @@ def postprocess_calls(
 
     extra_args = ''
     if clustered_vcf:
-        local_clusters = get_batch().read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi').vcf
-        local_intervals = get_batch().read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi').vcf
+        local_clusters = (
+            get_batch()
+            .read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi')
+            .vcf
+        )
+        local_intervals = (
+            get_batch()
+            .read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi')
+            .vcf
+        )
         extra_args += f"""--clustered-breakpoints {local_clusters} \\
          --input-intervals-vcf {local_intervals} \\
           -R {reference.base}
         """
 
-    j.command(f"""
+    j.command(
+        f"""
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
     BATCH_OUTS=$(dirname $OUTS)
     mkdir $OUTS
@@ -352,20 +362,24 @@ def postprocess_calls(
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
       --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
       {extra_args}
-    """)
+    """
+    )
 
     # index the output VCFs - GATK does this already?
     # or maybe it only generates indexes when the clustered input is provided
-    j.command(f"""
+    j.command(
+        f"""
     tabix -f {j.output['intervals.vcf.gz']}
     tabix -f {j.output['segments.vcf.gz']}
-    """)
+    """
+    )
 
     if clustered_vcf:
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
         # do some additional stuff to determine pass/fail
-        j.command(f"""
+        j.command(
+            f"""
         #use wc instead of grep -c so zero count isn't non-zero exit
         #use grep -P to recognize tab character
         NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
@@ -379,7 +393,8 @@ def postprocess_calls(
         else
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
-        """)
+        """
+        )
         get_batch().write_output(j.qc_file, qc_file)
 
     get_batch().write_output(j.output, output_prefix)
@@ -622,7 +637,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 original_start = int(l_split[1])
 
                 # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
-                original_info = d = dict(el.split('=') for el in  l_split[7].split(';'))
+                original_info = d = dict(el.split('=') for el in l_split[7].split(';'))
 
                 # steal the END integer
                 end_int = int(original_info['END'])
@@ -639,9 +654,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
                 original_info['SVLEN'] = end_int - original_start
-                l_split[
-                    7
-                ] = ';'.join(f'{k}={v}' for k, v in original_info.items())
+                l_split[7] = ';'.join(f'{k}={v}' for k, v in original_info.items())
 
                 # put it together and what have you got?
                 # bippidy boppidy boo
