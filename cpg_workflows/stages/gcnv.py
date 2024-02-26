@@ -452,7 +452,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
 @stage(
     required_stages=AnnotateCNVVcfWithStrvctvre,
-    analysis_type='es-index',
+    analysis_type='sv',
     analysis_keys=['mt'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
