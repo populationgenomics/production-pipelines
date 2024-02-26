@@ -1,6 +1,7 @@
 """
 Test large-cohort workflow.
 """
+
 import os
 from os.path import exists
 from pathlib import Path
@@ -99,16 +100,18 @@ def create_config(
                     / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
                 ),
             },
-            'broad': {
-                'genome_calling_interval_lists': (
-                    broad_prefix / 'wgs_calling_regions.hg38.interval_list'
-                ),
+            'gatk_sv': {
                 'protein_coding_gtf': (
                     broad_prefix
                     / 'sv-resources'
                     / 'resources'
                     / 'v1'
                     / 'MANE.GRCh38.v0.95.select_ensembl_genomic.gtf'
+                ),
+            },
+            'broad': {
+                'genome_calling_interval_lists': (
+                    broad_prefix / 'wgs_calling_regions.hg38.interval_list'
                 ),
             },
         },
