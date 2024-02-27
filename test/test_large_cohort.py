@@ -27,7 +27,6 @@ from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
 from .factories.types import SequencingType
 
-
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
 broad_prefix = ref_prefix / 'hg38/v0'
@@ -224,11 +223,11 @@ class TestAllLargeCohortMethods:
 
         siteonly_vcf_path = res_pref / 'siteonly.vcf.bgz'
         site_only_vcf.run(
-            vds_path=vds_path,
-            sample_qc_ht_path=sample_qc_ht_path,
-            relateds_to_drop_ht_path=relateds_to_drop_ht_path,
-            out_vcf_path=siteonly_vcf_path,
-            tmp_prefix=res_pref / 'tmp',
+            vds_path=str(vds_path),
+            sample_qc_ht_path=str(sample_qc_ht_path),
+            relateds_to_drop_ht_path=str(relateds_to_drop_ht_path),
+            out_vcf_path=str(siteonly_vcf_path),
+            tmp_prefix=str(res_pref / 'tmp'),
         )
 
         assert exists(vds_path)
