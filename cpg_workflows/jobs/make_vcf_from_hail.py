@@ -33,9 +33,7 @@ from cpg_workflows.utils import chunks
 
 LOGGER = logging.getLogger(__name__)
 handler = logging.StreamHandler()
-formatter = logging.Formatter(
-    '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 handler.setFormatter(formatter)
 LOGGER.addHandler(handler)
 LOGGER.setLevel(logging.INFO)
@@ -66,17 +64,25 @@ def read_hail(path: str) -> hl.Table | hl.MatrixTable | hl.vds.VariantDataset:
     if path.strip('/').endswith('.ht'):
         LOGGER.info('Reading Table')
         t = hl.read_table(path)
-        t = hl.read_matrix_table(path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS))
+        t = hl.read_matrix_table(
+            path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS)
+        )
     else:
         assert path.strip('/').endswith('.mt')
         LOGGER.info('Reading MT')
         t = hl.read_matrix_table(path)
-        t = hl.read_matrix_table(path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS))
-    LOGGER.info(f'Read data from {path} - dimensions: {t.count()}, partitions: {t.n_partitions()}')
+        t = hl.read_matrix_table(
+            path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS)
+        )
+    LOGGER.info(
+        f'Read data from {path} - dimensions: {t.count()}, partitions: {t.n_partitions()}'
+    )
     return t
 
 
-def vds_processing(obj: hl.vds.VariantDataset, sites_only: bool = False) -> hl.MatrixTable | hl.Table:
+def vds_processing(
+    obj: hl.vds.VariantDataset, sites_only: bool = False
+) -> hl.MatrixTable | hl.Table:
     """
     Process a VDS object - either densify if we need the full MT
     or just break off the variant MT.rows() if sites_only
@@ -113,7 +119,6 @@ def make_sites_only(obj: hl.MatrixTable | hl.Table) -> hl.MatrixTable | hl.Table
         return obj
     LOGGER.info('No further processing applied, assuming VDS')
     return obj
-
 
 
 def create_vcf_from_hail(
@@ -172,7 +177,9 @@ def create_vcf_from_hail(
     # read lines, create a script
     # next job localises the script and runs
     # this current approach wouldn't work within a pipeline
-    LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
+    LOGGER.info(
+        'Parsing the manifest file and generating a bash script for concatenating the VCF files'
+    )
     manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
     # there's a ton of possible approaches here - like doing a rolling merge
@@ -195,7 +202,7 @@ def create_vcf_from_hail(
         chunk_job.command(cat_string)
 
         # total, plus margin for error, then doubled for new output file
-        storage_gb = ((storage_bytes * 2.2) // 1024 ** 3) or 1
+        storage_gb = ((storage_bytes * 2.2) // 1024**3) or 1
         total_gb += storage_gb
         chunk_job.storage(f'{storage_gb}Gi')
 
@@ -203,7 +210,9 @@ def create_vcf_from_hail(
     final_job = get_batch().new_job(name='final_merge')
     final_job.image(image_path('bcftools'))
     final_job.storage(f'{total_gb}Gi')
-    final_job.declare_resource_group(output={'vcf.bgz': '{root}', 'vcf.bgz.tbi': '{root}.tbi'})
+    final_job.declare_resource_group(
+        output={'vcf.bgz': '{root}', 'vcf.bgz.tbi': '{root}.tbi'}
+    )
     command = 'cat '
     for sub_chunk in sub_chunks:
         command += f' {sub_chunk} '
