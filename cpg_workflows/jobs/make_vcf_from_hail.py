@@ -170,21 +170,24 @@ def create_vcf_from_hail(
     LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
     manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
+
     # there's a ton of possible approaches here - like doing a rolling merge
     # to reduce the overall amount of space, or splitting the merge into a bunch of different jobs.
     # this is an overly cautious approach, just to see what happens
     total_gb = 0
     sub_chunks = []
     for i, chunk in enumerate(chunks(manifest, 20)):
+        LOGGER.info(f'Processing chunk {chunk}')
         chunk_job = get_batch().new_job(name=f'chunk_{i}')
         # estimate space consumed by this chunk
         storage_bytes = 0
 
         cat_string = 'cat '
         for fragment in chunk:
-            frag_string = str(fragment).strip()
-            storage_bytes += to_path(join(temp, frag_string)).stat().st_size
-            frag_local = chunk_job.read_input(join(temp, frag_string))
+            full_frag_path = join(temp, str(fragment).strip())
+            LOGGER.info(f'Processing fragment {full_frag_path}')
+            storage_bytes += to_path(join(temp, full_frag_path)).stat().st_size
+            frag_local = chunk_job.read_input(join(temp, full_frag_path))
             cat_string += f' {frag_local} '
         cat_string += f' > {chunk_job.output}'
         sub_chunks.append(chunk_job.output)
