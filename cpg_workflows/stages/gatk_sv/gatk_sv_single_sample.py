@@ -2,7 +2,6 @@
 single-sample components of the GATK SV workflow
 """
 import logging
-from random import randint
 from typing import Any
 
 from cpg_utils import Path
