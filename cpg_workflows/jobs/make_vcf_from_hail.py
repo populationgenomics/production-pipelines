@@ -140,34 +140,34 @@ def create_vcf_from_hail(
         temp = os.path.join(temp, 'temp.vcf.bgz')
         LOGGER.info(f'Using edited temp path {temp}')
 
-    # first - decide what to do?
-    assert output_path.endswith('vcf.bgz'), 'Output file must end with vcf.bgz'
-    if not overwrite and to_path(output_path).exists():
-        raise FileExistsError(f'Output file {output_path} already exists')
-
-    # second - load the hail object
-    init_batch()
-    obj = read_hail(input_path)
-
-    # some object-specific processing
-    if isinstance(obj, hl.vds.VariantDataset):
-        obj = vds_processing(obj, sites_only)
-    else:
-        # do some stuff here if sites-only
-        obj = make_sites_only(obj) if sites_only else obj
-
-    # do any filtering/re-partitioning here
-
-    # third - export to vcf using hail's export_vcf method in parallel
-    LOGGER.info('Exporting to multiple temp VCFs')
-    hl.export_vcf(obj, output=temp, parallel='separate_header')
-
-    # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
-    # done in-line here, but equally this could be a separate (python?) job
-    # read lines, create a script
-    # next job localises the script and runs
-    # this current approach wouldn't work within a pipeline
-    LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
+    # # first - decide what to do?
+    # assert output_path.endswith('vcf.bgz'), 'Output file must end with vcf.bgz'
+    # if not overwrite and to_path(output_path).exists():
+    #     raise FileExistsError(f'Output file {output_path} already exists')
+    #
+    # # second - load the hail object
+    # init_batch()
+    # obj = read_hail(input_path)
+    #
+    # # some object-specific processing
+    # if isinstance(obj, hl.vds.VariantDataset):
+    #     obj = vds_processing(obj, sites_only)
+    # else:
+    #     # do some stuff here if sites-only
+    #     obj = make_sites_only(obj) if sites_only else obj
+    #
+    # # do any filtering/re-partitioning here
+    #
+    # # third - export to vcf using hail's export_vcf method in parallel
+    # LOGGER.info('Exporting to multiple temp VCFs')
+    # hl.export_vcf(obj, output=temp, parallel='separate_header')
+    #
+    # # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
+    # # done in-line here, but equally this could be a separate (python?) job
+    # # read lines, create a script
+    # # next job localises the script and runs
+    # # this current approach wouldn't work within a pipeline
+    # LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
     manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
 
@@ -194,19 +194,19 @@ def create_vcf_from_hail(
         chunk_job.command(cat_string)
 
         # total, plus margin for error, then doubled for new output file
-        storage_gb = (storage_bytes * 2.2) // 1024 ** 3
+        storage_gb = ((storage_bytes * 2.2) // 1024 ** 3) or 1
         total_gb += storage_gb
-        chunk_job.storage(storage_gb)
+        chunk_job.storage(f'{storage_gb}Gi')
 
     # and now one big job
     final_job = get_batch().new_job(name='final_merge')
     final_job.image(image_path('bcftools'))
+    final_job.storage(f'{total_gb}Gi')
     final_job.declare_resource_group(output={'vcf.bgz': '{root}', 'vcf.bgz.tbi': '{root}.tbi'})
     command = 'cat '
     for sub_chunk in sub_chunks:
         command += f' {sub_chunk} '
     command += f' > {final_job.output}'
-    final_job.storage(total_gb)
     final_job.command(command)
     final_job.command(f'tabix {final_job.output}')
 
