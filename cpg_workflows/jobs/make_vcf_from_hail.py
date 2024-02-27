@@ -5,7 +5,7 @@ This script is used to convert a hail MatrixTable/Table/VDS to a vcf file.
 Prototype design using hail's parallel export_vcf method.
 
 Usage:
-    make_vcf_from_hail.py <input> <output> [--overwrite]
+    make_vcf_from_hail.py <input> <output> [--overwrite] [--sites_only] [--temp <gs://temp>]
 
 Plan:
 
@@ -47,6 +47,8 @@ MIN_NUM_PARTITIONS = 100
 def read_hail(path: str) -> hl.Table | hl.MatrixTable | hl.vds.VariantDataset:
     """
     read a hail object using the appropriate method
+    if a MT or Table, require a minimum number of partitions to
+    make this parallel operation worthwhile
     TODO is this repartitioning valid?
 
     Args:
@@ -179,15 +181,12 @@ def create_vcf_from_hail(
     total_gb = 0
     sub_chunks = []
     for i, chunk in enumerate(chunks(manifest, 20)):
-        LOGGER.info(f'Processing chunk {chunk}')
         chunk_job = get_batch().new_job(name=f'chunk_{i}')
         # estimate space consumed by this chunk
         storage_bytes = 0
-
         cat_string = 'cat '
         for fragment in chunk:
             full_frag_path = join(temp, str(fragment).strip())
-            LOGGER.info(f'Processing fragment {full_frag_path}')
             storage_bytes += to_path(full_frag_path).stat().st_size
             frag_local = get_batch().read_input(full_frag_path)
             cat_string += f' {frag_local} '
@@ -212,7 +211,7 @@ def create_vcf_from_hail(
     final_job.command(command)
     final_job.command(f'tabix {final_job.output}')
 
-    get_batch().write_output(final_job.output, output_path.removesuffix('vcf.bgz'))
+    get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
     get_batch().run(wait=False)
 
 
