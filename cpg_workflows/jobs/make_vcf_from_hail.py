@@ -66,11 +66,28 @@ def read_hail(path: str) -> hl.Table | hl.MatrixTable | hl.vds.VariantDataset:
         LOGGER.info('Reading MT')
         t = hl.read_matrix_table(path)
         t = hl.read_matrix_table(path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS))
-    LOGGER.info(f'Read data from {path} - ')
+    LOGGER.info(f'Read data from {path} - dimensions: {t.count()}, partitions: {t.n_partitions()}')
     return t
 
+def vds_processing(obj: hl.vds.VariantDataset, sites_only: bool = False) -> hl.MatrixTable | hl.Table
+    """
+    Process a VDS object - either densify if we need the full MT
+    or just break off the variant MT.rows() if sites_only
 
-def make_sites_only(obj: hl.MatrixTable | hl.Table | hl.vds.VariantDataset) -> hl.MatrixTable | hl.Table:
+    Args:
+        obj (hl.vds.VariantDataset): hail object
+
+    Returns:
+        hail object
+    """
+    LOGGER.info('Processing VDS into MT')
+    if sites_only:
+        return obj.variant_data.rows()
+    else:
+        return hl.vds.to_dense_mt(obj)
+
+
+def make_sites_only(obj: hl.MatrixTable | hl.Table) -> hl.MatrixTable | hl.Table:
     """
     Remove genotypes from the hail object if appropriate
 
@@ -82,10 +99,12 @@ def make_sites_only(obj: hl.MatrixTable | hl.Table | hl.vds.VariantDataset) -> h
     LOGGER.info('Removing genotypes if appropriate')
     if isinstance(obj, hl.MatrixTable):
         return obj.rows()
-    if isinstance(obj, hl.vds.VariantDataset):
-        return obj.variant_data.rows()
+    # if isinstance(obj, hl.vds.VariantDataset):
+    #     return obj.variant_data.rows()
     if isinstance(obj, hl.Table):
         return obj
+    LOGGER.info('No further processing applied, assuming VDS')
+    return obj
 
     raise ValueError(f'Unexpected hail object type {type(obj)}')
 
@@ -128,8 +147,12 @@ def create_vcf_from_hail(
     init_batch()
     obj = read_hail(input_path)
 
-    # do some stuff here if sites-only
-    obj = make_sites_only(obj) if sites_only else obj
+    # some object-specific processing
+    if isinstance(obj, hl.vds.VariantDataset):
+        obj = vds_processing(obj, sites_only)
+    else:
+        # do some stuff here if sites-only
+        obj = make_sites_only(obj) if sites_only else obj
 
     # do any filtering/re-partitioning here
 
