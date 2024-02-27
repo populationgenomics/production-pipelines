@@ -54,13 +54,16 @@ def read_hail(path: str) -> hl.Table | hl.MatrixTable | hl.vds.VariantDataset:
         hail object (hl.VDS, hl.MatrixTable, or hl.Table), and a data type
     """
     LOGGER.info(f'Reading data from {path}')
+    if path.strip('/').endswith('.vds'):
+        # not sure if a VDS has a count/partitions equivalent
+        LOGGER.info('Reading VDS')
+        t = hl.vds.read_vds(path)
+        return t
+
     if path.strip('/').endswith('.ht'):
         LOGGER.info('Reading Table')
         t = hl.read_table(path)
         t = hl.read_matrix_table(path, _n_partitions=max(t.n_partitions(), MIN_NUM_PARTITIONS))
-    elif path.strip('/').endswith('.vds'):
-        LOGGER.info('Reading VDS')
-        t = hl.vds.read_vds(path)
     else:
         assert path.strip('/').endswith('.mt')
         LOGGER.info('Reading MT')
