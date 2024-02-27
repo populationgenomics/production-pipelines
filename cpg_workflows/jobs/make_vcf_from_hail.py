@@ -186,8 +186,8 @@ def create_vcf_from_hail(
         for fragment in chunk:
             full_frag_path = join(temp, str(fragment).strip())
             LOGGER.info(f'Processing fragment {full_frag_path}')
-            storage_bytes += to_path(join(temp, full_frag_path)).stat().st_size
-            frag_local = chunk_job.read_input(join(temp, full_frag_path))
+            storage_bytes += to_path(full_frag_path).stat().st_size
+            frag_local = chunk_job.read_input(full_frag_path)
             cat_string += f' {frag_local} '
         cat_string += f' > {chunk_job.output}'
         sub_chunks.append(chunk_job.output)
