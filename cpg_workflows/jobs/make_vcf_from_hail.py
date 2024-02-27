@@ -187,15 +187,6 @@ def create_vcf_from_hail(
 
 if __name__ == '__main__':
 
-    logger = logging.getLogger(__name__)
-    handler = logging.StreamHandler()
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
-    logger.setLevel(logging.INFO)
-
     parser = ArgumentParser()
     parser.add_argument('input', help='Input hail object')
     parser.add_argument('output', help='Output vcf file')
