@@ -138,12 +138,13 @@ def create_vcf_from_hail(
         sites_only (bool): Remove genotypes if appropriate
         temp (str): temp path for partial VCFs, optional
     """
-    if temp:
-        assert temp.startswith('gs://'), 'Temp path must be a GCP path'
-        LOGGER.info(f'Using temp path {temp}')
-    else:
+    if temp is None:
         temp = get_config()['storage']['default']['tmp']
         LOGGER.info(f'Using default temp path {temp}')
+
+    assert isinstance(temp, str), 'Temp path must be a string'
+    assert temp.startswith('gs://'), 'Temp must be a GCP path'
+    LOGGER.info(f'Using temp path {temp}')
 
     # temp needs a `.vcf.bgz` extension, otherwise data is dumped in plain text
     if not temp.endswith('vcf.bgz'):
@@ -185,7 +186,7 @@ def create_vcf_from_hail(
     # there's a ton of possible approaches here - like doing a rolling merge
     # to reduce the overall amount of space, or splitting the merge into a bunch of different jobs.
     # this is an overly cautious approach, just to see what happens
-    total_gb = 0
+    total_gb = 0.0
     sub_chunks = []
     for i, chunk in enumerate(chunks(manifest, 20)):
         chunk_job = get_batch().new_job(name=f'chunk_{i}')
