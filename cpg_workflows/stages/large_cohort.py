@@ -211,8 +211,8 @@ class AncestryPlots(CohortStage):
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'vcf': self.tmp_prefix / 'path_site_only.ht.vcf.bgz',
-            'tbi': self.tmp_prefix / 'path_site_only.ht.vcf.bgz.tbi',
+            'vcf': self.tmp_prefix / 'no_path_siteonly.vcf.bgz',
+            'tbi': self.tmp_prefix / 'no_path_siteonly.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -227,11 +227,11 @@ class MakeSiteOnlyVcf(CohortStage):
             query_command(
                 site_only_vcf,
                 site_only_vcf.run.__name__,
-                inputs.as_path(cohort, Combiner),
-                inputs.as_path(cohort, SampleQC),
-                inputs.as_path(cohort, Relatedness, key='relateds_to_drop'),
-                self.expected_outputs(cohort)['vcf'],
-                self.tmp_prefix,
+                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, SampleQC)),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['vcf']),
+                str(self.tmp_prefix),
                 setup_gcp=True,
             )
         )
