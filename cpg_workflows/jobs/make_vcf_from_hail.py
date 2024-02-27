@@ -168,7 +168,7 @@ def create_vcf_from_hail(
     # # next job localises the script and runs
     # # this current approach wouldn't work within a pipeline
     # LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
-    # manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
+    manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
     # there's a ton of possible approaches here - like doing a rolling merge
     # to reduce the overall amount of space, or splitting the merge into a bunch of different jobs.
