@@ -304,7 +304,7 @@ def clean_ped_family_ids(ped_line: str) -> str:
     >>> clean_ped_family_ids('family1\tchild1\t0\t0\t1\t0\\n')
     'family1\tchild1\t0\t0\t1\t0\\n'
     >>> clean_ped_family_ids('family-1-dirty\tchild1\t0\t0\t1\t0\\n')
-    'family-1-dirty\tchild1\t0\t0\t1\t0\\n'
+    'family_1_dirty\tchild1\t0\t0\t1\t0\\n'
 
     Args:
         ped_line (str): line from the pedigree file, unsplit

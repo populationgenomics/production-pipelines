@@ -24,13 +24,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
-from cpg_workflows.stages.gcnv import (
-    AnnotateCNV,
-    AnnotateCNVVcfWithStrvctvre,
-    AnnotateGCNVCohortForSeqr,
-    GermlineCNVCalls,
-    FastCombineGCNVs,
-)
+from cpg_workflows.stages.gcnv import AnnotateGCNVCohortForSeqr
 from cpg_workflows.stages.aip import (
     GeneratePanelData,
     QueryPanelapp,
@@ -71,7 +65,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
-    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre, AnnotateGCNVCohortForSeqr],
+    'gcnv': [AnnotateGCNVCohortForSeqr],
 }
 
 
