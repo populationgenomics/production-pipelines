@@ -11,10 +11,12 @@ Plan:
 
 1. Load the hail object
 2. Export to vcf using hail's export_vcf method in parallel
-3. Python Job to parse the manifest file and generate a bash script for concatenating the vcf files
-4. Run the bash script to concatenate the vcf files (assuming bgzip'd output files can be directly concatenated)
-5. Index the concatenated vcf file using tabix
-6. Write combined file to GCP
+3. parse the manifest file to identify the chunks in order
+4. Generate a series of Bash jobs to cat together chunks of the output (remove?)
+  - use the GCP entity stat to estimate storage requirements
+5. Concatenate the vcf intermediates
+6. Index the concatenated vcf file using tabix
+7. Write combined file to GCP
 """
 
 import logging
