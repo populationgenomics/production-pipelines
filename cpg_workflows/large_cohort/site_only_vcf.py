@@ -14,17 +14,17 @@ from cpg_workflows.utils import can_reuse
 
 
 def run(
-    vds_path: str,
-    sample_qc_ht_path: str,
-    relateds_to_drop_ht_path: str,
-    out_vcf_path: str,
-    tmp_prefix: str,
+    vds_path: Path,
+    sample_qc_ht_path: Path,
+    relateds_to_drop_ht_path: Path,
+    out_vcf_path: Path,
+    tmp_prefix: Path,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    site_only_ht_path = to_path(tmp_prefix) / f'site_only.ht'
+    site_only_ht_path = tmp_prefix / 'path_site_only.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
@@ -32,7 +32,7 @@ def run(
         out_ht_path=site_only_ht_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
-    assert to_path(out_vcf_path).suffix == '.bgz'
+    assert out_vcf_path.suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
 
 
