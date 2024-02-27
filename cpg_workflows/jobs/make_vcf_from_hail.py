@@ -20,7 +20,6 @@ Plan:
 """
 
 import logging
-import os.path
 from argparse import ArgumentParser
 from os.path import join
 
@@ -141,7 +140,7 @@ def create_vcf_from_hail(
 
     # temp needs a `.vcf.bgz` extension, otherwise data is dumped in plain text
     if not temp.endswith('vcf.bgz'):
-        temp = os.path.join(temp, 'temp.vcf.bgz')
+        temp = join(temp, 'temp.vcf.bgz')
         LOGGER.info(f'Using edited temp path {temp}')
 
     # first - decide what to do?
