@@ -147,28 +147,28 @@ def create_vcf_from_hail(
 
     # second - load the hail object
     init_batch()
-    obj = read_hail(input_path)
-
-    # some object-specific processing
-    if isinstance(obj, hl.vds.VariantDataset):
-        obj = vds_processing(obj, sites_only)
-    else:
-        # do some stuff here if sites-only
-        obj = make_sites_only(obj) if sites_only else obj
-
-    # do any filtering/re-partitioning here
-
-    # third - export to vcf using hail's export_vcf method in parallel
-    LOGGER.info('Exporting to multiple temp VCFs')
-    hl.export_vcf(obj, output=temp, parallel='separate_header')
-
-    # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
-    # done in-line here, but equally this could be a separate (python?) job
-    # read lines, create a script
-    # next job localises the script and runs
-    # this current approach wouldn't work within a pipeline
-    LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
-    manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
+    # obj = read_hail(input_path)
+    #
+    # # some object-specific processing
+    # if isinstance(obj, hl.vds.VariantDataset):
+    #     obj = vds_processing(obj, sites_only)
+    # else:
+    #     # do some stuff here if sites-only
+    #     obj = make_sites_only(obj) if sites_only else obj
+    #
+    # # do any filtering/re-partitioning here
+    #
+    # # third - export to vcf using hail's export_vcf method in parallel
+    # LOGGER.info('Exporting to multiple temp VCFs')
+    # hl.export_vcf(obj, output=temp, parallel='separate_header')
+    #
+    # # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
+    # # done in-line here, but equally this could be a separate (python?) job
+    # # read lines, create a script
+    # # next job localises the script and runs
+    # # this current approach wouldn't work within a pipeline
+    # LOGGER.info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
+    # manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
     # there's a ton of possible approaches here - like doing a rolling merge
     # to reduce the overall amount of space, or splitting the merge into a bunch of different jobs.
