@@ -211,14 +211,12 @@ class AncestryPlots(CohortStage):
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'vcf': get_workflow().prefix / 'no_dp_siteonly.vcf.bgz',
-            'tbi': get_workflow().prefix / 'no_dp_siteonly.vcf.bgz.tbi',
+            'vcf': self.tmp_prefix / 'siteonly.vcf.bgz',
+            'tbi': self.tmp_prefix / 'siteonly.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import site_only_vcf
-
-        output_prefix = get_workflow().prefix
 
         j = get_batch().new_job(
             'MakeSiteOnlyVcf', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
@@ -234,8 +232,6 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
-                str(output_prefix),
-                'no_dp',
                 setup_gcp=True,
             )
         )

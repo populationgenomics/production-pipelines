@@ -19,21 +19,12 @@ def run(
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
     tmp_prefix: str,
-    output_prefix: str,
-    dp_status: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    vds_path = to_path(vds_path)
-    sample_qc_ht_path = to_path(sample_qc_ht_path)
-    relateds_to_drop_ht_path = to_path(relateds_to_drop_ht_path)
-    out_vcf_path = to_path(out_vcf_path)
-    tmp_prefix = to_path(tmp_prefix)
-    output_prefix = to_path(output_prefix)
-
-    site_only_ht_path = output_prefix / f'{dp_status}_site_only.ht'
+    site_only_ht_path = to_path(tmp_prefix) / f'site_only.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
@@ -41,7 +32,7 @@ def run(
         out_ht_path=site_only_ht_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
-    assert out_vcf_path.suffix == '.bgz'
+    assert to_path(out_vcf_path).suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
 
 
