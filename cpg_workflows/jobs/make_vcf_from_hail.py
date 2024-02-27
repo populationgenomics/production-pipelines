@@ -201,15 +201,15 @@ def create_vcf_from_hail(
         sub_chunks.append(chunk_job.output)
         chunk_job.command(cat_string)
 
-        # total, plus margin for error, then doubled for new output file
-        storage_gb = ((storage_bytes * 2.2) // 1024**3) or 1
+        # total, plus 10% margin for error, then doubled for new output file
+        storage_gb = ((storage_bytes * 2.2) // 1024**2) or 1
         total_gb += storage_gb
-        chunk_job.storage(f'{storage_gb}Gi')
+        chunk_job.storage(f'{storage_gb}Mi')
 
     # and now one big job
     final_job = get_batch().new_job(name='final_merge')
     final_job.image(image_path('bcftools'))
-    final_job.storage(f'{total_gb}Gi')
+    final_job.storage(f'{total_gb}Mi')
     final_job.declare_resource_group(
         output={'vcf.bgz': '{root}', 'vcf.bgz.tbi': '{root}.tbi'}
     )
