@@ -69,7 +69,7 @@ def read_hail(path: str) -> hl.Table | hl.MatrixTable | hl.vds.VariantDataset:
     LOGGER.info(f'Read data from {path} - dimensions: {t.count()}, partitions: {t.n_partitions()}')
     return t
 
-def vds_processing(obj: hl.vds.VariantDataset, sites_only: bool = False) -> hl.MatrixTable | hl.Table
+def vds_processing(obj: hl.vds.VariantDataset, sites_only: bool = False) -> hl.MatrixTable | hl.Table:
     """
     Process a VDS object - either densify if we need the full MT
     or just break off the variant MT.rows() if sites_only
