@@ -135,7 +135,7 @@ def create_vcf_from_hail(
 
     # third - export to vcf using hail's export_vcf method in parallel
     LOGGER.info('Exporting to multiple temp VCFs')
-    obj.export_vcf(temp, parallel='separate_header')
+    hl.export_vcf(obj, output=temp, parallel='separate_header')
 
     # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
     # done in-line here, but equally this could be a separate (python?) job
