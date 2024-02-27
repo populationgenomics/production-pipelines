@@ -180,8 +180,9 @@ def create_vcf_from_hail(
     command += f' > {final_job.output}'
     final_job.storage(total_gb)
     final_job.command(command)
+    final_job.command(f'tabix {final_job.output}')
 
-    get_batch().write_output(final_job.output, output_path)
+    get_batch().write_output(final_job.output, output_path.removesuffix('vcf.bgz'))
     get_batch().run(wait=False)
 
 
