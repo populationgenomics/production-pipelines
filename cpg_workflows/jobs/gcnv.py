@@ -9,8 +9,9 @@ from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
+from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path, query_command
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
 from cpg_workflows.utils import can_reuse, chunks
 
 
@@ -670,3 +671,59 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
     with open(output_file, 'w') as f:
         f.writelines(headers)
         f.writelines(others)
+
+
+def annotate_dataset_jobs_cnv(
+    mt_path: Path,
+    sgids: list[str],
+    out_mt_path: Path,
+    tmp_prefix: Path,
+    job_attrs: dict | None = None,
+    depends_on: list[Job] | None = None
+) -> list[Job]:
+    """
+    Split mt by dataset and annotate dataset-specific fields (only for those datasets
+    that will be loaded into Seqr).
+    """
+    assert sgids
+    sgids_list_path = tmp_prefix / 'sgid-list.txt'
+    if not get_config()['workflow'].get('dry_run', False):
+        with sgids_list_path.open('w') as f:
+            f.write(','.join(sgids))
+
+    subset_mt_path = tmp_prefix / 'cohort-subset.mt'
+    subset_j: Job | None = None
+    if not subset_mt_path.exists():
+        subset_j = get_batch().new_job(
+            f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
+        )
+        subset_j.image(image_path('cpg_workflows'))
+        subset_j.command(
+            query_command(
+                seqr_loader,
+                seqr_loader.subset_mt_to_samples.__name__,
+                str(mt_path),
+                sgids,
+                str(subset_mt_path),
+                setup_gcp=True,
+            )
+        )
+        if depends_on:
+            subset_j.depends_on(*depends_on)
+
+    annotate_j = get_batch().new_job(
+        f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
+    )
+    annotate_j.image(image_path('cpg_workflows'))
+    annotate_j.command(
+        query_command(
+            seqr_loader_cnv,
+            seqr_loader_cnv.annotate_dataset_sv.__name__,
+            str(subset_mt_path),
+            str(out_mt_path),
+            setup_gcp=True,
+        )
+    )
+    if subset_j:
+        annotate_j.depends_on(subset_j)
+    return [subset_j, annotate_j]
