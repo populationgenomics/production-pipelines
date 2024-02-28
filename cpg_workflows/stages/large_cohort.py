@@ -269,7 +269,7 @@ class Vqsr(CohortStage):
 @stage(required_stages=Vqsr)
 class LoadVqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'vqsr.ht'
+        return self.tmp_prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import load_vqsr
