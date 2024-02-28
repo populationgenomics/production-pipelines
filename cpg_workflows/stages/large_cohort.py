@@ -272,18 +272,35 @@ class LoadVqsr(CohortStage):
         return get_workflow().prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.load_vqsr import run
+        from cpg_workflows.large_cohort import load_vqsr
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                site_only_vcf_path=inputs.as_path(cohort, Vqsr, key='vcf'),
-                vqsr_ht_path=self.expected_outputs(cohort),
-            ),
-            depends_on=inputs.get_jobs(cohort),
+        # from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        # from cpg_workflows.large_cohort.load_vqsr import run
+
+        j = get_batch().new_job(
+            'LoadVqsr', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
         )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                load_vqsr,
+                load_vqsr.run.__name__,
+                str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            )
+        )
+
+        # j = dataproc_job(
+        #     job_name=self.__class__.__name__,
+        #     function=run,
+        #     function_path_args=dict(
+        #         site_only_vcf_path=inputs.as_path(cohort, Vqsr, key='vcf'),
+        #         vqsr_ht_path=self.expected_outputs(cohort),
+        #     ),
+        #     depends_on=inputs.get_jobs(cohort),
+        # )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
