@@ -168,7 +168,8 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
         'sex_aneuploidy',
     )
 
-    cutoffs = get_config()['large_cohort']['sample_qc_cutoffs']
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    cutoffs = get_config()['large_cohort'][sequencing_type]['sample_qc_cutoffs']
     ht = ht.annotate_globals(hard_filter_cutoffs=hl.struct(**cutoffs))
 
     # Remove low-coverage samples
