@@ -8,15 +8,15 @@ from cpg_workflows.utils import can_reuse
 
 
 def run(
-    site_only_vcf_path: str,
-    out_ht_path: str,
+    site_only_vcf_path: Path,
+    out_ht_path: Path,
 ):
     load_vqsr(site_only_vcf_path, out_ht_path)
 
 
 def load_vqsr(
-    site_only_vcf_path: str,
-    out_ht_path: str | None = None,
+    site_only_vcf_path: Path,
+    out_ht_path: Path | None = None,
 ) -> hl.Table:
     """
     Convert VQSR VCF to HT
