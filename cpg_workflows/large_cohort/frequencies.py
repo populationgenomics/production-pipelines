@@ -18,10 +18,10 @@ from gnomad.utils.release import make_faf_index_dict
 
 
 def run(
-    vds_path: str,
-    sample_qc_ht_path: str,
-    relateds_to_drop_ht_path: str,
-    out_ht_path: str,
+    vds_path: Path,
+    sample_qc_ht_path: Path,
+    relateds_to_drop_ht_path: Path,
+    out_ht_path: Path,
 ):
     if can_reuse(out_ht_path):
         return
