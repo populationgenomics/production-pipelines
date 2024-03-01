@@ -197,7 +197,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
         genotypes=hl.agg.collect(
             hl.struct(
                 sample_id=mt.s,
-                gq=mt.CNQ,
+                gq=mt.QA,
                 cn=mt.CN,
                 end=mt.end,
                 num_exon=mt.NP,
