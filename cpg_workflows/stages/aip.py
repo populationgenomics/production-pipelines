@@ -501,7 +501,7 @@ class CreateAIPHTML(DatasetStage):
 # probably shouldn't be recorded as a custom type
 @stage(
     required_stages=ValidateMOI,
-    analysis_keys=['seqr_file'],
+    analysis_keys=['seqr_file', 'seqr_pheno_file'],
     analysis_type='custom',
     tolerate_missing_output=True,
 )
@@ -514,7 +514,10 @@ class GenerateSeqrFile(DatasetStage):
         return {
             'seqr_file': dataset.prefix(category='analysis')
             / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr_submission.json'
+            / f'{DATED_FOLDER}_seqr.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis')
+            / 'seqr_files'
+            / f'{DATED_FOLDER}_seqr_pheno.json'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
