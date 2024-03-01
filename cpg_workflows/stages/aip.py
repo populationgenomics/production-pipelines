@@ -52,8 +52,8 @@ data in test and main buckets.
 """
 import logging
 from datetime import datetime
-from os.path import join
 from functools import lru_cache
+from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -537,7 +537,7 @@ class GenerateSeqrFile(DatasetStage):
         job.image(image_path('aip'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'python3 helpers/minimise_output_for_seqr.py '
+            f'python3 reanalysis/minimise_output_for_seqr.py '
             f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
         )
 
