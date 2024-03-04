@@ -52,8 +52,12 @@ def sex_ploidy_plotter(file_path, gcs_path, label):
 @click.option(
     '--label', help='Column field in SampleQC table eg dataset or sex_karyotype'
 )
+@click.option(
+    '--out-prefix',
+    help='Prefix for output file',
+)
 @click.command()
-def main(file_path, job_storage, job_memory, label):
+def main(file_path, job_storage, job_memory, label, out_prefix):
     # Initialise batch
     b = get_batch()
 
@@ -62,7 +66,7 @@ def main(file_path, job_storage, job_memory, label):
     j.memory(job_memory)
     j.storage(job_storage)
 
-    gcs_output_path = output_path(f'sex_ploidy_plot.html', 'analysis')
+    gcs_output_path = output_path(f'{out_prefix}_sex_ploidy_plot.html', 'analysis')
     j.call(sex_ploidy_plotter, file_path, gcs_output_path, label)
 
     b.run(wait=False)
