@@ -8,7 +8,7 @@ mem_gb = 7.5
 mem_gb = 16
 # resource overrides for the GatherSampleEvidence stage
 [resource_overrides.GatherSampleEvidence.runtime_attr_scramble_part2]
-mem_gb = 7.5
+mem_gb = 16
 
 # resource overrides for the EvidenceQC stage
 [resource_overrides.EvidenceQC.wgd_build_runtime_attr]

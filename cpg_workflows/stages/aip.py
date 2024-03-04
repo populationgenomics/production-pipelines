@@ -52,8 +52,8 @@ data in test and main buckets.
 """
 import logging
 from datetime import datetime
-from os.path import join
 from functools import lru_cache
+from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -501,7 +501,7 @@ class CreateAIPHTML(DatasetStage):
 # probably shouldn't be recorded as a custom type
 @stage(
     required_stages=ValidateMOI,
-    analysis_keys=['seqr_file'],
+    analysis_keys=['seqr_file', 'seqr_pheno_file'],
     analysis_type='custom',
     tolerate_missing_output=True,
 )
@@ -514,7 +514,10 @@ class GenerateSeqrFile(DatasetStage):
         return {
             'seqr_file': dataset.prefix(category='analysis')
             / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr_submission.json'
+            / f'{DATED_FOLDER}_seqr.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis')
+            / 'seqr_files'
+            / f'{DATED_FOLDER}_seqr_pheno.json'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -537,7 +540,7 @@ class GenerateSeqrFile(DatasetStage):
         job.image(image_path('aip'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'python3 helpers/minimise_output_for_seqr.py '
+            f'python3 reanalysis/minimise_output_for_seqr.py '
             f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
         )
 
