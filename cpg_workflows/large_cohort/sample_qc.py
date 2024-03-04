@@ -121,12 +121,12 @@ def impute_sex(
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
         vds,
-        tmp_prefix=str(tmp_prefix / 'X_var_Y_var_annotate_sex'),
+        tmp_prefix=str(tmp_prefix / 'X_var_Y_ref_annotate_sex'),
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
         variants_only_x_ploidy=True,
-        variants_only_y_ploidy=True,
+        variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
         variants_filter_decoy=False,
