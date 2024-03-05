@@ -180,7 +180,7 @@ def annotate_cohort_gcnv(
     mt.write(out_mt_path, overwrite=True)
 
 
-def annotate_dataset_sv(mt_path: str, out_mt_path: str):
+def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
     """
     process data specific to samples in this dataset
     do this after sub-setting to specific samples
@@ -193,6 +193,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
 
     mt = read_hail(mt_path)
 
+    # adding in the GT here, that may cause problems later?
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(
             hl.struct(
@@ -203,6 +204,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 num_exon=mt.NP,
                 start=mt.start,
                 geneIds=mt.geneIds,
+                gt=mt.GT
             )
         )
     )
@@ -210,6 +212,14 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
         return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
+
+    def _genotype_filter_samples_cn2():
+        # Filter on the genotypes.
+        return hl.set(
+            mt.genotypes.filter(
+                lambda g: ((g.gt.is_haploid()) & (g.cn == 2))
+            ).map(lambda g: g.sample_id)
+        )
 
     # top level - decorator
     def _capture_i_decorator(func):
@@ -231,9 +241,14 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
     def _filter_samples_gq(i, g):
         return (g.gq >= i) & (g.gq < i + 10)
 
+    @_capture_i_decorator
+    def _filter_num_alt(i, g):
+        return i == g.gt.n_alt_alleles()
+
     # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
-        samples=_genotype_filter_samples(lambda g: True),
+        # # samples is bad, we do not want it
+        # samples=_genotype_filter_samples(lambda g: True),
         # dubious about this annotation - expected field is qs, I'm using gq, derived from CNQ
         samples_qs=hl.struct(
             **{
@@ -243,14 +258,40 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 'gt_1000': _genotype_filter_samples(lambda g: g.gq >= 1000)
             }
         ),
+        # ok, here's what we're
         samples_cn=hl.struct(
             **{
                 str(i): _genotype_filter_samples(_filter_sample_cn(i))
-                for i in range(0, 4, 1)
+                for i in [0, 1, 3]
             },
             **{
                 'gte_4': _genotype_filter_samples(lambda g: g.cn >= 4)
+            },
+            # and a special case for male sex-chrom CN
+            **{'2': _genotype_filter_samples_cn2()},
+        ),
+        # re-embedding the samples_num_alt, derived from hl.call().n_alt_alleles()
+        samples_num_alt=hl.struct(
+            **{
+                '%i' % i: _genotype_filter_samples(_filter_num_alt(i))
+                for i in range(1, 3, 1)
             }
+        ),
+    )
+
+    # removing GT again, out of an abundance of caution
+    # adding in the GT here, that may cause problems later?
+    mt = mt.annotate_rows(
+        genotypes=hl.agg.collect(
+            hl.struct(
+                sample_id=mt.s,
+                gq=mt.QA,
+                cn=mt.CN,
+                end=mt.end,
+                num_exon=mt.NP,
+                start=mt.start,
+                geneIds=mt.geneIds,
+            )
         )
     )
     logging.info('Genotype fields annotated')

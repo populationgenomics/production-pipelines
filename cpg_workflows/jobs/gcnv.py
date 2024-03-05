@@ -718,7 +718,7 @@ def annotate_dataset_jobs_cnv(
     annotate_j.command(
         query_command(
             seqr_loader_cnv,
-            seqr_loader_cnv.annotate_dataset_sv.__name__,
+            seqr_loader_cnv.annotate_dataset_gcnv.__name__,
             str(subset_mt_path),
             str(out_mt_path),
             setup_gcp=True,
