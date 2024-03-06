@@ -28,6 +28,7 @@ def create_cohort() -> Cohort:
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
     analysis_dataset_name = get_config()['workflow']['dataset']
+    # TODO: Handle multiple cohorts IDs as well as multiple datasets
     dataset_names = get_config()['workflow'].get(
         'input_datasets', [analysis_dataset_name]
     )
