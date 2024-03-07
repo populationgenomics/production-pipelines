@@ -77,7 +77,6 @@ def _sv_batch_meta(
     return {'type': 'gatk-sv-batch-calls'}
 
 
-
 def _sv_individual_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:

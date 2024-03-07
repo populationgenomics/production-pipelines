@@ -503,6 +503,7 @@ def _sv_filtered_meta(
     """
     return {'type': 'gatk-sv-filtered-calls', 'remove_sgids': EXCLUSION_FILE}
 
+
 @stage(
     required_stages=[GeneratePloidyTable, SVConcordance],
     analysis_type='sv',
