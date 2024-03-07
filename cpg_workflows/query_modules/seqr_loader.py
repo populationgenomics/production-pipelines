@@ -209,7 +209,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str |
     # this executes in a query command, by execution time the file should exist
     if exclusion_file:
         with hl.hadoop_open(exclusion_file) as f:
-            exclusion_ids = set(f.read().decode().splitlines())
+            exclusion_ids = set(f.read().splitlines())
         logging.info(f'Excluding {len(exclusion_ids)} samples from the subset')
         sample_ids -= exclusion_ids
 
