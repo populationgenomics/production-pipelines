@@ -77,14 +77,6 @@ def _sv_batch_meta(
     return {'type': 'gatk-sv-batch-calls'}
 
 
-def _sv_filtered_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-filtered-calls'}
-
 
 def _sv_individual_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument

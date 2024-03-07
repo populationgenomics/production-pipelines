@@ -190,17 +190,29 @@ def annotate_cohort(
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
-def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
+def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str | None = None):
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
     @param mt_path: cohort-level matrix table from VCF.
     @param sample_ids: samples to take from the matrix table.
     @param out_mt_path: path to write the result.
+    @param exclusion_file: path to a file containing samples to remove from the
+            subset prior to attempting removal
     """
+
     mt = hl.read_matrix_table(str(mt_path))
 
     sample_ids = set(sample_ids)
+
+    # if an exclusion file was passed, remove the samples from the subset
+    # this executes in a query command, by execution time the file should exist
+    if exclusion_file:
+        with hl.hadoop_open(exclusion_file) as f:
+            exclusion_ids = set(f.read().decode().splitlines())
+        logging.info(f'Excluding {len(exclusion_ids)} samples from the subset')
+        sample_ids -= exclusion_ids
+
     mt_sample_ids = set(mt.s.collect())
 
     sample_ids_not_in_mt = sample_ids - mt_sample_ids

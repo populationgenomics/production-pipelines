@@ -48,11 +48,18 @@ def annotate_dataset_jobs_sv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
+    exclusion_file: str | None = None
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
     that will be loaded into Seqr).
+
+    exclusion_file: str | None - this is a file path in GCP which will contain
+        all SG IDs which are to be removed from consideration in this run. i.e.
+        we anticipate that they will have been removed from the joint-call, and
+        we will not find them, so this subsetting code will fail if it attempts
+        to find them in the callset
     """
     assert sgids
     sgids_list_path = tmp_prefix / 'sgid-list.txt'

@@ -1,14 +1,16 @@
 """
-The second multi-sample workflow, containing the following stages:
-MakeCohortVCF and AnnotateVCF
+The second multi-sample workflow, containing all stages which combine the
+results of the per-batch workflows into a joint-call across the entire cohort
 """
+
 import logging
+from os.path import join
 from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.hail_batch import get_batch
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import image_path
+from cpg_utils.hail_batch import image_path, authenticate_cloud_credentials_in_job
 
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
@@ -18,7 +20,6 @@ from cpg_workflows.jobs.seqr_loader_sv import (
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     CromwellJobSizes,
     SV_CALLERS,
-    _sv_filtered_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
@@ -37,6 +38,66 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from datetime import datetime
+
+
+# create the file path outside Stages, so that
+# we can pass this to the metadata update function
+RUN_DATETIME = datetime.now().strftime('%Y-%m-%d')
+EXCLUSION_FILE = join(
+    get_config()['storage']['default']['default'],
+    'gatk_sv',
+    RUN_DATETIME,
+    'combined_exclusion_list.txt'
+)
+
+
+@stage(analysis_type='sv', analysis_keys=['exclusion_list'])
+class CombineExclusionLists(CohortStage):
+    """
+    Takes the per-batch lists of excluded sample IDs and combines
+    them into a single file for use in the SV pipeline
+
+    This will be used to remove any filtered samples from consideration in
+    subsequent stages, and to remove the CPG ID registration
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        Create dictionary of names -> output paths
+        This variable is a Path to make sure it gets existence checked
+        We need this quick stage to run each time
+        """
+
+        return {'exclusion_list': to_path(EXCLUSION_FILE)}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        queue job to combine exclusion lists
+        """
+
+        batch_names = get_config()['workflow']['batch_names']
+        batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
+
+        all_filter_lists = [
+            batch_prefix
+            / batch_name
+            / 'FilterBatch'
+            / 'outliers.samples.list'
+            for batch_name in batch_names
+        ]
+
+        # check for the existence of each file? Should all exist, even if empty
+
+        job = get_batch().new_job('Concatenate all sample exclusion files')
+        job.image(get_config()['workflow']['driver_image'])
+        authenticate_cloud_credentials_in_job(job)
+        job.command(
+            'gcloud storage objects compose '
+            f'{" ".join(all_filter_lists)} {self.expected_outputs(cohort)["exclusion_list"]}'
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
 
 
 @stage
@@ -434,6 +495,14 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
+def _sv_filtered_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, Any]:
+    """
+    Callable, add meta[type] to custom analysis object
+    """
+    return {'type': 'gatk-sv-filtered-calls', 'remove_sgids': EXCLUSION_FILE}
+
 @stage(
     required_stages=[GeneratePloidyTable, SVConcordance],
     analysis_type='sv',
@@ -524,7 +593,7 @@ def _sv_annotated_meta(
     """
     Callable, add meta[type] to custom analysis object
     """
-    return {'type': 'gatk-sv-annotated'}
+    return {'type': 'gatk-sv-annotated', 'remove_sgids': EXCLUSION_FILE}
 
 
 @stage(
@@ -672,11 +741,11 @@ def _update_sv_dataset_meta(
     """
     Add meta.type to custom analysis object
     """
-    return {'type': 'annotated-sv-dataset-callset'}
+    return {'type': 'annotated-sv-dataset-callset', 'remove_sgids': EXCLUSION_FILE}
 
 
 @stage(
-    required_stages=AnnotateCohortSv,
+    required_stages=[CombineExclusionLists, AnnotateCohortSv],
     analysis_type='sv',
     analysis_keys=['mt'],
     update_analysis_meta=_update_sv_dataset_meta,
@@ -714,6 +783,9 @@ class AnnotateDatasetSv(DatasetStage):
         mt_path = inputs.as_path(
             target=dataset.cohort, stage=AnnotateCohortSv, key='mt'
         )
+        exclusion_file = inputs.as_path(
+            target=dataset.cohort, stage=CombineExclusionLists, key='exclusion_list'
+        )
 
         checkpoint_prefix = (
             to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
@@ -727,6 +799,7 @@ class AnnotateDatasetSv(DatasetStage):
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
+            exclusion_file=str(exclusion_file),
         )
 
         return self.make_outputs(
@@ -741,7 +814,7 @@ def _gatk_sv_index_meta(
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'seqr-dataset-type': 'SV'}
+    return {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE}
 
 
 @stage(
