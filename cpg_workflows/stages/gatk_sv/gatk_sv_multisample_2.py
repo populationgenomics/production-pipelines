@@ -52,7 +52,20 @@ EXCLUSION_FILE = join(
 )
 
 
-@stage(analysis_type='sv', analysis_keys=['exclusion_list'])
+def _exclusion_callable(output_path: str):
+    from cpg_utils import to_path
+    excluded_ids = set()
+    with to_path(output_path).open() as f:
+        for line in f.readlines():
+            excluded_ids.add(line.strip())
+    return {'filtered_sgids': excluded_ids}
+
+
+@stage(
+    analysis_type='sv',
+    analysis_keys=['exclusion_list'],
+    update_analysis_meta=_exclusion_callable
+)
 class CombineExclusionLists(CohortStage):
     """
     Takes the per-batch lists of excluded sample IDs and combines
