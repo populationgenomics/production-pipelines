@@ -150,7 +150,6 @@ class GatherSampleEvidence(SequencingGroupStage):
         # we alter the per-sample maximum to be between 5 and 30 minutes for this
         # long-running job, so samples poll on different intervals, spreading load
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=sequencing_group.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -221,7 +220,6 @@ class EvidenceQC(CohortStage):
 
         # runs for approx 5 hours, depending on sample count
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,

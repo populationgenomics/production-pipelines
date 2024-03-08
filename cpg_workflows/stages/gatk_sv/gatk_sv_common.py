@@ -14,7 +14,7 @@ from analysis_runner.cromwell import (
 )
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, get_config
-from cpg_utils.hail_batch import Batch, command, image_path, reference_path
+from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
 from hailtop.batch.job import Job
 
 from cpg_workflows.batch import make_job_name
@@ -145,7 +145,6 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
 
 
 def add_gatk_sv_jobs(
-    batch: Batch,
     dataset: Dataset,
     wfl_name: str,
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
@@ -221,7 +220,7 @@ def add_gatk_sv_jobs(
     copy_outputs = get_config()['workflow'].get('copy_outputs', False)
 
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
-        b=batch,
+        b=get_batch(),
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
         repo='gatk-sv',
@@ -239,7 +238,7 @@ def add_gatk_sv_jobs(
         max_watch_poll_interval=polling_maximum,
     )
 
-    copy_j = batch.new_job(f'{job_prefix}: copy outputs')
+    copy_j = get_batch().new_job(f'{job_prefix}: copy outputs')
     copy_j.image(driver_image)
     cmds = []
     for key, resource in output_dict.items():
@@ -337,7 +336,6 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    batch,
     cohort,
     cohort_prefix: Path,
     input_vcf: Path,
@@ -380,7 +378,6 @@ def queue_annotate_sv_jobs(
         ]
     )
     jobs = add_gatk_sv_jobs(
-        batch=batch,
         dataset=cohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,

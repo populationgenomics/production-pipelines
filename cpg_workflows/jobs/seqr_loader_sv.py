@@ -7,12 +7,11 @@ from hailtop.batch import Batch
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, query_command
+from cpg_utils.hail_batch import get_batch, image_path, query_command
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_sv
 
 
 def annotate_cohort_jobs_sv(
-    b: Batch,
     vcf_path: Path,
     out_mt_path: Path,
     checkpoint_prefix: Path,
@@ -24,7 +23,7 @@ def annotate_cohort_jobs_sv(
     Mostly a duplicate of the small variant version
     """
 
-    j = b.new_job('Annotate cohort', job_attrs)
+    j = get_batch().new_job('Annotate cohort', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
     j.command(
         query_command(
@@ -42,7 +41,6 @@ def annotate_cohort_jobs_sv(
 
 
 def annotate_dataset_jobs_sv(
-    b: Batch,
     mt_path: Path,
     sgids: list[str],
     out_mt_path: Path,
@@ -62,6 +60,8 @@ def annotate_dataset_jobs_sv(
         to find them in the callset
     """
     assert sgids
+
+    # remove excluded SG IDs
     sgids_list_path = tmp_prefix / 'sgid-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with sgids_list_path.open('w') as f:
@@ -69,7 +69,7 @@ def annotate_dataset_jobs_sv(
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
-    subset_j = b.new_job(
+    subset_j = get_batch().new_job(
         f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     subset_j.image(image_path('cpg_workflows'))
@@ -80,13 +80,14 @@ def annotate_dataset_jobs_sv(
             str(mt_path),
             sgids,
             str(subset_mt_path),
+            exclusion_file,
             setup_gcp=True,
         )
     )
     if depends_on:
         subset_j.depends_on(*depends_on)
 
-    annotate_j = b.new_job(
+    annotate_j = get_batch().new_job(
         f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     annotate_j.image(image_path('cpg_workflows'))

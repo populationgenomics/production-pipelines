@@ -295,7 +295,6 @@ class MakeCohortVcf(CohortStage):
         }
 
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -345,7 +344,6 @@ class FormatVcfForGatk(CohortStage):
         }
 
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -415,7 +413,6 @@ class JoinRawCalls(CohortStage):
         }
 
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -465,7 +462,6 @@ class SVConcordance(CohortStage):
         }
 
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -591,7 +587,6 @@ class FilterGenotypes(CohortStage):
         }
 
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
@@ -648,7 +643,6 @@ class AnnotateVcf(CohortStage):
             AR_GUID_NAME: try_get_ar_guid(),
         }
         job_or_none = queue_annotate_sv_jobs(
-            batch=get_batch(),
             cohort=cohort,
             cohort_prefix=self.prefix,
             input_vcf=inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
@@ -738,7 +732,6 @@ class AnnotateCohortSv(CohortStage):
         )
 
         job = annotate_cohort_jobs_sv(
-            b=get_batch(),
             vcf_path=vcf_path,
             out_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
@@ -806,7 +799,6 @@ class AnnotateDatasetSv(DatasetStage):
         )
 
         jobs = annotate_dataset_jobs_sv(
-            b=get_batch(),
             mt_path=mt_path,
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
