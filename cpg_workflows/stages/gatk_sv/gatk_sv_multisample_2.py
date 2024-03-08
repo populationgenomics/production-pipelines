@@ -54,14 +54,14 @@ EXCLUSION_FILE = join(
 )
 
 
-def _exclusion_callable(output_path: str):
+def _exclusion_callable(output_path: str) -> dict[str, set[str]]:
     from cpg_utils import to_path
 
-    excluded_ids = set()
+    excluded_ids: set[str] = set()
 
     if not to_path(output_path).exists():
         print(f'No exclusion list found: {output_path}')
-        return excluded_ids
+        return {'filtered_sgids': excluded_ids}
 
     with to_path(output_path).open() as f:
         for line in f.readlines():
