@@ -67,7 +67,6 @@ from metamist.graphql import gql
 
 from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     Dataset,
     DatasetStage,
