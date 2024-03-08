@@ -5,28 +5,19 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 
 from cpg_workflows.jobs import sample_batching
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    CromwellJobSizes,
-    SV_CALLERS,
-    _sv_individual_meta,
-    add_gatk_sv_jobs,
-    get_fasta,
-    get_images,
-    get_references,
-)
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import (SV_CALLERS,
+                                                         CromwellJobSizes,
+                                                         _sv_individual_meta,
+                                                         add_gatk_sv_jobs,
+                                                         get_fasta, get_images,
+                                                         get_references)
+from cpg_workflows.workflow import (Cohort, CohortStage, SequencingGroup,
+                                    SequencingGroupStage, StageInput,
+                                    StageOutput, stage)
 
 
 @stage(

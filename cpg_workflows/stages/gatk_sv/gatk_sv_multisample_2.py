@@ -4,42 +4,25 @@ results of the per-batch workflows into a joint-call across the entire cohort
 """
 
 import logging
+from datetime import datetime
 from os.path import join
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import get_batch
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import image_path, authenticate_cloud_credentials_in_job
+from cpg_utils.hail_batch import (authenticate_cloud_credentials_in_job,
+                                  get_batch, image_path)
 
 from cpg_workflows.jobs import ploidy_table_from_ped
-from cpg_workflows.jobs.seqr_loader_sv import (
-    annotate_cohort_jobs_sv,
-    annotate_dataset_jobs_sv,
-)
+from cpg_workflows.jobs.seqr_loader_sv import (annotate_cohort_jobs_sv,
+                                               annotate_dataset_jobs_sv)
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    CromwellJobSizes,
-    SV_CALLERS,
-    add_gatk_sv_jobs,
-    get_fasta,
-    get_images,
-    get_references,
-    make_combined_ped,
-    queue_annotate_sv_jobs,
-)
+    SV_CALLERS, CromwellJobSizes, add_gatk_sv_jobs, get_fasta, get_images,
+    get_references, make_combined_ped, queue_annotate_sv_jobs)
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    Dataset,
-    DatasetStage,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
-from datetime import datetime
-
+from cpg_workflows.workflow import (Cohort, CohortStage, Dataset, DatasetStage,
+                                    StageInput, StageOutput, get_workflow,
+                                    stage)
 
 # create the file path outside Stages, so that
 # we can pass this to the metadata update function
