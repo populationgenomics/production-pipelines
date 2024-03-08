@@ -80,7 +80,7 @@ def annotate_dataset_jobs_sv(
             str(mt_path),
             sgids,
             str(subset_mt_path),
-            exclusion_file,
+            exclusion_file if exclusion_file else '',
             setup_gcp=True,
         )
     )
