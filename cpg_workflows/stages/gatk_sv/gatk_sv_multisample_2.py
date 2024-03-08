@@ -882,6 +882,7 @@ class MtToEsSv(DatasetStage):
 
         if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
             # noinspection PyProtectedMember
+
             j = dataproc._add_submit_job(
                 batch=get_batch(),
                 cluster_id=cluster_id,
@@ -889,6 +890,7 @@ class MtToEsSv(DatasetStage):
                 pyfiles=pyfiles,
                 job_name=job_name,
                 region='australia-southeast1',
+                hail_version=dataproc.DEFAULT_HAIL_VERSION
             )
         else:
             j = dataproc.hail_dataproc_job(
