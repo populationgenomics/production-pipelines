@@ -10,19 +10,38 @@ from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import (authenticate_cloud_credentials_in_job,
-                                  get_batch, image_path)
+from cpg_utils.hail_batch import (
+    authenticate_cloud_credentials_in_job,
+    get_batch,
+    image_path,
+)
 
 from cpg_workflows.jobs import ploidy_table_from_ped
-from cpg_workflows.jobs.seqr_loader_sv import (annotate_cohort_jobs_sv,
-                                               annotate_dataset_jobs_sv)
+from cpg_workflows.jobs.seqr_loader_sv import (
+    annotate_cohort_jobs_sv,
+    annotate_dataset_jobs_sv,
+)
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    SV_CALLERS, CromwellJobSizes, add_gatk_sv_jobs, get_fasta, get_images,
-    get_references, make_combined_ped, queue_annotate_sv_jobs)
+    SV_CALLERS,
+    CromwellJobSizes,
+    add_gatk_sv_jobs,
+    get_fasta,
+    get_images,
+    get_references,
+    make_combined_ped,
+    queue_annotate_sv_jobs,
+)
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.workflow import (Cohort, CohortStage, Dataset, DatasetStage,
-                                    StageInput, StageOutput, get_workflow,
-                                    stage)
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    Dataset,
+    DatasetStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
 # create the file path outside Stages, so that
 # we can pass this to the metadata update function
@@ -31,13 +50,19 @@ EXCLUSION_FILE = join(
     get_config()['storage']['default']['default'],
     'gatk_sv',
     RUN_DATETIME,
-    'combined_exclusion_list.txt'
+    'combined_exclusion_list.txt',
 )
 
 
 def _exclusion_callable(output_path: str):
     from cpg_utils import to_path
+
     excluded_ids = set()
+
+    if not to_path(output_path).exists():
+        print(f'No exclusion list found: {output_path}')
+        return excluded_ids
+
     with to_path(output_path).open() as f:
         for line in f.readlines():
             excluded_ids.add(line.strip())
@@ -47,7 +72,7 @@ def _exclusion_callable(output_path: str):
 @stage(
     analysis_type='sv',
     analysis_keys=['exclusion_list'],
-    update_analysis_meta=_exclusion_callable
+    update_analysis_meta=_exclusion_callable,
 )
 class CombineExclusionLists(CohortStage):
     """
@@ -76,10 +101,7 @@ class CombineExclusionLists(CohortStage):
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
 
         all_filter_lists = [
-            batch_prefix
-            / batch_name
-            / 'FilterBatch'
-            / 'outliers.samples.list'
+            batch_prefix / batch_name / 'FilterBatch' / 'outliers.samples.list'
             for batch_name in batch_names
         ]
 
@@ -873,7 +895,7 @@ class MtToEsSv(DatasetStage):
                 pyfiles=pyfiles,
                 job_name=job_name,
                 region='australia-southeast1',
-                hail_version=dataproc.DEFAULT_HAIL_VERSION
+                hail_version=dataproc.DEFAULT_HAIL_VERSION,
             )
         else:
             j = dataproc.hail_dataproc_job(

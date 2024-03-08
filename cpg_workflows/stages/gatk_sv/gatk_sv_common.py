@@ -9,7 +9,9 @@ from random import randint
 from typing import Any
 
 from analysis_runner.cromwell import (
-    CromwellOutputType, run_cromwell_workflow_from_repo_and_get_outputs)
+    CromwellOutputType,
+    run_cromwell_workflow_from_repo_and_get_outputs,
+)
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, get_config
 from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
