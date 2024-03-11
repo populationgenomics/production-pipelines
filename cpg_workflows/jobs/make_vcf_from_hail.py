@@ -4,6 +4,9 @@
 This script is used to convert a hail MatrixTable/Table/VDS to a vcf file.
 Prototype design using hail's parallel export_vcf method.
 
+Doubles up by using the gcloud compose command to concatenate the VCFs
+without ever needing to localise the separate elements.
+
 Usage:
     make_vcf_from_hail.py <input> <output> [--overwrite] [--sites_only] [--temp <gs://temp>]
 
@@ -27,7 +30,7 @@ import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, init_batch, image_path
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, init_batch
 from cpg_workflows.utils import chunks
 
 
@@ -87,8 +90,11 @@ def vds_processing(
     Process a VDS object - either densify if we need the full MT
     or just break off the variant MT.rows() if sites_only
 
+    # needs more stuff here, there's some incompatible VDS fields
+
     Args:
         obj (hl.vds.VariantDataset): hail object
+        sites_only (bool): Remove genotypes from the VCF representation
 
     Returns:
         hail object
@@ -107,6 +113,7 @@ def make_sites_only(obj: hl.MatrixTable | hl.Table) -> hl.MatrixTable | hl.Table
 
     Args:
         obj (hl.MatrixTable | hl.Table | hl.vds.VariantDataset): hail object
+
     Returns:
         hail object with genotypes removed if appropriate
     """
@@ -119,6 +126,61 @@ def make_sites_only(obj: hl.MatrixTable | hl.Table) -> hl.MatrixTable | hl.Table
         return obj
     LOGGER.info('No further processing applied, assuming VDS')
     return obj
+
+
+def get_gcloud_condense_command_string(fragment_list: list[str], output: str) -> str:
+    """
+    Generate a gcloud compose command string to concatenate a list of VCF fragments
+    write the product to the output path
+
+    Args:
+        fragment_list ():
+        output ():
+
+    Returns:
+
+    """
+
+    cat_string = 'gcloud storage objects compose '
+    for fragment in fragment_list:
+        cat_string += f'{fragment} '
+    cat_string += f'{output}'
+    return cat_string
+
+
+def compose_condense_fragments(
+        path_list: list[str],
+        temp_prefix: str | None = None,
+        chunk_size: int = 30,
+        output_name: str | None = None
+) -> list[str]:
+    """
+    takes a list of things to condense, creates jobs to condense them
+    and returns a list of the result paths
+
+    Args:
+        path_list ():
+        temp_prefix ():
+        chunk_size (): number of objects to condense at once
+        output_name (str): if specified, write
+
+    Returns:
+        list of paths to the condensed objects
+    """
+
+    assert output_name or temp_prefix, 'Either output_name or temp_prefix must be specified'
+
+    chunk_job = get_batch().new_job(name=f'chunkbuster_{len(path_list)}')
+    chunk_job.image(get_config()['workflow']['driver_image'])
+    authenticate_cloud_credentials_in_job(chunk_job)
+
+    sub_chunks = []
+    for i, chunk in enumerate(chunks(path_list, chunk_size=chunk_size)):
+        # either the named file, or a temp location
+        chunk_output = output_name or join(temp_prefix, f'chunk_{i}.vcf.bgz')
+        chunk_job.command(get_gcloud_condense_command_string(chunk, chunk_output))
+        sub_chunks.append(chunk_output)
+    return sub_chunks
 
 
 def create_vcf_from_hail(
@@ -173,7 +235,7 @@ def create_vcf_from_hail(
     LOGGER.info('Exporting to multiple temp VCFs')
     hl.export_vcf(obj, output=temp, parallel='separate_header')
 
-    # fourth - parse the manifest file and generate a bash script for concatenating the vcf files
+    # fourth - parse the manifest file and generate commands to concatenate vcf files
     # done in-line here, but equally this could be a separate (python?) job
     # read lines, create a script
     # next job localises the script and runs
@@ -183,45 +245,27 @@ def create_vcf_from_hail(
     )
     manifest = hl.hadoop_open(join(temp, 'shard-manifest.txt')).readlines()
 
-    # there's a ton of possible approaches here - like doing a rolling merge
-    # to reduce the overall amount of space, or splitting the merge into a bunch of different jobs.
-    # this is an overly cautious approach, just to see what happens
-    total_gb = 0.0
-    sub_chunks = []
-    for i, chunk in enumerate(chunks(manifest, 20)):
-        chunk_job = get_batch().new_job(name=f'chunk_{i}')
-        # estimate space consumed by this chunk
-        storage_bytes = 0
-        cat_string = 'cat '
-        for fragment in chunk:
-            full_frag_path = join(temp, str(fragment).strip())
-            storage_bytes += to_path(full_frag_path).stat().st_size
-            frag_local = get_batch().read_input(full_frag_path)
-            cat_string += f' {frag_local} '
-        cat_string += f' > {chunk_job.output}'
-        sub_chunks.append(chunk_job.output)
-        chunk_job.command(cat_string)
+    # prefix these shard names to get full GCP path for each
+    chunk_paths = [join(temp, str(fragment).strip()) for fragment in manifest]
 
-        # total, plus 10% margin for error, then doubled for new output file
-        storage_gb = ((storage_bytes * 2.2) // 1024**2) or 1
-        total_gb += storage_gb
-        chunk_job.storage(f'{storage_gb}Mi')
+    # rolling squash of the chunks, should enable scaling past 900 shards (2 rounds)
+    temp_chunk_prefix_num = 1
+    while len(chunk_paths) > 30:
+        condense_temp = join(temp, f'temp_chunk_{temp_chunk_prefix_num}')
+        temp_chunk_prefix_num += 1
+        chunk_paths = compose_condense_fragments(chunk_paths, condense_temp)
 
-    # and now one big job
-    final_job = get_batch().new_job(name='final_merge')
+    # now compress all those chunks into the final output file
+    final_path = compose_condense_fragments(chunk_paths, temp, output_name=output_path)[0]
+
+    # todo - after completion remove the temp files/dir?
+
+    # one final job - read the final vcf in, index it, move the index, and write it out
+    input_vcf = get_batch().read_input(final_path)
+    final_job = get_batch().new_bash_job(name='index_final_vcf')
     final_job.image(image_path('bcftools'))
-    final_job.storage(f'{total_gb}Mi')
-    final_job.declare_resource_group(
-        output={'vcf.bgz': '{root}', 'vcf.bgz.tbi': '{root}.tbi'}
-    )
-    command = 'cat '
-    for sub_chunk in sub_chunks:
-        command += f' {sub_chunk} '
-    command += f' > {final_job.output}'
-    final_job.command(command)
-    final_job.command(f'tabix {final_job.output}')
-
-    get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
+    final_job.command(f'tabix {input_vcf} && mv {input_vcf}.tbi {final_job.index}')
+    get_batch().write_output(final_job.index, final_path + '.tbi')
     get_batch().run(wait=False)
 
 
