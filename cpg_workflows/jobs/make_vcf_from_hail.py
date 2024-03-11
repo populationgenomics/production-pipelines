@@ -27,6 +27,7 @@ from argparse import ArgumentParser
 from os.path import join
 
 import hail as hl
+import hailtop.batch as hb
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
@@ -152,7 +153,7 @@ def compose_condense_fragments(
         path_list: list[str],
         temp_prefix: str | None = None,
         chunk_size: int = 30
-) -> list[str]:
+) -> tuple[list[str], hb.batch.job.Job]:
     """
     takes a list of things to condense, creates jobs to condense them
     and returns a list of the result paths
@@ -176,7 +177,7 @@ def compose_condense_fragments(
         chunk_output = join(temp_prefix, f'chunk_{i}.vcf.bgz')
         chunk_job.command(get_gcloud_condense_command_string(chunk, chunk_output))
         sub_chunks.append(chunk_output)
-    return sub_chunks
+    return sub_chunks, chunk_job
 
 
 def create_vcf_from_hail(
@@ -246,16 +247,19 @@ def create_vcf_from_hail(
 
     # rolling squash of the chunks, should enable infinite-ish scaling
     temp_chunk_prefix_num = 1
+    condense_job = None
     while len(chunk_paths) > 1:
         condense_temp = join(temp, f'temp_chunk_{temp_chunk_prefix_num}')
         temp_chunk_prefix_num += 1
-        chunk_paths = compose_condense_fragments(chunk_paths, condense_temp)
+        chunk_paths, condense_job = compose_condense_fragments(chunk_paths, condense_temp)
 
     # todo - after completion remove the temp files/dir?
 
     # one final job - read the final vcf in, index it, move the index, and write it out
     input_vcf = get_batch().read_input(chunk_paths[0])
     final_job = get_batch().new_bash_job(name='index_final_vcf')
+    if condense_job:
+        final_job.depends_on(condense_job)
     final_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
     final_job.image(image_path('bcftools'))
     final_job.storage('10Gi')  # make this configurable
