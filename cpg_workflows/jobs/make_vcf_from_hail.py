@@ -31,7 +31,7 @@ import hailtop.batch as hb
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, init_batch
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, init_batch, output_path
 from cpg_workflows.utils import chunks
 
 
@@ -152,7 +152,8 @@ def get_gcloud_condense_command_string(fragment_list: list[str], output: str) ->
 def compose_condense_fragments(
         path_list: list[str],
         temp_prefix: str | None = None,
-        chunk_size: int = 30
+        chunk_size: int = 30,
+        depends: hb.batch.job.Job | None = None,
 ) -> tuple[list[str], hb.batch.job.Job]:
     """
     takes a list of things to condense, creates jobs to condense them
@@ -162,12 +163,15 @@ def compose_condense_fragments(
         path_list ():
         temp_prefix ():
         chunk_size (): number of objects to condense at once
+        depends (): job dependency, or None
 
     Returns:
         list of paths to the condensed objects
     """
 
     chunk_job = get_batch().new_job(name=f'chunkbuster_{len(path_list)}')
+    if depends:
+        chunk_job.depends_on(depends)
     chunk_job.image(get_config()['workflow']['driver_image'])
     authenticate_cloud_credentials_in_job(chunk_job)
 
@@ -182,37 +186,25 @@ def compose_condense_fragments(
 
 def create_vcf_from_hail(
     input_path: str,
-    output_path: str,
+    final_file: str,
     overwrite: bool = False,
-    sites_only: bool = False,
-    temp: str | None = None,
+    sites_only: bool = False
 ):
     """
     This function is used to convert a hail MatrixTable/Table/VDS to a vcf file.
 
     Args:
         input_path (str): Input hail object
-        output_path (str): Output vcf file
+        final_file (str): Output vcf file
         overwrite (bool): Overwrite output file if it exists
         sites_only (bool): Remove genotypes if appropriate
-        temp (str): temp path for partial VCFs, optional
     """
-    if temp is None:
-        temp = get_config()['storage']['default']['tmp']
-        LOGGER.info(f'Using default temp path {temp}')
-
-    assert isinstance(temp, str), 'Temp path must be a string'
-    assert temp.startswith('gs://'), 'Temp must be a GCP path'
+    temp = output_path('temp.vcf.bgz', category='tmp')
     LOGGER.info(f'Using temp path {temp}')
 
-    # temp needs a `.vcf.bgz` extension, otherwise data is dumped in plain text
-    if not temp.endswith('vcf.bgz'):
-        temp = join(temp, 'temp.vcf.bgz')
-        LOGGER.info(f'Using edited temp path {temp}')
-
     # first - decide what to do?
-    assert output_path.endswith('vcf.bgz'), 'Output file must end with vcf.bgz'
-    if not overwrite and to_path(output_path).exists():
+    assert final_file.endswith('vcf.bgz'), 'Output file must end with vcf.bgz'
+    if not overwrite and to_path(final_file).exists():
         raise FileExistsError(f'Output file {output_path} already exists')
 
     # second - load the hail object
@@ -251,7 +243,11 @@ def create_vcf_from_hail(
     while len(chunk_paths) > 1:
         condense_temp = join(temp, f'temp_chunk_{temp_chunk_prefix_num}')
         temp_chunk_prefix_num += 1
-        chunk_paths, condense_job = compose_condense_fragments(chunk_paths, condense_temp)
+        chunk_paths, condense_job = compose_condense_fragments(
+            chunk_paths,
+            condense_temp,
+            depends=condense_job
+        )
 
     # todo - after completion remove the temp files/dir?
 
@@ -264,7 +260,7 @@ def create_vcf_from_hail(
     final_job.image(image_path('bcftools'))
     final_job.storage('10Gi')  # make this configurable
     final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]} && tabix {final_job.output["vcf.bgz"]}')
-    get_batch().write_output(final_job.output, f'{chunk_paths[0]}.tbi')
+    get_batch().write_output(final_job.output, final_file.removesuffix('.vcf.bgz'))
     get_batch().run(wait=False)
 
 
@@ -279,11 +275,8 @@ if __name__ == '__main__':
     parser.add_argument(
         '--sites_only', action='store_true', help='Remove genotypes if appropriate'
     )
-    parser.add_argument(
-        '--temp', help='temp path for partial VCFs, optional', required=False
-    )
     args = parser.parse_args()
 
     create_vcf_from_hail(
-        args.input, args.output, args.overwrite, args.sites_only, args.temp
+        args.input, args.output, args.overwrite, args.sites_only
     )
