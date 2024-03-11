@@ -151,8 +151,7 @@ def get_gcloud_condense_command_string(fragment_list: list[str], output: str) ->
 def compose_condense_fragments(
         path_list: list[str],
         temp_prefix: str | None = None,
-        chunk_size: int = 30,
-        output_name: str | None = None
+        chunk_size: int = 30
 ) -> list[str]:
     """
     takes a list of things to condense, creates jobs to condense them
@@ -162,13 +161,10 @@ def compose_condense_fragments(
         path_list ():
         temp_prefix ():
         chunk_size (): number of objects to condense at once
-        output_name (str): if specified, write
 
     Returns:
         list of paths to the condensed objects
     """
-
-    assert output_name or temp_prefix, 'Either output_name or temp_prefix must be specified'
 
     chunk_job = get_batch().new_job(name=f'chunkbuster_{len(path_list)}')
     chunk_job.image(get_config()['workflow']['driver_image'])
@@ -177,7 +173,7 @@ def compose_condense_fragments(
     sub_chunks = []
     for i, chunk in enumerate(chunks(path_list, chunk_size=chunk_size)):
         # either the named file, or a temp location
-        chunk_output = output_name or join(temp_prefix, f'chunk_{i}.vcf.bgz')
+        chunk_output = join(temp_prefix, f'chunk_{i}.vcf.bgz')
         chunk_job.command(get_gcloud_condense_command_string(chunk, chunk_output))
         sub_chunks.append(chunk_output)
     return sub_chunks
@@ -248,24 +244,23 @@ def create_vcf_from_hail(
     # prefix these shard names to get full GCP path for each
     chunk_paths = [join(temp, str(fragment).strip()) for fragment in manifest]
 
-    # rolling squash of the chunks, should enable scaling past 900 shards (2 rounds)
+    # rolling squash of the chunks, should enable infinite-ish scaling
     temp_chunk_prefix_num = 1
-    while len(chunk_paths) > 30:
+    while len(chunk_paths) > 1:
         condense_temp = join(temp, f'temp_chunk_{temp_chunk_prefix_num}')
         temp_chunk_prefix_num += 1
         chunk_paths = compose_condense_fragments(chunk_paths, condense_temp)
 
-    # now compress all those chunks into the final output file
-    final_path = compose_condense_fragments(chunk_paths, temp, output_name=output_path)[0]
-
     # todo - after completion remove the temp files/dir?
 
     # one final job - read the final vcf in, index it, move the index, and write it out
-    input_vcf = get_batch().read_input(final_path)
+    input_vcf = get_batch().read_input(chunk_paths[0])
     final_job = get_batch().new_bash_job(name='index_final_vcf')
+    final_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
     final_job.image(image_path('bcftools'))
-    final_job.command(f'tabix {input_vcf} && mv {input_vcf}.tbi {final_job.index}')
-    get_batch().write_output(final_job.index, final_path + '.tbi')
+    final_job.storage('10Gi')  # make this configurable
+    final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]} && tabix {final_job.output["vcf.bgz"]}')
+    get_batch().write_output(final_job.output, f'{chunk_paths[0]}.tbi')
     get_batch().run(wait=False)
 
 
