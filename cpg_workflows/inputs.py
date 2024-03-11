@@ -8,9 +8,9 @@ from cpg_utils.config import get_config, update_dict
 
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
-from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
-from .targets import Cohort, PedigreeInfo, SequencingGroup, Sex
-from .utils import exists
+from cpg_workflows.metamist import Assay, MetamistError, get_metamist, parse_reads
+from cpg_workflows.targets import Cohort, PedigreeInfo, SequencingGroup, Sex
+from cpg_workflows.utils import exists
 
 _cohort: Cohort | None = None
 
@@ -129,12 +129,12 @@ def _populate_analysis(cohort: Cohort) -> None:
     for dataset in cohort.get_datasets():
         gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
-            analysis_type=AnalysisType.GVCF,
+            analysis_type='gvcf',
             dataset=dataset.name,
         )
         cram_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
-            analysis_type=AnalysisType.CRAM,
+            analysis_type='cram',
             dataset=dataset.name,
         )
 
@@ -146,7 +146,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                     analysis.output,
                 )
                 sequencing_group.gvcf = GvcfPath(path=analysis.output)
-            elif exists(sequencing_group.make_gvcf_path()):
+            elif exists(sequencing_group.make_gvcf_path().path):
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
                     'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
@@ -162,7 +162,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                     crai_path = None
                 sequencing_group.cram = CramPath(analysis.output, crai_path)
 
-            elif exists(sequencing_group.make_cram_path()):
+            elif exists(sequencing_group.make_cram_path().path):
                 logging.warning(
                     f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
                     'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '

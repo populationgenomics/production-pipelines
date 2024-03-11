@@ -10,7 +10,6 @@ from hailtop.batch import Batch
 
 from ..metamist import get_metamist, AnalysisStatus
 
-from cpg_workflows.workflow import SequencingGroup
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
