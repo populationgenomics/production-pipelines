@@ -151,9 +151,9 @@ def get_gcloud_condense_command_string(fragment_list: list[str], output: str) ->
 
 def compose_condense_fragments(
         path_list: list[str],
-        temp_prefix: str | None = None,
+        temp_prefix: str,
         chunk_size: int = 30,
-        depends: hb.batch.job.Job | None = None,
+        dependency: hb.batch.job.Job | None = None,
 ) -> tuple[list[str], hb.batch.job.Job]:
     """
     takes a list of things to condense, creates jobs to condense them
@@ -163,15 +163,15 @@ def compose_condense_fragments(
         path_list ():
         temp_prefix ():
         chunk_size (): number of objects to condense at once
-        depends (): job dependency, or None
+        dependency (): job dependency, or None
 
     Returns:
         list of paths to the condensed objects
     """
 
     chunk_job = get_batch().new_job(name=f'chunkbuster_{len(path_list)}')
-    if depends:
-        chunk_job.depends_on(depends)
+    if dependency:
+        chunk_job.depends_on(dependency)
     chunk_job.image(get_config()['workflow']['driver_image'])
     authenticate_cloud_credentials_in_job(chunk_job)
 
@@ -246,7 +246,7 @@ def create_vcf_from_hail(
         chunk_paths, condense_job = compose_condense_fragments(
             chunk_paths,
             condense_temp,
-            depends=condense_job
+            dependency=condense_job
         )
 
     # todo - after completion remove the temp files/dir?
