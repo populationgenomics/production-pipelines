@@ -456,7 +456,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
     analysis_keys=['mt'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
-class AnnotateGCNVCohortForSeqr(CohortStage):
+class AnnotateCohortgCNV(CohortStage):
     """
     Rearrange the annotations across the cohort to suit Seqr
     """
@@ -505,7 +505,7 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
 
 
 @stage(
-    required_stages=AnnotateGCNVCohortForSeqr,
+    required_stages=AnnotateCohortgCNV,
     analysis_type='cnv',
     analysis_keys=['mt']
 )
@@ -539,7 +539,7 @@ class AnnotateDatasetCNV(DatasetStage):
 
         assert dataset.cohort
         mt_path = inputs.as_path(
-            target=dataset.cohort, stage=AnnotateGCNVCohortForSeqr, key='mt'
+            target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt'
         )
 
         checkpoint_prefix = (
