@@ -134,7 +134,7 @@ def main(
     max_samples: int,
     output_path: str,
     projects: list[str],
-    exclude: str = None,
+    exclude: str | None = None,
     additional: str | None = None,
 ):
     """

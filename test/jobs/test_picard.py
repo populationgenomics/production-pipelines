@@ -52,7 +52,7 @@ class TestPicard:
             },
         )
 
-    def _setup(self, config: PipelineConfig, tmp_path: Path, ref: str = None) -> Batch:
+    def _setup(self, config: PipelineConfig, tmp_path: Path, ref: str | None = None) -> Batch:
         if ref is not None:
             config.workflow.ref_fasta = ref
 
