@@ -1,7 +1,7 @@
-pre-commit>=3.5.0
+pre-commit
 pylint
 bump2version
 black
 pytest
 pytest_mock
-mypy==1.7.0
+mypy
