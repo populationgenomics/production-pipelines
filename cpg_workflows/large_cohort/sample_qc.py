@@ -122,12 +122,12 @@ def impute_sex(
     sex_ht = annotate_sex(
         vds,
         tmp_prefix=str(
-            tmp_prefix / 'X_ref_Y_ref_outlier_removed_normal_aneu_changed_annotate_sex'
+            tmp_prefix / 'X_var_Y_ref_outlier_removed_normal_aneu_changed_annotate_sex'
         ),
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
-        variants_only_x_ploidy=False,
+        variants_only_x_ploidy=True,
         variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
@@ -179,7 +179,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     # chrom 20 coverage is computed to infer sex and used here
     ht = add_filter(
         ht,
-        ht.autosomal_mean_dp < cutoffs['min_coverage'],
+        ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
         'low_coverage',
     )
 

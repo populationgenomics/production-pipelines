@@ -53,7 +53,7 @@ class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         return (
             self.tmp_prefix
-            / 'X_ref_Y_ref_outlier_removed_normal_aneu_changed_sample_qc.ht'
+            / 'X_var_Y_ref_outlier_removed_normal_aneu_changed_sample_qc.ht'
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
