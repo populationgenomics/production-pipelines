@@ -4,4 +4,4 @@ bump2version
 black
 pytest
 pytest_mock
-mypy==1.9.0
+mypy==1.8.0
