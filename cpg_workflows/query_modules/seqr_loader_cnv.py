@@ -69,9 +69,9 @@ def annotate_cohort_gcnv(
         start=mt.locus.position,
         pos=mt.locus.position,
         # todo @MattWellie - review use of AC_Orig vs. AC (post-qc)
-        sc=mt.AC_Orig[0],
-        sf=mt.AF_Orig[0],
-        sn=mt.AN_Orig,
+        sc=mt.info.AC_Orig[0],
+        sf=mt.info.AF_Orig[0],
+        sn=mt.info.AN_Orig,
         end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
