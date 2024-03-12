@@ -62,18 +62,16 @@ def annotate_cohort_gcnv(
         sampleType='WES'
     )
 
-    # apply variant_qc annotations
-    mt = hl.variant_qc(mt)
-
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
         contig=mt.locus.contig.replace('^chr', ''),
         start=mt.locus.position,
         pos=mt.locus.position,
-        sc=mt.variant_qc.AC[0],
-        sf=mt.variant_qc.AF[0],
-        sn=mt.variant_qc.AN,
+        # todo @MattWellie - review use of AC_Orig vs. AC (post-qc)
+        sc=mt.AC_Orig[0],
+        sf=mt.AF_Orig[0],
+        sn=mt.AN_Orig,
         end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
@@ -88,9 +86,6 @@ def annotate_cohort_gcnv(
         xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
         num_exon=hl.agg.max(mt.NP)
     )
-
-    # drop the variant_qc. Can't trust its NAN values
-    mt = mt.drop('variant_qc')
 
     # save those changes
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
