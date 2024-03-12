@@ -7,12 +7,11 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, query_command
+from cpg_utils.hail_batch import get_batch, image_path, query_command
 from cpg_workflows.query_modules import seqr_loader
 
 
 def annotate_dataset_jobs(
-    b: Batch,
     mt_path: Path,
     sequencing_group_ids: list[str],
     out_mt_path: Path,
@@ -31,7 +30,7 @@ def annotate_dataset_jobs(
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
-    subset_j = b.new_job(
+    subset_j = get_batch().new_job(
         'Subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     subset_j.image(image_path('cpg_workflows'))
@@ -49,7 +48,7 @@ def annotate_dataset_jobs(
     if depends_on:
         subset_j.depends_on(*depends_on)
 
-    annotate_j = b.new_job(
+    annotate_j = get_batch().new_job(
         'Annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
     )
     annotate_j.image(image_path('cpg_workflows'))

@@ -32,9 +32,6 @@ def complete_analysis_job(
         meta (dict): any metadata to add
         update_analysis_meta (Callable | None): function to update analysis meta
         tolerate_missing (bool): if True, allow missing output
-
-    Returns:
-
     """
     import traceback
     from cpg_utils import to_path
@@ -46,6 +43,17 @@ def complete_analysis_job(
 
     if update_analysis_meta is not None:
         meta | update_analysis_meta(output)
+
+    # if the meta has a remove_sgids key, we need to remove those from the list
+    # this occurs when samples are soft-filtered from joint-calls in a way that
+    # doesn't percolate through to the dataset/cohorts
+    # removal here prevents results being registered for samples that were omitted
+    if 'remove_sgids' in meta and to_path(meta['remove_sgids']).exists():
+        with to_path(meta['remove_sgids']).open() as f:
+            exclusion_ids = set(f.read().splitlines())
+            print(f'removing {len(exclusion_ids)} samples from analysis')
+            print(f'samples for removal: {", ".join(exclusion_ids)}')
+            sg_ids = [sg for sg in sg_ids if sg not in exclusion_ids]
 
     # we know that es indexes are registered names, not files/dirs
     # skip all relevant checks for this output type

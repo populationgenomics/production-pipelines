@@ -166,7 +166,6 @@ class AnnotateDataset(DatasetStage):
         )
 
         jobs = annotate_dataset_jobs(
-            b=get_batch(),
             mt_path=mt_path,
             sequencing_group_ids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
