@@ -69,6 +69,12 @@ min_n_snps = 2400000  # minimum number of SNPs for a sample
 max_n_singletons = 800000  # maximum number of unique SNPs for a sample
 max_r_duplication = 0.3  # maximum rate of duplicated reads (from picard metrics)
 max_r_het_hom = 3.3  # maximum rate of heterozygous to homozygous SNPs
+[large_cohort.exome.sample_qc_cutoffs]
+min_coverage = 10
+max_n_snps = 8000000
+min_n_snps = 0
+max_n_singletons = 10000 # put back to 5000
+max_r_het_hom = 10
 
 [hail]
 pool_label = 'large-cohort'
