@@ -7,7 +7,7 @@ import logging
 import hail as hl
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local, download_gencode_gene_id_mapping
 from cpg_workflows.utils import read_hail, checkpoint_hail
 
@@ -24,21 +24,6 @@ NON_GENE_PREDICTIONS = {
     'PREDICTED_NONCODING_BREAKPOINT',
     'PREDICTED_NONCODING_SPAN',
 }
-
-
-def parse_genes(gene_col: hl.expr.StringExpression) -> hl.expr.SetExpression:
-    """
-    Convert a string-ified gene list to a set()
-    """
-    return hl.set(gene_col.split(',').filter(
-        lambda gene: ~hl.set({'None', 'null', 'NA', ''}).contains(gene)
-    ).map(
-        lambda gene: gene.split(r'\.')[0]
-    ))
-
-
-def hl_agg_collect_set_union(gene_col: hl.expr.SetExpression) -> hl.expr.SetExpression:
-    return hl.flatten(hl.agg.collect_as_set(gene_col))
 
 
 def annotate_cohort_gcnv(
@@ -73,19 +58,20 @@ def annotate_cohort_gcnv(
         sourceFilePath=vcf_path,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
-        datasetType='CNV',
+        datasetType='SV',
         sampleType='WES'
     )
 
-    # apply variant_qc annotations
-    mt = hl.variant_qc(mt)
-
     # reimplementation of
-    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
+    # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/gcnv_mt_schema.py
     mt = mt.annotate_rows(
-        sc=mt.variant_qc.AC[0],
-        sf=mt.variant_qc.AF[0],
-        sn=mt.variant_qc.AN,
+        contig=mt.locus.contig.replace('^chr', ''),
+        start=mt.locus.position,
+        pos=mt.locus.position,
+        # todo @MattWellie - review use of AC_Orig vs. AC (post-qc)
+        sc=mt.info.AC_Orig[0],
+        sf=mt.info.AF_Orig[0],
+        sn=mt.info.AN_Orig,
         end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
@@ -95,11 +81,10 @@ def annotate_cohort_gcnv(
         gnomad_svs_AN=hl.missing('float64'),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         svType=mt.alleles[1].replace('[<>]', ''),
-        start=mt.locus.position,
-        pos=mt.locus.position,
         xpos=get_expr_for_xpos(mt.locus),
         xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
+        num_exon=hl.agg.max(mt.NP)
     )
 
     # save those changes
@@ -188,3 +173,123 @@ def annotate_cohort_gcnv(
 
     # write this output
     mt.write(out_mt_path, overwrite=True)
+
+
+def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
+    """
+    process data specific to samples in this dataset
+    do this after sub-setting to specific samples
+    Args:
+        mt_path (str): path to the annotated MatrixTable
+        out_mt_path (str): and where do you want it to end up?
+    """
+
+    logging.info('Annotating genotypes')
+
+    mt = read_hail(mt_path)
+
+    # adding in the GT here, that may cause problems later?
+    mt = mt.annotate_rows(
+        genotypes=hl.agg.collect(
+            hl.struct(
+                sample_id=mt.s,
+                gq=mt.QA,
+                cn=mt.CN,
+                end=mt.end,
+                num_exon=mt.NP,
+                start=mt.start,
+                geneIds=mt.geneIds,
+                gt=mt.GT
+            )
+        )
+    )
+
+    def _genotype_filter_samples(fn):
+        # Filter on the genotypes.
+        return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
+
+    def _genotype_filter_samples_cn2():
+        # Filter on the genotypes.
+        return hl.set(
+            mt.genotypes.filter(
+                lambda g: ((g.gt.is_haploid()) & (g.cn == 2))
+            ).map(lambda g: g.sample_id)
+        )
+
+    # top level - decorator
+    def _capture_i_decorator(func):
+        # call the returned_function(i) which locks in the value of i
+        def _inner_filter(i):
+            # the _genotype_filter_samples will call this _func with g
+            def _func(g):
+                return func(i, g)
+
+            return _func
+
+        return _inner_filter
+
+    @_capture_i_decorator
+    def _filter_sample_cn(i, g):
+        return g.cn == i
+
+    @_capture_i_decorator
+    def _filter_samples_gq(i, g):
+        return (g.gq >= i) & (g.gq < i + 10)
+
+    @_capture_i_decorator
+    def _filter_num_alt(i, g):
+        return i == g.gt.n_alt_alleles()
+
+    # github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/lib/model/gcnv_mt_schema.py
+    mt = mt.annotate_rows(
+        # # samples is bad, we do not want it
+        # samples=_genotype_filter_samples(lambda g: True),
+        # dubious about this annotation - expected field is qs, I'm using gq, derived from CNQ
+        samples_qs=hl.struct(
+            **{
+                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i))
+                for i in range(0, 1000, 10)
+            }, **{
+                'gt_1000': _genotype_filter_samples(lambda g: g.gq >= 1000)
+            }
+        ),
+        # ok, here's what we're
+        samples_cn=hl.struct(
+            **{
+                str(i): _genotype_filter_samples(_filter_sample_cn(i))
+                for i in [0, 1, 3]
+            },
+            **{
+                'gte_4': _genotype_filter_samples(lambda g: g.cn >= 4)
+            },
+            # and a special case for male sex-chrom CN
+            **{'2': _genotype_filter_samples_cn2()},
+        ),
+        # re-embedding the samples_num_alt, derived from hl.call().n_alt_alleles()
+        samples_num_alt=hl.struct(
+            **{
+                '%i' % i: _genotype_filter_samples(_filter_num_alt(i))
+                for i in range(1, 3, 1)
+            }
+        ),
+    )
+
+    # removing GT again, out of an abundance of caution
+    # adding in the GT here, that may cause problems later?
+    mt = mt.annotate_rows(
+        genotypes=hl.agg.collect(
+            hl.struct(
+                sample_id=mt.s,
+                gq=mt.QA,
+                cn=mt.CN,
+                end=mt.end,
+                num_exon=mt.NP,
+                start=mt.start,
+                geneIds=mt.geneIds,
+            )
+        )
+    )
+    logging.info('Genotype fields annotated')
+    mt.describe()
+    mt.write(out_mt_path, overwrite=True)
+    logging.info(f'Written gCNV MT to {out_mt_path}')

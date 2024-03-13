@@ -3,7 +3,7 @@ Stages that implement GATK-gCNV.
 """
 
 from cpg_utils import to_path, Path
-from cpg_utils.config import try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
@@ -15,8 +15,11 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
 )
 from cpg_workflows.targets import SequencingGroup, Cohort
 from cpg_workflows.workflow import (
+    get_workflow,
     stage,
     CohortStage,
+    Dataset,
+    DatasetStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
@@ -331,7 +334,7 @@ class FastCombineGCNVs(CohortStage):
 
 @stage(
     required_stages=FastCombineGCNVs,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_gcnv_annotated_meta,
 )
@@ -390,7 +393,7 @@ def _gcnv_srvctvre_meta(
 
 @stage(
     required_stages=AnnotateCNV,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['strvctvre_vcf'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
@@ -449,11 +452,11 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
 @stage(
     required_stages=AnnotateCNVVcfWithStrvctvre,
-    analysis_type='sv',
+    analysis_type='cnv',
     analysis_keys=['mt'],
     update_analysis_meta=_gcnv_srvctvre_meta,
 )
-class AnnotateGCNVCohortForSeqr(CohortStage):
+class AnnotateCohortgCNV(CohortStage):
     """
     Rearrange the annotations across the cohort to suit Seqr
     """
@@ -499,3 +502,162 @@ class AnnotateGCNVCohortForSeqr(CohortStage):
             data=self.expected_outputs(cohort),
             jobs=j,
         )
+
+
+@stage(
+    required_stages=AnnotateCohortgCNV,
+    analysis_type='cnv',
+    analysis_keys=['mt']
+)
+class AnnotateDatasetCNV(DatasetStage):
+    """
+    Subset the MT to be this Dataset only
+    Then work up all the genotype values
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict:
+        """
+        Expected to generate a matrix table
+        """
+        return {
+            'tmp_prefix': str(self.tmp_prefix / dataset.name),
+            'mt': (
+                dataset.prefix()
+                / 'mt'
+                / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'
+            ),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Subsets the whole MT to this cohort only
+        Then brings a range of genotype data into row annotations
+        Args:
+            dataset (Dataset): SGIDs specific to this dataset/project
+            inputs ():
+        """
+
+        assert dataset.cohort
+        mt_path = inputs.as_path(
+            target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt'
+        )
+
+        checkpoint_prefix = (
+            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
+        )
+
+        jobs = gcnv.annotate_dataset_jobs_cnv(
+            mt_path=mt_path,
+            sgids=dataset.get_sequencing_group_ids(),
+            out_mt_path=self.expected_outputs(dataset)['mt'],
+            tmp_prefix=checkpoint_prefix,
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
+        )
+
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )
+
+
+def _gatk_gcnv_index_meta(
+    output_path: str,  # pylint: disable=W0613:unused-argument
+) -> dict[str, str]:
+    """
+    Add meta.type to custom analysis object
+    https://github.com/populationgenomics/metamist/issues/539
+    """
+    return {'seqr-dataset-type': 'CNV'}
+
+
+@stage(
+    required_stages=[AnnotateDatasetCNV],
+    analysis_type='es-index',  # specific type of es index
+    analysis_keys=['index_name'],
+    update_analysis_meta=_gatk_gcnv_index_meta,
+)
+class MtToEsCNV(DatasetStage):
+    """
+    Create a Seqr index
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = get_config()['workflow']['sequencing_type']
+        index_name = f'{dataset.name}-{sequencing_type}-gCNV-{get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses analysis-runner's dataproc helper to run a hail query script
+        """
+        if (
+            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
+        ) and dataset.name not in es_datasets:
+            # Skipping dataset that wasn't explicitly requested to upload to ES
+            return self.make_outputs(dataset)
+
+        dataset_mt_path = inputs.as_path(
+            target=dataset, stage=AnnotateDatasetCNV, key='mt'
+        )
+        index_name = self.expected_outputs(dataset)['index_name']
+        done_flag_path = self.expected_outputs(dataset)['done_flag']
+
+        if 'elasticsearch' not in get_config():
+            raise ValueError(
+                f'"elasticsearch" section is not defined in config, cannot create '
+                f'Elasticsearch index for dataset {dataset}'
+            )
+
+        from analysis_runner import dataproc
+        from cpg_workflows.stages.seqr_loader import es_password
+
+        # transformation is the same, just use the same methods file?
+        script = (
+            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
+            f'--mt-path {dataset_mt_path} '
+            f'--es-index {index_name} '
+            f'--done-flag-path {done_flag_path} '
+            f'--es-password {es_password()}'
+        )
+        pyfiles = ['seqr-loading-pipelines/hail_scripts']
+        job_name = f'{dataset.name}: create ES index'
+
+        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
+            # noinspection PyProtectedMember
+            j = dataproc._add_submit_job(
+                batch=get_batch(),
+                cluster_id=cluster_id,
+                script=script,
+                pyfiles=pyfiles,
+                job_name=job_name,
+                region='australia-southeast1',
+            )
+        else:
+            j = dataproc.hail_dataproc_job(
+                get_batch(),
+                script,
+                max_age='48h',
+                packages=[
+                    'cpg_workflows',
+                    'elasticsearch==8.*',
+                    'google',
+                    'fsspec',
+                    'gcloud',
+                ],
+                num_workers=2,
+                num_secondary_workers=0,
+                job_name=job_name,
+                depends_on=inputs.get_jobs(dataset),
+                scopes=['cloud-platform'],
+                pyfiles=pyfiles,
+            )
+        j._preemptible = False
+        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
+        jobs = [j]
+        return self.make_outputs(dataset, data=index_name, jobs=jobs)
