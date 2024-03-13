@@ -79,7 +79,7 @@ class CollectReadCounts(SequencingGroupStage):
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
         jobs = gcnv.collect_read_counts(
-            inputs.as_path(seqgroup.dataset, PrepareIntervals, 'preprocessed'),
+            inputs.as_path(get_cohort(), PrepareIntervals, 'preprocessed'),
             seqgroup.cram,
             self.get_job_attrs(seqgroup),
             seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
