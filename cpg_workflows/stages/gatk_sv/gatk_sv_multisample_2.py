@@ -101,7 +101,7 @@ class CombineExclusionLists(CohortStage):
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
 
         all_filter_lists = [
-            batch_prefix / batch_name / 'FilterBatch' / 'outliers.samples.list'
+            str(batch_prefix / batch_name / 'FilterBatch' / 'outliers.samples.list')
             for batch_name in batch_names
         ]
 
