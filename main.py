@@ -24,14 +24,15 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
-from cpg_workflows.stages.gcnv import (
-    AnnotateCNV,
-    AnnotateCNVVcfWithStrvctvre,
-    AnnotateGCNVCohortForSeqr,
-    GermlineCNVCalls,
-    FastCombineGCNVs,
+from cpg_workflows.stages.gcnv import AnnotateGCNVCohortForSeqr
+from cpg_workflows.stages.aip import (
+    GeneratePanelData,
+    QueryPanelapp,
+    RunHailFiltering,
+    ValidateMOI,
+    CreateAIPHTML,
+    GenerateSeqrFile
 )
-from cpg_workflows.stages.aip import GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.happy_validation import (
     ValidationMtToVcf,
@@ -44,7 +45,7 @@ from cpg_workflows.stages.fraser import Fraser
 
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'aip': [GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML],
+    'aip': [GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
         DatasetVCF,
@@ -64,7 +65,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
-    'gcnv': [GermlineCNVCalls, FastCombineGCNVs, AnnotateCNV, AnnotateCNVVcfWithStrvctvre, AnnotateGCNVCohortForSeqr],
+    'gcnv': [AnnotateGCNVCohortForSeqr],
 }
 
 

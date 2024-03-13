@@ -4,23 +4,21 @@ Jobs that implement GATK-gCNV.
 
 from collections.abc import Iterable
 
-import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path
+from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, chunks
 
 
 def prepare_intervals(
-    b: hb.Batch,
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
-) -> list[Job]:
-    j = b.new_job(
+) -> Job:
+    j = get_batch().new_job(
         'Prepare intervals',
         job_attrs
         | {
@@ -30,7 +28,7 @@ def prepare_intervals(
     j.image(image_path('gatk_gcnv'))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
-    reference = fasta_res_group(b)
+    reference = fasta_res_group(get_batch())
 
     exclude_intervals = get_config()['workflow'].get('exclude_intervals', [])
     exclude_intervals_args = ' '.join(
@@ -38,7 +36,9 @@ def prepare_intervals(
     )
 
     if sequencing_type == 'exome':
-        intervals = b.read_input(get_config()['workflow'].get('intervals_path'))
+        intervals = get_batch().read_input(
+            get_config()['workflow'].get('intervals_path')
+        )
         preprocess_cmd = f"""
         gatk PreprocessIntervals \\
           --reference {reference.base} --intervals {intervals} {exclude_intervals_args} \\
@@ -72,23 +72,22 @@ def prepare_intervals(
 
     j.command(command([preprocess_cmd, annotate_cmd]))
     for key, path in output_paths.items():
-        b.write_output(j[key], str(path))
-    return [j]
+        get_batch().write_output(j[key], str(path))
+    return j
 
 
 def collect_read_counts(
-    b: hb.Batch,
     intervals_path: Path,
     cram_path: CramPath,
     job_attrs: dict[str, str],
     output_base_path: Path,
 ) -> list[Job]:
-    j = b.new_job(
+    j = get_batch().new_job(
         'Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'}
     )
     j.image(image_path('gatk_gcnv'))
 
-    reference = fasta_res_group(b)
+    reference = fasta_res_group(get_batch())
 
     j.declare_resource_group(
         counts={
@@ -110,14 +109,14 @@ def collect_read_counts(
     """
 
     j.command(command(cmd, setup_gcp=True))
-    b.write_output(j.counts, str(output_base_path))
+    get_batch().write_output(j.counts, str(output_base_path))
     return [j]
 
 
-def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
+def _counts_input_args(counts_paths: Iterable[Path]) -> str:
     args = ''
     for f in counts_paths:
-        counts = b.read_input_group(
+        counts = get_batch().read_input_group(
             **{
                 'counts.tsv.gz': str(f),
                 'counts.tsv.gz.tbi': str(f) + '.tbi',
@@ -129,15 +128,14 @@ def _counts_input_args(b: hb.Batch, counts_paths: Iterable[Path]) -> str:
 
 
 def filter_and_determine_ploidy(
-    b: hb.Batch,
-    ploidy_priors_path: Path,
+    ploidy_priors_path: str,
     preprocessed_intervals_path: Path,
     annotated_intervals_path: Path,
     counts_paths: Iterable[Path],
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    j = b.new_job(
+    j = get_batch().new_job(
         'Filter intervals and determine ploidy',
         job_attrs
         | {
@@ -146,15 +144,19 @@ def filter_and_determine_ploidy(
     )
     j.image(image_path('gatk_gcnv'))
 
-    counts_input_args = _counts_input_args(b, counts_paths)
+    counts_input_args = _counts_input_args(counts_paths)
     cmd = ''
 
     if can_reuse(output_paths['filtered']):
         # Remove 'filtered' entry from output_paths so we don't write_output() it later
-        filtered: ResourceFile = b.read_input(str(output_paths.pop('filtered')))
+        filtered: ResourceFile = get_batch().read_input(
+            str(output_paths.pop('filtered'))
+        )
     else:
-        preprocessed_intervals = b.read_input(str(preprocessed_intervals_path))
-        annotated_intervals = b.read_input(str(annotated_intervals_path))
+        preprocessed_intervals = get_batch().read_input(
+            str(preprocessed_intervals_path)
+        )
+        annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
 
         cmd += f"""
         gatk FilterIntervals \\
@@ -169,7 +171,7 @@ def filter_and_determine_ploidy(
         filtered = j.filtered
 
     # (Other arguments may be cloud URLs, but this *must* be a local file)
-    ploidy_priors = b.read_input(str(ploidy_priors_path))
+    ploidy_priors = get_batch().read_input(ploidy_priors_path)
 
     cmd += f"""
     gatk DetermineGermlineContigPloidy \\
@@ -189,7 +191,7 @@ def filter_and_determine_ploidy(
 
     j.command(command(cmd))
     for key, path in output_paths.items():
-        b.write_output(j[key], str(path))
+        get_batch().write_output(j[key], str(path))
     return [j]
 
 
@@ -212,7 +214,6 @@ def shard_basenames():
 
 
 def shard_gcnv(
-    b: hb.Batch,
     annotated_intervals_path: Path,
     filtered_intervals_path: Path,
     ploidy_calls_path: Path,
@@ -220,10 +221,10 @@ def shard_gcnv(
     job_attrs: dict[str, str],
     output_paths: dict[str, Path],
 ) -> list[Job]:
-    annotated_intervals = b.read_input(str(annotated_intervals_path))
-    filtered_intervals = b.read_input(str(filtered_intervals_path))
-    ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
-    counts_input_args = _counts_input_args(b, counts_paths)
+    annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
+    filtered_intervals = get_batch().read_input(str(filtered_intervals_path))
+    ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
+    counts_input_args = _counts_input_args(counts_paths)
 
     jobs: list[Job] = []
 
@@ -231,7 +232,7 @@ def shard_gcnv(
         if can_reuse(output_paths[name]):
             continue
 
-        j = b.new_job(
+        j = get_batch().new_job(
             'Call germline CNVs',
             job_attrs
             | {
@@ -263,21 +264,31 @@ def shard_gcnv(
         j.shard_tarball.add_extension('.tar.gz')
 
         j.command(command(cmd))
-        b.write_output(j.shard_tarball, str(output_paths[name]))
+        get_batch().write_output(j.shard_tarball, str(output_paths[name]))
         jobs.append(j)
 
     return jobs
 
 
 def postprocess_calls(
-    b: hb.Batch,
     ploidy_calls_path: Path,
     shard_paths: dict[str, Path],
     sample_index: int,
     job_attrs: dict[str, str],
     output_prefix: str,
-) -> list[Job]:
-    j = b.new_job(
+    clustered_vcf: str | None = None,
+    intervals_vcf: str | None = None,
+    qc_file: str | None = None,
+) -> Job:
+
+    if any([clustered_vcf, intervals_vcf, qc_file]):
+        assert all([clustered_vcf, intervals_vcf, qc_file]), [
+            clustered_vcf,
+            intervals_vcf,
+            qc_file,
+        ]
+
+    j = get_batch().new_job(
         'Postprocess gCNV calls',
         job_attrs
         | {
@@ -287,18 +298,22 @@ def postprocess_calls(
     j.image(image_path('gatk_gcnv'))
     j.storage('12Gi')  # TODO revisit limits
 
-    reference = fasta_res_group(b)
+    reference = fasta_res_group(get_batch())
 
-    ploidy_calls_tarball = b.read_input(str(ploidy_calls_path))
+    ploidy_calls_tarball = get_batch().read_input(str(ploidy_calls_path))
 
-    unpack_cmds = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR']
+    gcp_related_commands = [f'tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR/inputs']
 
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        unpack_cmds.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR')
-        model_shard_args += f' --model-shard-path $BATCH_TMPDIR/{name}-model'
-        calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/{name}-calls'
+        gcp_related_commands.append(
+            f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs'
+        )
+        model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
+        calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
+
+    j.command(command(gcp_related_commands, setup_gcp=True))
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
     allosomal_contigs_args = ' '.join(
@@ -316,82 +331,207 @@ def postprocess_calls(
         }
     )
 
-    postprocess_cmd = f"""
+    extra_args = ''
+    if clustered_vcf:
+        local_clusters = (
+            get_batch()
+            .read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi')
+            .vcf
+        )
+        local_intervals = (
+            get_batch()
+            .read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi')
+            .vcf
+        )
+        extra_args += f"""--clustered-breakpoints {local_clusters} \\
+         --input-intervals-vcf {local_intervals} \\
+          -R {reference.base}
+        """
+
+    j.command(
+        f"""
+    OUTS=$(dirname {j.output['intervals.vcf.gz']})
+    BATCH_OUTS=$(dirname $OUTS)
+    mkdir $OUTS
     gatk PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
-      --contig-ploidy-calls $BATCH_TMPDIR/ploidy-calls \\
+      --contig-ploidy-calls $BATCH_TMPDIR/inputs/ploidy-calls \\
       {model_shard_args} {calls_shard_args} \\
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
-      --output-denoised-copy-ratios {j.output['ratios.tsv']}
+      --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
+      {extra_args}
     """
+    )
 
-    # index the output VCFs
-    tabix_cmd = f"""
-    tabix {j.output['intervals.vcf.gz']}
-    tabix {j.output['segments.vcf.gz']}
+    # index the output VCFs - GATK does this already?
+    # or maybe it only generates indexes when the clustered input is provided
+    j.command(
+        f"""
+    tabix -f {j.output['intervals.vcf.gz']}
+    tabix -f {j.output['segments.vcf.gz']}
     """
+    )
 
-    j.command(command([*unpack_cmds, postprocess_cmd, tabix_cmd], setup_gcp=True))
+    if clustered_vcf:
+        max_events = get_config()['workflow']['gncv_max_events']
+        max_pass_events = get_config()['workflow']['gncv_max_pass_events']
+        # do some additional stuff to determine pass/fail
+        j.command(
+            f"""
+        #use wc instead of grep -c so zero count isn't non-zero exit
+        #use grep -P to recognize tab character
+        NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
+        NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l)
+        if [ $NUM_SEGMENTS -lt {max_events} ]; then
+            if [ $NUM_PASS_SEGMENTS -lt {max_pass_events} ]; then
+              echo "PASS" >> {j.qc_file}
+            else
+              echo "EXCESSIVE_NUMBER_OF_PASS_EVENTS" >> {j.qc_file}
+            fi
+        else
+            echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
+        fi
+        """
+        )
+        get_batch().write_output(j.qc_file, qc_file)
 
-    b.write_output(j.output, output_prefix)
+    get_batch().write_output(j.output, output_prefix)
 
-    return [j]
+    return j
 
 
-def fix_intervals_vcf(
-    b: hb.Batch, interval_vcf: Path, job_attrs: dict[str, str], output_path: Path
-):
+def joint_segment_vcfs(
+    segment_vcfs: list[ResourceFile],
+    pedigree: ResourceFile,
+    reference: ResourceGroup,
+    intervals: ResourceFile,  # hmm,
+    title: str,
+    job_attrs: dict,
+) -> tuple[Job, ResourceGroup]:
     """
-    Note: the reheader loop is only required until the closure and
-    adoption of https://github.com/broadinstitute/gatk/pull/8621
-    Args:
-        b (the batch instance):
-        interval_vcf (Path): the individual intervals VCF
+    This job will run the joint segmentation step of the gCNV workflow
+    Takes individual Segment VCFs and merges them into a single VCF
+    Depending on the config setting workflow.num_samples_per_scatter_block
+    this may be conducted in hierarchical 2-step, with intermediate merges
+    being conducted, then a merge of those intermediates
+
     Returns:
-        the Job doing the work
+        the job that does the work, and the resulting resource group of VCF & index
     """
-    reheader_job = b.new_job('Reheader intervals VCF', job_attrs | {'tool': 'bcftools'})
-    reheader_job.declare_resource_group(
-        output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
+    job = get_batch().new_job(
+        f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'}
     )
-    reheader_job.image(image_path('bcftools')).storage('1Gi')
-
-    # read the Intervals VCF for this SG ID
-    input_vcf = b.read_input(str(interval_vcf))
-
-    # pull the header into a temp file
-    reheader_job.command(f'bcftools view -h {input_vcf} > header')
-
-    # sed command to swap Integer GT to String in-place
-    reheader_job.command(
-        r"sed -i 's/<ID=GT,Number=1,Type=Integer/<ID=GT,Number=1,Type=String/' header"
+    job.declare_resource_group(
+        output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
+    job.image(image_path('gatk_gcnv'))
+    job.memory('8Gi')
+    vcf_string = ''
+    for each_vcf in segment_vcfs:
+        vcf_string += f' -V {each_vcf}'
 
-    # apply the new header
-    reheader_job.command(f'bcftools reheader -h header {input_vcf} -o temp.vcf.bgz')
-
-    # split multiallelics (CNV calls are DEL/DUP at all loci)
-    reheader_job.command(
-        f'bcftools norm -m - temp.vcf.bgz | bgzip -c > {reheader_job.output["vcf.bgz"]}'
+    # this already creates a tabix index
+    job.command(
+        f"""
+    set -e
+    gatk --java-options "-Xmx6000m" JointGermlineCNVSegmentation \\
+        -R {reference.base} \\
+        -O {job.output["vcf.gz"]} \\
+        {vcf_string} \\
+        --model-call-intervals {intervals} \\
+        -ped {pedigree}
+    """
     )
+    return job, job.output
 
-    # and index with tabix
-    reheader_job.command(f'tabix {reheader_job.output["vcf.bgz"]}')
 
-    # get the output root to write to, and write both VCF and index
-    b.write_output(reheader_job.output, str(output_path).removesuffix('.vcf.bgz'))
+def run_joint_segmentation(
+    segment_vcfs: list[str],
+    pedigree: str,
+    intervals: str,
+    tmp_prefix: str,
+    output_path: Path,
+    job_attrs: dict[str, str] | None = None,
+) -> list[Job]:
+    """
+    This job will run the joint segmentation step of the gCNV workflow
+    Takes individual Segment VCFs and merges them into a single VCF
+    Depending on the config setting workflow.num_samples_per_scatter_block
+    this may be conducted in hierarchical 2-step, with intermediate merges
+    being conducted, then a merge of those intermediates
 
-    return reheader_job
+    Returns:
+
+    """
+
+    if can_reuse(output_path):
+        return []
+
+    jobs = []
+
+    pedigree_in_batch = get_batch().read_input(pedigree)
+    intervals_in_batch = get_batch().read_input(intervals)
+
+    # find the number of samples to shove into each scatter block
+    sams_per_block = get_config()['workflow']['num_samples_per_scatter_block']
+
+    reference = fasta_res_group(get_batch())
+
+    chunked_vcfs = []
+
+    # if we have more samples to process than the block size, condense
+    # this is done by calling an intermediate round of VCF segmenting
+    if len(segment_vcfs) > sams_per_block:
+        for subchunk_index, chunk_vcfs in enumerate(
+            chunks(segment_vcfs, sams_per_block)
+        ):
+            # create a new job for each chunk
+            # read these files into this batch
+            local_vcfs = [
+                get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi')['vcf']
+                for vcf in chunk_vcfs
+            ]
+            job, vcf_group = joint_segment_vcfs(
+                local_vcfs,
+                pedigree=pedigree_in_batch,
+                reference=reference,
+                intervals=intervals_in_batch,
+                job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
+                title=f'sub-chunk_{subchunk_index}',
+            )
+            chunked_vcfs.append(vcf_group['vcf.gz'])
+            get_batch().write_output(
+                vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}'
+            )
+            jobs.append(job)
+
+    # else, all vcf files into the batch
+    else:
+        chunked_vcfs = [
+            get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf
+            for vcf in segment_vcfs
+        ]
+
+    # second round of condensing output - produces one single file
+    job, vcf_group = joint_segment_vcfs(
+        chunked_vcfs,
+        pedigree=pedigree_in_batch,
+        reference=reference,
+        intervals=intervals_in_batch,
+        job_attrs=job_attrs or {} | {'title': f'all-chunks'},
+        title='all-chunks',
+    )
+    jobs.append(job)
+
+    # write the final output file group (VCF & index)
+    get_batch().write_output(vcf_group, f'{str(output_path).removesuffix(".vcf.gz")}')
+    return jobs
 
 
 def merge_calls(
-    b: hb.Batch,
-    sg_vcfs: list[str],
-    docker_image: str,
-    job_attrs: dict[str, str],
-    output_path: Path
+    sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path
 ):
     """
     This job will run a fast simple merge on per-SGID call files
@@ -399,7 +539,6 @@ def merge_calls(
     and edit the SVLEN and SVTYPE attributes into each row
 
     Args:
-        b (batch):
         sg_vcfs (list[str]): paths to all individual VCFs
         docker_image (str): docker image to use
         job_attrs (dict): any params to atach to the job
@@ -411,7 +550,9 @@ def merge_calls(
 
     assert sg_vcfs, 'No VCFs to merge'
 
-    merge_job = b.new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
+    merge_job = get_batch().new_job(
+        'Merge gCNV calls', job_attrs | {'tool': 'bcftools'}
+    )
     merge_job.image(docker_image)
 
     # this should be made reactive, in case we scale past 10GB
@@ -420,7 +561,7 @@ def merge_calls(
     batch_vcfs = []
     for each_vcf in sg_vcfs:
         batch_vcfs.append(
-            b.read_input_group(
+            get_batch().read_input_group(
                 **{
                     'vcf.gz': each_vcf,
                     'vcf.gz.tbi': f'{each_vcf}.tbi',
@@ -438,13 +579,18 @@ def merge_calls(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0'
     )
 
+    # now normlise the result, splitting multiallelics
+    merge_job.command(
+        f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}'
+    )
+
     # create a python job to do the file content updates
-    pyjob = b.new_python_job('Update VCF content')
+    pyjob = get_batch().new_python_job('Update VCF content')
     pyjob.storage('10Gi')
-    pyjob.call(update_vcf_attributes, merge_job.tmp_vcf, pyjob.output)
+    pyjob.call(update_vcf_attributes, merge_job.tmp_vcf_split, pyjob.output)
 
     # a third job just to tidy up
-    third_job = b.new_job('bgzip and tabix')
+    third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(
         output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
@@ -456,17 +602,16 @@ def merge_calls(
 
     # get the output root to write to
     output_no_suffix = str(output_path).removesuffix('.vcf.bgz')
-    b.write_output(third_job.output, output_no_suffix)
+    get_batch().write_output(third_job.output, output_no_suffix)
     return [merge_job, pyjob, third_job]
 
 
 def update_vcf_attributes(input_tmp: str, output_file: str):
     """
     A Python method to call as a PythonJob, edits content of the VCF
-    - Add 2 new INFO sections in the header, SVTYPE and SVLEN
-    - Use the Alt-allele post splitting to find DUP/DEL for each line
+    - INFO.SVLEN exists in header, but not populated on variant rows
     - Use the END value (in INFO) to determine CNV Length (SVLEN)
-    - Update the ID field to be unique for each line
+    - Update the ID field to be appropriate for each line
     - Expand the INFO in each line
     - write the file back out to the specified path
 
@@ -485,36 +630,38 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
             # don't alter current header lines
             if line.startswith('#'):
                 headers.append(line)
-                # but do insert additional INFO field lines
-                if line.startswith('##INFO=<ID=END'):
-                    headers.extend([
-                        '##INFO=<ID=SVTYPE,Number=.,Type=String,Description="SV Type">\n',
-                        '##INFO=<ID=SVLEN,Number=.,Type=Integer,Description="SV Length">\n']
-                    )
             # for non-header lines
             else:
                 # split on tabs
                 l_split = line.split('\t')
+
+                # don't bother with null/WT/missing alleles
+                if l_split[4] == '.':
+                    continue
+
                 original_start = int(l_split[1])
 
-                # e.g. END=12345
-                # this will be added back in upon export
-                original_end = l_split[7]
+                # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
+                original_info: dict[str, str] = dict(
+                    el.split('=') for el in l_split[7].split(';')
+                )
 
-                # steal the END integer (only current INFO field, int)
-                end_int = int(original_end.removeprefix('END='))
+                # steal the END integer
+                end_int = int(original_info['END'])
 
                 # e.g. <DEL> -> DEL
                 alt_allele = l_split[4][1:-1]
 
-                # grab the original ID
-                original_id = l_split[2]
+                # replace compound ID original ID
+                chrom = l_split[0]
+                start = l_split[1]
 
                 # make this unique after splitting (include alt allele)
-                l_split[2] = f'{original_id}_{alt_allele}'
+                l_split[2] = f'CNV_{chrom}_{start}_{end_int}_{alt_allele}'
 
                 # update the INFO field with Length and Type (DUP/DEL, not "CNV")
-                l_split[7] = f'SVTYPE={alt_allele};SVLEN={end_int - original_start};{original_end}'
+                original_info['SVLEN'] = str(end_int - original_start)
+                l_split[7] = ';'.join(f'{k}={v}' for k, v in original_info.items())
 
                 # put it together and what have you got?
                 # bippidy boppidy boo

@@ -9,6 +9,8 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
+
+from itertools import chain, islice
 from os.path import basename, dirname, join
 from random import choices
 from typing import Union, cast
@@ -17,6 +19,41 @@ import hail as hl
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from hailtop.batch import ResourceFile
+
+
+def chunks(iterable, chunk_size):
+    """
+    Yield successive n-sized chunks from an iterable
+
+    Args:
+        iterable (): any iterable - tuple, str, list, set
+        chunk_size (): size of intervals to return
+
+    Returns:
+        intervals of requested size across the collection
+    """
+
+    if isinstance(iterable, set):
+        iterable = list(iterable)
+
+    for i in range(0, len(iterable), chunk_size):
+        yield iterable[i : (i + chunk_size)]
+
+
+def generator_chunks(generator, size):
+    """
+    Iterates across a generator, returning specifically sized chunks
+
+    Args:
+        generator (): any generator or method implementing yield
+        size (): size of iterator to return
+
+    Returns:
+        a subset of the generator results
+    """
+    iterator = iter(generator)
+    for first in iterator:
+        yield list(chain([first], islice(iterator, size - 1)))
 
 
 def read_hail(path):

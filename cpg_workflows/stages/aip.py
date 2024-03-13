@@ -52,8 +52,8 @@ data in test and main buckets.
 """
 import logging
 from datetime import datetime
-from os.path import join
 from functools import lru_cache
+from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -494,5 +494,56 @@ class CreateAIPHTML(DatasetStage):
             f'--dataset "{dataset.name}" '
         )
 
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
+
+
+# probably shouldn't be recorded as a custom type
+@stage(
+    required_stages=ValidateMOI,
+    analysis_keys=['seqr_file', 'seqr_pheno_file'],
+    analysis_type='custom',
+    tolerate_missing_output=True,
+)
+class GenerateSeqrFile(DatasetStage):
+    """
+    takes the results file from Seqr and produces a minimised form for Seqr ingestion
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {
+            'seqr_file': dataset.prefix(category='analysis')
+            / 'seqr_files'
+            / f'{DATED_FOLDER}_seqr.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis')
+            / 'seqr_files'
+            / f'{DATED_FOLDER}_seqr_pheno.json'
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        # pull out the config section relevant to this datatype & cohort
+        cohort_seq_type_section = get_config()['cohorts'][dataset.name].get(
+            get_config()['workflow'].get('sequencing_type', {})
+        )
+
+        # if there's no lookup file, do nothing
+        if not (seqr_lookup := cohort_seq_type_section.get('seqr_lookup')):
+            return self.make_outputs(dataset, data={}, jobs=[], skipped=True)
+
+        moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
+        input_localised = get_batch().read_input(str(moi_inputs))
+
+        # create a job to run the minimisation script
+        job = get_batch().new_job(f'AIP Prep for Seqr: {dataset.name}')
+        job.cpu(1.0).memory('lowmem')
+        job.image(image_path('aip'))
+        lookup_in_batch = get_batch().read_input(seqr_lookup)
+        job.command(
+            f'python3 reanalysis/minimise_output_for_seqr.py '
+            f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
+        )
+
+        # write the results out
         expected_out = self.expected_outputs(dataset)
+        get_batch().write_output(job.out_json, str(expected_out['seqr_file']))
         return self.make_outputs(dataset, data=expected_out, jobs=job)

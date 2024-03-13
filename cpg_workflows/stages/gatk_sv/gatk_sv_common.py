@@ -14,7 +14,7 @@ from analysis_runner.cromwell import (
 )
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, get_config
-from cpg_utils.hail_batch import Batch, command, image_path, reference_path
+from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
 from hailtop.batch.job import Job
 
 from cpg_workflows.batch import make_job_name
@@ -75,15 +75,6 @@ def _sv_batch_meta(
     Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-batch-calls'}
-
-
-def _sv_filtered_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-filtered-calls'}
 
 
 def _sv_individual_meta(
@@ -154,7 +145,6 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
 
 
 def add_gatk_sv_jobs(
-    batch: Batch,
     dataset: Dataset,
     wfl_name: str,
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
@@ -230,7 +220,7 @@ def add_gatk_sv_jobs(
     copy_outputs = get_config()['workflow'].get('copy_outputs', False)
 
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
-        b=batch,
+        b=get_batch(),
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
         repo='gatk-sv',
@@ -248,7 +238,7 @@ def add_gatk_sv_jobs(
         max_watch_poll_interval=polling_maximum,
     )
 
-    copy_j = batch.new_job(f'{job_prefix}: copy outputs')
+    copy_j = get_batch().new_job(f'{job_prefix}: copy outputs')
     copy_j.image(driver_image)
     cmds = []
     for key, resource in output_dict.items():
@@ -304,7 +294,7 @@ def clean_ped_family_ids(ped_line: str) -> str:
     >>> clean_ped_family_ids('family1\tchild1\t0\t0\t1\t0\\n')
     'family1\tchild1\t0\t0\t1\t0\\n'
     >>> clean_ped_family_ids('family-1-dirty\tchild1\t0\t0\t1\t0\\n')
-    'family-1-dirty\tchild1\t0\t0\t1\t0\\n'
+    'family_1_dirty\tchild1\t0\t0\t1\t0\\n'
 
     Args:
         ped_line (str): line from the pedigree file, unsplit
@@ -346,7 +336,6 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    batch,
     cohort,
     cohort_prefix: Path,
     input_vcf: Path,
@@ -389,7 +378,6 @@ def queue_annotate_sv_jobs(
         ]
     )
     jobs = add_gatk_sv_jobs(
-        batch=batch,
         dataset=cohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
