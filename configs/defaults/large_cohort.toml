@@ -73,7 +73,7 @@ max_r_het_hom = 3.3  # maximum rate of heterozygous to homozygous SNPs
 min_coverage = 10
 max_n_snps = 8000000
 min_n_snps = 0
-max_n_singletons = 10000 # put back to 5000
+max_n_singletons = 25000 # put back to 5000
 max_r_het_hom = 10
 
 [hail]
