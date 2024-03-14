@@ -156,6 +156,15 @@ def filter_and_determine_ploidy(
     )
     j.image(image_path('gatk_gcnv'))
 
+    # set highmem resources for this job
+    job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+    job_res.set_to_job(j)
+    resource_string = (
+        '--java-options '
+        f'"-Xms{job_res.get_java_mem_mb()}m '
+        f'-Xmx{job_res.get_java_mem_mb()}m"'
+    )
+
     counts_input_args = _counts_input_args(counts_paths)
     cmd = ''
 
@@ -171,7 +180,7 @@ def filter_and_determine_ploidy(
         annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
 
         cmd += f"""
-        gatk FilterIntervals \\
+        gatk {resource_string} FilterIntervals \\
           --interval-merging-rule OVERLAPPING_ONLY \\
           --intervals {preprocessed_intervals} --annotated-intervals {annotated_intervals} \\
           {counts_input_args} \\
@@ -186,7 +195,7 @@ def filter_and_determine_ploidy(
     ploidy_priors = get_batch().read_input(ploidy_priors_path)
 
     cmd += f"""
-    gatk DetermineGermlineContigPloidy \\
+    gatk {resource_string} DetermineGermlineContigPloidy \\
       --interval-merging-rule OVERLAPPING_ONLY \\
       --intervals {filtered} --contig-ploidy-priors {ploidy_priors} \\
       {counts_input_args} \\
@@ -253,14 +262,22 @@ def shard_gcnv(
             },
         )
         j.image(image_path('gatk_gcnv'))
-        j.memory('16Gi')  # TODO revisit limits
+
+        # set highmem resources for this job
+        job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+        job_res.set_to_job(j)
+        resource_string = (
+            '--java-options '
+            f'"-Xms{job_res.get_java_mem_mb()}m '
+            f'-Xmx{job_res.get_java_mem_mb()}m"'
+        )
 
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
 
         {select_cmd} < {filtered_intervals} > {j.shard_intervals}
 
-        gatk GermlineCNVCaller \\
+        gatk {resource_string} GermlineCNVCaller \\
           --run-mode COHORT --interval-merging-rule OVERLAPPING_ONLY \\
           --intervals {j.shard_intervals} --annotated-intervals {annotated_intervals} \\
           {counts_input_args} \\
@@ -308,7 +325,15 @@ def postprocess_calls(
         },
     )
     j.image(image_path('gatk_gcnv'))
-    j.storage('12Gi')  # TODO revisit limits
+
+    # set highmem resources for this job
+    job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=20)
+    job_res.set_to_job(j)
+    resource_string = (
+        '--java-options '
+        f'"-Xms{job_res.get_java_mem_mb()}m '
+        f'-Xmx{job_res.get_java_mem_mb()}m"'
+    )
 
     reference = fasta_res_group(get_batch())
 
@@ -365,7 +390,7 @@ def postprocess_calls(
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
     BATCH_OUTS=$(dirname $OUTS)
     mkdir $OUTS
-    gatk PostprocessGermlineCNVCalls \\
+    gatk {resource_string} PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/inputs/ploidy-calls \\
       {model_shard_args} {calls_shard_args} \\
@@ -439,7 +464,16 @@ def joint_segment_vcfs(
         output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
     )
     job.image(image_path('gatk_gcnv'))
-    job.memory('8Gi')
+
+    # set highmem resources for this job
+    job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+    job_res.set_to_job(job)
+    resource_string = (
+        '--java-options '
+        f'"-Xms{job_res.get_java_mem_mb()}m '
+        f'-Xmx{job_res.get_java_mem_mb()}m"'
+    )
+
     vcf_string = ''
     for each_vcf in segment_vcfs:
         vcf_string += f' -V {each_vcf}'
@@ -448,7 +482,7 @@ def joint_segment_vcfs(
     job.command(
         f"""
     set -e
-    gatk --java-options "-Xmx6000m" JointGermlineCNVSegmentation \\
+    gatk {resource_string} JointGermlineCNVSegmentation \\
         -R {reference.base} \\
         -O {job.output["vcf.gz"]} \\
         {vcf_string} \\
