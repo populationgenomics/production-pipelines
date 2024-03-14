@@ -13,6 +13,7 @@ from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
 from cpg_workflows.utils import can_reuse, chunks
+from cpg_workflows.resources import HIGHMEM
 
 
 def prepare_intervals(
@@ -96,10 +97,20 @@ def collect_read_counts(
             'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
         }
     )
+
     assert isinstance(j.counts, ResourceGroup)
 
+    # set highmem resources for this job
+    job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+    job_res.set_to_job(j)
+    resource_string = (
+        '--java-options '
+        f'"-Xms{job_res.get_java_mem_mb()}m '
+        f'-Xmx{job_res.get_java_mem_mb()}m"'
+    )
+
     cmd = f"""
-    gatk CollectReadCounts \\
+    gatk {resource_string} CollectReadCounts \\
       --reference {reference.base} --intervals {intervals_path} \\
       --interval-merging-rule OVERLAPPING_ONLY \\
       --input {cram_path.path} --read-index {cram_path.index_path} \\
