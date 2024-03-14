@@ -264,7 +264,7 @@ def shard_gcnv(
         j.image(image_path('gatk_gcnv'))
 
         # set highmem resources for this job
-        job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+        job_res = HIGHMEM.request_resources(ncpu=8)
         job_res.set_to_job(j)
         resource_string = (
             '--java-options '
