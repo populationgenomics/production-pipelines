@@ -5,11 +5,10 @@ Impute sex. Add soft filters for samples.
 import logging
 
 import hail as hl
-from gnomad.sample_qc.pipeline import annotate_sex
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
 
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
@@ -168,7 +167,8 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
         'sex_aneuploidy',
     )
 
-    cutoffs = get_config()['large_cohort']['sample_qc_cutoffs']
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    cutoffs = get_config()['large_cohort'][sequencing_type]['sample_qc_cutoffs']
     ht = ht.annotate_globals(hard_filter_cutoffs=hl.struct(**cutoffs))
 
     # Remove low-coverage samples
