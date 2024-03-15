@@ -540,10 +540,11 @@ class GenerateSeqrFile(DatasetStage):
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             f'python3 reanalysis/minimise_output_for_seqr.py '
-            f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
+            f'{input_localised} {job.out_json} {job.pheno_json} --external_map {lookup_in_batch}'
         )
 
         # write the results out
         expected_out = self.expected_outputs(dataset)
         get_batch().write_output(job.out_json, str(expected_out['seqr_file']))
+        get_batch().write_output(job.pheno_json, str(expected_out['seqr_pheno_file']))
         return self.make_outputs(dataset, data=expected_out, jobs=job)
