@@ -102,38 +102,33 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     # find the exomiser references
     # first - the core ones
     clinvar_file = reference_path('references/exomiser_core/clinvar_whitelist')
-    genome_h2 = reference_path('references/exomiser_core/genome_h2')
-    ensembl = reference_path('references/exomiser_core/ensembl_transcripts')
-    refseq = reference_path('references/exomiser_core/refseq_transcripts')
-    ucsc = reference_path('references/exomiser_core/ucsc_transcripts')
-    variants = reference_path('references/exomiser_core/variants')
     core_group = get_batch().read_input_group(
         **{
             'clinvar': str(clinvar_file),
             'clinvar_index': f'{clinvar_file}.tbi',
-            'genome_h2': str(genome_h2),
-            'ensembl': str(ensembl),
-            'refseq': str(refseq),
-            'ucsc': str(ucsc),
-            'variants': str(variants),
+            'genome_h2': str(reference_path('references/exomiser_core/genome_h2')),
+            'ensembl': str(reference_path('references/exomiser_core/ensembl_transcripts')),
+            # 'refseq': str(reference_path('references/exomiser_core/refseq_transcripts')),
+            # 'ucsc': str(reference_path('references/exomiser_core/ucsc_transcripts')),
+            'variants': str(reference_path('references/exomiser_core/variants')),
         }
     )
 
     # cadd
     cadd_group = get_batch().read_input_group(
         **{
-            'cadd_indel': reference_path('references/exomiser_cadd/indel_tsv'),
-            'cadd_indel_index': reference_path('references/exomiser_cadd/indel_index'),
-            'cadd_snv': reference_path('references/exomiser_cadd/snv_tsv'),
-            'cadd_snv_index': reference_path('references/exomiser_cadd/snv_index'),
+            'cadd_indel': str(reference_path('references/exomiser_cadd/indel_tsv')),
+            'cadd_indel_index': str(reference_path('references/exomiser_cadd/indel_index')),
+            'cadd_snv': str(reference_path('references/exomiser_cadd/snv_tsv')),
+            'cadd_snv_index': str(reference_path('references/exomiser_cadd/snv_index')),
         }
     )
 
     # remm
     remm_group = get_batch().read_input_group(
         **{
-            'remm': reference_path('references/exomiser_remm/remm'),
-            'remm_index': reference_path('references/exomiser_remm/remm_tsv'),
+            'remm': str(reference_path('references/exomiser_remm/remm')),
+            'remm_index': str(reference_path('references/exomiser_remm/remm_tsv')),
         }
     )
 
@@ -141,3 +136,47 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     ...
     # now chunk the jobs - load resources, then run a bunch of families
     # TODO can we load more cores and run tasks in parallel? e.g. end with &
+    # UGH, we need phenopackets?!
+    for instructions in chunks(content_dict, chunk_size):
+        # todo ok, so we need to overwrite the application.properties file...
+        # it's mostly commented out, but we need to replace it with runtime attributes
+
+        # todo a bunch of stuff
+        # todo alternative - make a data directory and symlink the resources
+
+        # todo phenotype data is sprawling, maybe compress that and uncompress inside the image
+        # todo sigh deeply
+        """
+        mkdir -p data/2303_hg38
+        mkdir -p data/2303_phenotype
+        mkdir -p data/cadd
+        mkdir -p data/remm
+        ln -s {cadd_group} data/cadd
+        ...
+        """
+        application_properties = (
+            'remm.version=0.3.1.post1\n'
+            'cadd.version=1.6\n'
+            f'exomiser.hg38.variant-white-list-path={core_group["clinvar"]}\n'
+            'exomiser.phenotype.data-version=2302\n'
+            '#exomiser.phenotype.data-directory=${exomiser.data-directory}/${exomiser.phenotype.data-version}_phenotype'
+            'logging.level.com.zaxxer.hikari=ERROR\n'
+            f'exomiser.hg19.remm-path={remm_group["remm"]}\n'
+            f'exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]}\n'
+            f'exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]}\n'
+            'pathogenicitySources: [POLYPHEN, MUTATION_TASTER, SIFT, CADD, REMM]\n'
+            'exomiser.hg38.clin-var-data-version=2302\n'
+            'exomiser.hg38.use-clinvar-white-list=true'
+        )
+
+        original = """
+        remm.version=0.3.1.post1
+        cadd.version=1.4
+        exomiser.hg19.data-version=2402
+        exomiser.phenotype.data-version=2402
+        logging.level.com.zaxxer.hikari=ERROR
+        """
+        # create a new job, reference the resources in a config file
+        # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
+        families = list(instructions.keys())
+        job = get_batch().new_bash_job(f'Run Exomiser for {families}')
