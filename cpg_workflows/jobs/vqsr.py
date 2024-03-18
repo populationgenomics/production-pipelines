@@ -136,7 +136,7 @@ def make_vqsr_jobs(
     # To fit only a site-only VCF
     small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
-    huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
+    # huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     jobs: list[Job] = []
 
