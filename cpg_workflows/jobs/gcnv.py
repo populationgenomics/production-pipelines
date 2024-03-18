@@ -397,8 +397,7 @@ def postprocess_calls(
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
-      --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
-      {extra_args}
+      --output-denoised-copy-ratios {j.output['ratios.tsv']} {extra_args}
     """
     )
 
