@@ -337,16 +337,14 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
 
 
 def storage_for_joint_vcf(
-    sequencing_group_count: int | None, site_only: bool = True, job_attrs: dict | None = None
+    sequencing_group_count: int | None, site_only: bool = True
 ) -> float | None:
     """
     Storage enough to fit and process a joint-called VCF
     """
     if not sequencing_group_count:
         return None
-    if job_attrs is None:
-        job_attrs = {}
-    if job_attrs.get('sequencing_type') == 'exome':
+    if get_config()['workflow']['sequencing_type'] == 'exome':
         gb_per_sequencing_group = 0.1
     else:
         gb_per_sequencing_group = 1.0

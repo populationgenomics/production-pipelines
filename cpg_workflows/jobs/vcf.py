@@ -104,7 +104,7 @@ def gather_vcfs(
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
         j.image(image_path('bcftools'))
         res = STANDARD.set_resources(
-            j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only, job_attrs)
+            j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only)
         )
         cmd = f"""
         bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in vcfs_in_batch)} \
@@ -163,7 +163,7 @@ def sort_vcf(
     job_attrs = (job_attrs or {}) | {'tool': 'bcftools sort'}
     j = b.new_job('Sort gathered VCF', job_attrs)
     j.image(image_path('bcftools'))
-    if storage_gb := storage_for_joint_vcf(sequencing_group_count, site_only, job_attrs):
+    if storage_gb := storage_for_joint_vcf(sequencing_group_count, site_only):
         storage_gb *= 2  # sort needs extra tmp space
     STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
 
@@ -206,7 +206,7 @@ def tabix_vcf(
     STANDARD.set_resources(
         j,
         fraction=1,
-        storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only, job_attrs),
+        storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only),
     )
     j.declare_resource_group(
         output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}

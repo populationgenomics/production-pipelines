@@ -136,7 +136,7 @@ def make_vqsr_jobs(
     # To fit only a site-only VCF
     small_disk = 50 if is_small_callset else (100 if not is_huge_callset else 200)
     # To fit a joint-called VCF
-    # huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
+    huge_disk = 200 if is_small_callset else (500 if not is_huge_callset else 2000)
 
     jobs: list[Job] = []
 
@@ -281,7 +281,7 @@ def make_vqsr_jobs(
                 recalibration=snps_recalibrations[idx],
                 recalibration_idx=snps_recalibration_idxs[idx],
                 tranches=snp_gathered_tranches,
-                disk_size=small_disk,
+                disk_size=huge_disk,
                 use_as_annotations=use_as_annotations,
                 filter_level=snp_filter_level,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
