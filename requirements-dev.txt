@@ -5,3 +5,5 @@ black
 pytest
 pytest_mock
 mypy
+types-requests
+types-toml
