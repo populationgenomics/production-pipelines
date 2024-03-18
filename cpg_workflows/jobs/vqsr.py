@@ -281,7 +281,7 @@ def make_vqsr_jobs(
                 recalibration=snps_recalibrations[idx],
                 recalibration_idx=snps_recalibration_idxs[idx],
                 tranches=snp_gathered_tranches,
-                disk_size=huge_disk,
+                disk_size=small_disk,
                 use_as_annotations=use_as_annotations,
                 filter_level=snp_filter_level,
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
