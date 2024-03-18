@@ -154,19 +154,11 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'intervals': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.intervals.vcf.gz',
-            'intervals_index': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.intervals.vcf.gz.tbi',
-            'segments': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.segments.vcf.gz',
-            'segments_index': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.segments.vcf.gz.tbi',
-            'ratios': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.ratios.tsv',
+            'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
+            'intervals_index': self.prefix / f'{seqgroup.id}.intervals.vcf.gz.tbi',
+            'segments': self.prefix / f'{seqgroup.id}.segments.vcf.gz',
+            'segments_index': self.prefix / f'{seqgroup.id}.segments.vcf.gz.tbi',
+            'ratios': self.prefix / f'{seqgroup.id}.ratios.tsv',
         }
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
