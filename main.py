@@ -20,6 +20,8 @@ from cpg_workflows.stages.aip import (
     ValidateMOI,
 )
 from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.exomiser import RDCombiner
+from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
@@ -48,14 +50,8 @@ from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'aip': [
-        GeneratePanelData,
-        QueryPanelapp,
-        RunHailFiltering,
-        ValidateMOI,
-        CreateAIPHTML,
-        GenerateSeqrFile,
-    ],
+    'aip': [GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
+    'exomiser': [RDCombiner],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
         DatasetVCF,
