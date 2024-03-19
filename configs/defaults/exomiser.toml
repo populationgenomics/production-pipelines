@@ -1,2 +1,4 @@
 [workflow]
 'nothing' = 'here'
+
+status_reporter = 'metamist'

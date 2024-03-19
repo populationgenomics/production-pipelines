@@ -14,11 +14,11 @@ from cpg_utils import to_path, Path
 from cpg_workflows.jobs.exomiser import (
     extract_vcf_jobs,
     extract_mini_ped_files,
+    mt_from_vds,
     run_exomiser_batches,
     create_vds_jobs
 )
 # from cpg_workflows.stages.aip import query_for_latest_mt
-from cpg_workflows.scripts import vds_from_gvcfs
 from cpg_workflows.workflow import (
     get_workflow,
     StageInput,
@@ -60,6 +60,28 @@ class RDCombiner(DatasetStage):
         sgids = dataset.get_sequencing_groups()
         output = self.expected_outputs(dataset)
         jobs = create_vds_jobs(sgids=sgids, out_path=str(output['vds']))
+        return self.make_outputs(dataset, output, jobs=jobs)
+
+
+@stage(
+    required_stages=RDCombiner,
+    analysis_keys=['mt'],
+    analysis_type='custom'
+)
+class VDStoMT(DatasetStage):
+    """
+    make a VDS from that MT
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {'mt': self.prefix / 'mt' / f'{get_workflow().output_version}.mt'}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        sgids = dataset.get_sequencing_groups()
+        vds = str(inputs.as_dict(target=dataset, stage=RDCombiner)['vds'])
+        output = self.expected_outputs(dataset)
+        jobs = mt_from_vds(vds_path=vds, out_path=str(output['mt']))
         return self.make_outputs(dataset, output, jobs=jobs)
 
 

@@ -5,8 +5,7 @@ import pandas as pd
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, authenticate_cloud_credentials_in_job, reference_path
-from cpg_workflows.inputs import get_cohort
-from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
+from cpg_workflows.scripts import extract_vcf_from_mt, mt_from_vds as vds2mt, vds_from_gvcfs
 from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -25,11 +24,34 @@ def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
 
     gvcf_paths = " ".join([str(s.gvcf.path) for s in sgids if s.gvcf])
     sequencing_group_names = " ".join([s.id for s in sgids])
-    vds_script = str(vds_from_gvcfs.__file__).removeprefix('/production-pipeline')
+    vds_script = str(vds_from_gvcfs.__file__).removeprefix('/production-pipelines')
     job = get_batch().new_job('Make VDS from gVCFs')
     authenticate_cloud_credentials_in_job(job)
     job.image(get_config()['workflow']['driver_image'])
     job.command(f'python3 {vds_script} --gvcfs {gvcf_paths} --sgids {sequencing_group_names} --out {out_path}')
+    job.storage('10Gi')
+    job.cpu(4)
+    job.memory('standard')
+    return job
+
+
+def mt_from_vds(vds_path: str, out_path: str):
+    """
+    create the MT from the VDS
+
+    Args:
+        vds_path (str): path to the VDS
+        out_path (str): path to the MT
+    """
+
+    if exists(out_path):
+        return []
+
+    # find the path to the script in _this_ container
+    script_path = str(vds2mt.__file__).removeprefix('/production-pipelines')
+    job = get_batch().new_job('Make MT from VDS')
+    job.image(get_config()['workflow']['driver_image'])
+    job.command(f'python3 {script_path} {vds_path} {out_path}')
     job.storage('10Gi')
     job.cpu(4)
     job.memory('standard')
@@ -45,7 +67,7 @@ def extract_mini_ped_files(
     Args:
         dataset (Dataset): the dataset
         family_dict (dict[str, list[str]]): family ID to list of SG IDs
-        out_path (Path): temp dir to write the mini-peds to
+        out_prefix (Path): temp dir to write the mini-peds to
     """
 
     # collect all members per-family
@@ -92,7 +114,7 @@ def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: 
     vcf_jobs = []
 
     # find the path to the script in _this_ container
-    script_path = str(extract_vcf_from_mt.__file__).removeprefix('/production-pipeline')
+    script_path = str(extract_vcf_from_mt.__file__).removeprefix('/production-pipelines')
     for family_id, sg_ids in family_dict.items():
 
         vcf_target = out_path / f'{family_id}.vcf.bgz'
