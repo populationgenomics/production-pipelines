@@ -25,7 +25,7 @@ def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
 
     gvcf_paths = " ".join([str(s.gvcf.path) for s in sgids if s.gvcf])
     sequencing_group_names = " ".join([s.id for s in sgids])
-    vds_script = 'cpg_workflows/scripts/vds_from_gvcfs.py'
+    vds_script = str(vds_from_gvcfs.__file__).removeprefix('/production-pipeline')
     job = get_batch().new_job('Make VDS from gVCFs')
     authenticate_cloud_credentials_in_job(job)
     job.image(get_config()['workflow']['driver_image'])
@@ -92,7 +92,7 @@ def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: 
     vcf_jobs = []
 
     # find the path to the script in _this_ container
-    script_path = 'cpg_workflows/scripts/extract_vcf_from_mt.py'
+    script_path = str(extract_vcf_from_mt.__file__).removeprefix('/production-pipeline')
     for family_id, sg_ids in family_dict.items():
 
         vcf_target = out_path / f'{family_id}.vcf.bgz'
