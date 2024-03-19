@@ -89,7 +89,6 @@ class MakePedExtracts(DatasetStage):
     """
     from the dataset MT, we make a PED per-family
     """
-
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
         families_without_results = []
