@@ -57,12 +57,7 @@ from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import (
-    authenticate_cloud_credentials_in_job,
-    copy_common_env,
-    get_batch,
-    image_path,
-)
+from cpg_utils.hail_batch import copy_common_env, get_batch, image_path
 from metamist.graphql import gql
 
 from cpg_workflows.metamist import gql_query_optional_logging
@@ -201,7 +196,6 @@ class GeneratePanelData(DatasetStage):
         job.image(image_path('aip'))
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         expected_out = self.expected_outputs(dataset)
@@ -239,8 +233,6 @@ class QueryPanelapp(DatasetStage):
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
-        # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         hpo_panel_json = inputs.as_path(
@@ -281,8 +273,6 @@ class RunHailFiltering(DatasetStage):
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
-        # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(
@@ -335,8 +325,6 @@ class RunHailSVFiltering(DatasetStage):
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
-        # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(
@@ -391,7 +379,6 @@ class ValidateMOI(DatasetStage):
 
         # auth and copy env
         job.image(image_path('aip'))
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
@@ -474,8 +461,6 @@ class CreateAIPHTML(DatasetStage):
         job.cpu(1.0).memory('lowmem')
         job.image(image_path('aip'))
 
-        # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
@@ -516,7 +501,7 @@ class GenerateSeqrFile(DatasetStage):
             / f'{DATED_FOLDER}_seqr.json',
             'seqr_pheno_file': dataset.prefix(category='analysis')
             / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr_pheno.json'
+            / f'{DATED_FOLDER}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
