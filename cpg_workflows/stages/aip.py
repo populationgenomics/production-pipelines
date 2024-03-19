@@ -63,9 +63,8 @@ from cpg_utils.hail_batch import (
     get_batch,
     image_path,
 )
-from metamist.graphql import gql
+from metamist.graphql import gql, query
 
-from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
     Dataset,
@@ -94,13 +93,13 @@ MTA_QUERY = gql(
 
 
 @lru_cache(maxsize=None)
-def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
+def query_for_sv_mt(dataset: str, analysis_type: str = 'sv') -> str | None:
     """
     query for the latest SV MT for a dataset
 
     Args:
         dataset (str): project to query for
-        type (str): type of analysis entry to query for
+        analysis_type (str): type of analysis entry to query for
 
     Returns:
         str, the path to the latest MT for the given type
@@ -115,9 +114,7 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
     ):
         query_dataset += '-test'
 
-    result = gql_query_optional_logging(
-        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
-    )
+    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': analysis_type})
     mt_by_date = {}
     for analysis in result['project']['analyses']:
         if (
@@ -158,8 +155,8 @@ def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
         and 'test' not in query_dataset
     ):
         query_dataset += '-test'
-    result = gql_query_optional_logging(
-        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
+    result = query(
+        MTA_QUERY, variables={'dataset': query_dataset, 'type': type}
     )
     mt_by_date = {}
 

@@ -89,32 +89,6 @@ GET_PEDIGREE_QUERY = gql(
 _metamist: Optional['Metamist'] = None
 
 
-def gql_query_optional_logging(query_to_run, query_params: dict | None = None):
-    """
-    Run a query, but don't log the results to the console
-    This is done by setting the global logger level to WARN
-    for the duration of the query exectution, then returning to
-    whichever state it was previously in
-    Ref: https://github.com/populationgenomics/metamist/issues/540
-    Allow for a config override to log the results to the console
-
-    Args:
-        query_to_run (gql DocumentNode): Query String
-        query_params (dict): Query Parameters or None
-
-    Returns:
-        query result, with or without logging
-    """
-    if get_config()['workflow'].get('log_metamist', False):
-        return query(query_to_run, variables=query_params)
-
-    curr_level = logging.root.level
-    logging.getLogger().setLevel(logging.WARN)
-    result = query(query_to_run, variables=query_params)
-    logging.getLogger().setLevel(curr_level)
-    return result
-
-
 def get_metamist() -> 'Metamist':
     """Return the cohort object"""
     global _metamist
@@ -151,38 +125,6 @@ class AnalysisStatus(Enum):
         return {v.value: v for v in AnalysisStatus}[name.lower()]
 
 
-class AnalysisType(Enum):
-    """
-    Corresponds to metamist Analysis types:
-    https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums
-    /analysis.py#L4-L11
-
-    Re-defined in a separate module to decouple from the main metamist module,
-    so decorators can use `@stage(analysis_type=AnalysisType.QC)` without importing
-    the metamist package.
-    """
-
-    QC = 'qc'
-    JOINT_CALLING = 'joint-calling'
-    GVCF = 'gvcf'
-    CRAM = 'cram'
-    MITO_CRAM = 'mito-cram'
-    CUSTOM = 'custom'
-    ES_INDEX = 'es-index'
-
-    @staticmethod
-    def parse(val: str) -> 'AnalysisType':
-        """
-        Parse str and create a AnalysisStatus object
-        """
-        d = {v.value: v for v in AnalysisType}
-        if val not in d:
-            raise MetamistError(
-                f'Unrecognised analysis type {val}. Available: {list(d.keys())}'
-            )
-        return d[val.lower()]
-
-
 @dataclass
 class Analysis:
     """
@@ -193,7 +135,7 @@ class Analysis:
     """
 
     id: int
-    type: AnalysisType
+    type: str
     status: AnalysisStatus
     sequencing_group_ids: set[str]
     output: Path | None
@@ -217,7 +159,7 @@ class Analysis:
 
         a = Analysis(
             id=int(data['id']),
-            type=AnalysisType.parse(data['type']),
+            type=data['type'],
             status=AnalysisStatus.parse(data['status']),
             sequencing_group_ids=set([s['id'] for s in data['sequencingGroups']]),
             output=output,
@@ -252,7 +194,7 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        sequencing_group_entries = gql_query_optional_logging(
+        sequencing_group_entries = query(
             GET_SEQUENCING_GROUPS_QUERY,
             {
                 'metamist_proj': metamist_proj,
@@ -293,14 +235,14 @@ class Metamist:
         try:
             data = self.aapi.get_latest_complete_analysis_for_type(
                 project=metamist_proj,
-                analysis_type=models.AnalysisType('joint-calling'),
+                analysis_type='joint-calling',
             )
         except ApiException:
             return None
         a = Analysis.parse(data)
         if not a:
             return None
-        assert a.type == AnalysisType.JOINT_CALLING, data
+        assert a.type == 'joint-calling', data
         assert a.status == AnalysisStatus.COMPLETED, data
         if a.sequencing_group_ids != set(sequencing_group_ids):
             return None
@@ -309,7 +251,7 @@ class Metamist:
     def get_analyses_by_sgid(
         self,
         sg_ids: list[str],
-        analysis_type: AnalysisType,
+        analysis_type: str,
         analysis_status: AnalysisStatus = AnalysisStatus.COMPLETED,
         meta: dict | None = None,
         dataset: str | None = None,
@@ -324,11 +266,11 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        analyses = gql_query_optional_logging(
+        analyses = query(
             GET_ANALYSES_QUERY,
             {
                 'metamist_proj': metamist_proj,
-                'analysis_type': analysis_type.value,
+                'analysis_type': analysis_type,
                 'analysis_status': analysis_status.name,
             },
         )
@@ -358,7 +300,7 @@ class Metamist:
     def create_analysis(
         self,
         output: Path | str,
-        type_: str | AnalysisType,
+        type_: str,
         status: str | AnalysisStatus,
         sequencing_group_ids: list[str],
         dataset: str | None = None,
@@ -372,8 +314,6 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        if isinstance(type_, AnalysisType):
-            type_ = type_.value
         if isinstance(status, AnalysisStatus):
             status = status.value
 
@@ -499,7 +439,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = gql_query_optional_logging(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
+        entries = query(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
