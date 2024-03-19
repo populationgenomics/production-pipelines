@@ -30,9 +30,7 @@ def default_config() -> PipelineConfig:
     )
 
 
-def select_jobs(
-    jobs: list[Job], jtype: Literal['align', 'merge', 'markdup']
-) -> list[Job]:
+def select_jobs(jobs: list[Job], jtype: Literal['align', 'merge', 'markdup']) -> list[Job]:
     if jtype == 'align':
         return [j for j in jobs if 'Align' in str(j.name)]
     elif jtype == 'merge':

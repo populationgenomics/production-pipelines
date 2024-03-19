@@ -177,9 +177,7 @@ class AnalysisType(Enum):
         """
         d = {v.value: v for v in AnalysisType}
         if val not in d:
-            raise MetamistError(
-                f'Unrecognised analysis type {val}. Available: {list(d.keys())}'
-            )
+            raise MetamistError(f'Unrecognised analysis type {val}. Available: {list(d.keys())}')
         return d[val.lower()]
 
 
@@ -350,8 +348,7 @@ class Metamist:
             analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
 
         logging.info(
-            f'Querying {analysis_type} analysis entries for {metamist_proj}: '
-            f'found {len(analysis_per_sid)}'
+            f'Querying {analysis_type} analysis entries for {metamist_proj}: ' f'found {len(analysis_per_sid)}'
         )
         return analysis_per_sid
 
@@ -432,10 +429,7 @@ class Metamist:
                 f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups" }'
             )
         elif not completed_analysis.output:
-            logging.error(
-                f'Found a completed analysis {label}, '
-                f'but the "output" field does not exist or empty'
-            )
+            logging.error(f'Found a completed analysis {label}, ' f'but the "output" field does not exist or empty')
         else:
             found_output_fpath = completed_analysis.output
             if found_output_fpath != expected_output_fpath:
@@ -447,17 +441,13 @@ class Metamist:
                 found_output_fpath = None
             elif not exists(found_output_fpath):
                 logging.error(
-                    f'Found a completed analysis {label}, '
-                    f'but the "output" file {found_output_fpath} does not exist'
+                    f'Found a completed analysis {label}, ' f'but the "output" file {found_output_fpath} does not exist'
                 )
                 found_output_fpath = None
 
         # completed and good exists, can reuse
         if found_output_fpath:
-            logging.info(
-                f'Completed analysis {label} exists, '
-                f'reusing the result {found_output_fpath}'
-            )
+            logging.info(f'Completed analysis {label} exists, ' f'reusing the result {found_output_fpath}')
             return found_output_fpath
 
         # can't reuse, need to invalidate
@@ -486,8 +476,7 @@ class Metamist:
         # proceeding with the standard workflow (creating status=queued, submitting jobs)
         else:
             logging.info(
-                f'Expected output file {expected_output_fpath} does not exist, '
-                f'so queueing analysis {label}'
+                f'Expected output file {expected_output_fpath} does not exist, ' f'so queueing analysis {label}'
             )
             return None
 
@@ -536,9 +525,7 @@ class Assay:
         missing_keys = [key for key in assay_keys if data.get(key) is None]
 
         if missing_keys:
-            raise ValueError(
-                f'Cannot parse metamist Sequence {data}. Missing keys: {missing_keys}'
-            )
+            raise ValueError(f'Cannot parse metamist Sequence {data}. Missing keys: {missing_keys}')
 
         assay_type = str(data['type'])
         assert assay_type, data
@@ -574,21 +561,16 @@ def parse_reads(  # pylint: disable=too-many-return-statements
     if not reads_data:
         raise MetamistError(f'{sequencing_group_id}: no "meta/reads" field in meta')
     if not reads_type:
-        raise MetamistError(
-            f'{sequencing_group_id}: no "meta/reads_type" field in meta'
-        )
+        raise MetamistError(f'{sequencing_group_id}: no "meta/reads_type" field in meta')
     supported_types = ('fastq', 'bam', 'cram')
     if reads_type not in supported_types:
         raise MetamistError(
-            f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of '
-            f'{supported_types}'
+            f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of ' f'{supported_types}'
         )
 
     if reads_type in ('bam', 'cram'):
         if len(reads_data) > 1:
-            raise MetamistError(
-                f'{sequencing_group_id}: supporting only single bam/cram input'
-            )
+            raise MetamistError(f'{sequencing_group_id}: supporting only single bam/cram input')
 
         location = reads_data[0]['location']
         if not (location.endswith('.cram') or location.endswith('.bam')):
@@ -599,9 +581,7 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         if get_config()['workflow']['access_level'] == 'test':
             location = location.replace('-main-upload/', '-test-upload/')
         if check_existence and not exists(location):
-            raise MetamistError(
-                f'{sequencing_group_id}: ERROR: index file does not exist: {location}'
-            )
+            raise MetamistError(f'{sequencing_group_id}: ERROR: index file does not exist: {location}')
 
         # Index:
         index_location = None
@@ -618,13 +598,9 @@ def parse_reads(  # pylint: disable=too-many-return-statements
                     f'.crai or .bai, got: {index_location}'
                 )
             if get_config()['workflow']['access_level'] == 'test':
-                index_location = index_location.replace(
-                    '-main-upload/', '-test-upload/'
-                )
+                index_location = index_location.replace('-main-upload/', '-test-upload/')
             if check_existence and not exists(index_location):
-                raise MetamistError(
-                    f'{sequencing_group_id}: ERROR: index file does not exist: {index_location}'
-                )
+                raise MetamistError(f'{sequencing_group_id}: ERROR: index file does not exist: {index_location}')
 
         if location.endswith('.cram'):
             return CramPath(
@@ -649,13 +625,11 @@ def parse_reads(  # pylint: disable=too-many-return-statements
                 )
             if check_existence and not exists(lane_pair[0]['location']):
                 raise MetamistError(
-                    f'{sequencing_group_id}: ERROR: read 1 file does not exist: '
-                    f'{lane_pair[0]["location"]}'
+                    f'{sequencing_group_id}: ERROR: read 1 file does not exist: ' f'{lane_pair[0]["location"]}'
                 )
             if check_existence and not exists(lane_pair[1]['location']):
                 raise MetamistError(
-                    f'{sequencing_group_id}: ERROR: read 2 file does not exist: '
-                    f'{lane_pair[1]["location"]}'
+                    f'{sequencing_group_id}: ERROR: read 2 file does not exist: ' f'{lane_pair[1]["location"]}'
                 )
 
             fastq_pairs.append(

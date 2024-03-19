@@ -28,9 +28,7 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
-    def get_sequencing_groups(
-        self, only_active: bool = True
-    ) -> list['SequencingGroup']:
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get flat list of all sequencing groups corresponding to this target.
         """
@@ -50,12 +48,7 @@ class Target:
         s = ' '.join(
             sorted(
                 [
-                    ' '.join(
-                        sorted(
-                            str(alignment_input)
-                            for alignment_input in s.alignment_input_by_seq_type.values()
-                        )
-                    )
+                    ' '.join(sorted(str(alignment_input) for alignment_input in s.alignment_input_by_seq_type.values()))
                     for s in self.get_sequencing_groups()
                     if s.alignment_input_by_seq_type
                 ]
@@ -101,11 +94,7 @@ class Target:
         """
         Map if internal IDs to participant or external IDs, if the latter is provided.
         """
-        return {
-            s.id: s.rich_id
-            for s in self.get_sequencing_groups()
-            if s.participant_id != s.id
-        }
+        return {s.id: s.rich_id for s in self.get_sequencing_groups() if s.participant_id != s.id}
 
 
 class Cohort(Target):
@@ -129,30 +118,20 @@ class Cohort(Target):
         """Unique target ID"""
         return self.name
 
-    def write_ped_file(
-        self, out_path: Path | None = None, use_participant_id: bool = False
-    ) -> Path:
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
         """
         Create a PED file for all samples in the whole cohort
         PED is written with no header line to be strict specification compliant
         """
         datas = []
         for sequencing_group in self.get_sequencing_groups():
-            datas.append(
-                sequencing_group.pedigree.get_ped_dict(
-                    use_participant_id=use_participant_id
-                )
-            )
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
         if not datas:
             raise ValueError(f'No pedigree data found for {self.name}')
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = (
-                self.analysis_dataset.tmp_prefix()
-                / 'ped'
-                / f'{self.alignment_inputs_hash()}.ped'
-            )
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -166,14 +145,10 @@ class Cohort(Target):
         """
         datasets = [ds for k, ds in self._datasets_by_name.items()]
         if only_active:
-            datasets = [
-                ds for ds in datasets if ds.active and ds.get_sequencing_groups()
-            ]
+            datasets = [ds for ds in datasets if ds.active and ds.get_sequencing_groups()]
         return datasets
 
-    def get_dataset_by_name(
-        self, name: str, only_active: bool = True
-    ) -> Optional['Dataset']:
+    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
         """
         Get dataset by name.
         Include only "active" datasets (unless only_active is False)
@@ -181,18 +156,14 @@ class Cohort(Target):
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
 
-    def get_sequencing_groups(
-        self, only_active: bool = True
-    ) -> list['SequencingGroup']:
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Gets a flat list of all sequencing groups from all datasets.
         Include only "active" sequencing groups (unless only_active is False)
         """
         all_sequencing_groups = []
         for ds in self.get_datasets(only_active=False):
-            all_sequencing_groups.extend(
-                ds.get_sequencing_groups(only_active=only_active)
-            )
+            all_sequencing_groups.extend(ds.get_sequencing_groups(only_active=only_active))
         return all_sequencing_groups
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
@@ -306,9 +277,7 @@ class Dataset(Target):
         prefix at all.
         """
         seq_type = get_config()['workflow'].get('sequencing_type')
-        return (
-            '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
-        )
+        return '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
 
     def prefix(self, **kwargs) -> Path:
         """
@@ -385,15 +354,11 @@ class Dataset(Target):
         Create a new sequencing group and add it to the dataset.
         """
         if id in self._sequencing_group_by_id:
-            logging.debug(
-                f'SequencingGroup {id} already exists in the dataset {self.name}'
-            )
+            logging.debug(f'SequencingGroup {id} already exists in the dataset {self.name}')
             return self._sequencing_group_by_id[id]
 
         force_sgs = get_config()['workflow'].get('force_sgs', set())
-        forced = (
-            id in force_sgs or external_id in force_sgs or participant_id in force_sgs
-        )
+        forced = id in force_sgs or external_id in force_sgs or participant_id in force_sgs
 
         s = SequencingGroup(
             id=id,
@@ -409,17 +374,11 @@ class Dataset(Target):
         self._sequencing_group_by_id[id] = s
         return s
 
-    def get_sequencing_groups(
-        self, only_active: bool = True
-    ) -> list['SequencingGroup']:
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
         """
-        return [
-            s
-            for sid, s in self._sequencing_group_by_id.items()
-            if (s.active or not only_active)
-        ]
+        return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active)]
 
     def get_job_attrs(self) -> dict:
         """
@@ -436,20 +395,14 @@ class Dataset(Target):
         """
         return f'{self.name}: '
 
-    def write_ped_file(
-        self, out_path: Path | None = None, use_participant_id: bool = False
-    ) -> Path:
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
         """
         Create a PED file for all sequencing groups
         PED is written with no header line to be strict specification compliant
         """
         datas = []
         for sequencing_group in self.get_sequencing_groups():
-            datas.append(
-                sequencing_group.pedigree.get_ped_dict(
-                    use_participant_id=use_participant_id
-                )
-            )
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
         if not datas:
             raise ValueError(f'No pedigree data found for {self.name}')
         df = pd.DataFrame(datas)
@@ -524,9 +477,7 @@ class SequencingGroup(Target):
         )
         if sex:
             self.pedigree.sex = sex
-        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = (
-            alignment_input_by_seq_type or dict()
-        )
+        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = alignment_input_by_seq_type or dict()
         self.assays: dict[str, tuple[Assay, ...]] = assays or {}
         self.forced = forced
         self.active = True
@@ -541,10 +492,7 @@ class SequencingGroup(Target):
             'active': str(self.active),
             'meta': str(self.meta),
             'alignment_inputs': ','.join(
-                [
-                    f'{seq_t}: {al_inp}'
-                    for seq_t, al_inp in self.alignment_input_by_seq_type.items()
-                ]
+                [f'{seq_t}: {al_inp}' for seq_t, al_inp in self.alignment_input_by_seq_type.items()]
             ),
             'pedigree': self.pedigree,
         }
@@ -634,9 +582,7 @@ class SequencingGroup(Target):
         """Unique target ID"""
         return self.id
 
-    def get_sequencing_groups(
-        self, only_active: bool = True
-    ) -> list['SequencingGroup']:
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Implementing the abstract method.
         """

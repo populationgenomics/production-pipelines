@@ -26,17 +26,17 @@ class Fraser:
     """
 
     def __init__(
-            self,
-            fds_tar: hb.ResourceFile,
-            cohort_name: str,
-            output: hb.ResourceGroup,
-            nthreads: int = 8,
-            pval_cutoff: float = 0.05,
-            z_cutoff: float | None = None,
-            min_delta_psi: float = 0.0,
-            delta_psi_cutoff: float = 0.3,
-            min_count: int = 5,
-        ) -> None:
+        self,
+        fds_tar: hb.ResourceFile,
+        cohort_name: str,
+        output: hb.ResourceGroup,
+        nthreads: int = 8,
+        pval_cutoff: float = 0.05,
+        z_cutoff: float | None = None,
+        min_delta_psi: float = 0.0,
+        delta_psi_cutoff: float = 0.3,
+        min_count: int = 5,
+    ) -> None:
         self.fds_tar = fds_tar
         assert isinstance(self.fds_tar, hb.ResourceFile), f'fds_tar must be a resource file, instead got {self.fds_tar}'
         self.cohort_name = cohort_name
@@ -191,7 +191,7 @@ class Fraser:
 
     def __str__(self):
         return self.command
-    
+
     def __repr__(self):
         return self.__str__()
 
@@ -305,8 +305,10 @@ def fraser(
     # Write output to file
     if output_fds_path:
         # NOTE: j.output is just a placeholder
-        b.write_output(j.output, str(to_path(output_fds_path).with_suffix('').with_suffix('').with_suffix('')))  # Remove .fds.tar.gz suffix
-    
+        b.write_output(
+            j.output, str(to_path(output_fds_path).with_suffix('').with_suffix('').with_suffix(''))
+        )  # Remove .fds.tar.gz suffix
+
     return jobs
 
 
@@ -361,7 +363,9 @@ def fraser_count(
 
     non_spliced_counts_dict = {}
     for sample_id in sample_ids:
-        output_counts_path = output_counts_prefix / 'output/cache/nonSplicedCounts' / cohort_name / f'nonSplicedCounts-{sample_id}.h5'
+        output_counts_path = (
+            output_counts_prefix / 'output/cache/nonSplicedCounts' / cohort_name / f'nonSplicedCounts-{sample_id}.h5'
+        )
         sample_j, non_spliced_counts = fraser_count_non_split_reads_one_sample(
             b=b,
             fds=fds,
@@ -500,7 +504,7 @@ def fraser_count_split_reads_one_sample(
         ln -s {fds} output/savedObjects/{cohort_name}/fds-object.RDS
         # ls BAM file to ensure it is localised
         ls {bam}
-        
+
         R --vanilla <<EOF
         library(FRASER)
 
@@ -562,10 +566,12 @@ def fraser_merge_split_reads(
 
     # Create command to symlink split counts
     link_counts_cmd = 'mkdir -p output/cache/splitCounts\n'
-    link_counts_cmd += '\n'.join([
-        f'ln -s {split_counts} output/cache/splitCounts/splitCounts-{sample_id}.RDS'
-        for sample_id, split_counts in split_counts_dict.items()
-    ])
+    link_counts_cmd += '\n'.join(
+        [
+            f'ln -s {split_counts} output/cache/splitCounts/splitCounts-{sample_id}.RDS'
+            for sample_id, split_counts in split_counts_dict.items()
+        ]
+    )
 
     # Create resource group for outputs
     split_counts_rg = {
@@ -576,19 +582,13 @@ def fraser_merge_split_reads(
         'g_ranges_non_split_counts': 'rds/g_ranges_non_split_counts.RDS',
         'splice_site_coords': 'rds/splice_site_coords.RDS',
     }
-    split_counts_rg_flat = {
-        key: value.split('/')[-1]
-        for key, value in split_counts_rg.items()
-    }
+    split_counts_rg_flat = {key: value.split('/')[-1] for key, value in split_counts_rg.items()}
     j.declare_resource_group(
         split_counts=split_counts_rg_flat,
     )
 
     # Create move command for outputs
-    move_cmd = '\n'.join([
-        f'mv {file} {j.split_counts[key]}'
-        for key, file in split_counts_rg.items()
-    ])
+    move_cmd = '\n'.join([f'mv {file} {j.split_counts[key]}' for key, file in split_counts_rg.items()])
 
     cmd = dedent(
         f"""\
@@ -601,7 +601,7 @@ def fraser_merge_split_reads(
         ls {' '.join(bams)}
         # Make RDS directory
         mkdir -p rds
-        
+
         R --vanilla <<EOF
         library(FRASER)
         fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
@@ -681,7 +681,7 @@ def fraser_count_non_split_reads_one_sample(
         ln -s {split_counts.splice_site_coords} rds/splice_site_coords.RDS
         # ls BAM file to ensure it is localised
         ls {bam}
-        
+
         R --vanilla <<EOF
         library(FRASER)
         fds <- loadFraserDataSet(dir = "output", name = "{cohort_name}")
@@ -748,10 +748,12 @@ def fraser_merge_non_split_reads(
 
     # Create command to symlink non-spliced counts
     link_counts_cmd = f'mkdir -p output/cache/nonSplicedCounts/{cohort_name}\n'
-    link_counts_cmd += '\n'.join([
-        f'ln -s {non_spliced_counts} output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5'
-        for sample_id, non_spliced_counts in non_spliced_counts_dict.items()
-    ])
+    link_counts_cmd += '\n'.join(
+        [
+            f'ln -s {non_spliced_counts} output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5'
+            for sample_id, non_spliced_counts in non_spliced_counts_dict.items()
+        ]
+    )
     link_counts_cmd += f'\n'
     # Add command to symlink RDS files
     link_counts_cmd += 'mkdir -p rds\n'
@@ -761,7 +763,9 @@ def fraser_merge_non_split_reads(
     # Add command to symlink split counts assays
     link_counts_cmd += f'mkdir -p output/savedObjects/{cohort_name}/splitCounts\n'
     link_counts_cmd += f'ln -s {split_counts.raw_counts_j_h5} output/savedObjects/{cohort_name}/rawCountsJ.h5\n'
-    link_counts_cmd += f'ln -s {split_counts.split_counts_assays} output/savedObjects/{cohort_name}/splitCounts/assays.h5\n'
+    link_counts_cmd += (
+        f'ln -s {split_counts.split_counts_assays} output/savedObjects/{cohort_name}/splitCounts/assays.h5\n'
+    )
     link_counts_cmd += f'ln -s {split_counts.split_counts_se} output/savedObjects/{cohort_name}/splitCounts/se.rds\n'
 
     cmd = dedent(
@@ -773,7 +777,7 @@ def fraser_merge_non_split_reads(
         {link_counts_cmd}
         # ls BAM files to ensure they are localised
         ls {' '.join(bams)}
-        
+
         R --vanilla <<EOF
         library(FRASER)
 

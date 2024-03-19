@@ -23,9 +23,7 @@ def load_vqsr(
     if can_reuse(out_ht_path):
         return hl.read_table(str(out_ht_path))
 
-    logging.info(
-        f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}'
-    )
+    logging.info(f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}')
     ht = hl.import_vcf(
         str(site_only_vcf_path),
         reference_genome=genome_build(),
@@ -61,7 +59,5 @@ def load_vqsr(
         ht = hl.read_table(str(out_ht_path))
         logging.info(f'Wrote split HT to {out_ht_path}')
     split_count = ht.count()
-    logging.info(
-        f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations'
-    )
+    logging.info(f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations')
     return ht

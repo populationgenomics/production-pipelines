@@ -33,14 +33,10 @@ def prepare_intervals(
     reference = fasta_res_group(get_batch())
 
     exclude_intervals = get_config()['workflow'].get('exclude_intervals', [])
-    exclude_intervals_args = ' '.join(
-        [f'--exclude-intervals {i}' for i in exclude_intervals]
-    )
+    exclude_intervals_args = ' '.join([f'--exclude-intervals {i}' for i in exclude_intervals])
 
     if sequencing_type == 'exome':
-        intervals = get_batch().read_input(
-            get_config()['workflow'].get('intervals_path')
-        )
+        intervals = get_batch().read_input(get_config()['workflow'].get('intervals_path'))
         preprocess_cmd = f"""
         gatk PreprocessIntervals \\
           --reference {reference.base} --intervals {intervals} {exclude_intervals_args} \\
@@ -84,9 +80,7 @@ def collect_read_counts(
     job_attrs: dict[str, str],
     output_base_path: Path,
 ) -> list[Job]:
-    j = get_batch().new_job(
-        'Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'}
-    )
+    j = get_batch().new_job('Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'})
     j.image(image_path('gatk_gcnv'))
 
     reference = fasta_res_group(get_batch())
@@ -103,11 +97,7 @@ def collect_read_counts(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = (
-        '--java-options '
-        f'"-Xms{job_res.get_java_mem_mb()}m '
-        f'-Xmx{job_res.get_java_mem_mb()}m"'
-    )
+    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
 
     cmd = f"""
     gatk {resource_string} CollectReadCounts \\
@@ -159,24 +149,16 @@ def filter_and_determine_ploidy(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = (
-        '--java-options '
-        f'"-Xms{job_res.get_java_mem_mb()}m '
-        f'-Xmx{job_res.get_java_mem_mb()}m"'
-    )
+    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
 
     counts_input_args = _counts_input_args(counts_paths)
     cmd = ''
 
     if can_reuse(output_paths['filtered']):
         # Remove 'filtered' entry from output_paths so we don't write_output() it later
-        filtered: ResourceFile = get_batch().read_input(
-            str(output_paths.pop('filtered'))
-        )
+        filtered: ResourceFile = get_batch().read_input(str(output_paths.pop('filtered')))
     else:
-        preprocessed_intervals = get_batch().read_input(
-            str(preprocessed_intervals_path)
-        )
+        preprocessed_intervals = get_batch().read_input(str(preprocessed_intervals_path))
         annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
 
         cmd += f"""
@@ -266,11 +248,7 @@ def shard_gcnv(
         # set highmem resources for this job
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
-        resource_string = (
-            '--java-options '
-            f'"-Xms{job_res.get_java_mem_mb()}m '
-            f'-Xmx{job_res.get_java_mem_mb()}m"'
-        )
+        resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
 
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
@@ -329,11 +307,7 @@ def postprocess_calls(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=20)
     job_res.set_to_job(j)
-    resource_string = (
-        '--java-options '
-        f'"-Xms{job_res.get_java_mem_mb()}m '
-        f'-Xmx{job_res.get_java_mem_mb()}m"'
-    )
+    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
 
     reference = fasta_res_group(get_batch())
 
@@ -344,18 +318,14 @@ def postprocess_calls(
     model_shard_args = ''
     calls_shard_args = ''
     for name, path in shard_paths.items():
-        gcp_related_commands.append(
-            f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs'
-        )
+        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
 
     j.command(command(gcp_related_commands, setup_gcp=True))
 
     allosomal_contigs = get_config()['workflow'].get('allosomal_contigs', [])
-    allosomal_contigs_args = ' '.join(
-        [f'--allosomal-contig {c}' for c in allosomal_contigs]
-    )
+    allosomal_contigs_args = ' '.join([f'--allosomal-contig {c}' for c in allosomal_contigs])
 
     # declare all output files in advance
     j.declare_resource_group(
@@ -370,16 +340,8 @@ def postprocess_calls(
 
     extra_args = ''
     if clustered_vcf:
-        local_clusters = (
-            get_batch()
-            .read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi')
-            .vcf
-        )
-        local_intervals = (
-            get_batch()
-            .read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi')
-            .vcf
-        )
+        local_clusters = get_batch().read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi').vcf
+        local_intervals = get_batch().read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi').vcf
         extra_args += f"""--clustered-breakpoints {local_clusters} \\
          --input-intervals-vcf {local_intervals} \\
           -R {reference.base}
@@ -457,22 +419,14 @@ def joint_segment_vcfs(
     Returns:
         the job that does the work, and the resulting resource group of VCF & index
     """
-    job = get_batch().new_job(
-        f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'}
-    )
-    job.declare_resource_group(
-        output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    job = get_batch().new_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
+    job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     job.image(image_path('gatk_gcnv'))
 
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(job)
-    resource_string = (
-        '--java-options '
-        f'"-Xms{job_res.get_java_mem_mb()}m '
-        f'-Xmx{job_res.get_java_mem_mb()}m"'
-    )
+    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
 
     vcf_string = ''
     for each_vcf in segment_vcfs:
@@ -530,15 +484,10 @@ def run_joint_segmentation(
     # if we have more samples to process than the block size, condense
     # this is done by calling an intermediate round of VCF segmenting
     if len(segment_vcfs) > sams_per_block:
-        for subchunk_index, chunk_vcfs in enumerate(
-            chunks(segment_vcfs, sams_per_block)
-        ):
+        for subchunk_index, chunk_vcfs in enumerate(chunks(segment_vcfs, sams_per_block)):
             # create a new job for each chunk
             # read these files into this batch
-            local_vcfs = [
-                get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi')['vcf']
-                for vcf in chunk_vcfs
-            ]
+            local_vcfs = [get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi')['vcf'] for vcf in chunk_vcfs]
             job, vcf_group = joint_segment_vcfs(
                 local_vcfs,
                 pedigree=pedigree_in_batch,
@@ -548,17 +497,12 @@ def run_joint_segmentation(
                 title=f'sub-chunk_{subchunk_index}',
             )
             chunked_vcfs.append(vcf_group['vcf.gz'])
-            get_batch().write_output(
-                vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}'
-            )
+            get_batch().write_output(vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}')
             jobs.append(job)
 
     # else, all vcf files into the batch
     else:
-        chunked_vcfs = [
-            get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf
-            for vcf in segment_vcfs
-        ]
+        chunked_vcfs = [get_batch().read_input_group(vcf=vcf, index=f'{vcf}.tbi').vcf for vcf in segment_vcfs]
 
     # second round of condensing output - produces one single file
     job, vcf_group = joint_segment_vcfs(
@@ -576,9 +520,7 @@ def run_joint_segmentation(
     return jobs
 
 
-def merge_calls(
-    sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path
-):
+def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path):
     """
     This job will run a fast simple merge on per-SGID call files
     It then throws in a python script to add in two additional header lines
@@ -596,9 +538,7 @@ def merge_calls(
 
     assert sg_vcfs, 'No VCFs to merge'
 
-    merge_job = get_batch().new_job(
-        'Merge gCNV calls', job_attrs | {'tool': 'bcftools'}
-    )
+    merge_job = get_batch().new_job('Merge gCNV calls', job_attrs | {'tool': 'bcftools'})
     merge_job.image(docker_image)
 
     # this should be made reactive, in case we scale past 10GB
@@ -621,14 +561,10 @@ def merge_calls(
     # --threads: number of threads to use
     # -m: merge strategy
     # -0: compression level
-    merge_job.command(
-        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0'
-    )
+    merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
 
     # now normlise the result, splitting multiallelics
-    merge_job.command(
-        f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}'
-    )
+    merge_job.command(f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}')
 
     # create a python job to do the file content updates
     pyjob = get_batch().new_python_job('Update VCF content')
@@ -638,9 +574,7 @@ def merge_calls(
     # a third job just to tidy up
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
-    third_job.declare_resource_group(
-        output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
-    )
+    third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
     third_job.command(f'bgzip -c {pyjob.output} > {third_job.output["vcf.bgz"]}')
     third_job.command(f'tabix {third_job.output["vcf.bgz"]}')
 
@@ -688,9 +622,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
                 original_start = int(l_split[1])
 
                 # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
-                original_info: dict[str, str] = dict(
-                    el.split('=') for el in l_split[7].split(';')
-                )
+                original_info: dict[str, str] = dict(el.split('=') for el in l_split[7].split(';'))
 
                 # steal the END integer
                 end_int = int(original_info['END'])
@@ -724,7 +656,7 @@ def annotate_dataset_jobs_cnv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -739,9 +671,7 @@ def annotate_dataset_jobs_cnv(
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
     subset_j: Job | None = None
     if not subset_mt_path.exists():
-        subset_j = get_batch().new_job(
-            f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
-        )
+        subset_j = get_batch().new_job(f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
         subset_j.image(image_path('cpg_workflows'))
         subset_j.command(
             query_command(
@@ -756,9 +686,7 @@ def annotate_dataset_jobs_cnv(
         if depends_on:
             subset_j.depends_on(*depends_on)
 
-    annotate_j = get_batch().new_job(
-        f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    annotate_j = get_batch().new_job(f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))
     annotate_j.command(
         query_command(

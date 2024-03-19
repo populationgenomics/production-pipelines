@@ -1,6 +1,7 @@
 """
 Stage that summarises QC.
 """
+
 from typing import Any
 
 from cpg_utils import Path, to_path
@@ -36,13 +37,7 @@ class JointVcfQC(CohortStage):
         """
         Generate a pVCF and a site-only VCF.
         """
-        qc_prefix = (
-            cohort.analysis_dataset.prefix()
-            / 'qc'
-            / 'jc'
-            / get_workflow().output_version
-            / 'picard'
-        )
+        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / get_workflow().output_version / 'picard'
         d = {
             'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
             'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
@@ -81,9 +76,7 @@ class JointVcfHappy(SequencingGroupStage):
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sequencing_group.participant_id not in get_config().get(
-            'validation', {}
-        ).get('sample_map', {}):
+        if sequencing_group.participant_id not in get_config().get('validation', {}).get('sample_map', {}):
             return None
 
         return (
@@ -94,14 +87,10 @@ class JointVcfHappy(SequencingGroupStage):
             / f'{get_workflow().output_version}-{sequencing_group.id}.summary.csv'
         )
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
         assert sequencing_group.dataset.cohort
-        vcf_path = inputs.as_path(
-            target=sequencing_group.dataset.cohort, stage=JointGenotyping, key='vcf'
-        )
+        vcf_path = inputs.as_path(target=sequencing_group.dataset.cohort, stage=JointGenotyping, key='vcf')
 
         jobs = happy(
             b=get_batch(),
@@ -119,9 +108,7 @@ class JointVcfHappy(SequencingGroupStage):
         if not jobs:
             return self.make_outputs(sequencing_group)
         else:
-            return self.make_outputs(
-                sequencing_group, self.expected_outputs(sequencing_group), jobs
-            )
+            return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
@@ -156,16 +143,8 @@ class JointVcfMultiQC(CohortStage):
             return {}
         h = get_workflow().output_version
         return {
-            'html': cohort.analysis_dataset.web_prefix()
-            / 'qc'
-            / 'jc'
-            / h
-            / 'multiqc.html',
-            'json': cohort.analysis_dataset.prefix()
-            / 'qc'
-            / 'jc'
-            / h
-            / 'multiqc_data.json',
+            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / h / 'multiqc.html',
+            'json': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'multiqc_data.json',
             'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
         }
 
@@ -177,9 +156,7 @@ class JointVcfMultiQC(CohortStage):
         html_path = self.expected_outputs(cohort)['html']
         checks_path = self.expected_outputs(cohort)['checks']
         if base_url := cohort.analysis_dataset.web_url():
-            html_url = str(html_path).replace(
-                str(cohort.analysis_dataset.web_prefix()), base_url
-            )
+            html_url = str(html_path).replace(str(cohort.analysis_dataset.web_prefix()), base_url)
         else:
             html_url = None
 

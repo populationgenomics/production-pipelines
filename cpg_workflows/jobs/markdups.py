@@ -16,9 +16,7 @@ class Markdup:
     Construct a sambamba markdup command for marking duplicates
     """
 
-    def __init__(
-        self, input_bam: BamPath | Path | str, output_bam: Path | str, nthreads: int = 8
-    ):
+    def __init__(self, input_bam: BamPath | Path | str, output_bam: Path | str, nthreads: int = 8):
         self.command = [
             'sambamba markdup',
             '-t',

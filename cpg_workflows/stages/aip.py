@@ -50,6 +50,7 @@ Generates:
 This will have to be run using Full permissions as we will need to reference
 data in test and main buckets.
 """
+
 import logging
 from datetime import datetime
 from functools import lru_cache
@@ -109,24 +110,16 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if (
-        get_config()['workflow'].get('access_level') == 'test'
-        and 'test' not in query_dataset
-    ):
+    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
-    result = gql_query_optional_logging(
-        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
-    )
+    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
     mt_by_date = {}
     for analysis in result['project']['analyses']:
         if (
             analysis['output']
             and analysis['output'].endswith('.mt')
-            and (
-                analysis['meta']['sequencing_type']
-                == get_config()['workflow'].get('sequencing_type')
-            )
+            and (analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type'))
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -153,24 +146,16 @@ def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if (
-        get_config()['workflow'].get('access_level') == 'test'
-        and 'test' not in query_dataset
-    ):
+    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
-    result = gql_query_optional_logging(
-        MTA_QUERY, query_params={'dataset': query_dataset, 'type': type}
-    )
+    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
     mt_by_date = {}
 
     for analysis in result['project']['analyses']:
         if (
             analysis['output']
             and analysis['output'].endswith('.mt')
-            and (
-                analysis['meta']['sequencing_type']
-                == get_config()['workflow'].get('sequencing_type')
-            )
+            and (analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type'))
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -207,10 +192,7 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if (
-            get_config()['workflow'].get('access_level') == 'test'
-            and 'test' not in query_dataset
-        ):
+        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
         hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
 
@@ -243,9 +225,7 @@ class QueryPanelapp(DatasetStage):
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
-        hpo_panel_json = inputs.as_path(
-            target=dataset, stage=GeneratePanelData, key='hpo_panels'
-        )
+        hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/query_panelapp.py '
@@ -274,9 +254,7 @@ class RunHailFiltering(DatasetStage):
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
-        input_mt = get_config()['workflow'].get(
-            'matrix_table', query_for_latest_mt(dataset.name)
-        )
+        input_mt = get_config()['workflow'].get('matrix_table', query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
@@ -285,9 +263,7 @@ class RunHailFiltering(DatasetStage):
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
-        panelapp_json = inputs.as_path(
-            target=dataset, stage=QueryPanelapp, key='panel_data'
-        )
+        panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         expected_out = self.expected_outputs(dataset)
         pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
         # peddy can't read cloud paths
@@ -313,18 +289,14 @@ class RunHailSVFiltering(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'labelled_vcf': dataset.prefix()
-            / DATED_FOLDER
-            / 'SV_hail_labelled.vcf.bgz',
+            'labelled_vcf': dataset.prefix() / DATED_FOLDER / 'SV_hail_labelled.vcf.bgz',
             'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         expected_out = self.expected_outputs(dataset)
-        sv_mt = get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name)
-        )
+        sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name))
 
         # this might work? May require some config entries
         if sv_mt is None:
@@ -339,9 +311,7 @@ class RunHailSVFiltering(DatasetStage):
         authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
-        panelapp_json = inputs.as_path(
-            target=dataset, stage=QueryPanelapp, key='panel_data'
-        )
+        panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
@@ -396,15 +366,11 @@ class ValidateMOI(DatasetStage):
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
-        input_path = get_config()['workflow'].get(
-            'matrix_table', query_for_latest_mt(dataset.name)
-        )
+        input_path = get_config()['workflow'].get('matrix_table', query_for_latest_mt(dataset.name))
 
         # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
-        if sv_path := get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name)
-        ):
+        if sv_path := get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name)):
             # bump input_path to contain both source files if appropriate
             input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
@@ -461,12 +427,8 @@ def _aip_html_meta(
 class CreateAIPHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'results_html': dataset.prefix(category='web')
-            / DATED_FOLDER
-            / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web')
-            / DATED_FOLDER
-            / f'summary_latest_{CHUNKY_DATE}.html',
+            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -511,12 +473,8 @@ class GenerateSeqrFile(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'seqr_file': dataset.prefix(category='analysis')
-            / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr.json',
-            'seqr_pheno_file': dataset.prefix(category='analysis')
-            / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr_pheno.json'
+            'seqr_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{DATED_FOLDER}_seqr.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{DATED_FOLDER}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

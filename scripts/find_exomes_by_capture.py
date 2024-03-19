@@ -11,7 +11,8 @@ from metamist.graphql import gql, query
 import toml
 
 
-meta_query = gql("""
+meta_query = gql(
+    """
 query SampleMetaQuery($name: String!) {
   project(name: $name) {
     sequencingGroups {
@@ -25,7 +26,8 @@ query SampleMetaQuery($name: String!) {
       }
     }
   }
-}""")
+}"""
+)
 
 
 # the structure we want is

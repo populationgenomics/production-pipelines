@@ -74,9 +74,7 @@ class TestSamtoolsStatsRun:
 
         assert j is None
 
-    def test_will_create_job_if_path_already_exists_and_overwrite_true(
-        self, tmp_path: Path
-    ):
+    def test_will_create_job_if_path_already_exists_and_overwrite_true(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
         output = tmp_path / 'output_stats_file'
         output.touch()
@@ -100,9 +98,7 @@ class TestSamtoolsStatsRun:
             ),
         ],
     )
-    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(
-        self, tmp_path: Path, job_attrs, expected_attrs
-    ):
+    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path, job_attrs, expected_attrs):
         _, cram_pth, batch = setup_test(tmp_path)
 
         j = samtools_stats(
@@ -145,9 +141,7 @@ class TestSamtoolsStatsRun:
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
-        self, tmp_path: Path
-    ):
+    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
 
         j = samtools_stats(
@@ -161,9 +155,7 @@ class TestSamtoolsStatsRun:
         ref_file = config.references['broad']['ref_fasta']
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
-        self, tmp_path: Path
-    ):
+    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         j = samtools_stats(
@@ -192,9 +184,7 @@ class TestSamtoolsStatsRun:
         cmd = get_command_str(j)
         assert re.search(r'\$CRAM > \${BATCH_TMPDIR}/.*/output_stats', cmd)
 
-    def test_batch_writes_samtools_stats_file_to_output_path(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_batch_writes_samtools_stats_file_to_output_path(self, mocker: MockFixture, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         spy = mocker.spy(batch, 'write_output')

@@ -27,18 +27,14 @@ from ..helpers import get_command_str
 from .shared import select_jobs, default_config
 
 
-def setup_test(
-    config: PipelineConfig, tmp_path: Path, num_pairs: Optional[int] = 1, create=False
-):
+def setup_test(config: PipelineConfig, tmp_path: Path, num_pairs: Optional[int] = 1, create=False):
     set_config(config, tmp_path / 'config.toml')
     batch = create_local_batch(tmp_path)
 
     dataset_id = config.workflow.dataset
     alignment_input = None
     if num_pairs:
-        alignment_input = create_fastq_pairs_input(
-            prefix='SAMPLE1', location=tmp_path, n=num_pairs, create=create
-        )
+        alignment_input = create_fastq_pairs_input(prefix='SAMPLE1', location=tmp_path, n=num_pairs, create=create)
 
     sg = create_sequencing_group(
         dataset=dataset_id,
@@ -70,9 +66,7 @@ class TestPreProcess:
             (2, r'Alignment inputs for sequencing group .* do not exist'),
         ],
     )
-    def test_error_if_alignment_input_is_missing(
-        self, tmp_path: Path, n_pairs: Optional[int], expected_error: str
-    ):
+    def test_error_if_alignment_input_is_missing(self, tmp_path: Path, n_pairs: Optional[int], expected_error: str):
         """
         Test that the `align` function throws an error if the alignment input is
         `None` or the file doesn't exist.
@@ -126,9 +120,7 @@ class TestDragmap:
             cmd = get_command_str(job)
             assert re.search(pattern, cmd, flags=re.DOTALL)
 
-    def test_dragmap_aligner_reads_dragmap_reference_resource(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_dragmap_aligner_reads_dragmap_reference_resource(self, mocker: MockFixture, tmp_path: Path):
         config = default_config()
         batch, sg = setup_test(config, tmp_path)
 
@@ -155,9 +147,7 @@ class TestDragmap:
 
 
 class TestBwaAndBwa2:
-    @pytest.mark.parametrize(
-        'alinger,expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')]
-    )
+    @pytest.mark.parametrize('alinger,expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')])
     @pytest.mark.parametrize(
         'reference,expected_reference',
         [
@@ -190,9 +180,7 @@ class TestBwaAndBwa2:
         assert re.search(rf"-R '\@RG\\tID:{sg.id}\\tSM:{sg.id}'", cmd)
         assert re.search(fr'\${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
         assert re.search(r'\$BATCH_TMPDIR/R1.fq.gz \$BATCH_TMPDIR/R2.fq.gz', cmd)
-        assert re.search(
-            r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd
-        )
+        assert re.search(r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd)
 
 
 class TestPostProcess:
@@ -235,6 +223,4 @@ class TestPostProcess:
         assert len(align_jobs) == 1
 
         cmd = get_command_str(align_jobs[0])
-        assert re.search(
-            r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam', cmd
-        )
+        assert re.search(r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam', cmd)

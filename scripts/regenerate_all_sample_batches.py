@@ -20,7 +20,8 @@ from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
 
 
-FIND_ACTIVE_SGS = gql("""
+FIND_ACTIVE_SGS = gql(
+    """
 query FindActiveSGs($project: String!) {
   project(name: $project) {
     sequencingGroups(activeOnly: {eq: true}) {
@@ -28,7 +29,8 @@ query FindActiveSGs($project: String!) {
     }
   }
 }
-""")
+"""
+)
 
 
 def collect_all_sgids(projects: list[str]) -> list[str]:

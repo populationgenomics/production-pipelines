@@ -1,6 +1,7 @@
 """
 single-sample components of the GATK SV workflow
 """
+
 import logging
 from typing import Any
 
@@ -55,41 +56,26 @@ class GatherSampleEvidence(SequencingGroupStage):
         """
 
         d: dict[str, Path] = {
-            'coverage_counts': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.coverage_counts.tsv.gz',
+            'coverage_counts': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.coverage_counts.tsv.gz',
             # split reads
-            'pesr_split': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.sr.txt.gz',
-            'pesr_split_index': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.sr.txt.gz.tbi',
+            'pesr_split': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sr.txt.gz',
+            'pesr_split_index': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sr.txt.gz.tbi',
             # site depth
-            'pesr_sd': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.sd.txt.gz',
-            'pesr_sd_index': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.sd.txt.gz.tbi',
+            'pesr_sd': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sd.txt.gz',
+            'pesr_sd_index': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sd.txt.gz.tbi',
             # discordant paired reads
-            'pesr_disc': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.pe.txt.gz',
-            'pesr_disc_index': sequencing_group.make_sv_evidence_path
-            / f'{sequencing_group.id}.pe.txt.gz.tbi',
+            'pesr_disc': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.pe.txt.gz',
+            'pesr_disc_index': sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.pe.txt.gz.tbi',
         }
 
         # Caller's VCFs
         for caller in SV_CALLERS:
-            d[f'{caller}_vcf'] = (
-                sequencing_group.make_sv_evidence_path
-                / f'{sequencing_group.id}.{caller}.vcf.gz'
-            )
-            d[f'{caller}_index'] = (
-                sequencing_group.make_sv_evidence_path
-                / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
-            )
+            d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
+            d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
         return d
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         """
         Add jobs to batch
         Adds billing-related labels to the Cromwell job(s)
@@ -199,9 +185,7 @@ class EvidenceQC(CohortStage):
             'counts': [str(d[sid]['coverage_counts']) for sid in sgids],
         }
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcfs'] = [
-                str(d[sid][f'{caller}_vcf']) for sid in sgids
-            ]
+            input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sgids]
 
         input_dict |= get_images(
             [
@@ -264,9 +248,7 @@ class CreateSampleBatches(CohortStage):
 
         # PCR +/- logic is only relevant to exomes
         if get_config()['workflow'].get('sequencing_type') != 'genome':
-            sequencing_group_types = {
-                'exome': [sg.id for sg in cohort.get_sequencing_groups()]
-            }
+            sequencing_group_types = {'exome': [sg.id for sg in cohort.get_sequencing_groups()]}
         # within exomes, divide into PCR- and all other sequencing groups
         # this logic is currently invalid, as pcr_status isn't populated
         # TODO resolve issue #575

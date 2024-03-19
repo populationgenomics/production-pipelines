@@ -2,14 +2,11 @@
 takes a Pedigree file, generates a Ploidy file from it
 """
 
-
 from collections import defaultdict
 from cpg_utils import to_path
 
 
-def convert_ped_record(
-    ped_record: str, contigs: list[str], chr_x: str = 'chrX', chr_y: str = 'chrY'
-) -> str:
+def convert_ped_record(ped_record: str, contigs: list[str], chr_x: str = 'chrX', chr_y: str = 'chrY') -> str:
     """
     Converts a ped file record to a table record.
     Args:
@@ -63,9 +60,7 @@ def generate_ploidy_table(ped: str, contigs: str, outpath: str):
             if line.startswith('#'):
                 # skip comments / headers
                 continue
-            output_lines.append(
-                convert_ped_record(ped_record=line, contigs=contig_strings) + '\n'
-            )
+            output_lines.append(convert_ped_record(ped_record=line, contigs=contig_strings) + '\n')
 
     # write the data to a file
     with to_path(outpath).open('w') as handle:

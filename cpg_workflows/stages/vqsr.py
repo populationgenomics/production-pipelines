@@ -39,16 +39,12 @@ class Vqsr(CohortStage):
         """
         Submit jobs.
         """
-        siteonly_vcf_path = inputs.as_path(
-            stage=JointGenotyping, target=cohort, key='siteonly'
-        )
+        siteonly_vcf_path = inputs.as_path(stage=JointGenotyping, target=cohort, key='siteonly')
 
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
-            scatter_count=joint_calling_scatter_count(
-                len(cohort.get_sequencing_groups())
-            ),
+            scatter_count=joint_calling_scatter_count(len(cohort.get_sequencing_groups())),
             gvcf_count=len(cohort.get_sequencing_groups()),
             out_path=self.expected_outputs(cohort)['siteonly'],
             tmp_prefix=to_path(self.expected_outputs(cohort)['tmp_prefix']),

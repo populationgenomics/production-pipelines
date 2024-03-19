@@ -41,7 +41,7 @@ class Count(SequencingGroupStage):
             'count': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count',
             'summary': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count.summary',
         }
-    
+
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to count the reads with featureCounts.

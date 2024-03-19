@@ -50,9 +50,7 @@ def annotate_cohort(
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
-    mt = hl.split_multi_hts(
-        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    )
+    mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
@@ -64,9 +62,7 @@ def annotate_cohort(
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
-            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
-                lambda val: val != 'PASS'
-            ),
+            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(lambda val: val != 'PASS'),
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
@@ -93,12 +89,8 @@ def annotate_cohort(
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
-        originalAltAlleles=variant_id.get_expr_for_variant_ids(
-            mt.locus_old, mt.alleles_old
-        ),
-        sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(
-            mt.vep
-        ),
+        originalAltAlleles=variant_id.get_expr_for_variant_ids(mt.locus_old, mt.alleles_old),
+        sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(mt.vep),
         variantId=variant_id.get_expr_for_variant_id(mt),
         contig=variant_id.get_expr_for_contig(mt.locus),
         pos=mt.locus.position,
@@ -130,22 +122,14 @@ def annotate_cohort(
         '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
     )
     mt = mt.annotate_rows(
-        domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(
-            mt.sortedTranscriptConsequences
-        ),
-        transcriptConsequenceTerms=vep.get_expr_for_vep_consequence_terms_set(
-            mt.sortedTranscriptConsequences
-        ),
-        transcriptIds=vep.get_expr_for_vep_transcript_ids_set(
-            mt.sortedTranscriptConsequences
-        ),
+        domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(mt.sortedTranscriptConsequences),
+        transcriptConsequenceTerms=vep.get_expr_for_vep_consequence_terms_set(mt.sortedTranscriptConsequences),
+        transcriptIds=vep.get_expr_for_vep_transcript_ids_set(mt.sortedTranscriptConsequences),
         mainTranscript=vep.get_expr_for_worst_transcript_consequence_annotations_struct(
             mt.sortedTranscriptConsequences
         ),
         geneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences),
-        codingGeneIds=vep.get_expr_for_vep_gene_ids_set(
-            mt.sortedTranscriptConsequences, only_coding_genes=True
-        ),
+        codingGeneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences, only_coding_genes=True),
         cadd=mt.ref_data.cadd,
         dbnsfp=mt.ref_data.dbnsfp,
         geno2mp=mt.ref_data.geno2mp,
@@ -224,10 +208,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str |
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    logging.info(
-        f'Found {len(mt_sample_ids)} samples in mt, '
-        f'subsetting to {len(sample_ids)} samples.'
-    )
+    logging.info(f'Found {len(mt_sample_ids)} samples in mt, ' f'subsetting to {len(sample_ids)} samples.')
 
     n_rows_before = mt.count_rows()
 
@@ -279,9 +260,7 @@ def annotate_dataset_mt(mt_path, out_mt_path):
             ),
             hl.sum(mt.AD),
         ),
-        'dp': hl.if_else(
-            is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)
-        ),
+        'dp': hl.if_else(is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)),
         'sample_id': mt.s,
     }
     logging.info('Annotating genotypes')
@@ -325,25 +304,12 @@ def annotate_dataset_mt(mt_path, out_mt_path):
 
     mt = mt.annotate_rows(
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
-        samples_num_alt=hl.struct(
-            **{
-                ('%i' % i): _genotype_filter_samples(_filter_num_alt(i))
-                for i in range(1, 3, 1)
-            }
-        ),
+        samples_num_alt=hl.struct(**{('%i' % i): _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
         samples_gq=hl.struct(
-            **{
-                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(
-                    _filter_samples_gq(i)
-                )
-                for i in range(0, 95, 5)
-            }
+            **{('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 95, 5)}
         ),
         samples_ab=hl.struct(
-            **{
-                '%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i))
-                for i in range(0, 45, 5)
-            }
+            **{'%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i)) for i in range(0, 45, 5)}
         ),
     )
     mt.describe()

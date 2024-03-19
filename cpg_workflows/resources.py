@@ -120,11 +120,7 @@ class MachineType:
         return JobResource(
             machine_type=self,
             ncpu=min_ncpu,
-            attach_disk_storage_gb=(
-                storage_gb
-                if storage_gb and storage_gb > self.calc_instance_disk_gb()
-                else None
-            ),
+            attach_disk_storage_gb=(storage_gb if storage_gb and storage_gb > self.calc_instance_disk_gb() else None),
         )
 
     def fraction_to_ncpu(self, fraction: float) -> int:
@@ -169,10 +165,7 @@ class MachineType:
         the nearest power of 2, not less than the minimal number of cores allowed.
         """
         if ncpu > self.max_ncpu:
-            raise ValueError(
-                f'Requesting more cores than available on {self.name} machine: '
-                f'{ncpu}>{self.max_ncpu}'
-            )
+            raise ValueError(f'Requesting more cores than available on {self.name} machine: ' f'{ncpu}>{self.max_ncpu}')
 
         if ncpu < MachineType.min_cpu:
             ncpu = MachineType.min_cpu
@@ -279,9 +272,7 @@ class JobResource:
         if self.attach_disk_storage_gb:
             storage_gb = self.attach_disk_storage_gb
         else:
-            storage_gb = (
-                self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
-            )
+            storage_gb = self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
 
         # Hail Batch actually requests 5% lower number than the
         # requested one (e.g. "req_storage: 46.25G, actual_storage: 44.0 GiB"),
@@ -336,9 +327,7 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
     return 50
 
 
-def storage_for_joint_vcf(
-    sequencing_group_count: int | None, site_only: bool = True
-) -> int | None:
+def storage_for_joint_vcf(sequencing_group_count: int | None, site_only: bool = True) -> int | None:
     """
     Storage enough to fit and process a joint-called VCF
     """

@@ -125,9 +125,7 @@ def test_batch_samples():
         # separately, so sizes can be odd.
         # at ~hundreds of samples this is a fine margin of error
         assert min_size <= batch['size'] <= max_size + 1
-        mean_of_medians = sum(batch['coverage_medians']) / len(
-            batch['coverage_medians']
-        )
+        mean_of_medians = sum(batch['coverage_medians']) / len(batch['coverage_medians'])
         assert mean_of_medians > cov
         cov = mean_of_medians
 

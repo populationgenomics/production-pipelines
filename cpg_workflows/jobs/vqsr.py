@@ -4,7 +4,7 @@ Create Hail Batch jobs to create and apply AS-VQSR models.
 Parameters are borrowed from WARP:
 WGS VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/wgs/JointGenotyping.inputs.json#L29-L35 (there is no direct example config for WGS AS-VQSR, but adjusted correspondingly)
 Exome AS-VQSR: https://github.com/broadinstitute/warp/blob/79261cde9bd06bb6b1d4a83d75dc54f734541fec/pipelines/broad/dna_seq/germline/joint_genotyping/exome/JointGenotyping.inputs.json#L8-L11
-Note that there is no example settings config for WGS AS-VQSR, so we construct it 
+Note that there is no example settings config for WGS AS-VQSR, so we construct it
 from WGS VQSR and Exome AS-VQSR settings.
 """
 
@@ -149,9 +149,7 @@ def make_vqsr_jobs(
 
     indel_recal_path = tmp_prefix / 'indel_recalibrations'
     indel_tranches_path = tmp_prefix / 'indel_tranches'
-    if not can_reuse(
-        [indel_recal_path, str(indel_recal_path) + '.idx', indel_tranches_path]
-    ):
+    if not can_reuse([indel_recal_path, str(indel_recal_path) + '.idx', indel_tranches_path]):
         indel_recalibrator_j = indel_recalibrator_job(
             b=b,
             siteonly_vcf=siteonly_vcf,
@@ -165,9 +163,7 @@ def make_vqsr_jobs(
         )
         jobs.append(indel_recalibrator_j)
         b.write_output(indel_recalibrator_j.recalibration, str(indel_recal_path))
-        b.write_output(
-            indel_recalibrator_j.recalibration_idx, str(indel_recal_path) + '.idx'
-        )
+        b.write_output(indel_recalibrator_j.recalibration_idx, str(indel_recal_path) + '.idx')
         b.write_output(indel_recalibrator_j.tranches, str(indel_tranches_path))
     indel_recalibration = b.read_input(str(indel_recal_path))
     indel_recalibration_idx = b.read_input(str(indel_recal_path) + '.idx')
@@ -206,12 +202,8 @@ def make_vqsr_jobs(
     if intervals_j:
         jobs.append(intervals_j)
 
-    snps_recal_paths = [
-        tmp_prefix / f'snp_recalibrations_{i}' for i in range(scatter_count)
-    ]
-    snps_tranches_paths = [
-        tmp_prefix / f'snp_tranches_{i}' for i in range(scatter_count)
-    ]
+    snps_recal_paths = [tmp_prefix / f'snp_recalibrations_{i}' for i in range(scatter_count)]
+    snps_tranches_paths = [tmp_prefix / f'snp_tranches_{i}' for i in range(scatter_count)]
     scattered_jobs = []
     for idx in range(scatter_count):
         if not can_reuse(
@@ -238,9 +230,7 @@ def make_vqsr_jobs(
             snps_recal_j.depends_on(*jobs)
             scattered_jobs.append(snps_recal_j)
             b.write_output(snps_recal_j.recalibration, str(snps_recal_paths[idx]))
-            b.write_output(
-                snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx'
-            )
+            b.write_output(snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx')
             b.write_output(snps_recal_j.tranches, str(snps_tranches_paths[idx]))
     jobs.extend(scattered_jobs)
     snps_recalibrations = [b.read_input(str(p)) for p in snps_recal_paths]
@@ -257,14 +247,11 @@ def make_vqsr_jobs(
         )
         snps_gather_tranches_j.depends_on(*jobs)
         jobs.append(snps_gather_tranches_j)
-        b.write_output(
-            snps_gather_tranches_j.out_tranches, str(snp_gathered_tranches_path)
-        )
+        b.write_output(snps_gather_tranches_j.out_tranches, str(snp_gathered_tranches_path))
     snp_gathered_tranches = b.read_input(str(snp_gathered_tranches_path))
 
     interval_snps_applied_vcf_paths = [
-        tmp_prefix / f'interval_snps_applied_{idx}.vcf.gz'
-        for idx in range(scatter_count)
+        tmp_prefix / f'interval_snps_applied_{idx}.vcf.gz' for idx in range(scatter_count)
     ]
     scattered_apply_jobs = []
     for idx in range(scatter_count):
@@ -289,9 +276,7 @@ def make_vqsr_jobs(
             j.depends_on(*jobs)
             scattered_apply_jobs.append(j)
             b.write_output(j.output_vcf, str(interval_snps_applied_vcf_paths[idx]))
-            b.write_output(
-                j.output_tbi, str(interval_snps_applied_vcf_paths[idx]) + '.tbi'
-            )
+            b.write_output(j.output_tbi, str(interval_snps_applied_vcf_paths[idx]) + '.tbi')
     jobs.extend(scattered_apply_jobs)
     interval_snps_applied_vcfs = [
         b.read_input_group(
@@ -356,9 +341,7 @@ def add_tabix_job(
     j = b.new_job('VQSR: Tabix', job_attrs)
     j.image(image_path('bcftools'))
     STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     vcf_inp = b.read_input(str(vcf_path))
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
@@ -404,24 +387,13 @@ def indel_recalibrator_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
-    tranche_cmdl = ' '.join(
-        [f'-tranche {v}' for v in INDEL_RECALIBRATION_TRANCHE_VALUES]
-    )
+    tranche_cmdl = ' '.join([f'-tranche {v}' for v in INDEL_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [
-            f'-an {v}'
-            for v in (
-                INDEL_ALLELE_SPECIFIC_FEATURES
-                if use_as_annotations
-                else INDEL_STANDARD_FEATURES
-            )
-        ]
+        [f'-an {v}' for v in (INDEL_ALLELE_SPECIFIC_FEATURES if use_as_annotations else INDEL_STANDARD_FEATURES)]
     )
     j.command(
         f"""set -euo pipefail
@@ -443,7 +415,7 @@ def indel_recalibrator_job(
       -resource:mills,known=false,training=true,truth=true,prior=12 {mills_resource_vcf.base} \\
       -resource:axiomPoly,known=false,training=true,truth=false,prior=10 {axiom_poly_resource_vcf.base} \\
       -resource:dbsnp,known=true,training=false,truth=false,prior=2 {dbsnp_resource_vcf.base}
-    
+
     mv {j.recalibration}.idx {j.recalibration_idx}
     """
     )
@@ -494,9 +466,7 @@ def snps_recalibrator_create_model_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
@@ -504,14 +474,7 @@ def snps_recalibrator_create_model_job(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [
-            f'-an {v}'
-            for v in (
-                SNP_ALLELE_SPECIFIC_FEATURES
-                if use_as_annotations
-                else SNP_STANDARD_FEATURES
-            )
-        ]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
     )
     j.command(
         f"""set -euo pipefail
@@ -587,14 +550,7 @@ def snps_recalibrator_scattered(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [
-            f'-an {v}'
-            for v in (
-                SNP_ALLELE_SPECIFIC_FEATURES
-                if use_as_annotations
-                else SNP_STANDARD_FEATURES
-            )
-        ]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
     )
     j.command(
         f"""set -euo pipefail
@@ -621,8 +577,8 @@ def snps_recalibrator_scattered(
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
       -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
-    
-    mv {j.recalibration}.idx {j.recalibration_idx}  
+
+    mv {j.recalibration}.idx {j.recalibration_idx}
     """
     )
     return j
@@ -653,9 +609,7 @@ def snps_recalibrator_job(
     # however, for smaller datasets we take a standard instance, and for larger
     # ones we take a highmem instance
     if is_small_callset:
-        res = STANDARD.set_resources(
-            j, fraction=instance_fraction, storage_gb=disk_size
-        )
+        res = STANDARD.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
     else:
         res = HIGHMEM.set_resources(j, fraction=instance_fraction, storage_gb=disk_size)
 
@@ -665,14 +619,7 @@ def snps_recalibrator_job(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [
-            f'-an {v}'
-            for v in (
-                SNP_ALLELE_SPECIFIC_FEATURES
-                if use_as_annotations
-                else SNP_STANDARD_FEATURES
-            )
-        ]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
     )
     j.command(
         f"""set -euo pipefail
@@ -694,7 +641,7 @@ def snps_recalibrator_job(
       -resource:hapmap,known=false,training=true,truth=true,prior=15 {hapmap_resource_vcf.base} \\
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
-      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base} 
+      -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
       """
     )
     return j
@@ -777,7 +724,7 @@ def apply_recalibration_snps(
     cmd = f"""
     cp {recalibration} $BATCH_TMPDIR/recalibration
     cp {recalibration_idx} $BATCH_TMPDIR/recalibration.idx
-    
+
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     ApplyVQSR \\
     -O $BATCH_TMPDIR/output.vcf.gz \\
@@ -844,7 +791,7 @@ def apply_recalibration_indels(
     cmd = f"""\
     mv {recalibration} $BATCH_TMPDIR/recalibration
     mv {recalibration_idx} $BATCH_TMPDIR/recalibration.idx
-    
+
     gatk --java-options -Xms{res.get_java_mem_mb()}m \\
     ApplyVQSR \\
     --tmp-dir $BATCH_TMPDIR \\

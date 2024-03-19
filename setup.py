@@ -9,7 +9,7 @@ setup(
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url=f'https://github.com/populationgenomics/production-pipelines',
+    url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
     packages=find_packages(),
     install_requires=[

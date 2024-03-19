@@ -76,11 +76,7 @@ def run(
 
     # Key samples by their external IDs
     use_external_id = get_config()['large_cohort']['use_external_id']
-    ht = (
-        key_by_external_id(scores_ht, sample_ht)
-        if use_external_id
-        else scores_ht.cache()
-    )
+    ht = key_by_external_id(scores_ht, sample_ht) if use_external_id else scores_ht.cache()
 
     # Use eigenvalues to calculate variance
     eigenvalues = eigenvalues_ht.f0.collect()
@@ -96,28 +92,16 @@ def run(
     use_inferred = get_config()['large_cohort']['pca_background']['inferred_ancestry']
     # if the inferred ancestry is set to true in the config, annotate the PCA with the
     # inferred population ancestry (calculated in the ancestry_pca.py script
-    superpopulation_label = (
-        ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
-    )
-    population_label = (
-        ht.training_pop.collect() if use_inferred else ht.population.collect()
-    )
+    superpopulation_label = ht.training_pop.collect() if use_inferred else ht.superpopulation.collect()
+    population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
     # Change 'none' values to dataset name
     analysis_dataset_name = get_config()['workflow']['dataset']
-    workflow_dataset = get_config()['workflow'].get(
-        'input_datasets', [analysis_dataset_name]
-    )
+    workflow_dataset = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
     # join dataset names with underscore, in case there are multiple
     workflow_dataset = '_'.join(workflow_dataset)
-    superpopulation_label = [
-        workflow_dataset if x is None else x for x in superpopulation_label
-    ]
+    superpopulation_label = [workflow_dataset if x is None else x for x in superpopulation_label]
     population_label = [workflow_dataset if x is None else x for x in population_label]
-    is_training = (
-        ht.is_training.collect()
-        if use_inferred
-        else [False] * len(ht.is_training.collect())
-    )
+    is_training = ht.is_training.collect() if use_inferred else [False] * len(ht.is_training.collect())
     for scope, title, labels in [
         ('dataset', 'Dataset', datasets),
         ('superpopulation', 'Superpopulation', superpopulation_label),
@@ -138,9 +122,7 @@ def run(
             )
         )
 
-    plots.extend(
-        _plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern)
-    )
+    plots.extend(_plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern))
 
     return plots
 
@@ -188,19 +170,14 @@ def _plot_pca(
                 label=labels,
                 samples=sample_names,
                 dataset=datasets,
-                is_training=[
-                    {True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v)
-                    for v in is_training
-                ],
+                is_training=[{True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training],
             )
         )
         plot.scatter(
             'x',
             'y',
             alpha=0.5,
-            marker=factor_mark(
-                'is_training', ['cross', 'circle'], [PROVIDED_LABEL, INFERRED_LABEL]
-            ),
+            marker=factor_mark('is_training', ['cross', 'circle'], [PROVIDED_LABEL, INFERRED_LABEL]),
             source=source,
             size=5,
             color=factor_cmap('label', palette, unique_labels),
@@ -211,9 +188,7 @@ def _plot_pca(
 
         if out_path_pattern:
             html = file_html(plot, CDN, title)
-            plot_filename_html = str(out_path_pattern).format(
-                scope=scope, pci=pc2, pca_suffix=pca_suffix, ext='html'
-            )
+            plot_filename_html = str(out_path_pattern).format(scope=scope, pci=pc2, pca_suffix=pca_suffix, ext='html')
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)
     return plots
@@ -288,35 +263,26 @@ def manhattan_loadings(
     hover_fields['locus'] = hl.str(locus)
     hover_fields['gene'] = hl.str(loadings.gene_names)
 
-    source_pd = (
-        hl.plot.plots._collect_scatter_plot_data(  # pylint: disable=protected-access
-            ('_global_locus', locus.global_position()),
-            ('_pval', pvals),
-            fields=hover_fields,
-            n_divisions=None if collect_all else n_divisions,
-        )
+    source_pd = hl.plot.plots._collect_scatter_plot_data(  # pylint: disable=protected-access
+        ('_global_locus', locus.global_position()),
+        ('_pval', pvals),
+        fields=hover_fields,
+        n_divisions=None if collect_all else n_divisions,
     )
     source_pd['p_value'] = source_pd['_pval']
     source_pd['_contig'] = [locus.split(':')[0] for locus in source_pd['locus']]
 
     observed_contigs = set(source_pd['_contig'])
     ref = locus.dtype.reference_genome
-    observed_contigs = [
-        contig for contig in ref.contigs.copy() if contig in observed_contigs
-    ]
+    observed_contigs = [contig for contig in ref.contigs.copy() if contig in observed_contigs]
 
     contig_ticks = [
-        ref._contig_global_position(contig)  # pylint: disable=protected-access
-        + ref.contig_length(contig) // 2
+        ref._contig_global_position(contig) + ref.contig_length(contig) // 2  # pylint: disable=protected-access
         for contig in observed_contigs
     ]
-    color_mapper = CategoricalColorMapper(
-        factors=ref.contigs, palette=palette[:2] * int((len(ref.contigs) + 1) / 2)
-    )
+    color_mapper = CategoricalColorMapper(factors=ref.contigs, palette=palette[:2] * int((len(ref.contigs) + 1) / 2))
 
-    p = figure(
-        title=title, x_axis_label='Chromosome', y_axis_label='Loadings', width=1000
-    )
+    p = figure(title=title, x_axis_label='Chromosome', y_axis_label='Loadings', width=1000)
     (
         p,
         _,
@@ -336,8 +302,6 @@ def manhattan_loadings(
     legend.visible = False
     p.xaxis.ticker = contig_ticks
     p.xaxis.major_label_overrides = dict(zip(contig_ticks, observed_contigs))
-    p.select_one(HoverTool).tooltips = [
-        t for t in p.select_one(HoverTool).tooltips if not t[0].startswith('_')
-    ]
+    p.select_one(HoverTool).tooltips = [t for t in p.select_one(HoverTool).tooltips if not t[0].startswith('_')]
 
     return p

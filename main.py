@@ -24,25 +24,17 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import AnnotateVcf, AnnotateDatasetSv, MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
-from cpg_workflows.stages.gcnv import (
-    AnnotateCohortgCNV,
-    AnnotateDatasetCNV,
-    MtToEsCNV
-)
+from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
 from cpg_workflows.stages.aip import (
     GeneratePanelData,
     QueryPanelapp,
     RunHailFiltering,
     ValidateMOI,
     CreateAIPHTML,
-    GenerateSeqrFile
+    GenerateSeqrFile,
 )
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.happy_validation import (
-    ValidationMtToVcf,
-    ValidationHappyOnVcf,
-    ValidationParseHappy
-)
+from cpg_workflows.stages.happy_validation import ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.fraser import Fraser
@@ -51,22 +43,12 @@ from cpg_workflows.stages.fraser import Fraser
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'aip': [GeneratePanelData, QueryPanelapp, RunHailFiltering, ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
     'pre_alignment': [FastQCMultiQC],
-    'seqr_loader': [
-        DatasetVCF,
-        AnnotateDataset,
-        MtToEs,
-        GvcfMultiQC,
-        CramMultiQC,
-        Stripy,
-        MitoReport
-    ],
+    'seqr_loader': [DatasetVCF, AnnotateDataset, MtToEs, GvcfMultiQC, CramMultiQC, Stripy, MitoReport],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
-    'gatk_sv_sandwich': [
-        MergeBatchSites
-    ],  # stage to run between FilterBatch & GenotypeBatch
+    'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
     'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
@@ -93,8 +75,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     '--list-last-stages',
     'list_last_stages',
     is_flag=True,
-    help='Only list possible end stages for a workflow, that can be specified '
-    'with `workflow/last_stages` in config',
+    help='Only list possible end stages for a workflow, that can be specified ' 'with `workflow/last_stages` in config',
 )
 @click.option(
     '--dry-run',
@@ -123,9 +104,7 @@ def main(
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
 
     if not workflow and not list_workflows:
-        click.echo(
-            f'You must specify WORKFLOW as a first positional command line argument.'
-        )
+        click.echo(f'You must specify WORKFLOW as a first positional command line argument.')
     if not workflow or list_workflows or workflow == 'list':
         click.echo(f'Available values for WORKFLOW (and corresponding last stages):')
         for wfl, last_stages in WORKFLOWS.items():

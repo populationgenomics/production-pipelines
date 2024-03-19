@@ -68,9 +68,7 @@ def multiqc(
     file_list = b.read_input(str(file_list_path))
 
     endings_conf = ', '.join(list(ending_to_trim)) if ending_to_trim else ''
-    modules_conf = (
-        ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
-    )
+    modules_conf = ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
 
     if sequencing_group_id_map:
         sample_map_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_rename-sample-map.tsv'

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Hail script to submit on a dataproc cluster. 
+Hail script to submit on a dataproc cluster.
 
 Loads the matrix table into an ElasticSearch index.
 """
@@ -125,9 +125,7 @@ def main(
     )
     assert password
 
-    print(
-        f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"'
-    )
+    print(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
     print(f'Reading passport from secret "{secret_name}" in project "{project_id}"')
     es = HailElasticsearchClientV8(
         host=host,

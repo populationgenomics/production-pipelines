@@ -177,9 +177,7 @@ class TestSomalierRelate:
             cmd,
         )
 
-    def test_if_verifybamid_file_not_available_inputs_files_still_generated(
-        self, tmp_path: Path
-    ):
+    def test_if_verifybamid_file_not_available_inputs_files_still_generated(self, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         pedigree_jobs = pedigree(
@@ -226,14 +224,10 @@ class TestSomalierRelate:
         cmd = get_command_str(relate_j)
         expected_ped_filename = 'test_ped.ped'
         sample_id_list_file = 'sample_ids.list'
-        assert re.search(
-            fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd
-        )
+        assert re.search(fr'cat \${{BATCH_TMPDIR}}/inputs/\w+/{expected_ped_filename}', cmd)
         assert re.search(fr'grep -f \$BATCH_TMPDIR/{sample_id_list_file}', cmd)
 
-    def test_moves_somalier_output_to_expected_batch_resource_files(
-        self, tmp_path: Path
-    ):
+    def test_moves_somalier_output_to_expected_batch_resource_files(self, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         pedigree_jobs = pedigree(
@@ -284,9 +278,7 @@ class TestSomalierRelate:
             cmd,
         )
 
-    def test_writes_outputs_to_final_destinations(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_writes_outputs_to_final_destinations(self, mocker: MockFixture, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         spy = mocker.spy(batch, 'write_output')

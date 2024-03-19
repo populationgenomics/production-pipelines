@@ -1,6 +1,7 @@
 """
 Metamist wrapper to report analysis progress.
 """
+
 from abc import ABC, abstractmethod
 from typing import Callable
 
@@ -12,13 +13,13 @@ from .targets import Target
 
 
 def complete_analysis_job(
-        output: str,
-        analysis_type: str,
-        sg_ids: list[str],
-        project_name: str,
-        meta: dict,
-        update_analysis_meta: Callable | None = None,
-        tolerate_missing: bool = False
+    output: str,
+    analysis_type: str,
+    sg_ids: list[str],
+    project_name: str,
+    meta: dict,
+    update_analysis_meta: Callable | None = None,
+    tolerate_missing: bool = False,
 ):
     """
     a job to be called within the batch as a pythonJob
@@ -38,6 +39,7 @@ def complete_analysis_job(
     from metamist.apis import AnalysisApi
     from metamist.exceptions import ApiException
     from metamist.models import AnalysisStatus, Analysis
+
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
 
@@ -83,10 +85,7 @@ def complete_analysis_job(
         traceback.print_exc()
         raise
     else:
-        print(
-            f'Created Analysis(id={a_id}, type={analysis_type}, '
-            f'output={output}) in {project_name}'
-        )
+        print(f'Created Analysis(id={a_id}, type={analysis_type}, ' f'output={output}) in {project_name}')
         return
 
 
@@ -154,9 +153,7 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
-        py_job = b.new_python_job(
-            f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'}
-        )
+        py_job = b.new_python_job(f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'})
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             complete_analysis_job,
@@ -166,7 +163,7 @@ class MetamistStatusReporter(StatusReporter):
             project_name,
             meta,
             update_analysis_meta,
-            tolerate_missing_output
+            tolerate_missing_output,
         )
 
         py_job.depends_on(*jobs)

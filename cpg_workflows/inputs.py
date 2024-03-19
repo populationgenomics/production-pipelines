@@ -28,9 +28,7 @@ def create_cohort() -> Cohort:
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
     analysis_dataset_name = get_config()['workflow']['dataset']
-    dataset_names = get_config()['workflow'].get(
-        'input_datasets', [analysis_dataset_name]
-    )
+    dataset_names = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
     skip_datasets = get_config()['workflow'].get('skip_datasets', [])
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
@@ -115,9 +113,7 @@ def _populate_alignment_inputs(
         )
         sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
     else:
-        logging.warning(
-            f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}'
-        )
+        logging.warning(f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}')
 
     return None
 

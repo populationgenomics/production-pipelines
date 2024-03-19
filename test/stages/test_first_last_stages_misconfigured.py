@@ -1,6 +1,7 @@
 """
 Test building stages DAG.
 """
+
 import pytest
 from pytest_mock import MockFixture
 
@@ -26,7 +27,7 @@ def test_first_last_stages_misconfigured(mocker: MockFixture, tmp_path):
     check_inputs = false
     check_intermediates = false
     check_expected_outputs = false
-    
+
     first_stages = ['C']
     last_stages = ['B']
 

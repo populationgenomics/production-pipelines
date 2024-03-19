@@ -55,9 +55,7 @@ def setup_test(
                 index=index,
             )
         else:
-            raise ValueError(
-                f'alignment_input must be "cram" or "bam", not {alignment_input}'
-            )
+            raise ValueError(f'alignment_input must be "cram" or "bam", not {alignment_input}')
 
     seq_group = create_sequencing_group(
         dataset=config.workflow.dataset,
@@ -103,9 +101,7 @@ class TestPreProcessing:
         config = default_config()
         config.workflow.sequencing_type = 'genome'
 
-        batch, sg = setup_test(
-            config, tmp_path, alignment_input=input_type, index=index
-        )
+        batch, sg = setup_test(config, tmp_path, alignment_input=input_type, index=index)
 
         jobs = align(b=batch, sequencing_group=sg)
         assert len(select_jobs(jobs, 'align')) == expected_count
@@ -121,9 +117,7 @@ class TestPreProcessing:
         file = re.escape('SAMPLE1.bam')
         for i, job in enumerate(align_jobs):
             cmd = get_command_str(job)
-            pattern = (
-                fr'bazam .* -bam \${{BATCH_TMPDIR}}/inputs/\w+/{file} -s {i+1},10 > r1'
-            )
+            pattern = fr'bazam .* -bam \${{BATCH_TMPDIR}}/inputs/\w+/{file} -s {i+1},10 > r1'
             assert re.search(pattern, cmd)
 
     @pytest.mark.parametrize(
@@ -173,12 +167,8 @@ class TestPreProcessing:
         """
         config = default_config()
         config.set_storage(config.workflow.dataset, StorageConfig(default=tmp_path))
-        config.workflow.realign_from_cram_version = realignment_config[
-            'realign_from_cram_version'
-        ]
-        config.workflow.cram_version_reference = realignment_config[
-            'cram_version_reference'
-        ]  # type: ignore
+        config.workflow.realign_from_cram_version = realignment_config['realign_from_cram_version']
+        config.workflow.cram_version_reference = realignment_config['cram_version_reference']  # type: ignore
 
         batch, sg = setup_test(
             config,
@@ -219,16 +209,11 @@ class TestPreProcessing:
 
         # Test sorts and indexes alignment input,
         assert re.search(
-            (
-                fr'samtools sort \${{BATCH_TMPDIR}}/inputs/\w+/{file}'
-                r' .* > \$BATCH_TMPDIR/sorted\.bam'
-            ),
+            (fr'samtools sort \${{BATCH_TMPDIR}}/inputs/\w+/{file}' r' .* > \$BATCH_TMPDIR/sorted\.bam'),
             cmd,
         )
         # Test override original input
-        assert re.search(
-            fr'mv \$BATCH_TMPDIR/sorted\.bam \${{BATCH_TMPDIR}}/inputs/\w+/{file}', cmd
-        )
+        assert re.search(fr'mv \$BATCH_TMPDIR/sorted\.bam \${{BATCH_TMPDIR}}/inputs/\w+/{file}', cmd)
         # Test indexes sorted input
         assert re.search(
             (
@@ -286,12 +271,8 @@ class TestPreProcessing:
         """
         config = default_config()
         config.set_storage(config.workflow.dataset, StorageConfig(default=tmp_path))
-        config.workflow.realign_from_cram_version = realignment_config[
-            'realign_from_cram_version'
-        ]
-        config.workflow.cram_version_reference = realignment_config[
-            'cram_version_reference'
-        ]  # type: ignore
+        config.workflow.realign_from_cram_version = realignment_config['realign_from_cram_version']
+        config.workflow.cram_version_reference = realignment_config['cram_version_reference']  # type: ignore
 
         batch, sg = setup_test(
             config,
@@ -338,9 +319,7 @@ class TestPreProcessing:
         specified on the CRAM input.
         """
         config = default_config()
-        batch, sg = setup_test(
-            config, tmp_path, alignment_input='cram', reference_assembly=None
-        )
+        batch, sg = setup_test(config, tmp_path, alignment_input='cram', reference_assembly=None)
 
         with pytest.raises(
             AssertionError,
@@ -355,9 +334,7 @@ class TestPreProcessing:
             ('cram', r'Alignment inputs for sequencing group .* do not exist'),
         ],
     )
-    def test_error_if_alignment_input_does_not_exist(
-        self, tmp_path: Path, alignment_input: str, expected_error: str
-    ):
+    def test_error_if_alignment_input_does_not_exist(self, tmp_path: Path, alignment_input: str, expected_error: str):
         """
         Test that the `align` function throws an error if alignment input is `None`
         or doesn't exist on disk.
@@ -372,9 +349,7 @@ class TestPreProcessing:
 
 class TestDragmap:
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    def test_using_dragmap_generates_alignment_correct_command(
-        self, tmp_path: Path, input_type: str
-    ):
+    def test_using_dragmap_generates_alignment_correct_command(self, tmp_path: Path, input_type: str):
         """
         Tests that the dragmap aligner command is correctly configured.
         """
@@ -399,9 +374,7 @@ class TestDragmap:
         cmd = get_command_str(align_jobs[0])
         assert re.search(pattern, cmd, flags=re.DOTALL)
 
-    def test_dragmap_aligner_reads_dragmap_reference_resource(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_dragmap_aligner_reads_dragmap_reference_resource(self, mocker: MockFixture, tmp_path: Path):
         config = default_config()
         batch, sg = setup_test(config, tmp_path, alignment_input='cram')
 
@@ -423,9 +396,7 @@ class TestDragmap:
 
 class TestBwaAndBw2:
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    @pytest.mark.parametrize(
-        'alinger, expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')]
-    )
+    @pytest.mark.parametrize('alinger, expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')])
     @pytest.mark.parametrize(
         'reference,expected_reference',
         [
@@ -463,9 +434,7 @@ class TestBwaAndBw2:
         assert re.search(fr'{expected_tool} mem -K 100000000.*-p .* -Y', cmd, re.DOTALL)
         assert re.search(rf"-R '\@RG\\tID:{sg.id}\\tSM:{sg.id}'", cmd)
         assert re.search(fr'\${{BATCH_TMPDIR}}/inputs/\w+/{ref_file} r1', cmd)
-        assert re.search(
-            r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd
-        )
+        assert re.search(r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd)
 
 
 class TestPostProcess:
@@ -501,6 +470,4 @@ class TestPostProcess:
         assert len(select_jobs(jobs, 'merge')) == 0
 
         cmd = get_command_str(align_jobs[0])
-        assert re.search(
-            r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam', cmd
-        )
+        assert re.search(r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam', cmd)

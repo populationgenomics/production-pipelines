@@ -54,14 +54,10 @@ class AnnotateCohort(CohortStage):
         Apply VEP and VQSR annotations to all-sample callset
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(
-            target=cohort, stage=Vqsr, key='siteonly'
-        )
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, key='siteonly')
         vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
         j = get_batch().new_job(f'annotate cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
@@ -147,11 +143,7 @@ class AnnotateDataset(DatasetStage):
         """
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (
-                dataset.prefix()
-                / 'mt'
-                / f'{get_workflow().output_version}-{dataset.name}.mt'
-            ),
+            'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -161,9 +153,7 @@ class AnnotateDataset(DatasetStage):
         assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
@@ -174,9 +164,7 @@ class AnnotateDataset(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
 @stage(
@@ -196,16 +184,8 @@ class DatasetVCF(DatasetStage):
         Expected to generate a VCF from the single-dataset MT
         """
         return {
-            'vcf': (
-                dataset.prefix()
-                / 'vcf'
-                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'
-            ),
-            'index': (
-                dataset.prefix()
-                / 'vcf'
-                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'
-            ),
+            'vcf': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'),
+            'index': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -260,9 +240,7 @@ class MtToEs(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = get_config()['workflow']['sequencing_type']
-        index_name = (
-            f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
-        )
+        index_name = f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
@@ -278,9 +256,7 @@ class MtToEs(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(
-            target=dataset, stage=AnnotateDataset, key='mt'
-        )
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 

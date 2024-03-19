@@ -111,11 +111,7 @@ def haplotype_caller(
         for idx in range(scatter_count):
             assert intervals[idx], intervals
             # give each fragment a tmp location
-            fragment = (
-                tmp_prefix
-                / 'haplotypecaller'
-                / f'{idx}_of_{scatter_count}_{sequencing_group_name}.g.vcf.gz'
-            )
+            fragment = tmp_prefix / 'haplotypecaller' / f'{idx}_of_{scatter_count}_{sequencing_group_name}.g.vcf.gz'
             j, result = _haplotype_caller_one(
                 b,
                 sequencing_group_name=sequencing_group_name,
@@ -193,11 +189,7 @@ def _haplotype_caller_one(
     # Based on an audit of RD crams on 19/05/23, 99% of crams are <34Gb. Will set the
     # default to 40Gb for genomes then use a run specific confg to run the rare
     # sequencing group that will fail from this limit.
-    if (
-        haplo_storage := get_config()['resource_overrides'].get(
-            'haplotypecaller_storage'
-        )
-    ) is not None:
+    if (haplo_storage := get_config()['resource_overrides'].get('haplotypecaller_storage')) is not None:
         storage_gb = haplo_storage
     elif get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 40
@@ -246,9 +238,7 @@ def _haplotype_caller_one(
     -ERC GVCF \\
     --create-output-variant-index
     """
-    j.command(
-        command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
-    )
+    j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     return j, j.output_gvcf
@@ -288,9 +278,7 @@ def merge_gvcfs_job(
     for gvcf_group in gvcf_groups:
         # if the output was recoverable, read into the batch
         if isinstance(gvcf_group, str):
-            gvcf_group = b.read_input_group(
-                **{'g.vcf.gz': gvcf_group, 'g.vcf.gz.tbi': f'{gvcf_group}.tbi'}
-            )
+            gvcf_group = b.read_input_group(**{'g.vcf.gz': gvcf_group, 'g.vcf.gz.tbi': f'{gvcf_group}.tbi'})
         input_cmd += f'INPUT={gvcf_group["g.vcf.gz"]} '
 
     assert isinstance(j.output_gvcf, hb.ResourceGroup)
@@ -321,9 +309,7 @@ def postproc_gvcf(
        from Hail about mismatched INFO annotations
     4. Renames the GVCF sequencing group name to use CPG ID.
     """
-    logging.info(
-        f'Adding GVCF postproc job for sequencing group {sequencing_group_name}, gvcf {gvcf_path}'
-    )
+    logging.info(f'Adding GVCF postproc job for sequencing group {sequencing_group_name}, gvcf {gvcf_path}')
     job_name = 'Postproc GVCF'
     if utils.can_reuse(output_path, overwrite):
         logging.info(f'Reusing {output_path} output for {job_name}. {job_attrs}')
@@ -391,9 +377,7 @@ def postproc_gvcf(
 
     tabix -p vcf {j.output_gvcf['g.vcf.gz']}
     """
-    j.command(
-        command(cmd, setup_gcp=True, monitor_space=True, define_retry_function=True)
-    )
+    j.command(command(cmd, setup_gcp=True, monitor_space=True, define_retry_function=True))
     if output_path:
         b.write_output(j.output_gvcf, str(output_path).replace('.g.vcf.gz', ''))
     if depends_on:

@@ -35,9 +35,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
-        autosome_vds = hl.vds.filter_chromosomes(
-            vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
-        )
+        autosome_vds = hl.vds.filter_chromosomes(vds, keep=[f'chr{chrom}' for chrom in range(1, 23)])
         sqc_ht = hl.vds.sample_qc(autosome_vds)
         sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
@@ -95,9 +93,7 @@ def impute_sex(
     # Load calling intervals
     seq_type = get_config()['workflow']['sequencing_type']
     calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
-    calling_intervals_ht = hl.import_locus_intervals(
-        str(calling_intervals_path), reference_genome=genome_build()
-    )
+    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
@@ -113,9 +109,9 @@ def impute_sex(
             tmp_variant_data = vds.variant_data.filter_rows(
                 hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
             )
-            vds = VariantDataset(
-                reference_data=vds.reference_data, variant_data=tmp_variant_data
-            ).checkpoint(str(tmp_prefix / f'{name}_checkpoint.vds'))
+            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+                str(tmp_prefix / f'{name}_checkpoint.vds')
+            )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
@@ -154,11 +150,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
 
     # Helper function to add filters into the `hard_filters` set
     def add_filter(ht_, expr, name):
-        return ht_.annotate(
-            filters=hl.if_else(
-                expr & hl.is_defined(expr), ht_.filters.add(name), ht_.filters
-            )
-        )
+        return ht_.annotate(filters=hl.if_else(expr & hl.is_defined(expr), ht_.filters.add(name), ht_.filters))
 
     # Remove samples with ambiguous sex assignments
     ht = add_filter(ht, ht.sex_karyotype == 'ambiguous', 'ambiguous_sex')

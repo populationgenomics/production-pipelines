@@ -1,6 +1,7 @@
 """
 Stages that generates and summarises GVCF QC.
 """
+
 import logging
 from typing import Any
 
@@ -44,9 +45,7 @@ class GvcfQC(SequencingGroupStage):
             }
         return outs
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Use function from the jobs module
         """
@@ -61,9 +60,7 @@ class GvcfQC(SequencingGroupStage):
             output_detail_path=self.expected_outputs(sequencing_group)['qc_detail'],
             overwrite=sequencing_group.forced,
         )
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[j]
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[j])
 
 
 @stage(required_stages=Genotype)
@@ -77,21 +74,11 @@ class GvcfHappy(SequencingGroupStage):
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sequencing_group.participant_id not in get_config().get(
-            'validation', {}
-        ).get('sample_map', {}):
+        if sequencing_group.participant_id not in get_config().get('validation', {}).get('sample_map', {}):
             return None
-        return (
-            sequencing_group.dataset.prefix()
-            / 'qc'
-            / 'gvcf'
-            / 'hap.py'
-            / f'{sequencing_group.id}.summary.csv'
-        )
+        return sequencing_group.dataset.prefix() / 'qc' / 'gvcf' / 'hap.py' / f'{sequencing_group.id}.summary.csv'
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
         gvcf_path = inputs.as_path(sequencing_group, Genotype, 'gvcf')
 
@@ -107,9 +94,7 @@ class GvcfHappy(SequencingGroupStage):
         if not jobs:
             return self.make_outputs(sequencing_group)
         else:
-            return self.make_outputs(
-                sequencing_group, self.expected_outputs(sequencing_group), jobs
-            )
+            return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
@@ -211,6 +196,4 @@ class GvcfMultiQC(DatasetStage):
             extra_config={'table_columns_visible': {'Picard': True}},
             label='GVCF',
         )
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

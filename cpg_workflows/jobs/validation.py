@@ -63,9 +63,7 @@ def validation_mt_to_vcf_job(
     """
     from cpg_workflows.query_modules import validation
 
-    vcf_j = b.new_job(
-        f'VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    vcf_j = b.new_job(f'VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'})
     vcf_j.image(image_path('cpg_workflows'))
     vcf_j.command(
         query_command(
@@ -120,9 +118,7 @@ def run_happy_on_vcf(
 
     # read in sample-specific truth data from config
     ref_data = get_sample_truth_data(sequencing_group_ext_id)
-    truth_input = b.read_input_group(
-        vcf=ref_data['vcf'], index=ref_data['index'], bed=ref_data['bed']
-    )
+    truth_input = b.read_input_group(vcf=ref_data['vcf'], index=ref_data['index'], bed=ref_data['bed'])
 
     happy_j.declare_resource_group(
         output={

@@ -81,12 +81,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
-            path := (
-                sequencing_group.dataset.prefix()
-                / 'cram'
-                / realign_cram_ver
-                / f'{sequencing_group.id}.cram'
-            )
+            path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
         ).exists():
             logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
             alignment_input = CramPath(
@@ -168,9 +163,7 @@ def align(
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = (
-        isinstance(alignment_input, CramPath | BamPath)
-        and alignment_input.index_path
-        and realignment_shards_num > 1
+        isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path and realignment_shards_num > 1
     )
     sharded = sharded_fq or sharded_bazam
 
@@ -240,9 +233,7 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
-        merge_j = b.new_job(
-            'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
-        )
+        merge_j = b.new_job('Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge'))
         merge_j.image(image_path('samtools'))
 
         nthreads = STANDARD.set_resources(
@@ -306,10 +297,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
         if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
             storage_gb = 400
         # For unindexed/unsorted CRAM or BAM inputs, extra storage is needed for tmp
-        if (
-            isinstance(alignment_input, CramPath | BamPath)
-            and not alignment_input.index_path
-        ):
+        if isinstance(alignment_input, CramPath | BamPath) and not alignment_input.index_path:
             storage_gb += 150
     return storage_gb
 
@@ -340,9 +328,7 @@ def _align_one(
 
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     if shard_number is not None and number_of_shards_for_realignment is not None:
-        job_name = (
-            f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
-        )
+        job_name = f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
@@ -465,10 +451,7 @@ def _align_one(
     elif aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
-            **{
-                k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k)
-                for k in DRAGMAP_INDEX_FILES
-            }
+            **{k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k) for k in DRAGMAP_INDEX_FILES}
         )
         if use_bazam:
             input_params = f'--interleaved=1 -b {r1_param}'
@@ -503,9 +486,7 @@ def _align_one(
             for fname, cmd in fifo_commands.items()
         ]
 
-        _fifo_waits = ' && '.join(
-            f'wait $pid_{fname}' for fname in fifo_commands.keys()
-        )
+        _fifo_waits = ' && '.join(f'wait $pid_{fname}' for fname in fifo_commands.keys())
         fifo_post = dedent(
             f"""
             if {_fifo_waits}

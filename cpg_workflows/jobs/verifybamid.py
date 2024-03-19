@@ -1,6 +1,7 @@
 """
 Create Hail Batch jobs for VerifyBAMID.
 """
+
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
 from cpg_utils import Path
@@ -55,7 +56,7 @@ def verifybamid(
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI
-        
+
     /root/micromamba/share/verifybamid2-2.0.1-8/VerifyBamID \
     --NumThread {res.get_nthreads()} \
     --Verbose \

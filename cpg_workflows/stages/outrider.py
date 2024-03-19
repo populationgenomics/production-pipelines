@@ -27,17 +27,14 @@ class Outrider(CohortStage):
         Generate outrider outputs.
         """
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
-        return {
-            cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'
-        }
-    
+        return {cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'}
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to run outrider.
         """
         count_inputs = [
-            inputs.as_path(sequencing_group, Count, 'count')
-            for sequencing_group in cohort.get_sequencing_groups()
+            inputs.as_path(sequencing_group, Count, 'count') for sequencing_group in cohort.get_sequencing_groups()
         ]
         j = outrider.outrider(
             b=get_batch(),

@@ -32,10 +32,7 @@ def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if (
         not alignment_input
-        or (
-            get_config()['workflow'].get('check_inputs', True)
-            and not alignment_input.exists()
-        )
+        or (get_config()['workflow'].get('check_inputs', True) and not alignment_input.exists())
         or not isinstance(alignment_input, (FastqPair, FastqPairs))
     ):
         return None
@@ -88,16 +85,12 @@ class TrimAlignRNA(SequencingGroupStage):
     Trim and align RNA-seq FASTQ reads with fastp and STAR
     """
 
-    def expected_tmp_outputs(
-        self, sequencing_group: SequencingGroup
-    ) -> dict[str, Path]:
+    def expected_tmp_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         """
         Expect a pair of BAM and BAI files, one per set of input FASTQ files
         """
         return {
-            suffix: sequencing_group.dataset.tmp_prefix()
-            / 'bam'
-            / f'{sequencing_group.id}.{extension}'
+            suffix: sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.{extension}'
             for suffix, extension in [
                 ('bam', 'bam'),
                 ('bai', 'bam.bai'),
@@ -109,9 +102,7 @@ class TrimAlignRNA(SequencingGroupStage):
         Expect a pair of CRAM and CRAI files, one per set of input FASTQ files
         """
         expected_outs = {
-            suffix: sequencing_group.dataset.prefix()
-            / 'cram'
-            / f'{sequencing_group.id}.{extension}'
+            suffix: sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.{extension}'
             for suffix, extension in [
                 ('cram', 'cram'),
                 ('crai', 'cram.crai'),
@@ -122,9 +113,7 @@ class TrimAlignRNA(SequencingGroupStage):
             expected_outs.update(self.expected_tmp_outputs(sequencing_group))
         return expected_outs
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to align the input FASTQ files to the genome using STAR
         """
@@ -133,9 +122,7 @@ class TrimAlignRNA(SequencingGroupStage):
         # Run trim
         input_fq_pairs = get_trim_inputs(sequencing_group)
         if not input_fq_pairs:
-            return self.make_outputs(
-                target=sequencing_group, error_msg=f'No FASTQ input found'
-            )
+            return self.make_outputs(target=sequencing_group, error_msg=f'No FASTQ input found')
         assert isinstance(input_fq_pairs, FastqPairs)
         trimmed_fastq_pairs = []
         for fq_pair in input_fq_pairs:

@@ -3,6 +3,7 @@ Stage to run STR analysis with STRipy-pipeline.
 
 See https://gitlab.com/andreassh/stripy-pipeline
 """
+
 from typing import Any
 
 from cpg_utils import Path
@@ -60,20 +61,14 @@ class Stripy(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'stripy_html': sequencing_group.dataset.web_prefix()
-            / 'stripy'
-            / f'{sequencing_group.id}.stripy.html',
-            'stripy_json': sequencing_group.dataset.analysis_prefix()
-            / 'stripy'
-            / f'{sequencing_group.id}.stripy.json',
+            'stripy_html': sequencing_group.dataset.web_prefix() / 'stripy' / f'{sequencing_group.id}.stripy.html',
+            'stripy_json': sequencing_group.dataset.analysis_prefix() / 'stripy' / f'{sequencing_group.id}.stripy.json',
             'stripy_log': sequencing_group.dataset.analysis_prefix()
             / 'stripy'
             / f'{sequencing_group.id}.stripy.log.txt',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_path = inputs.as_path(sequencing_group, Align, 'cram')
         crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
@@ -92,6 +87,4 @@ class Stripy(SequencingGroupStage):
         )
         jobs.append(j)
 
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)

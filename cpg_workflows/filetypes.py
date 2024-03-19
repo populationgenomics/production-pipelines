@@ -41,22 +41,18 @@ class CramOrBamPath(AlignmentInput, ABC):
         if index_path:
             self.index_path = to_path(index_path)
             assert self.index_path.suffix == f'.{self.index_ext}'
-            self.full_index_suffix = str(self.index_path).replace(
-                str(self.path.with_suffix('')), ''
-            )
+            self.full_index_suffix = str(self.index_path).replace(str(self.path.with_suffix('')), '')
         self.reference_assembly = None
         if reference_assembly:
             self.reference_assembly = to_path(reference_assembly)
 
     @property
     @abstractmethod
-    def ext(self) -> str:
-        ...
+    def ext(self) -> str: ...
 
     @property
     @abstractmethod
-    def index_ext(self) -> str:
-        ...
+    def index_ext(self) -> str: ...
 
     def __str__(self) -> str:
         return str(self.path)
@@ -204,12 +200,7 @@ class FastqPair(AlignmentInput):
         Makes a pair of ResourceFile objects for r1 and r2.
         """
         return FastqPair(
-            *[
-                self[i]
-                if isinstance(self[i], ResourceFile)
-                else b.read_input(str(self[i]))
-                for i in [0, 1]
-            ]
+            *[self[i] if isinstance(self[i], ResourceFile) else b.read_input(str(self[i])) for i in [0, 1]]
         )
 
     def exists(self) -> bool:

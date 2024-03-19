@@ -69,7 +69,7 @@ def cram_to_bam(
     """
     Convert a CRAM file to a BAM file.
     """
-    
+
     assert isinstance(input_cram, ResourceGroup)
 
     job_name = 'cram_to_bam'

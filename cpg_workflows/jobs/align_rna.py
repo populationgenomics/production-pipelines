@@ -158,9 +158,7 @@ def align(
         return None
 
     if not isinstance(fastq_pairs, FastqPairs):
-        raise TypeError(
-            f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}'
-        )
+        raise TypeError(f'fastq_pairs must be a FastqPairs object, not {type(fastq_pairs)}')
     if len(fastq_pairs) == 0:
         raise ValueError('fastq_pairs must contain at least one FastqPair')
 
@@ -172,9 +170,7 @@ def align(
     # baseline align jobs, no prior dependencies
     for job_idx, fq_pair in enumerate(fastq_pairs, 1):
         if not isinstance(fq_pair, FastqPair):
-            raise TypeError(
-                f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}'
-            )
+            raise TypeError(f'fastq_pairs must contain FastqPair objects, not {type(fq_pair)}')
         label = f'{extra_label} {job_idx}' if extra_label else f'{job_idx}'
         j, bam = align_fq_pair(
             b=b,

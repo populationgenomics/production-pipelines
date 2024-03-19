@@ -53,10 +53,7 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if len(gvcf_by_sgid) == 0:
-        raise ValueError(
-            'Provided samples collection for joint calling should contain '
-            'at least one active sample'
-        )
+        raise ValueError('Provided samples collection for joint calling should contain ' 'at least one active sample')
     scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sgid))
 
     all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
@@ -85,9 +82,7 @@ def make_joint_genotyping_jobs(
     # Preparing inputs for GenomicsDB
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
     sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
-    df = pd.DataFrame(
-        [{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sgid.items()]
-    )
+    df = pd.DataFrame([{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sgid.items()])
     if not get_config()['workflow'].get('dry_run', False):
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
@@ -95,9 +90,7 @@ def make_joint_genotyping_jobs(
     do_filter_excesshet = len(gvcf_by_sgid) >= 1000 and do_filter_excesshet
 
     for idx, interval in enumerate(intervals):
-        genomicsdb_path = (
-            genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
-        )
+        genomicsdb_path = genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
         import_gvcfs_j = genomicsdb(
             b=b,
             sample_map_bucket_path=sample_map_bucket_path,
@@ -107,9 +100,7 @@ def make_joint_genotyping_jobs(
         )
 
         jc_vcf_path = (
-            (tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz')
-            if scatter_count > 1
-            else out_vcf_path
+            (tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz') if scatter_count > 1 else out_vcf_path
         )
         filt_jc_vcf_path = (
             (tmp_bucket / 'excess-filter' / 'parts' / f'part{idx + 1}.vcf.gz')
@@ -268,12 +259,12 @@ def genomicsdb(
     cmd = f"""\
     WORKSPACE={output_path.with_suffix('').name}
 
-    # Multiple GenomicsDBImport read same GVCFs in parallel, which could lead to 
+    # Multiple GenomicsDBImport read same GVCFs in parallel, which could lead to
     # some of the jobs failing reading a GVCF, e.g.:
-    # https://batch.hail.populationgenomics.org.au/batches/74388/jobs/45 
-    # So wrapping the command in a "retry" call, which would attempt it multiple 
+    # https://batch.hail.populationgenomics.org.au/batches/74388/jobs/45
+    # So wrapping the command in a "retry" call, which would attempt it multiple
     # times after a timeout using.
-    # --overwrite-existing-genomicsdb-workspace is to make sure the $WORKSPACE 
+    # --overwrite-existing-genomicsdb-workspace is to make sure the $WORKSPACE
     # directory from a previous attempt is not in the way of a new attempt.
     function run {{
     gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
@@ -288,9 +279,7 @@ def genomicsdb(
     }}
     retry run
     """
-    j.command(
-        command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
-    )
+    j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
     b.write_output(j.db_tar, str(output_path))
     return j
 
@@ -340,9 +329,7 @@ def _add_joint_genotyper_job(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     reference = fasta_res_group(b)
 
@@ -361,7 +348,7 @@ def _add_joint_genotyper_job(
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""\
     {input_cmd}
-    
+
     gatk --java-options "-Xmx{res.get_java_mem_mb()}m" \\
     {tool.name} \\
     -R {reference.base} \\
@@ -380,14 +367,12 @@ def _add_joint_genotyper_job(
         cmd += f"""\
     --merge-input-intervals \\
     -G AS_StandardAnnotation
-    
-    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
         tabix -p vcf {j.output_vcf['vcf.gz']}
     fi
     """
-    j.command(
-        command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True)
-    )
+    j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
@@ -428,9 +413,7 @@ def _add_excess_het_filter(
     j = b.new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2)
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
@@ -447,8 +430,8 @@ def _add_excess_het_filter(
     -O {j.output_vcf['vcf.gz']} \\
     -V {input_vcf['vcf.gz']} \\
     2> {j.stderr}
-    
-    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
         tabix -p vcf {j.output_vcf['vcf.gz']}
     fi
     """
@@ -487,9 +470,7 @@ def add_make_sitesonly_job(
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
         j.storage(f'{storage_gb}G')
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
@@ -500,7 +481,7 @@ def add_make_sitesonly_job(
     -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']}
 
-    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then 
+    if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
         tabix -p vcf {j.output_vcf['vcf.gz']}
     fi
     """

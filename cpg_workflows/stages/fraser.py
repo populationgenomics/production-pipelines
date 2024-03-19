@@ -32,16 +32,14 @@ class Fraser(CohortStage):
         Generate FRASER outputs.
         """
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
-        return {
-            cohort.name: dataset_prefix / 'fraser' / f'{cohort.name}.fds.tar.gz'
-        }
-    
+        return {cohort.name: dataset_prefix / 'fraser' / f'{cohort.name}.fds.tar.gz'}
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to run FRASER.
         """
         sequencing_groups = cohort.get_sequencing_groups()
-        
+
         bam_or_cram_inputs: list[tuple[BamPath, None] | tuple[CramPath, Path]] = []
         for sequencing_group in sequencing_groups:
             cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')

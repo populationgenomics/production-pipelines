@@ -51,11 +51,7 @@ def add_vep_jobs(
     if input_siteonly_vcf_part_paths:
         assert len(input_siteonly_vcf_part_paths) == scatter_count
         for path in input_siteonly_vcf_part_paths:
-            input_vcf_parts.append(
-                b.read_input_group(
-                    **{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}
-                )
-            )
+            input_vcf_parts.append(b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}))
 
     # If there is only one partition, we don't need to split the VCF
     elif scatter_count == 1:
@@ -194,9 +190,7 @@ def vep_one(
         vcf = b.read_input(str(vcf))
 
     if out_format == 'vcf':
-        j.declare_resource_group(
-            output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-        )
+        j.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
         assert isinstance(j.output, hb.ResourceGroup)
         output = j.output['vcf.gz']
     else:
@@ -213,15 +207,11 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep'
-        if vep_version == '105'
-        else '$VEP_DIR_PLUGINS',
+        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS',
     }
 
     # sexy new plugin - only present in 110 build
-    alpha_missense_plugin = (
-        f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
-    )
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI

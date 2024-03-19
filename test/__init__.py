@@ -16,8 +16,7 @@ logging.getLogger('py4j').setLevel(logging.ERROR)
 
 @runtime_checkable
 class IDictRepresentable(Protocol):
-    def as_dict(self) -> dict[str, Any]:
-        ...
+    def as_dict(self) -> dict[str, Any]: ...
 
 
 class TomlAnyPathEncoder(toml.TomlEncoder):
@@ -78,10 +77,7 @@ def set_config(
         elif isinstance(config, str):
             f.write(config)
         else:
-            raise TypeError(
-                f'Expected config to be a string, dict, or IDictRepresentable, but'
-                f'got {type(config)}'
-            )
+            raise TypeError(f'Expected config to be a string, dict, or IDictRepresentable, but' f'got {type(config)}')
 
         f.flush()
 

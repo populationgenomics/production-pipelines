@@ -1,6 +1,7 @@
 """
 Utility functions and constants.
 """
+
 import logging
 import re
 import string
@@ -74,10 +75,7 @@ def read_hail(path):
 
 
 def checkpoint_hail(
-        t: hl.Table | hl.MatrixTable,
-        file_name: str,
-        checkpoint_prefix: str | None = None,
-        allow_reuse=False
+    t: hl.Table | hl.MatrixTable, file_name: str, checkpoint_prefix: str | None = None, allow_reuse=False
 ):
     """
     checkpoint method
@@ -223,9 +221,7 @@ def timestamp(rand_suffix_len: int = 5) -> str:
     """
     result = time.strftime('%Y_%m%d_%H%M')
     if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
-        )
+        rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=rand_suffix_len))
         result += f'_{rand_bit}'
     return result
 

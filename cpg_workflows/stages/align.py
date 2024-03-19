@@ -1,6 +1,7 @@
 """
 Stage that generates a CRAM file.
 """
+
 import logging
 
 from cpg_utils import Path
@@ -38,9 +39,7 @@ class Align(SequencingGroupStage):
             'crai': cram_path.index_path,
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
         Checks the `realign_from_cram_version` pipeline config argument, and
@@ -74,14 +73,8 @@ class Align(SequencingGroupStage):
             )
         except MissingAlignmentInputException:
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
-                logging.error(
-                    f'No alignment inputs, skipping sequencing group {sequencing_group}'
-                )
+                logging.error(f'No alignment inputs, skipping sequencing group {sequencing_group}')
                 sequencing_group.active = False
-                return self.make_outputs(
-                    sequencing_group, skipped=True
-                )  # return empty output
+                return self.make_outputs(sequencing_group, skipped=True)  # return empty output
             else:
-                return self.make_outputs(
-                    target=sequencing_group, error_msg='No alignment input found'
-                )
+                return self.make_outputs(target=sequencing_group, error_msg='No alignment input found')

@@ -79,13 +79,9 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
-        assert (
-            j is None
-        ), 'A new job was created when it should have reused existing output, was overwrite set to True?'
+        assert j is None, 'A new job was created when it should have reused existing output, was overwrite set to True?'
 
-    def test_will_create_job_if_path_already_exists_and_overwrite_true(
-        self, tmp_path: Path
-    ):
+    def test_will_create_job_if_path_already_exists_and_overwrite_true(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
         output = tmp_path / 'output_verifybamid_file'
         output.touch()
@@ -109,9 +105,7 @@ class TestVerifyBAMID:
             ),
         ],
     )
-    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(
-        self, tmp_path: Path, job_attrs, expected_attrs
-    ):
+    def test_sets_job_attrs_or_sets_default_attrs_if_not_supplied(self, tmp_path: Path, job_attrs, expected_attrs):
         _, cram_pth, batch = setup_test(tmp_path)
 
         j = verifybamid(
@@ -137,9 +131,7 @@ class TestVerifyBAMID:
         assert j is not None
         assert j._image == config.images['verifybamid']
 
-    def test_uses_num_principal_components_in_config_file_in_bash_command(
-        self, tmp_path: Path
-    ):
+    def test_uses_num_principal_components_in_config_file_in_bash_command(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
 
         j = verifybamid(
@@ -169,9 +161,7 @@ class TestVerifyBAMID:
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
-        self, tmp_path: Path
-    ):
+    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
 
         j = verifybamid(
@@ -205,9 +195,7 @@ class TestVerifyBAMID:
         assert re.search(fr'--MeanPath \${{BATCH_TMPDIR}}/inputs/\w+/{mu_file}', cmd)
         assert re.search(fr'--BedPath \${{BATCH_TMPDIR}}/inputs/\w+/{bed_file}', cmd)
 
-    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
-        self, tmp_path: Path
-    ):
+    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         j = verifybamid(
@@ -244,9 +232,7 @@ class TestVerifyBAMID:
         else:
             assert '--max-depth 1000' not in cmd
 
-    def test_batch_writes_verifybamid_selfsm_file_to_output_path(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_batch_writes_verifybamid_selfsm_file_to_output_path(self, mocker: MockFixture, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         spy = mocker.spy(batch, 'write_output')

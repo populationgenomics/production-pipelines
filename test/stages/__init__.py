@@ -1,6 +1,7 @@
 """
 Test building stages DAG.
 """
+
 from typing import Callable, Type
 
 from cpg_utils import Path, to_path
@@ -31,15 +32,9 @@ class TestStage(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> Path:
         return to_path(dataset_path(f'{sequencing_group.id}_{self.name}.tsv'))
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
-        j = get_batch().new_job(
-            self.name, attributes=self.get_job_attrs(sequencing_group)
-        )
-        return self.make_outputs(
-            sequencing_group, self.expected_outputs(sequencing_group), j
-        )
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        j = get_batch().new_job(self.name, attributes=self.get_job_attrs(sequencing_group))
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), j)
 
 
 # A -> B -> C -> D

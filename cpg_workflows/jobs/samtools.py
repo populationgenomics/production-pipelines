@@ -1,6 +1,7 @@
 """
 Create Hail Batch jobs for samtools.
 """
+
 from hailtop.batch.job import Job
 
 from cpg_utils import Path

@@ -24,9 +24,7 @@ def add_background(
     """
     sites_table = get_config()['references']['ancestry']['sites_table']
     qc_variants_ht = hl.read_table(sites_table)
-    dense_mt = (
-        dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
-    )
+    dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
         path = dataset_dict['dataset_path']
@@ -38,9 +36,7 @@ def add_background(
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
             background_vds = hl.vds.read_vds(str(path))
-            background_vds = hl.vds.split_multi(
-                background_vds, filter_changed_loci=True
-            )
+            background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
             background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
             background_mt = hl.vds.to_dense_mt(background_vds)
             # annotate background mt with metadata info derived from SampleQC stage
@@ -49,19 +45,13 @@ def add_background(
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables)
-            background_mt = background_mt.annotate_cols(
-                **metadata_tables[background_mt.col_key]
-            )
+            background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
         # save metadata info before merging dense and background datasets
         ht = background_mt.cols()
-        background_mt = (
-            background_mt.select_cols()
-            .select_rows()
-            .select_entries('GT', 'GQ', 'DP', 'AD')
-        )
+        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
@@ -99,15 +89,11 @@ def run(
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
-        logging.info(
-            f'Adding background datasets using following config: {pca_background}'
-        )
+        logging.info(f'Adding background datasets using following config: {pca_background}')
         dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
 
     logging.info(
-        f'Running PCA on {dense_mt.count_cols()} samples, '
-        f'{dense_mt.count_rows()} sites, '
-        f'using {n_pcs} PCs'
+        f'Running PCA on {dense_mt.count_cols()} samples, ' f'{dense_mt.count_rows()} sites, ' f'using {n_pcs} PCs'
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
@@ -192,15 +178,10 @@ def _run_pca_ancestry_analysis(
         )
 
     if n_pcs > samples_to_use:
-        logging.info(
-            'Adjusting the number of PCs not to exceed the number of samples:'
-            f'{n_pcs} -> {samples_to_use}'
-        )
+        logging.info('Adjusting the number of PCs not to exceed the number of samples:' f'{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
 
-    eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(
-        mt, sample_to_drop_ht, n_pcs=n_pcs
-    )
+    eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)
     logging.info(f'scores_ht.s: {list(scores_ht.s.collect())}')
     logging.info(f'eigenvalues: {eigenvalues}')
     eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(eigenvalues, columns=['f0']))
@@ -264,14 +245,10 @@ def _infer_pop_labels(
         'Using calculated PCA scores as well as training samples with known '
         '`population` label to assign population labels to remaining samples'
     )
-    scores_ht = scores_ht.annotate(
-        training_pop=training_pop_ht[scores_ht.key].training_pop
-    )
+    scores_ht = scores_ht.annotate(training_pop=training_pop_ht[scores_ht.key].training_pop)
 
     def _run_assign_population_pcs(pop_pca_scores_ht_, min_prob_):
-        examples_num = pop_pca_scores_ht_.aggregate(
-            hl.agg.count_where(hl.is_defined(pop_pca_scores_ht_.training_pop))
-        )
+        examples_num = pop_pca_scores_ht_.aggregate(hl.agg.count_where(hl.is_defined(pop_pca_scores_ht_.training_pop)))
         logging.info(f'Running RF using {examples_num} training examples')
         pop_ht_, pops_rf_model_ = assign_population_pcs(
             pop_pca_scores_ht_,
@@ -279,14 +256,10 @@ def _infer_pop_labels(
             known_col='training_pop',
             min_prob=min_prob_,
         )
-        n_mislabeled_samples_ = pop_ht_.aggregate(
-            hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop)
-        )
+        n_mislabeled_samples_ = pop_ht_.aggregate(hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop))
         return pop_ht_, pops_rf_model_, n_mislabeled_samples_
 
-    pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(
-        scores_ht, min_prob
-    )
+    pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(scores_ht, min_prob)
     while n_mislabeled_samples > max_mislabeled_training_samples:
         logging.info(
             f'Found {n_mislabeled_samples} samples '
@@ -296,22 +269,16 @@ def _infer_pop_labels(
 
         pop_ht = pop_ht[scores_ht.key]
         pop_pca_scores_ht = scores_ht.annotate(
-            training_pop=hl.or_missing(
-                (pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop
-            )
+            training_pop=hl.or_missing((pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop)
         ).persist()
 
-        pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(
-            pop_pca_scores_ht, min_prob
-        )
+        pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(pop_pca_scores_ht, min_prob)
 
     # Writing a tab delimited file indicating inferred sample populations
     pop_tsv_file = tmp_prefix / 'RF_pop_assignments.txt.gz'
     if not can_reuse(pop_tsv_file, overwrite=True):
         pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
-        pop_ht.transmute(
-            **{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}
-        ).export(str(pop_tsv_file))
+        pop_ht.transmute(**{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}).export(str(pop_tsv_file))
 
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'

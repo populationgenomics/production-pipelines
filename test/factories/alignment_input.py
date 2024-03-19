@@ -162,9 +162,7 @@ def create_bam_input(
     return BamPath(path=path, index_path=index_path if index else None)
 
 
-def create_reference_assembly(
-    location: str | Path, name: str = 'GRCh38.fa', create: bool = False
-) -> Path:
+def create_reference_assembly(location: str | Path, name: str = 'GRCh38.fa', create: bool = False) -> Path:
     """
     Create a reference assembly file for testing. The file will be named as follows:
     `'{location}/{name}'`. If `create` is `True`, the file will be created on disk

@@ -1,6 +1,6 @@
-""" 
-TODO: This test should be moved to a markdup test module. Picard is defined in it's own 
-module, however biobambam2 is constructed in the align job module so it can use piped 
+"""
+TODO: This test should be moved to a markdup test module. Picard is defined in it's own
+module, however biobambam2 is constructed in the align job module so it can use piped
 output from an alignment or samtools merge command.
 """
 
@@ -30,15 +30,11 @@ def setup_test(config: PipelineConfig, tmp_path: Path, input_type: str, **kwargs
     else:
         # Remove kwargs not in setup_bam_cram_test
         kwargs.pop('num_pairs', None)
-        return setup_bam_cram_test(
-            config, tmp_path, alignment_input=input_type, **kwargs
-        )
+        return setup_bam_cram_test(config, tmp_path, alignment_input=input_type, **kwargs)
 
 
 @pytest.mark.parametrize('input_type', ['fastq', 'bam', 'cram'])
-def test_uses_output_from_merge_job_when_multiple_align_jobs_are_created(
-    tmp_path: Path, input_type: str
-):
+def test_uses_output_from_merge_job_when_multiple_align_jobs_are_created(tmp_path: Path, input_type: str):
     config = default_config()
     batch, sg = setup_test(config, tmp_path, input_type=input_type, num_pairs=5)
 
@@ -78,9 +74,7 @@ def test_uses_output_from_merge_job_when_multiple_align_jobs_are_created(
 
 
 @pytest.mark.parametrize('input_type', ['fastq', 'bam', 'cram'])
-def test_uses_output_from_align_job_when_one_align_job_is_created(
-    tmp_path: Path, input_type: str
-):
+def test_uses_output_from_align_job_when_one_align_job_is_created(tmp_path: Path, input_type: str):
     config = default_config()
     config.workflow.sequencing_type = 'exome'
     batch, sg = setup_test(config, tmp_path, input_type=input_type, num_pairs=1)
@@ -141,15 +135,11 @@ def test_writes_correct_resource_depending_on_markdup_tool(
     jobs = align(b=batch, sequencing_group=sg, output_path=out, markdup_tool=tool)
 
     final_job = jobs[-1]
-    spy.assert_called_with(
-        getattr(final_job, expected_resource), str(out.path.with_suffix(''))
-    )
+    spy.assert_called_with(getattr(final_job, expected_resource), str(out.path.with_suffix('')))
 
 
 @pytest.mark.parametrize('input_type', ['fastq', 'bam', 'cram'])
-def test_writes_markdup_metrics_resrouce(
-    mocker: MockFixture, tmp_path: Path, input_type: str
-):
+def test_writes_markdup_metrics_resrouce(mocker: MockFixture, tmp_path: Path, input_type: str):
     config = default_config()
     batch, sg = setup_test(config, tmp_path, input_type=input_type, num_pairs=1)
     cram_out = CramPath(path=tmp_path / 'out')

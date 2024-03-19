@@ -15,7 +15,8 @@ from metamist import models
 from metamist.apis import AnalysisApi
 from metamist.graphql import query, gql
 
-FIND_CRAMS = gql("""
+FIND_CRAMS = gql(
+    """
 query CramQuery($project: String!) {
   project(name: $project) {
     sequencingGroups {
@@ -30,7 +31,8 @@ query CramQuery($project: String!) {
     }
   }
 }
-""")
+"""
+)
 
 
 def query_metamist(dataset: str):
@@ -53,7 +55,7 @@ def query_metamist(dataset: str):
 KNOWN_REFS = {
     '49f7a7583b832aed0104b1901f9cf5fd': 'Homo_sapiens_assembly38_masked',
     '760a471d32c9a356ffb37f632bebfea3': 'Homo_sapiens_assembly38[unmasked]',
-    }
+}
 
 
 def parse_one_SQ(line: str):
@@ -104,8 +106,9 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
                 field = parse_one_SQ(line)
                 new_line, new_len = translate[field['SN']]
                 if field['LN'] != new_len:
-                    raise ValueError(f'{incram}:{field["SN"]}: new length {new_len} differs '
-                                     f'from existing {field["LN"]}')
+                    raise ValueError(
+                        f'{incram}:{field["SN"]}: new length {new_len} differs ' f'from existing {field["LN"]}'
+                    )
                 print(new_line, file=newhdr)
             else:
                 print(line, file=newhdr)
@@ -151,8 +154,12 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
 
 @click.command()
 @click.argument('source', nargs=-1)
-@click.option('--ref', 'new_reference_path', required=True, metavar='GCS_PATH', help='Dict file containing the new @SQ headers')
-@click.option('--expected', 'expected_refset', required=True, metavar='NAME', help='KNOWN_REFS name of the (bad) refset expected')
+@click.option(
+    '--ref', 'new_reference_path', required=True, metavar='GCS_PATH', help='Dict file containing the new @SQ headers'
+)
+@click.option(
+    '--expected', 'expected_refset', required=True, metavar='NAME', help='KNOWN_REFS name of the (bad) refset expected'
+)
 @click.option('--intended', 'new_refset', metavar='NAME', help='KNOWN_REFS name of the replacement headers')
 @click.option('--dry-run', is_flag=True, help='Display information only without making changes')
 def main(
@@ -175,8 +182,7 @@ def main(
 
     if len(source) > 0:
         print(f'Scanning {" ".join(source)} for *.cram files')
-        cram_list = [fn for srcdir in source
-                     for fn in to_path(srcdir).iterdir() if fn.suffix == '.cram']
+        cram_list = [fn for srcdir in source for fn in to_path(srcdir).iterdir() if fn.suffix == '.cram']
     else:
         print(f'Finding CRAMs for {dataset} in database')
         cram_list = query_metamist(dataset)
@@ -210,9 +216,16 @@ def main(
         j.image(image_path('samtools'))
         j.storage(filesize * 1.2)  # Allow some extra space for index file, references, etc
 
-        j_result = j.call(do_reheader,
-                          dry_run, expected_refset, new_reference, new_refset,
-                          b.read_input(str(path)), j.out_cram, j.out_crai)
+        j_result = j.call(
+            do_reheader,
+            dry_run,
+            expected_refset,
+            new_reference,
+            new_refset,
+            b.read_input(str(path)),
+            j.out_cram,
+            j.out_crai,
+        )
 
         assert isinstance(j.out_cram, JobResourceFile)
         assert isinstance(j.out_crai, JobResourceFile)
@@ -229,8 +242,7 @@ def main(
             db_j = b.new_python_job(f'Update metamist for {newpath}')
             db_j.image(config['workflow']['driver_image'])
 
-            db_j.call(do_metamist_update,
-                      dataset, sequencing_type, path.stem, str(path), str(newpath), j_result)
+            db_j.call(do_metamist_update, dataset, sequencing_type, path.stem, str(path), str(newpath), j_result)
 
     b.run(wait=False)
 
