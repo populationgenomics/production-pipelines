@@ -38,8 +38,7 @@ def find_families(dataset: Dataset) -> dict[str, list[str]]:
     """
     dict_by_family: dict[str, list[str]] = {}
     for sg in dataset.get_sequencing_groups():
-        family_id = sg.pedigree.fam_id
-        assert isinstance(family_id, str), f'Family ID is not a string: {family_id}'
+        family_id = str(sg.pedigree.fam_id)
         dict_by_family.setdefault(family_id, []).append(sg.id)
 
     return dict_by_family
