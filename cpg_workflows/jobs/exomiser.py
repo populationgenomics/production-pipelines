@@ -5,9 +5,35 @@ import pandas as pd
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, authenticate_cloud_credentials_in_job, reference_path
-from cpg_workflows.scripts import extract_vcf_from_mt
-from cpg_workflows.targets import Dataset
-from cpg_workflows.utils import chunks
+from cpg_workflows.inputs import get_cohort
+from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
+from cpg_workflows.targets import Dataset, SequencingGroup
+from cpg_workflows.utils import chunks, exists
+
+
+def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
+    """
+    returns a job or None
+
+    Args:
+        sgids (list[SequencingGroup])
+        out_path (str):
+    """
+
+    if exists(out_path):
+        return []
+
+    gvcf_paths = " ".join([str(s.gvcf.path) for s in sgids if s.gvcf])
+    sequencing_group_names = " ".join([s.id for s in sgids])
+    vds_script = vds_from_gvcfs.__file__
+    job = get_batch().new_job('Make VDS from gVCFs')
+    authenticate_cloud_credentials_in_job(job)
+    job.image(get_config()['workflow']['driver_image'])
+    job.command(f'python3 {vds_script} --gvcfs {gvcf_paths} --sgids {sequencing_group_names} --out {out_path}')
+    job.storage('10Gi')
+    job.cpu(4)
+    job.memory('standard')
+    return job
 
 
 def extract_mini_ped_files(

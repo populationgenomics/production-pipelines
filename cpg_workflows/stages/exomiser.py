@@ -10,12 +10,15 @@ As a dataset Stage
 
 from functools import lru_cache
 
+from cpg_utils import to_path, Path
 from cpg_workflows.jobs.exomiser import (
     extract_vcf_jobs,
     extract_mini_ped_files,
     run_exomiser_batches,
+    create_vds_jobs
 )
-from cpg_workflows.stages.aip import query_for_latest_mt
+# from cpg_workflows.stages.aip import query_for_latest_mt
+from cpg_workflows.scripts import vds_from_gvcfs
 from cpg_workflows.workflow import (
     get_workflow,
     StageInput,
@@ -42,6 +45,24 @@ def find_families(dataset: Dataset) -> dict[str, list[str]]:
     return dict_by_family
 
 
+# we need a MT. I didn't think this would happen... but I need to combine some shit
+@stage
+class RDCombiner(DatasetStage):
+    """
+    it's a gVCF combiner, followed by densification
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {'vds': self.prefix / 'vds' / f'{get_workflow().output_version}.vds'}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        sgids = dataset.get_sequencing_groups()
+        output = self.expected_outputs(dataset)
+        jobs = create_vds_jobs(sgids=sgids, out_path=str(output['vds']))
+        return self.make_outputs(dataset, output, jobs=jobs)
+
+
 @stage
 class CreateFamilyVCFs(DatasetStage):
     """
@@ -54,7 +75,7 @@ class CreateFamilyVCFs(DatasetStage):
 
         # generate the exomiser result paths for each family
         # skip those families that already have results
-        # uses output_prefix to track consisently
+        # uses output_prefix to track consistently
 
         # the output path of the next step
         batch_prefix = get_workflow().prefix / RunExomiser.name
@@ -76,9 +97,12 @@ class CreateFamilyVCFs(DatasetStage):
         families_to_process = {
             k: v for k, v in dataset_families.items() if k in expected_out
         }
+
+        # mt_path = query_for_latest_mt(dataset.name)
+        mt_path = 'gs://cpg-acute-care-test/mt/9b8fa425cf500067c4802e030d8be35598a792_3-acute-care.mt'
         vcf_jobs = extract_vcf_jobs(
             families_to_process,
-            query_for_latest_mt(dataset.name),
+            mt_path,
             dataset.tmp_prefix() / self.name,
         )
         return self.make_outputs(dataset, data=expected_out, jobs=vcf_jobs)
