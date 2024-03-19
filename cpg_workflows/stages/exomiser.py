@@ -98,7 +98,7 @@ class CreateFamilyVCFs(DatasetStage):
         # uses output_prefix to track consistently
 
         # the output path of the next step
-        batch_prefix = get_workflow().prefix / RunExomiser.name
+        batch_prefix = get_workflow().prefix / 'RunExomiser'
 
         # get all families without results
         for family in family_dict.keys():
