@@ -277,7 +277,9 @@ class RunHailSVFiltering(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
         sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
-        sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type))
+        sv_mt = get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
+        )
 
         # this might work? May require some config entries
         if sv_mt is None:
