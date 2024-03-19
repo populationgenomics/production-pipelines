@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--mt', help='Output MT')
     args = parser.parse_args()
 
-    get_logger(__file__).info(f'Creating VDS {args.out} from {len(args.gvcfs)} gVCFs')
+    get_logger(__file__).info(f'Creating MT {args.mt} from VDS {args.vds}')
 
     init_batch()
 
