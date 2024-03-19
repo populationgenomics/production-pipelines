@@ -9,7 +9,13 @@ from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path, query_command
+from cpg_utils.hail_batch import (
+    command,
+    fasta_res_group,
+    get_batch,
+    image_path,
+    query_command,
+)
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
 from cpg_workflows.resources import HIGHMEM
@@ -358,8 +364,7 @@ def postprocess_calls(
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
-      --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
-      {extra_args}
+      --output-denoised-copy-ratios {j.output['ratios.tsv']} {extra_args}
     """,
     )
 
