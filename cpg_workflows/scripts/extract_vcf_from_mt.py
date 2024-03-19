@@ -28,7 +28,7 @@ def extract_vcf_from_dataset_vcf(input_mt: str, sg_ids: list[str], out_path: str
     # read full MT
     mt = hl.read_matrix_table(input_mt)
 
-    samples_in_mt = mt.s.collect_as_set()
+    samples_in_mt = mt.s.collect()
     requested_samples = set(sg_ids)
     if missing_samples := (requested_samples - samples_in_mt):
         raise ValueError(f'Requested samples {missing_samples} not found in MT')
