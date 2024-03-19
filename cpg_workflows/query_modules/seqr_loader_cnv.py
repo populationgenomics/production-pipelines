@@ -107,7 +107,10 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     # might have to drop this for the Seqr ingest
     mt = mt.annotate_rows(
         geneSymbols=hl.set(
-            hl.filter(hl.is_defined, [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols]).flatmap(
+            hl.filter(
+                hl.is_defined,
+                [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols],
+            ).flatmap(
                 lambda x: x,
             ),
         ),
@@ -127,7 +130,10 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
         # this expected mt.variant_name to be present, and it's not
         variantId=hl.format(f'%s_%s_{datetime.date.today():%m%d%Y}', mt.rsid, mt.svType),
         geneIds=hl.set(
-            hl.filter(hl.is_defined, [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols]).flatmap(
+            hl.filter(
+                hl.is_defined,
+                [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols],
+            ).flatmap(
                 lambda x: x,
             ),
         ),

@@ -79,7 +79,9 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
     )
 
 
-def get_expr_for_xpos(locus: hl.LocusExpression | hl.StructExpression) -> hl.Int64Expression:
+def get_expr_for_xpos(
+    locus: hl.LocusExpression | hl.StructExpression,
+) -> hl.Int64Expression:
     """Genomic position represented as a single number = contig_number * 10**9 + position.
     This represents chrom:pos more compactly and allows for easier sorting.
     """

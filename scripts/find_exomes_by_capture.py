@@ -40,7 +40,12 @@ query SampleMetaQuery($name: String!) {
 # nb. SSQXTCREV2 is the Agilent SureSelect Clinical Research Exome V2
 # but V1 was only for GRCh37, so it's implied that unspecified versions
 # are likely also V2 and can be grouped together
-known_captures = ['_SSQXTCREV2_', '_TwistWES1VCGS1_', '_SSXTLICREV2_', '_NEXTERAFLEXWGS_']
+known_captures = [
+    '_SSQXTCREV2_',
+    '_TwistWES1VCGS1_',
+    '_SSXTLICREV2_',
+    '_NEXTERAFLEXWGS_',
+]
 
 capture_dict: dict = dict()
 projects = ['acute-care']

@@ -201,7 +201,7 @@ class FastqPair(AlignmentInput):
         Makes a pair of ResourceFile objects for r1 and r2.
         """
         return FastqPair(
-            *[self[i] if isinstance(self[i], ResourceFile) else b.read_input(str(self[i])) for i in [0, 1]],
+            *[(self[i] if isinstance(self[i], ResourceFile) else b.read_input(str(self[i]))) for i in [0, 1]],
         )
 
     def exists(self) -> bool:

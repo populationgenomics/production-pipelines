@@ -120,7 +120,10 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
             print(fp.read())
         return {}
 
-    sb.run(['samtools', 'reheader', '--no-PG', '--in-place', newhdr_file, incram], check=True)
+    sb.run(
+        ['samtools', 'reheader', '--no-PG', '--in-place', newhdr_file, incram],
+        check=True,
+    )
     os.rename(incram, outcram)
     sb.run(['samtools', 'index', '-o', outcrai, outcram], check=True)
 
@@ -168,7 +171,12 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
     metavar='NAME',
     help='KNOWN_REFS name of the (bad) refset expected',
 )
-@click.option('--intended', 'new_refset', metavar='NAME', help='KNOWN_REFS name of the replacement headers')
+@click.option(
+    '--intended',
+    'new_refset',
+    metavar='NAME',
+    help='KNOWN_REFS name of the replacement headers',
+)
 @click.option('--dry-run', is_flag=True, help='Display information only without making changes')
 def main(
     source: tuple[str],
@@ -250,7 +258,15 @@ def main(
             db_j = b.new_python_job(f'Update metamist for {newpath}')
             db_j.image(config['workflow']['driver_image'])
 
-            db_j.call(do_metamist_update, dataset, sequencing_type, path.stem, str(path), str(newpath), j_result)
+            db_j.call(
+                do_metamist_update,
+                dataset,
+                sequencing_type,
+                path.stem,
+                str(path),
+                str(newpath),
+                j_result,
+            )
 
     b.run(wait=False)
 

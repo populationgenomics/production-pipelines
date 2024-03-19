@@ -207,7 +207,7 @@ def vep_one(
         'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
         'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
         'conservation_file': f'{vep_dir}/loftee.sql',
-        'loftee_path': '$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS',
+        'loftee_path': ('$MAMBA_ROOT_PREFIX/share/ensembl-vep' if vep_version == '105' else '$VEP_DIR_PLUGINS'),
     }
 
     # sexy new plugin - only present in 110 build
