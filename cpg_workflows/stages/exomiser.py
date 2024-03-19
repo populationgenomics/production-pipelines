@@ -78,7 +78,6 @@ class VDStoMT(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        sgids = dataset.get_sequencing_groups()
         vds = str(inputs.as_dict(target=dataset, stage=RDCombiner)['vds'])
         output = self.expected_outputs(dataset)
         jobs = mt_from_vds(vds_path=vds, out_path=str(output['mt']))
