@@ -595,7 +595,6 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
 
 
 def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
-
     mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
 
     def mock_get_pedigree_empty(*args, **kwargs):

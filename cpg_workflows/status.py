@@ -60,7 +60,6 @@ def complete_analysis_job(
     # we know that es indexes are registered names, not files/dirs
     # skip all relevant checks for this output type
     if analysis_type != 'es-index':
-
         if not output_cloudpath.exists():
             if tolerate_missing:
                 print(f"Output {output} doesn't exist, allowing silent return")

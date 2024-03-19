@@ -48,11 +48,13 @@ class CramOrBamPath(AlignmentInput, ABC):
 
     @property
     @abstractmethod
-    def ext(self) -> str: ...
+    def ext(self) -> str:
+        ...
 
     @property
     @abstractmethod
-    def index_ext(self) -> str: ...
+    def index_ext(self) -> str:
+        ...
 
     def __str__(self) -> str:
         return str(self.path)

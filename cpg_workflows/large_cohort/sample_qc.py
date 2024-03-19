@@ -16,7 +16,6 @@ from cpg_workflows.utils import can_reuse
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
-
     if can_reuse(out_sample_qc_ht_path, overwrite=True):
         return []
 

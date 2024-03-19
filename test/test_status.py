@@ -132,7 +132,6 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-
     from cpg_utils import to_path
 
     with to_path(output_path).open() as f:

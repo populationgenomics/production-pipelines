@@ -287,7 +287,6 @@ def postprocess_calls(
     intervals_vcf: str | None = None,
     qc_file: str | None = None,
 ) -> Job:
-
     if any([clustered_vcf, intervals_vcf, qc_file]):
         assert all([clustered_vcf, intervals_vcf, qc_file]), [
             clustered_vcf,

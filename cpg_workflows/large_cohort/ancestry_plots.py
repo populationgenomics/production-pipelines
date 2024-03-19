@@ -139,7 +139,6 @@ def _plot_pca(
     is_training,
     out_path_pattern=None,
 ):
-
     cntr = Counter(labels)
     # count the number of samples for each group and add it to the labels
     labels = [f'{x} ({cntr[x]})' for x in labels]

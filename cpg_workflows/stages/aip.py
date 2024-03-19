@@ -180,7 +180,6 @@ class GeneratePanelData(DatasetStage):
         return {'hpo_panels': dataset.prefix() / DATED_FOLDER / 'hpo_panel_data.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
@@ -216,7 +215,6 @@ class QueryPanelapp(DatasetStage):
         return {'panel_data': dataset.prefix() / DATED_FOLDER / 'panelapp_data.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
@@ -250,7 +248,6 @@ class RunHailFiltering(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
@@ -294,7 +291,6 @@ class RunHailSVFiltering(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
         expected_out = self.expected_outputs(dataset)
         sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name))
 
@@ -478,7 +474,6 @@ class GenerateSeqrFile(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
         # pull out the config section relevant to this datatype & cohort
         cohort_seq_type_section = get_config()['cohorts'][dataset.name].get(
             get_config()['workflow'].get('sequencing_type', {})

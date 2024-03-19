@@ -16,7 +16,8 @@ logging.getLogger('py4j').setLevel(logging.ERROR)
 
 @runtime_checkable
 class IDictRepresentable(Protocol):
-    def as_dict(self) -> dict[str, Any]: ...
+    def as_dict(self) -> dict[str, Any]:
+        ...
 
 
 class TomlAnyPathEncoder(toml.TomlEncoder):

@@ -158,7 +158,6 @@ def main(
 
     # iterate over projects in order
     for project in projects:
-
         # decide if its time to stop
         if len(collected_sgs) >= max_samples:
             break
