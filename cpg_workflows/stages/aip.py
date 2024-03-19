@@ -233,6 +233,7 @@ class QueryPanelapp(DatasetStage):
         job.cpu(0.25).memory('lowmem')
         job.image(image_path('aip'))
 
+        # auth and copy env
         copy_common_env(job)
 
         hpo_panel_json = inputs.as_path(
@@ -273,6 +274,7 @@ class RunHailFiltering(DatasetStage):
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
+        # auth and copy env
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(
@@ -312,8 +314,9 @@ class RunHailSVFiltering(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         expected_out = self.expected_outputs(dataset)
+        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
         sv_mt = get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name)
+            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
         )
 
         # this might work? May require some config entries
@@ -325,6 +328,7 @@ class RunHailSVFiltering(DatasetStage):
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
+        # auth and copy env
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(
@@ -389,8 +393,9 @@ class ValidateMOI(DatasetStage):
 
         # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
+        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
         if sv_path := get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name)
+            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
         ):
             # bump input_path to contain both source files if appropriate
             input_path = f'{input_path}, {sv_path}'
@@ -461,6 +466,7 @@ class CreateAIPHTML(DatasetStage):
         job.cpu(1.0).memory('lowmem')
         job.image(image_path('aip'))
 
+        # auth and copy env
         copy_common_env(job)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
@@ -501,7 +507,7 @@ class GenerateSeqrFile(DatasetStage):
             / f'{DATED_FOLDER}_seqr.json',
             'seqr_pheno_file': dataset.prefix(category='analysis')
             / 'seqr_files'
-            / f'{DATED_FOLDER}_seqr_pheno.json',
+            / f'{DATED_FOLDER}_seqr_pheno.json'
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
