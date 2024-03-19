@@ -51,7 +51,7 @@ def mt_from_vds(vds_path: str, out_path: str):
     script_path = str(vds2mt.__file__).removeprefix('/production-pipelines')
     job = get_batch().new_job('Make MT from VDS')
     job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {script_path} {vds_path} {out_path}')
+    job.command(f'python3 {script_path} --vds {vds_path} --mt {out_path}')
     job.storage('10Gi')
     job.cpu(4)
     job.memory('standard')
