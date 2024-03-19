@@ -4,9 +4,9 @@ Test initialising Batch object.
 
 from pathlib import Path
 
-from cpg_utils import to_path
 from pytest_mock import MockFixture
 
+from cpg_utils import to_path
 from cpg_workflows.targets import Cohort
 
 from . import set_config
@@ -111,7 +111,6 @@ def test_attributes(mocker: MockFixture, tmp_path):
     """
 
     from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
-
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
@@ -200,7 +199,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         # test job name
         assert job.name
         assert job.name.startswith(
-            f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}'
+            f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}',
         )
 
     # Check that the job_by_stage and job_by_tool dicts are correct

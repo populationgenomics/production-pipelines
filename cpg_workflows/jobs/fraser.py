@@ -2,22 +2,24 @@
 Perform aberrant splicing analysis with FRASER.
 """
 
+from textwrap import dedent
+
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD
+from cpg_utils.hail_batch import command, image_path
 from cpg_workflows.filetypes import (
     BamPath,
     CramPath,
 )
+from cpg_workflows.jobs.bam_to_cram import cram_to_bam
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import can_reuse
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
-from cpg_workflows.jobs.bam_to_cram import cram_to_bam
-from textwrap import dedent
 
 
 class Fraser:
@@ -262,7 +264,7 @@ def fraser(
             'volcano_plots.tar.gz': '{root}.volcano_plots.tar.gz',
             'misc_plots.tar.gz': '{root}.misc_plots.tar.gz',
             'fds.tar.gz': '{root}.fds.tar.gz',
-        }
+        },
     )
 
     # Perform counting in parallel jobs
@@ -306,7 +308,8 @@ def fraser(
     if output_fds_path:
         # NOTE: j.output is just a placeholder
         b.write_output(
-            j.output, str(to_path(output_fds_path).with_suffix('').with_suffix('').with_suffix(''))
+            j.output,
+            str(to_path(output_fds_path).with_suffix('').with_suffix('').with_suffix('')),
         )  # Remove .fds.tar.gz suffix
 
     return jobs
@@ -406,7 +409,7 @@ def fraser_init(
     Run FRASER initialisation.
     """
     # Create FRASER job
-    job_name = f'fraser_init'
+    job_name = 'fraser_init'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -458,7 +461,7 @@ def fraser_init(
 
         # Move output to resource file
         mv output/savedObjects/{cohort_name}/fds-object.RDS {j.fds}
-        """
+        """,
     )
 
     j.command(command(cmd, monitor_space=True))
@@ -484,7 +487,7 @@ def fraser_count_split_reads_one_sample(
         return None, b.read_input(str(output_counts_path))
 
     # Create FRASER job
-    job_name = f'fraser_count_split'
+    job_name = 'fraser_count_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -527,7 +530,7 @@ def fraser_count_split_reads_one_sample(
 
         # Move output to resource file
         mv output/cache/splitCounts/splitCounts-{sample_id}.RDS {j.split_counts}
-        """
+        """,
     )
 
     j.command(command(cmd, monitor_space=True))
@@ -551,7 +554,7 @@ def fraser_merge_split_reads(
     Merge split-read counts.
     """
     # Create FRASER job
-    job_name = f'fraser_merge_split'
+    job_name = 'fraser_merge_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -570,7 +573,7 @@ def fraser_merge_split_reads(
         [
             f'ln -s {split_counts} output/cache/splitCounts/splitCounts-{sample_id}.RDS'
             for sample_id, split_counts in split_counts_dict.items()
-        ]
+        ],
     )
 
     # Create resource group for outputs
@@ -633,7 +636,7 @@ def fraser_merge_split_reads(
 
         # Move outputs to resource group
         {move_cmd}
-        """
+        """,
     )
 
     j.command(command(cmd, monitor_space=True))
@@ -658,7 +661,7 @@ def fraser_count_non_split_reads_one_sample(
     # NOTE: Can't reuse output, need to count non-split reads for each sample
 
     # Create FRASER job
-    job_name = f'fraser_count_non_split'
+    job_name = 'fraser_count_non_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -708,7 +711,7 @@ def fraser_count_non_split_reads_one_sample(
 
         # Move output to resource file
         mv output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5 {j.non_spliced_counts}
-        """
+        """,
     )
 
     j.command(command(cmd, monitor_space=True))
@@ -733,7 +736,7 @@ def fraser_merge_non_split_reads(
     Merge non-split-read counts.
     """
     # Create FRASER job
-    job_name = f'fraser_merge_non_split'
+    job_name = 'fraser_merge_non_split'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -752,9 +755,9 @@ def fraser_merge_non_split_reads(
         [
             f'ln -s {non_spliced_counts} output/cache/nonSplicedCounts/{cohort_name}/nonSplicedCounts-{sample_id}.h5'
             for sample_id, non_spliced_counts in non_spliced_counts_dict.items()
-        ]
+        ],
     )
-    link_counts_cmd += f'\n'
+    link_counts_cmd += '\n'
     # Add command to symlink RDS files
     link_counts_cmd += 'mkdir -p rds\n'
     link_counts_cmd += f'ln -s {split_counts.g_ranges_split_counts} rds/g_ranges_split_counts.RDS\n'
@@ -829,7 +832,7 @@ def fraser_merge_non_split_reads(
 
         # tar saved objects directory
         tar -chf {j.fds_tar} output/savedObjects/{cohort_name}/
-        """
+        """,
     )
 
     j.command(command(cmd, monitor_space=True))

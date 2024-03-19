@@ -9,11 +9,11 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
-
-from cpg_workflows.filetypes import CramPath, GvcfPath
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows import utils
+from cpg_workflows.filetypes import CramPath, GvcfPath
+from cpg_workflows.resources import HIGHMEM, STANDARD
+
 from .picard import get_intervals
 
 
@@ -205,7 +205,7 @@ def _haplotype_caller_one(
         output_gvcf={
             'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
             'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
-        }
+        },
     )
 
     reference = fasta_res_group(b)
@@ -271,7 +271,7 @@ def merge_gvcfs_job(
         output_gvcf={
             'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
             'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
-        }
+        },
     )
 
     input_cmd = ''
@@ -328,7 +328,7 @@ def postproc_gvcf(
         output_gvcf={
             'g.vcf.gz': '{root}.g.vcf.gz',
             'g.vcf.gz.tbi': '{root}.g.vcf.gz.tbi',
-        }
+        },
     )
 
     reference = fasta_res_group(b)

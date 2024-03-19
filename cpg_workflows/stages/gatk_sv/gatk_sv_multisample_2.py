@@ -15,7 +15,6 @@ from cpg_utils.hail_batch import (
     get_batch,
     image_path,
 )
-
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
@@ -111,7 +110,7 @@ class CombineExclusionLists(CohortStage):
         authenticate_cloud_credentials_in_job(job)
         job.command(
             'gcloud storage objects compose '
-            f'{" ".join(all_filter_lists)} {self.expected_outputs(cohort)["exclusion_list"]}'
+            f'{" ".join(all_filter_lists)} {self.expected_outputs(cohort)["exclusion_list"]}',
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
@@ -247,7 +246,7 @@ class MakeCohortVcf(CohortStage):
                 {'allosome_fai': 'allosome_file'},
                 {'cytobands': 'cytoband'},
                 {'pe_exclude_list': 'pesr_exclude_list'},
-            ]
+            ],
         )
 
         # images!
@@ -261,7 +260,7 @@ class MakeCohortVcf(CohortStage):
                 'sv_pipeline_qc_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
-            ]
+            ],
         )
         expected_d = self.expected_outputs(cohort)
 
@@ -525,12 +524,12 @@ class FilterGenotypes(CohortStage):
             [
                 {'gq_recalibrator_model_file': 'aou_filtering_model'},
                 'primary_contigs_fai',
-            ]
+            ],
         )
 
         # something a little trickier - we need to get various genome tracks
         input_dict['genome_tracks'] = list(
-            get_references(get_config()['references']['gatk_sv'].get('genome_tracks', [])).values()
+            get_references(get_config()['references']['gatk_sv'].get('genome_tracks', [])).values(),
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -640,7 +639,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
-            f'-p {phylop_in_batch}'
+            f'-p {phylop_in_batch}',
         )
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
 
@@ -794,7 +793,7 @@ class MtToEsSv(DatasetStage):
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         from analysis_runner import dataproc

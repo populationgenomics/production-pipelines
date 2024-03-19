@@ -6,10 +6,11 @@ Convert to site-only table and annotate with AS fields.
 import logging
 
 import hail as hl
+
 from cpg_utils import Path
 from cpg_workflows.utils import can_reuse
-from gnomad.utils.vcf import adjust_vcf_incompatible_types
 from gnomad.utils.sparse_mt import default_compute_info
+from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
 
 def run(

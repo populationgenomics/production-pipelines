@@ -10,13 +10,14 @@ a channel with:
 
 /invite @Seqr Loader
 """
-import logging
 import json
+import logging
 import pprint
 from collections import defaultdict
 from typing import Optional
 
 import click
+
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.slack import send_message

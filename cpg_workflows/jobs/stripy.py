@@ -5,12 +5,11 @@ Create Hail Batch jobs to run STRipy
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
-from cpg_workflows.resources import STANDARD
+from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
+from cpg_workflows.utils import can_reuse
 
 
 def stripy(

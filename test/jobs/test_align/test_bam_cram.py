@@ -10,7 +10,6 @@ import pytest
 from pytest_mock import MockFixture
 
 from cpg_workflows.filetypes import BamPath, CramPath
-
 from cpg_workflows.jobs.align import (
     Aligner,
     MarkDupTool,
@@ -23,10 +22,8 @@ from ...factories.alignment_input import create_bam_input, create_cram_input
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig, StorageConfig
 from ...factories.sequencing_group import create_sequencing_group
-
 from ..helpers import get_command_str
-
-from .shared import select_jobs, default_config
+from .shared import default_config, select_jobs
 
 
 def setup_test(
@@ -92,7 +89,11 @@ class TestPreProcessing:
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
     @pytest.mark.parametrize('index,expected_count', [(True, 10), (False, 1)])
     def test_does_not_shard_if_sequencing_genome_and_index_does_not_exist(
-        self, tmp_path: Path, input_type: str, index: bool, expected_count: int
+        self,
+        tmp_path: Path,
+        input_type: str,
+        index: bool,
+        expected_count: int,
     ):
         """
         Test that when genome sequencing is specified, the `align` function does not
@@ -205,7 +206,7 @@ class TestPreProcessing:
         assert len(align_jobs) == 1
 
         cmd = get_command_str(align_jobs[0])
-        file = re.escape(f'SAMPLE1.bam')
+        file = re.escape('SAMPLE1.bam')
 
         # Test sorts and indexes alignment input,
         assert re.search(
@@ -390,7 +391,7 @@ class TestDragmap:
                 'hash_table_cfg_bin': f'{file_location}hash_table.cfg.bin',
                 'hash_table_cmp': f'{file_location}hash_table.cmp',
                 'reference_bin': f'{file_location}reference.bin',
-            }
+            },
         )
 
 

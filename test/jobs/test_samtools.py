@@ -28,7 +28,7 @@ def default_config() -> PipelineConfig:
             'broad': {
                 'ref_fasta': 'hg38_reference.fa',
                 'dragmap_prefix': 'gs://a-cpg-bucket/dragen_reference/',
-            }
+            },
         },
     )
 

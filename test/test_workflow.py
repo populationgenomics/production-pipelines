@@ -5,7 +5,6 @@ Test building Workflow object.
 from unittest import mock
 
 from cpg_utils import Path, to_path
-
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import path_walk
 
@@ -54,7 +53,6 @@ def test_workflow(tmp_path):
     set_config(conf, tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import dataset_path, get_batch
-
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.workflow import (
         CohortStage,

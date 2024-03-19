@@ -10,15 +10,16 @@ from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs import joint_genotyping
 from cpg_workflows.workflow import (
     Cohort,
-    stage,
+    CohortStage,
     StageInput,
     StageOutput,
-    CohortStage,
     WorkflowError,
+    stage,
 )
-from .genotype import Genotype
+
 from .. import get_batch
 from ..resources import joint_calling_scatter_count
+from .genotype import Genotype
 
 
 @stage(required_stages=Genotype)

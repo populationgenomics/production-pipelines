@@ -5,16 +5,15 @@ jobs relating to the validation steps of the pipeline
 import json
 from csv import DictReader
 
-from hailtop.batch.job import Job
 from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
-from ..metamist import get_metamist, AnalysisStatus
-
-from cpg_workflows.workflow import SequencingGroup
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
+from cpg_workflows.workflow import SequencingGroup
 
+from ..metamist import AnalysisStatus, get_metamist
 
 SUMMARY_KEYS = {
     'TRUTH.TOTAL': 'true_variants',
@@ -63,7 +62,7 @@ def validation_mt_to_vcf_job(
     """
     from cpg_workflows.query_modules import validation
 
-    vcf_j = b.new_job(f'VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'})
+    vcf_j = b.new_job('VCF from dataset MT', (job_attrs or {}) | {'tool': 'hail query'})
     vcf_j.image(image_path('cpg_workflows'))
     vcf_j.command(
         query_command(
@@ -73,7 +72,7 @@ def validation_mt_to_vcf_job(
             sequencing_group_id,
             out_vcf_path,
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         vcf_j.depends_on(*depends_on)
@@ -154,7 +153,7 @@ def run_happy_on_vcf(
     if stratification := get_config()['references']['stratification']:
         strat_folder = to_path(stratification)
         strat_dict = {file.name: str(file) for file in strat_folder.glob('*')}
-        assert 'definition.tsv' in strat_dict, f'definition.tsv file does not exist'
+        assert 'definition.tsv' in strat_dict, 'definition.tsv file does not exist'
         batch_beds = b.read_input_group(**strat_dict)
         command += f'--stratification {batch_beds["definition.tsv"]}'
     # endregion

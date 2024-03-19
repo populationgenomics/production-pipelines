@@ -4,12 +4,11 @@ Run hap.py validation/concordance stats on a sample GVCF or joint VCF.
 
 import logging
 
-from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import ResourceGroup
 
-from cpg_utils.hail_batch import command
+from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
 

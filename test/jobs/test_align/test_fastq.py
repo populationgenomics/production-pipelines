@@ -3,28 +3,25 @@ Test the `align` function using a SequencingGroup with a FASTQ pair(s)
 alignment input.
 """
 
-from calendar import c
 import re
+from calendar import c
 from pathlib import Path
 from typing import Optional
 
 import pytest
 from pytest_mock import MockFixture
+
 from cpg_utils.config import ConfigError
 from cpg_workflows.filetypes import CramPath
-
-from cpg_workflows.jobs.align import Aligner, MarkDupTool, align
-from cpg_workflows.jobs.align import MissingAlignmentInputException
+from cpg_workflows.jobs.align import Aligner, MarkDupTool, MissingAlignmentInputException, align
 
 from ... import set_config
 from ...factories.alignment_input import create_fastq_pairs_input
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig
 from ...factories.sequencing_group import create_sequencing_group
-
 from ..helpers import get_command_str
-
-from .shared import select_jobs, default_config
+from .shared import default_config, select_jobs
 
 
 def setup_test(config: PipelineConfig, tmp_path: Path, num_pairs: Optional[int] = 1, create=False):
@@ -142,7 +139,7 @@ class TestDragmap:
                 'hash_table_cfg_bin': f'{file_location}hash_table.cfg.bin',
                 'hash_table_cmp': f'{file_location}hash_table.cmp',
                 'reference_bin': f'{file_location}reference.bin',
-            }
+            },
         )
 
 

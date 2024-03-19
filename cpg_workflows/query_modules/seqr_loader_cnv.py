@@ -10,12 +10,11 @@ import hail as hl
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.query_modules.seqr_loader_sv import (
+    download_gencode_gene_id_mapping,
     get_expr_for_xpos,
     parse_gtf_from_local,
-    download_gencode_gene_id_mapping,
 )
-from cpg_workflows.utils import read_hail, checkpoint_hail
-
+from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 GENE_SYMBOL = 'gene_symbol'
@@ -109,9 +108,9 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     mt = mt.annotate_rows(
         geneSymbols=hl.set(
             hl.filter(hl.is_defined, [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols]).flatmap(
-                lambda x: x
-            )
-        )
+                lambda x: x,
+            ),
+        ),
     )
 
     # overwrite symbols with ENSG IDs in these columns
@@ -119,7 +118,9 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     # with ENSGs from the jump, but this is all symbols
     for col_name in conseq_predicted_gene_cols:
         mt = mt.annotate_rows(
-            info=mt.info.annotate(**{col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])})
+            info=mt.info.annotate(
+                **{col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])},
+            ),
         )
 
     mt = mt.annotate_rows(
@@ -127,8 +128,8 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
         variantId=hl.format(f'%s_%s_{datetime.date.today():%m%d%Y}', mt.rsid, mt.svType),
         geneIds=hl.set(
             hl.filter(hl.is_defined, [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols]).flatmap(
-                lambda x: x
-            )
+                lambda x: x,
+            ),
         ),
     )
 
@@ -148,7 +149,7 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
                 ),
             ),
             mt.geneIds,
-        )
+        ),
     )
 
     # transcriptConsequenceTerms
@@ -156,9 +157,9 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     gene_major_consequences = hl.array(
         hl.set(
             mt.sortedTranscriptConsequences.filter(lambda x: hl.is_defined(x.major_consequence)).map(
-                lambda x: x.major_consequence
-            )
-        )
+                lambda x: x.major_consequence,
+            ),
+        ),
     )
     mt = mt.annotate_rows(
         transcriptConsequenceTerms=gene_major_consequences.extend(default_consequences),
@@ -194,8 +195,8 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
                 start=mt.start,
                 geneIds=mt.geneIds,
                 gt=mt.GT,
-            )
-        )
+            ),
+        ),
     )
 
     def _genotype_filter_samples(fn):
@@ -262,8 +263,8 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
                 num_exon=mt.NP,
                 start=mt.start,
                 geneIds=mt.geneIds,
-            )
-        )
+            ),
+        ),
     )
     logging.info('Genotype fields annotated')
     mt.describe()

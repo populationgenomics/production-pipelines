@@ -2,9 +2,9 @@ import re
 from typing import Literal
 
 import pytest
-from cpg_utils import Path
 from pytest_mock import MockFixture
 
+from cpg_utils import Path
 from cpg_workflows.jobs.verifybamid import verifybamid
 
 from .. import set_config
@@ -35,7 +35,7 @@ def default_config() -> PipelineConfig:
                 'exome_contam_ud': 'test_exome_ud.ud',
                 'exome_contam_bed': 'test_exome_bed.bed',
                 'exome_contam_mu': 'test_exome_mu.mu',
-            }
+            },
         },
         other={'cramqc': {'num_pcs': '4'}},
     )
@@ -213,7 +213,9 @@ class TestVerifyBAMID:
 
     @pytest.mark.parametrize('sequencing_type', ['exome', 'genome'])
     def test_extra_opts_changes_according_to_sequencing_type(
-        self, tmp_path: Path, sequencing_type: Literal['exome', 'genome']
+        self,
+        tmp_path: Path,
+        sequencing_type: Literal['exome', 'genome'],
     ):
         config = default_config()
         config.workflow.sequencing_type = sequencing_type

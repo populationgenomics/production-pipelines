@@ -5,8 +5,9 @@ Test seqr-loader workflow.
 from pathlib import Path
 from unittest.mock import mock_open
 
-from cpg_utils import to_path
 from pytest_mock import MockFixture
+
+from cpg_utils import to_path
 
 from . import set_config
 
@@ -145,8 +146,8 @@ def _mock_cohort():
                         'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
                         'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
                     ),
-                ]
-            )
+                ],
+            ),
         },
     )
     return cohort

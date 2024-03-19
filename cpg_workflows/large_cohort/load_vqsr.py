@@ -1,5 +1,6 @@
-import hail as hl
 import logging
+
+import hail as hl
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import genome_build

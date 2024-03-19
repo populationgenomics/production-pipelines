@@ -5,11 +5,11 @@ Trim raw FASTQ reads using cutadapt
 from dataclasses import dataclass
 from enum import Enum
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import Batch, command, image_path
 from cpg_workflows.filetypes import FastqPair
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
@@ -99,7 +99,7 @@ class Cutadapt:
                     str(output_fastq_pair.r2),
                     '-A',
                     adapters.r2.sequence,
-                ]
+                ],
             )
         if quality_trim:
             if two_colour:
@@ -163,7 +163,7 @@ class Fastp:
                     str(output_fastq_pair.r2),
                     '--adapter_sequence_r2',
                     adapters.r2.sequence,
-                ]
+                ],
             )
         if not polyG:
             self.command.append('--disable_trim_poly_g')
@@ -201,7 +201,7 @@ def trim(
     if not get_config()['workflow']['sequencing_type'] == 'transcriptome':
         raise InvalidSequencingTypeException(
             f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'"
-            + f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'"
+            + f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'",
         )
 
     try:

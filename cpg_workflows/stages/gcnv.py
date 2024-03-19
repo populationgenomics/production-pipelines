@@ -2,8 +2,8 @@
 Stages that implement GATK-gCNV.
 """
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
@@ -13,16 +13,16 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     queue_annotate_sv_jobs,
 )
-from cpg_workflows.targets import SequencingGroup, Cohort
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     CohortStage,
     Dataset,
     DatasetStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_workflow,
+    stage,
 )
 
 
@@ -229,7 +229,7 @@ class GCNVJointSegmentation(CohortStage):
         GermlineCNV,
         GermlineCNVCalls,
         DeterminePloidy,
-    ]
+    ],
 )
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
@@ -399,7 +399,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
             output_vcf={
                 'vcf.bgz': '{root}.vcf.bgz',
                 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            }
+            },
         )
 
         # run strvctvre
@@ -440,7 +440,7 @@ class AnnotateCohortgCNV(CohortStage):
         vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
 
         checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        j = get_batch().new_job(f'annotate gCNV cohort', self.get_job_attrs(cohort))
+        j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -450,7 +450,7 @@ class AnnotateCohortgCNV(CohortStage):
                 str(self.expected_outputs(cohort)['mt']),
                 str(checkpoint_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
 
         # todo is this necessary?
@@ -555,7 +555,7 @@ class MtToEsCNV(DatasetStage):
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         from analysis_runner import dataproc

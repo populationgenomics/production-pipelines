@@ -5,19 +5,19 @@ Align RNA-seq reads to the genome using STAR.
 import re
 
 import hailtop.batch as hb
-from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch.job import Job
 
+from cpg_utils import Path, to_path
+from cpg_utils.hail_batch import Batch, command, image_path
 from cpg_workflows.filetypes import (
-    FastqPair,
-    FastqPairs,
     BamPath,
     CramPath,
+    FastqPair,
+    FastqPairs,
 )
 from cpg_workflows.jobs.bam_to_cram import bam_to_cram
 from cpg_workflows.jobs.markdups import markdup
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import can_reuse
 
 
@@ -81,7 +81,7 @@ class STAR:
                 '--readFilesIn',
                 str(input_fastq_pair.r1),
                 str(input_fastq_pair.r2),
-            ]
+            ],
         )
         if output_path and not stdout:
             self.move_output_command = f'\n\nmv {self.output} {output_path}'
@@ -350,7 +350,7 @@ def sort_index_bam(
         sorted_bam={
             'bam': '{root}.bam',
             'bam.bai': '{root}.bam.bai',
-        }
+        },
     )
 
     cmd = f'samtools sort -@ {res.get_nthreads() - 1} {input_bam} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'

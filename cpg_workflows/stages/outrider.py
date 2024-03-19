@@ -3,16 +3,15 @@ Perform outlier gene expression analysis with Outrider.
 """
 
 from cpg_utils import Path
-
 from cpg_workflows import get_batch
 from cpg_workflows.jobs import outrider
 from cpg_workflows.stages.count import Count
 from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
     Cohort,
     CohortStage,
+    StageInput,
+    StageOutput,
+    stage,
 )
 
 

@@ -13,7 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.hail_batch import get_batch, get_config, image_path
 from metamist import models
 from metamist.apis import AnalysisApi
-from metamist.graphql import query, gql
+from metamist.graphql import gql, query
 
 FIND_CRAMS = gql(
     """
@@ -31,7 +31,7 @@ query CramQuery($project: String!) {
     }
   }
 }
-"""
+""",
 )
 
 
@@ -107,7 +107,7 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
                 new_line, new_len = translate[field['SN']]
                 if field['LN'] != new_len:
                     raise ValueError(
-                        f'{incram}:{field["SN"]}: new length {new_len} differs ' f'from existing {field["LN"]}'
+                        f'{incram}:{field["SN"]}: new length {new_len} differs ' f'from existing {field["LN"]}',
                     )
                 print(new_line, file=newhdr)
             else:
@@ -155,10 +155,18 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
 @click.command()
 @click.argument('source', nargs=-1)
 @click.option(
-    '--ref', 'new_reference_path', required=True, metavar='GCS_PATH', help='Dict file containing the new @SQ headers'
+    '--ref',
+    'new_reference_path',
+    required=True,
+    metavar='GCS_PATH',
+    help='Dict file containing the new @SQ headers',
 )
 @click.option(
-    '--expected', 'expected_refset', required=True, metavar='NAME', help='KNOWN_REFS name of the (bad) refset expected'
+    '--expected',
+    'expected_refset',
+    required=True,
+    metavar='NAME',
+    help='KNOWN_REFS name of the (bad) refset expected',
 )
 @click.option('--intended', 'new_refset', metavar='NAME', help='KNOWN_REFS name of the replacement headers')
 @click.option('--dry-run', is_flag=True, help='Display information only without making changes')

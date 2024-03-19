@@ -5,8 +5,9 @@ Functions to set up Hail Batch resources (cores, memory, storage).
 import math
 from dataclasses import dataclass
 
-from cpg_utils.config import get_config
 from hailtop.batch.job import Job
+
+from cpg_utils.config import get_config
 
 
 def _is_power_of_two(n: int) -> bool:
@@ -115,7 +116,7 @@ class MachineType:
                     self.mem_gb_to_ncpu(mem_gb) if mem_gb else None,
                     self.storage_gb_to_ncpu(storage_gb) if storage_gb else None,
                 ],
-            )
+            ),
         )
         return JobResource(
             machine_type=self,
@@ -224,7 +225,7 @@ class JobResource:
             if ncpu > self.machine_type.max_ncpu:
                 raise ValueError(
                     f'Max number of CPU on machine {self.machine_type.name} '
-                    f'is {self.machine_type.max_ncpu}, requested {ncpu}'
+                    f'is {self.machine_type.max_ncpu}, requested {ncpu}',
                 )
             self.fraction_of_full = ncpu / self.machine_type.max_ncpu
 
@@ -234,7 +235,7 @@ class JobResource:
                 raise ValueError(
                     f'Storage can be overridden only when the entire machine is used, '
                     f'not a fraction ({self.fraction_of_full}). '
-                    f'override_storage_gb={attach_disk_storage_gb}'
+                    f'override_storage_gb={attach_disk_storage_gb}',
                 )
             self.attach_disk_storage_gb = attach_disk_storage_gb
 

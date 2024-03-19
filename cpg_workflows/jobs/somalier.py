@@ -5,6 +5,10 @@ Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 from typing import cast
 
 import pandas as pd
+
+from hailtop.batch import Batch, Resource
+from hailtop.batch.job import Job
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
@@ -14,9 +18,6 @@ from cpg_utils.hail_batch import (
     image_path,
     reference_path,
 )
-from hailtop.batch import Batch, Resource
-from hailtop.batch.job import Job
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
 from cpg_workflows.resources import STANDARD
@@ -150,7 +151,7 @@ def _check_pedigree(
             cmd,
             python_script_path=script_path,
             setup_gcp=True,
-        )
+        ),
     )
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))

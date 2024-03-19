@@ -9,17 +9,15 @@ from pathlib import Path
 
 import pytest
 from pytest_mock import MockFixture
-from cpg_workflows.filetypes import CramPath
 
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs.align import MarkDupTool, align
 
 from ...factories.config import PipelineConfig
-
 from ..helpers import get_command_str
-
-from .shared import select_jobs, default_config
-from .test_fastq import setup_test as setup_fastq_test
+from .shared import default_config, select_jobs
 from .test_bam_cram import setup_test as setup_bam_cram_test
+from .test_fastq import setup_test as setup_fastq_test
 
 
 def setup_test(config: PipelineConfig, tmp_path: Path, input_type: str, **kwargs):

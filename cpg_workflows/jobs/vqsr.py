@@ -15,10 +15,10 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, image_path, command
-from cpg_workflows.resources import STANDARD, HIGHMEM, joint_calling_scatter_count
+from cpg_utils.hail_batch import command, image_path, reference_path
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
+from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
 
 STANDARD_FEATURES = [
@@ -144,7 +144,7 @@ def make_vqsr_jobs(
         **{
             'vcf.gz': str(input_siteonly_vcf_path),
             'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        }
+        },
     )
 
     indel_recal_path = tmp_prefix / 'indel_recalibrations'
@@ -211,7 +211,7 @@ def make_vqsr_jobs(
                 snps_recal_paths[idx],
                 str(snps_recal_paths[idx]) + '.idx',
                 snps_tranches_paths[idx],
-            ]
+            ],
         ):
             snps_recal_j = snps_recalibrator_scattered(
                 b,
@@ -259,7 +259,7 @@ def make_vqsr_jobs(
             [
                 interval_snps_applied_vcf_paths[idx],
                 to_path(str(interval_snps_applied_vcf_paths[idx]) + '.tbi'),
-            ]
+            ],
         ):
             j = apply_recalibration_snps(
                 b,
@@ -283,7 +283,7 @@ def make_vqsr_jobs(
             **{
                 'vcf.gz': str(p),
                 'vcf.gz.tbi': str(p) + '.tbi',
-            }
+            },
         )
         for p in interval_snps_applied_vcf_paths
     ]
@@ -305,7 +305,7 @@ def make_vqsr_jobs(
         **{
             'vcf.gz': str(gathered_vcf_path),
             'vcf.gz.tbi': f'{gathered_vcf_path}.tbi',
-        }
+        },
     )
 
     apply_indel_j = apply_recalibration_indels(
@@ -349,8 +349,8 @@ def add_tabix_job(
             f"""\
     gunzip {vcf_inp} -c | bgzip -c > {j.output_vcf['vcf.gz']}
     tabix -p vcf {j.output_vcf['vcf.gz']}
-    """
-        )
+    """,
+        ),
     )
     return j
 
@@ -393,7 +393,7 @@ def indel_recalibrator_job(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in INDEL_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [f'-an {v}' for v in (INDEL_ALLELE_SPECIFIC_FEATURES if use_as_annotations else INDEL_STANDARD_FEATURES)]
+        [f'-an {v}' for v in (INDEL_ALLELE_SPECIFIC_FEATURES if use_as_annotations else INDEL_STANDARD_FEATURES)],
     )
     j.command(
         f"""set -euo pipefail
@@ -417,7 +417,7 @@ def indel_recalibrator_job(
       -resource:dbsnp,known=true,training=false,truth=false,prior=2 {dbsnp_resource_vcf.base}
 
     mv {j.recalibration}.idx {j.recalibration_idx}
-    """
+    """,
     )
     return j
 
@@ -474,7 +474,7 @@ def snps_recalibrator_create_model_job(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)],
     )
     j.command(
         f"""set -euo pipefail
@@ -499,7 +499,7 @@ def snps_recalibrator_create_model_job(
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
       -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
-      """
+      """,
     )
     return j
 
@@ -550,7 +550,7 @@ def snps_recalibrator_scattered(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)],
     )
     j.command(
         f"""set -euo pipefail
@@ -579,7 +579,7 @@ def snps_recalibrator_scattered(
       -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
 
     mv {j.recalibration}.idx {j.recalibration_idx}
-    """
+    """,
     )
     return j
 
@@ -619,7 +619,7 @@ def snps_recalibrator_job(
 
     tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
     an_cmdl = ' '.join(
-        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)]
+        [f'-an {v}' for v in (SNP_ALLELE_SPECIFIC_FEATURES if use_as_annotations else SNP_STANDARD_FEATURES)],
     )
     j.command(
         f"""set -euo pipefail
@@ -642,7 +642,7 @@ def snps_recalibrator_job(
       -resource:omni,known=false,training=true,truth=true,prior=12 {omni_resource_vcf.base} \\
       -resource:1000G,known=false,training=true,truth=false,prior=10 {one_thousand_genomes_resource_vcf.base} \\
       -resource:dbsnp,known=true,training=false,truth=false,prior=7 {dbsnp_resource_vcf.base}
-      """
+      """,
     )
     return j
 
@@ -681,7 +681,7 @@ def snps_gather_tranches_job(
       GatherTranches \\
       --mode SNP \\
       {inputs_cmdl} \\
-      --output {j.out_tranches}"""
+      --output {j.out_tranches}""",
     )
     return j
 
@@ -784,7 +784,7 @@ def apply_recalibration_indels(
         output_vcf={
             'vcf.gz': '{root}.vcf.gz',
             'vcf.gz.tbi': '{root}.vcf.gz.tbi',
-        }
+        },
     )
     assert isinstance(j.output_vcf, hb.ResourceGroup)
 

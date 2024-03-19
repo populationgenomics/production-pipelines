@@ -1,6 +1,6 @@
 from cloudpathlib import CloudPath
-from cpg_utils import Path, to_path
 
+from cpg_utils import Path, to_path
 from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs
 
 # TODO: Support writing contents to file?
@@ -113,7 +113,7 @@ def create_fastq_pairs_input(
                 prefix=f'{prefix}_L{i+1}',
                 gzipped=gzipped,
                 create=create,
-            )
+            ),
         )
 
     return pairs

@@ -1,9 +1,9 @@
 import re
 
 import pytest
-from cpg_utils import Path
 from pytest_mock import MockFixture
 
+from cpg_utils import Path
 from cpg_workflows.jobs.somalier import extract
 
 from ... import set_config
@@ -104,7 +104,10 @@ class TestSomalierExtract:
         ],
     )
     def test_sets_supplied_job_attrs_or_sets_default_attrs_if_attrs_not_supplied(
-        self, tmp_path: Path, job_attrs, expected_attrs
+        self,
+        tmp_path: Path,
+        job_attrs,
+        expected_attrs,
     ):
         _, cram_pth, batch = setup_test(tmp_path)
 

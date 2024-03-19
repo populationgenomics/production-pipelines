@@ -9,7 +9,6 @@ from typing import Any, Callable, Optional
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
@@ -88,14 +87,14 @@ def qc_functions() -> list[Qc]:
             Qc(
                 func=picard_wgs_metrics,
                 outs={'picard_wgs_metrics': QcOut('.picard-wgs-metrics', 'picard/wgs_metrics')},
-            )
+            ),
         )
     if sequencing_type == 'exome':
         qcs.append(
             Qc(
                 func=picard_hs_metrics,
                 outs={'picard_hs_metrics': QcOut('.picard-hs-metrics', 'picard/hsmetrics')},
-            )
+            ),
         )
     return qcs
 
@@ -180,7 +179,7 @@ class SomalierPedigree(DatasetStage):
                 if not exists(verify_bamid_path):
                     logging.warning(
                         f'VerifyBAMID results {verify_bamid_path} do not exist for '
-                        f'{sequencing_group}, somalier pedigree estimations might be affected'
+                        f'{sequencing_group}, somalier pedigree estimations might be affected',
                     )
                 else:
                     verifybamid_by_sgid[sequencing_group.id] = verify_bamid_path
@@ -294,7 +293,7 @@ class CramMultiQC(DatasetStage):
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
                             f'Output CramQc/"{key}" not found for {sequencing_group}, '
-                            f'it will be silently excluded from MultiQC'
+                            f'it will be silently excluded from MultiQC',
                         )
                         continue
                     modules_to_trim_endings.add(out.multiqc_key)

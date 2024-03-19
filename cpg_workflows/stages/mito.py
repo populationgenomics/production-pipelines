@@ -7,11 +7,11 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 """
 
 import hailtop.batch as hb
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reference_path
-from hailtop.batch.job import Job
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align

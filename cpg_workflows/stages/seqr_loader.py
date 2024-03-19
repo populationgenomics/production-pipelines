@@ -5,25 +5,24 @@ Hail Query stages for the Seqr loader workflow.
 """
 from typing import Any
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
-
 from cpg_workflows.jobs.seqr_loader import (
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     Cohort,
     CohortStage,
     Dataset,
     DatasetStage,
     StageInput,
     StageOutput,
+    get_workflow,
+    stage,
 )
 
 from .. import get_batch
@@ -58,7 +57,7 @@ class AnnotateCohort(CohortStage):
         vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
 
         checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        j = get_batch().new_job(f'annotate cohort', self.get_job_attrs(cohort))
+        j = get_batch().new_job('annotate cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -70,7 +69,7 @@ class AnnotateCohort(CohortStage):
                 str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
                 str(checkpoint_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
         if depends_on := inputs.get_jobs(cohort):
             j.depends_on(*depends_on)
@@ -263,7 +262,7 @@ class MtToEs(DatasetStage):
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         # Importing this requires CPG_CONFIG_PATH to be already set, that's why

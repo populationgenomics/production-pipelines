@@ -8,7 +8,6 @@ from typing import Any
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.multiqc import multiqc
@@ -165,7 +164,7 @@ class GvcfMultiQC(DatasetStage):
                     if _stage != GvcfHappy:
                         logging.warning(
                             f'Output {_stage.__name__}/"{key}" not found for {sequencing_group}, '
-                            f'it will be silently excluded from MultiQC'
+                            f'it will be silently excluded from MultiQC',
                         )
                 else:
                     paths.append(path)

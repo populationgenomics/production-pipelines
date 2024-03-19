@@ -2,8 +2,8 @@
 Test GATK-SV accessory functions.
 """
 
-import pytest
 import pandas as pd
+import pytest
 
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs

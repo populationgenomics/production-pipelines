@@ -3,6 +3,7 @@ takes a Pedigree file, generates a Ploidy file from it
 """
 
 from collections import defaultdict
+
 from cpg_utils import to_path
 
 

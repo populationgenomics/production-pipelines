@@ -12,8 +12,8 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, image_path, query_command
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
-from cpg_workflows.utils import can_reuse, chunks
 from cpg_workflows.resources import HIGHMEM
+from cpg_workflows.utils import can_reuse, chunks
 
 
 def prepare_intervals(
@@ -89,7 +89,7 @@ def collect_read_counts(
         counts={
             'counts.tsv.gz': '{root}.counts.tsv.gz',
             'counts.tsv.gz.tbi': '{root}.counts.tsv.gz.tbi',
-        }
+        },
     )
 
     assert isinstance(j.counts, ResourceGroup)
@@ -122,7 +122,7 @@ def _counts_input_args(counts_paths: Iterable[Path]) -> str:
             **{
                 'counts.tsv.gz': str(f),
                 'counts.tsv.gz.tbi': str(f) + '.tbi',
-            }
+            },
         )
         args += f' --input {counts["counts.tsv.gz"]}'
 
@@ -334,7 +334,7 @@ def postprocess_calls(
             'segments.vcf.gz': '{root}/segments.vcf.gz',
             'segments.vcf.gz.tbi': '{root}/segments.vcf.gz.tbi',
             'ratios.tsv': '{root}/ratios.tsv',
-        }
+        },
     )
 
     extra_args = ''
@@ -360,7 +360,7 @@ def postprocess_calls(
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
       --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
       {extra_args}
-    """
+    """,
     )
 
     # index the output VCFs - GATK does this already?
@@ -369,7 +369,7 @@ def postprocess_calls(
         f"""
     tabix -f {j.output['intervals.vcf.gz']}
     tabix -f {j.output['segments.vcf.gz']}
-    """
+    """,
     )
 
     if clustered_vcf:
@@ -391,7 +391,7 @@ def postprocess_calls(
         else
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
-        """
+        """,
         )
         get_batch().write_output(j.qc_file, qc_file)
 
@@ -441,7 +441,7 @@ def joint_segment_vcfs(
         {vcf_string} \\
         --model-call-intervals {intervals} \\
         -ped {pedigree}
-    """
+    """,
     )
     return job, job.output
 
@@ -509,7 +509,7 @@ def run_joint_segmentation(
         pedigree=pedigree_in_batch,
         reference=reference,
         intervals=intervals_in_batch,
-        job_attrs=job_attrs or {} | {'title': f'all-chunks'},
+        job_attrs=job_attrs or {} | {'title': 'all-chunks'},
         title='all-chunks',
     )
     jobs.append(job)
@@ -550,8 +550,8 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
                 **{
                     'vcf.gz': each_vcf,
                     'vcf.gz.tbi': f'{each_vcf}.tbi',
-                }
-            )['vcf.gz']
+                },
+            )['vcf.gz'],
         )
 
     # option breakdown:
@@ -670,7 +670,7 @@ def annotate_dataset_jobs_cnv(
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
     subset_j: Job | None = None
     if not subset_mt_path.exists():
-        subset_j = get_batch().new_job(f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
+        subset_j = get_batch().new_job('subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
         subset_j.image(image_path('cpg_workflows'))
         subset_j.command(
             query_command(
@@ -680,12 +680,12 @@ def annotate_dataset_jobs_cnv(
                 sgids,
                 str(subset_mt_path),
                 setup_gcp=True,
-            )
+            ),
         )
         if depends_on:
             subset_j.depends_on(*depends_on)
 
-    annotate_j = get_batch().new_job(f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
+    annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))
     annotate_j.command(
         query_command(
@@ -694,7 +694,7 @@ def annotate_dataset_jobs_cnv(
             str(subset_mt_path),
             str(out_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     if subset_j:
         annotate_j.depends_on(subset_j)

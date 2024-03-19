@@ -4,19 +4,19 @@ Perform aberrant splicing analysis with FRASER.
 
 from cpg_utils import Path
 from cpg_workflows import get_batch
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    Cohort,
-    CohortStage,
-)
 from cpg_workflows.filetypes import (
     BamPath,
     CramPath,
 )
-from cpg_workflows.stages.trim_align import TrimAlignRNA
 from cpg_workflows.jobs import fraser
+from cpg_workflows.stages.trim_align import TrimAlignRNA
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    StageInput,
+    StageOutput,
+    stage,
+)
 
 
 @stage(

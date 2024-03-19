@@ -2,14 +2,13 @@
 extract from Broad sample batching script for GATK-SV
 """
 
-import logging
 import json
+import logging
 
 import numpy as np
 import pandas as pd
 
 from cpg_utils import to_path
-
 
 SEX_VALS = {'male', 'female'}
 
@@ -66,7 +65,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
                 'mf_ratio': is_male.sum() / is_female.sum(),
                 'size': n_sg,
                 'coverage_medians': md.median_coverage.tolist(),
-            }
+            },
         ]
 
     # start with a single bin and work upwards
@@ -86,7 +85,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     Total sequencing_groups: {n_sg}
     Num. bins: {cov_bins}
     Approx sequencing groups per batch: {n_per_batch}
-"""
+""",
     )
 
     # Split sequencing groups by sex, then roughly by coverage
@@ -108,7 +107,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
                 'size': len(sample_ids),
                 'mf_ratio': len(md_sex_cov['male'][cov]) or 1 / len(md_sex_cov['female'][cov]) or 1,
                 'coverage_medians': sample_ids.median_coverage.tolist(),
-            }
+            },
         )
 
     return batches

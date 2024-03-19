@@ -21,10 +21,12 @@ from typing import Callable, Generic, Optional, Sequence, Type, TypeVar, Union, 
 
 import networkx as nx
 from cloudpathlib import CloudPath
+
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
-from hailtop.batch.job import Job
 
 from .inputs import get_cohort
 from .status import MetamistStatusReporter
@@ -227,7 +229,7 @@ class StageInput:
                 f'{self.stage.name}: getting inputs from stage {stage.__name__}, '
                 f'but {stage.__name__} is not listed in required_stages. '
                 f'Consider adding it into the decorator: '
-                f'@stage(required_stages=[{stage.__name__}])'
+                f'@stage(required_stages=[{stage.__name__}])',
             )
 
         if stage.__name__ not in self._outputs_by_target_by_stage:
@@ -239,7 +241,7 @@ class StageInput:
                     'stages, and consider changing `workflow/first_stage`'
                     if get_config()['workflow'].get('skip_sgs_with_missing_input')
                     else ''
-                )
+                ),
             )
 
         return {trg: fun(result) for trg, result in self._outputs_by_target_by_stage.get(stage.__name__, {}).items()}
@@ -278,11 +280,11 @@ class StageInput:
             raise StageInputNotFoundError(
                 f'Not found output from stage {stage.__name__}, required for stage '
                 f'{self.stage.name}. Is {stage.__name__} in the `required_stages`'
-                f'decorator? Available: {self._outputs_by_target_by_stage}'
+                f'decorator? Available: {self._outputs_by_target_by_stage}',
             )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFoundError(
-                f'Not found output for {target} from stage {stage.__name__}, required ' f'for stage {self.stage.name}'
+                f'Not found output for {target} from stage {stage.__name__}, required ' f'for stage {self.stage.name}',
             )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
@@ -541,13 +543,13 @@ class Stage(Generic[TargetT], ABC):
                     raise WorkflowError(
                         f'Cannot create Analysis: `analysis_keys` '
                         f'must be set with the @stage decorator to select value from '
-                        f'the expected_outputs dict: {outputs.data}'
+                        f'the expected_outputs dict: {outputs.data}',
                     )
                 if not all(key in outputs.data for key in self.analysis_keys):
                     raise WorkflowError(
                         f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
                         f'"{self.analysis_keys}" is not a subset of the expected_outputs '
-                        f'keys {outputs.data.keys()}'
+                        f'keys {outputs.data.keys()}',
                     )
 
                 for analysis_key in self.analysis_keys:
@@ -621,7 +623,7 @@ class Stage(Generic[TargetT], ABC):
                     f'but is marked as "skipped", '
                     f'workflow/skip_sgs_with_missing_input=true '
                     f'and some expected outputs for the target do not exist: '
-                    f'{first_missing_path}'
+                    f'{first_missing_path}',
                 )
                 # `workflow/skip_sgs_with_missing_input` means that we can ignore
                 # sgs/datasets that have missing results from skipped stages.
@@ -633,20 +635,20 @@ class Stage(Generic[TargetT], ABC):
                 logging.info(
                     f'{self.name}: {target} [REUSE] (stage is skipped, some outputs are'
                     f'missing, but stage is listed in '
-                    f'workflow/allow_missing_outputs_for_stages)'
+                    f'workflow/allow_missing_outputs_for_stages)',
                 )
                 return Action.REUSE
             else:
                 raise WorkflowError(
                     f'{self.name}: stage is required, but is skipped, and '
                     f'the following expected outputs for target {target} do not exist: '
-                    f'{first_missing_path}'
+                    f'{first_missing_path}',
                 )
 
         if reusable and not first_missing_path:
             if target.forced:
                 logging.info(
-                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target ' f'to rerun this stage)'
+                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target ' f'to rerun this stage)',
                 )
                 return Action.QUEUE
             elif self.forced:
@@ -955,7 +957,7 @@ class Workflow:
                     raise WorkflowError(
                         f'Value in workflow/{param} "{_s_name}" must be a stage name '
                         f'or a subset of stages from the available list: '
-                        f'{", ".join(stage_names)}'
+                        f'{", ".join(stage_names)}',
                     )
 
         if not (last_stages or first_stages):
@@ -977,7 +979,7 @@ class Workflow:
                     if not stages_d[grand_descendant].assume_outputs_exist:
                         logging.info(
                             f'Not checking expected outputs of not immediately '
-                            f'required stage {grand_descendant} (< {descendant} < {fs})'
+                            f'required stage {grand_descendant} (< {descendant} < {fs})',
                         )
                         stages_d[grand_descendant].assume_outputs_exist = True
 
@@ -1020,7 +1022,7 @@ class Workflow:
                 raise WorkflowError(
                     f'Value in workflow/only_stages "{s_name}" must be a stage '
                     f'name or a subset of stages from the available list: '
-                    f'{", ".join(stage_names)}'
+                    f'{", ".join(stage_names)}',
                 )
 
         # We want to run stages only appearing in only_stages, and check outputs of
@@ -1059,7 +1061,7 @@ class Workflow:
         if only_stages and (first_stages or last_stages or skip_stages):
             raise WorkflowError(
                 "Workflow config parameter 'only_stages' is incompatible with "
-                + "'first_stages', 'last_stages' and/or 'skip_stages'"
+                + "'first_stages', 'last_stages' and/or 'skip_stages'",
             )
 
         logging.info(f'End stages for the workflow "{self.name}": ' f'{[cls.__name__ for cls in requested_stages]}')
@@ -1195,7 +1197,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
                 f'`workflow.input_datasets` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`'
+                f'via workflow.skip_datasets`',
             )
             return output_by_target
         if not cohort.get_sequencing_groups():
@@ -1205,7 +1207,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'usable (active=True) sequencing groups found. Check logs above for '
                 f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                 f'via `workflow.skip_sgs` in config, or they all missing stage '
-                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
+                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
             )
             return output_by_target
 
@@ -1218,7 +1220,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                     f'usable (active=True) sequencing groups found. Check logs above for '
                     f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                     f'via `workflow.skip_sgs` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
+                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
                 )
                 continue
 
@@ -1267,7 +1269,7 @@ class DatasetStage(Stage, ABC):
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
                 f'`workflow.input_datasets` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`'
+                f'via workflow.skip_datasets`',
             )
             return output_by_target
         for dataset_i, dataset in enumerate(datasets):

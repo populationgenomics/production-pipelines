@@ -5,17 +5,16 @@ Batch jobs to run MultiQC.
 """
 from typing import cast
 
-from cpg_utils.config import get_config
-from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
+from hailtop.batch.job import Job
 
-from cpg_utils import to_path
-from cpg_utils.hail_batch import image_path, copy_common_env, command
-from cpg_utils import Path
+from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, copy_common_env, image_path
+from cpg_workflows.python_scripts import check_multiqc
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import rich_sequencing_group_id_seds
-from cpg_workflows.python_scripts import check_multiqc
 
 
 def multiqc(
@@ -172,7 +171,7 @@ def check_report_job(
             cmd,
             python_script_path=script_path,
             setup_gcp=True,
-        )
+        ),
     )
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))

@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group, command
+from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 
@@ -49,7 +49,7 @@ def subset_vcf(
         command(
             cmd,
             monitor_space=True,
-        )
+        ),
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
@@ -123,7 +123,7 @@ def gather_vcfs(
                     job_attrs=job_attrs,
                     sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
-                )
+                ),
             )
         else:
             jobs.append(
@@ -134,7 +134,7 @@ def gather_vcfs(
                     job_attrs=job_attrs,
                     sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
-                )
+                ),
             )
     return [j for j in jobs if j is not None]
 

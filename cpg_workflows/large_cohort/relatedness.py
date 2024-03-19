@@ -1,5 +1,7 @@
 import logging
+
 import hail as hl
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
@@ -92,11 +94,11 @@ def flag_related(
     @param tmp_prefix: path for temporary files.
     @return: table of samples to drop, ordered by rank.
     """
-    logging.info(f'Flagging related samples to drop')
+    logging.info('Flagging related samples to drop')
     if can_reuse(out_relateds_to_drop_ht_path):
         return hl.read_table(str(out_relateds_to_drop_ht_path))
 
-    rankings_ht_path = tmp_prefix / 'relatedness' / f'samples_rankings.ht'
+    rankings_ht_path = tmp_prefix / 'relatedness' / 'samples_rankings.ht'
     if can_reuse(rankings_ht_path):
         rank_ht = hl.read_table(str(rankings_ht_path))
     else:

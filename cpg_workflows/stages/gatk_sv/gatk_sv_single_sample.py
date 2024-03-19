@@ -8,7 +8,6 @@ from typing import Any
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
@@ -105,7 +104,7 @@ class GatherSampleEvidence(SequencingGroupStage):
                 'gatk_docker_pesr_override',
                 'genomes_in_the_cloud_docker',
                 'cloud_sdk_docker',
-            ]
+            ],
         )
         input_dict |= get_references(
             [
@@ -115,7 +114,7 @@ class GatherSampleEvidence(SequencingGroupStage):
                 'manta_region_bed',
                 'wham_include_list_bed_file',
                 {'sd_locs_vcf': 'dbsnp_vcf'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(sequencing_group)
@@ -193,7 +192,7 @@ class EvidenceQC(CohortStage):
                 'sv_base_docker',
                 'sv_pipeline_docker',
                 'sv_pipeline_qc_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])

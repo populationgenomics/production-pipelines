@@ -12,11 +12,11 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, reference_path, query_command
+from cpg_utils.hail_batch import image_path, query_command, reference_path
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
-from cpg_workflows.utils import can_reuse
 from cpg_workflows.query_modules import vep
+from cpg_workflows.utils import can_reuse
 
 
 def add_vep_jobs(
@@ -44,7 +44,7 @@ def add_vep_jobs(
         **{
             'vcf.gz': str(input_siteonly_vcf_path),
             'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        }
+        },
     )
 
     input_vcf_parts: list[hb.ResourceGroup] = []
@@ -150,7 +150,7 @@ def gather_vep_json_to_ht(
             str(out_path),
             vep_version,
             setup_gcp=True,
-        )
+        ),
     )
     return j
 

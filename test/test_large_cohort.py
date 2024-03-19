@@ -6,11 +6,11 @@ import os
 from os.path import exists
 from pathlib import Path
 
+from pytest_mock import MockFixture
+
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
 from cpg_utils.hail_batch import start_query_context
-from pytest_mock import MockFixture
-
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.large_cohort import (
     ancestry_pca,
@@ -26,7 +26,6 @@ from cpg_workflows.targets import Cohort
 from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
 from .factories.types import SequencingType
-
 
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'

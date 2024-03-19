@@ -7,9 +7,9 @@ to be used in generating capture-specific batch config files
 """
 
 
-from metamist.graphql import gql, query
 import toml
 
+from metamist.graphql import gql, query
 
 meta_query = gql(
     """
@@ -26,7 +26,7 @@ query SampleMetaQuery($name: String!) {
       }
     }
   }
-}"""
+}""",
 )
 
 

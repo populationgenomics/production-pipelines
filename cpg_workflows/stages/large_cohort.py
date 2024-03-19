@@ -1,7 +1,6 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, query_command
-
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
@@ -62,7 +61,7 @@ class SampleQC(CohortStage):
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
@@ -85,7 +84,7 @@ class DenseSubset(CohortStage):
                 str(inputs.as_path(cohort, Combiner)),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
-            )
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 

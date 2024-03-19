@@ -7,15 +7,14 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import (
     HIGHMEM,
     STANDARD,
     storage_for_cram_qc_job,
     storage_for_joint_vcf,
 )
-from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse, exists
 
 
@@ -151,7 +150,7 @@ def markdup(
         output_cram={
             'cram': '{root}.cram',
             'cram.crai': '{root}.cram.crai',
-        }
+        },
     )
 
     if fasta_reference is None:

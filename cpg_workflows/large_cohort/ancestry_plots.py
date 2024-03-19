@@ -3,22 +3,22 @@ Plot ancestry PCA analysis results
 """
 
 from collections import Counter
-from typing import List, Iterable
-from cpg_utils.config import get_config
+from typing import Iterable, List
 
-import pandas as pd
 import numpy as np
-import hail as hl
-from bokeh.resources import CDN
+import pandas as pd
 from bokeh.embed import file_html
-from bokeh.transform import factor_cmap, factor_mark
-from bokeh.plotting import ColumnDataSource, figure
-from bokeh.palettes import turbo, d3  # flake: disable=F401
 from bokeh.models import CategoricalColorMapper, HoverTool
+from bokeh.palettes import d3, turbo  # flake: disable=F401
+from bokeh.plotting import ColumnDataSource, figure
+from bokeh.resources import CDN
+from bokeh.transform import factor_cmap, factor_mark
+
+import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.hail_batch import reference_path, genome_build
-
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import genome_build, reference_path
 
 PROVIDED_LABEL = 'Provided ancestry'
 INFERRED_LABEL = 'Inferred ancestry'
@@ -67,7 +67,7 @@ def run(
                     hl.is_defined(meta_ht[ht_.old_s]),
                     meta_ht[ht_.old_s].external_id,
                     ht_.old_s,
-                )
+                ),
             )
             .key_by('s')
             .drop('old_s')
@@ -119,7 +119,7 @@ def run(
                 is_training=is_training,
                 sample_names=sample_names,
                 out_path_pattern=out_path_pattern,
-            )
+            ),
         )
 
     plots.extend(_plot_loadings(num_pcs_to_plot, loadings_ht, out_path_pattern=out_path_pattern))
@@ -170,7 +170,7 @@ def _plot_pca(
                 samples=sample_names,
                 dataset=datasets,
                 is_training=[{True: PROVIDED_LABEL, False: INFERRED_LABEL}.get(v) for v in is_training],
-            )
+            ),
         )
         plot.scatter(
             'x',
@@ -220,7 +220,10 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
         if out_path_pattern:
             html = file_html(plot, CDN, 'my plot')
             plot_filename_html = str(out_path_pattern).format(
-                scope='loadings', pci=pc, pca_suffix=pca_suffix, ext='html'
+                scope='loadings',
+                pci=pc,
+                pca_suffix=pca_suffix,
+                ext='html',
             )
             with hl.hadoop_open(plot_filename_html, 'w') as f:
                 f.write(html)

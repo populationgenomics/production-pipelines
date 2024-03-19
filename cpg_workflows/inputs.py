@@ -5,7 +5,6 @@ Metamist wrapper to get input sequencing groups.
 import logging
 
 from cpg_utils.config import get_config, update_dict
-
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
@@ -145,7 +144,7 @@ def _populate_analysis(cohort: Cohort) -> None:
             elif exists(sequencing_group.make_gvcf_path()):
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
-                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
                 )
             if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
                 # assert file exists
@@ -161,7 +160,7 @@ def _populate_analysis(cohort: Cohort) -> None:
             elif exists(sequencing_group.make_cram_path()):
                 logging.warning(
                     f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
-                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. '
+                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
                 )
 
 
@@ -201,5 +200,5 @@ def _populate_pedigree(cohort: Cohort) -> None:
         if sgids_wo_ped:
             logging.warning(
                 f'No pedigree data found for '
-                f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups'
+                f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups',
             )

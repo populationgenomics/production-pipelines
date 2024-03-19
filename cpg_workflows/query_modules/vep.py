@@ -166,7 +166,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                 }>,
                 variant_class:str
             }
-        """
+        """,
         )
     elif vep_version == '105':
         json_schema = hl.dtype(
@@ -320,7 +320,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                     variant_allele:str
                 }>,
                 variant_class:str
-            }"""
+            }""",
         )
 
     else:

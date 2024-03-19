@@ -7,7 +7,6 @@ import dataclasses
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.filetypes import BamPath, FastqPairs
 from cpg_workflows.jobs import fastqc
 from cpg_workflows.jobs.multiqc import multiqc
@@ -56,7 +55,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
                 alignment_input.path,
                 prefix / (sequencing_group.id + '_fastqc.html'),
                 prefix / (sequencing_group.id + '_fastqc.zip'),
-            )
+            ),
         ]
     elif isinstance(alignment_input, FastqPairs):
         outs: list[OneFastqc] = []
@@ -70,7 +69,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
                         pair[pair_id],
                         prefix / f'{sequencing_group.id}{suffix}_fastqc.html',
                         prefix / f'{sequencing_group.id}{suffix}_fastqc.zip',
-                    )
+                    ),
                 )
         return outs
     return []

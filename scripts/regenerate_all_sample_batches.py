@@ -12,13 +12,13 @@ filter to retain only active SG IDs, then re-batch cleanly.
 
 import json
 import logging
-import pandas as pd
 from argparse import ArgumentParser
-from metamist.graphql import gql, query
+
+import pandas as pd
 
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
-
+from metamist.graphql import gql, query
 
 FIND_ACTIVE_SGS = gql(
     """
@@ -29,7 +29,7 @@ query FindActiveSGs($project: String!) {
     }
   }
 }
-"""
+""",
 )
 
 

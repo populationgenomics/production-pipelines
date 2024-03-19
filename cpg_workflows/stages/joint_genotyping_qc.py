@@ -7,7 +7,6 @@ from typing import Any
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
 from cpg_workflows.workflow import (
@@ -55,7 +54,7 @@ class JointVcfQC(CohortStage):
                 **{
                     'vcf.gz': str(vcf_path),
                     'vcf.gz.tbi': str(vcf_path) + '.tbi',
-                }
+                },
             ),
             is_gvcf=False,
             job_attrs=self.get_job_attrs(cohort),
@@ -99,7 +98,7 @@ class JointVcfHappy(SequencingGroupStage):
                 **{
                     'vcf.gz': str(vcf_path),
                     'vcf.gz.tbi': str(vcf_path) + '.tbi',
-                }
+                },
             ),
             is_gvcf=False,
             job_attrs=self.get_job_attrs(sequencing_group),

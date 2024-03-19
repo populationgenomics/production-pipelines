@@ -4,7 +4,6 @@ Stage that generates a GVCF file.
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-
 from cpg_workflows.jobs import genotype
 from cpg_workflows.workflow import (
     SequencingGroup,

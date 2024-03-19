@@ -3,6 +3,9 @@ Hail Batch jobs needed to call mitochondrial SNVs
 """
 
 import hailtop.batch as hb
+from hailtop.batch.job import Job
+from hailtop.batch.resource import PythonResult
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
@@ -12,9 +15,6 @@ from cpg_utils.hail_batch import (
     image_path,
     reference_path,
 )
-from hailtop.batch.job import Job
-from hailtop.batch.resource import PythonResult
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
@@ -54,7 +54,7 @@ def subset_cram_to_chrM(
         output_bam={
             'bam': '{root}.bam',
             'bam.bai': '{root}.bai',
-        }
+        },
     )
 
     # We are only accessing a tiny fraction of the genome. Mounting is the best option.
@@ -365,7 +365,7 @@ def mito_mutect2(
             'vcf.gz': '{root}.vcf.gz',
             'vcf.gz.tbi': '{root}.vcf.gz.tbi',
             'vcf.gz.stats': '{root}.vcf.gz.stats',
-        }
+        },
     )
 
     cmd = f"""
@@ -746,7 +746,7 @@ def mitoreport(
         **{
             'cram': str(cram_path),
             'cram.crai': str(cram_path.with_suffix('.cram.crai')),
-        }
+        },
     )
 
     cmd = f"""
@@ -767,7 +767,7 @@ def mitoreport(
         command(
             cmd,
             setup_gcp=True,
-        )
+        ),
     )
 
     return j

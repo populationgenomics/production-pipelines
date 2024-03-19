@@ -11,11 +11,6 @@ from typing import Optional
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from metamist import models
-from metamist.apis import AnalysisApi
-from metamist.exceptions import ApiException
-from metamist.graphql import gql, query
-
 from cpg_workflows.filetypes import (
     AlignmentInput,
     BamPath,
@@ -24,7 +19,10 @@ from cpg_workflows.filetypes import (
     FastqPairs,
 )
 from cpg_workflows.utils import exists
-
+from metamist import models
+from metamist.apis import AnalysisApi
+from metamist.exceptions import ApiException
+from metamist.graphql import gql, query
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
     """
@@ -53,7 +51,7 @@ GET_SEQUENCING_GROUPS_QUERY = gql(
                 }
             }
         }
-        """
+        """,
 )
 
 GET_ANALYSES_QUERY = gql(
@@ -72,7 +70,7 @@ GET_ANALYSES_QUERY = gql(
                 }
             }
         }
-        """
+        """,
 )
 
 GET_PEDIGREE_QUERY = gql(
@@ -82,7 +80,7 @@ GET_PEDIGREE_QUERY = gql(
                 pedigree(replaceWithFamilyExternalIds: false)
             }
         }
-    """
+    """,
 )
 
 
@@ -348,7 +346,7 @@ class Metamist:
             analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
 
         logging.info(
-            f'Querying {analysis_type} analysis entries for {metamist_proj}: ' f'found {len(analysis_per_sid)}'
+            f'Querying {analysis_type} analysis entries for {metamist_proj}: ' f'found {len(analysis_per_sid)}',
         )
         return analysis_per_sid
 
@@ -389,7 +387,7 @@ class Metamist:
         else:
             logging.info(
                 f'Created Analysis(id={aid}, type={type_}, status={status}, '
-                f'output={str(output)}) in {metamist_proj}'
+                f'output={str(output)}) in {metamist_proj}',
             )
             return aid
 
@@ -426,7 +424,7 @@ class Metamist:
         if not completed_analysis:
             logging.warning(
                 f'Not found completed analysis {label} for '
-                f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups" }'
+                f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups" }',
             )
         elif not completed_analysis.output:
             logging.error(f'Found a completed analysis {label}, ' f'but the "output" field does not exist or empty')
@@ -436,12 +434,13 @@ class Metamist:
                 logging.error(
                     f'Found a completed analysis {label}, but the "output" path '
                     f'{found_output_fpath} does not match the expected path '
-                    f'{expected_output_fpath}'
+                    f'{expected_output_fpath}',
                 )
                 found_output_fpath = None
             elif not exists(found_output_fpath):
                 logging.error(
-                    f'Found a completed analysis {label}, ' f'but the "output" file {found_output_fpath} does not exist'
+                    f'Found a completed analysis {label}, '
+                    f'but the "output" file {found_output_fpath} does not exist',
                 )
                 found_output_fpath = None
 
@@ -454,7 +453,7 @@ class Metamist:
         if completed_analysis:
             logging.warning(
                 f'Invalidating the analysis {label} by setting the status to "failure", '
-                f'and resubmitting the analysis.'
+                f'and resubmitting the analysis.',
             )
             self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
 
@@ -462,7 +461,7 @@ class Metamist:
         if exists(expected_output_fpath):
             logging.info(
                 f'Output file {expected_output_fpath} already exists, so creating '
-                f'an analysis {label} with status=completed'
+                f'an analysis {label} with status=completed',
             )
             self.create_analysis(
                 type_=analysis_type,
@@ -476,7 +475,7 @@ class Metamist:
         # proceeding with the standard workflow (creating status=queued, submitting jobs)
         else:
             logging.info(
-                f'Expected output file {expected_output_fpath} does not exist, ' f'so queueing analysis {label}'
+                f'Expected output file {expected_output_fpath} does not exist, ' f'so queueing analysis {label}',
             )
             return None
 
@@ -565,7 +564,7 @@ def parse_reads(  # pylint: disable=too-many-return-statements
     supported_types = ('fastq', 'bam', 'cram')
     if reads_type not in supported_types:
         raise MetamistError(
-            f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of ' f'{supported_types}'
+            f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of ' f'{supported_types}',
         )
 
     if reads_type in ('bam', 'cram'):
@@ -576,7 +575,7 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         if not (location.endswith('.cram') or location.endswith('.bam')):
             raise MetamistError(
                 f'{sequencing_group_id}: ERROR: expected the file to have an extension '
-                f'.cram or .bam, got: {location}'
+                f'.cram or .bam, got: {location}',
             )
         if get_config()['workflow']['access_level'] == 'test':
             location = location.replace('-main-upload/', '-test-upload/')
@@ -595,7 +594,7 @@ def parse_reads(  # pylint: disable=too-many-return-statements
             ):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: expected the index file to have an extension '
-                    f'.crai or .bai, got: {index_location}'
+                    f'.crai or .bai, got: {index_location}',
                 )
             if get_config()['workflow']['access_level'] == 'test':
                 index_location = index_location.replace('-main-upload/', '-test-upload/')
@@ -621,22 +620,22 @@ def parse_reads(  # pylint: disable=too-many-return-statements
                     f'Sequence data for sequencing group {sequencing_group_id} is incorrectly '
                     f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
                     f'but got {len(lane_pair)}. '
-                    f'Read data: {pprint.pformat(lane_pair)}'
+                    f'Read data: {pprint.pformat(lane_pair)}',
                 )
             if check_existence and not exists(lane_pair[0]['location']):
                 raise MetamistError(
-                    f'{sequencing_group_id}: ERROR: read 1 file does not exist: ' f'{lane_pair[0]["location"]}'
+                    f'{sequencing_group_id}: ERROR: read 1 file does not exist: ' f'{lane_pair[0]["location"]}',
                 )
             if check_existence and not exists(lane_pair[1]['location']):
                 raise MetamistError(
-                    f'{sequencing_group_id}: ERROR: read 2 file does not exist: ' f'{lane_pair[1]["location"]}'
+                    f'{sequencing_group_id}: ERROR: read 2 file does not exist: ' f'{lane_pair[1]["location"]}',
                 )
 
             fastq_pairs.append(
                 FastqPair(
                     to_path(lane_pair[0]['location']),
                     to_path(lane_pair[1]['location']),
-                )
+                ),
             )
 
         return fastq_pairs

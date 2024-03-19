@@ -96,7 +96,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -147,7 +147,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -303,7 +303,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -336,7 +336,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -459,7 +459,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -492,7 +492,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -543,7 +543,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -636,7 +636,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                             'sequencing_platform': 'illumina',
                         },
                         'type': 'sequencing',
-                    }
+                    },
                 ],
             },
             {
@@ -687,7 +687,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                             'sequencing_platform': 'illumina',
                         },
                         'type': 'sequencing',
-                    }
+                    },
                 ],
             },
         ]

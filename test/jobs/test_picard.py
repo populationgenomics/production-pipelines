@@ -4,8 +4,8 @@ from functools import cached_property
 from pathlib import Path
 
 import pytest
-from cpg_utils.hail_batch import Batch, fasta_res_group
 
+from cpg_utils.hail_batch import Batch, fasta_res_group
 from cpg_workflows.filetypes import BamPath, CramPath, GvcfPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
@@ -42,7 +42,7 @@ class TestPicard:
                     'dbsnp_vcf_index': 'dbsnp.vcf.gz.tbi',
                     'genome_evaluation_interval_lists': 'intervals.txt',
                     'exome_evaluation_interval_lists': 'exome_intervals.txt',
-                }
+                },
             },
             other={
                 'resource_overrides': {

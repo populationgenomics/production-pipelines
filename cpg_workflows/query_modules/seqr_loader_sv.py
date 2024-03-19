@@ -4,6 +4,7 @@ Hail Query functions for seqr loader; SV edition.
 
 import gzip
 import logging
+
 import requests
 
 import hail as hl
@@ -11,8 +12,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from cpg_workflows.utils import read_hail, checkpoint_hail
-
+from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
@@ -51,7 +51,7 @@ PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
         # Discordant
         frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
         frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
-    }
+    },
 )
 
 GENCODE_FILE_HEADER = [
@@ -283,8 +283,8 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
                             GENE_SYMBOL: gene,
                             GENE_ID: gene_id_mapping.get(gene, hl.missing(hl.tstr)),
                             MAJOR_CONSEQUENCE: gene_col.replace(CONSEQ_PREDICTED_PREFIX, '', 1),  # noqa: B023
-                        }
-                    )
+                        },
+                    ),
                 )
                 for gene_col in conseq_predicted_gene_cols
             ],
@@ -323,12 +323,12 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     # and some more annotation stuff
     mt = mt.annotate_rows(
         transcriptConsequenceTerms=hl.set(
-            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend([mt.sv_types[0]])
+            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend([mt.sv_types[0]]),
         ),
         geneIds=hl.set(
             mt.sortedTranscriptConsequences.filter(lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS').map(
-                lambda x: x[GENE_ID]
-            )
+                lambda x: x[GENE_ID],
+            ),
         ),
         rsid=hl.missing('tstr'),
     )
@@ -376,8 +376,8 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 # new_call=hl.or_missing(
                 #     is_called, ~was_previously_called | novel_genotype
                 # ),
-            )
-        )
+            ),
+        ),
     )
 
     def _genotype_filter_samples(fn):
@@ -420,7 +420,7 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(**{'%i' % i: _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
         samples_gq_sv=hl.struct(
-            **{('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 90, 10)}
+            **{('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 90, 10)},
         ),
         # As per `samples` field, I beleive CN stats should only be generated for gCNV only
         # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,

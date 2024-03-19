@@ -41,7 +41,7 @@ def annotate_dataset_jobs(
             sequencing_group_ids,
             str(subset_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         subset_j.depends_on(*depends_on)
@@ -55,7 +55,7 @@ def annotate_dataset_jobs(
             str(subset_mt_path),
             str(out_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     annotate_j.depends_on(subset_j)
     return [subset_j, annotate_j]
@@ -92,7 +92,7 @@ def cohort_to_vcf_job(
             str(mt_path),
             str(out_vcf_path),
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         vcf_j.depends_on(*depends_on)

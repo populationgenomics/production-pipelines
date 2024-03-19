@@ -129,13 +129,13 @@ def run(
     if bad.any():
         warning(
             f'⚠️ Excluded {len(df[bad])}/{len(df)} samples with zero '
-            f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}'
+            f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}',
         )
         info('')
     bad_ids = list(df[bad].sample_id)  # for checking in pairs_df
     df = df[~bad]
 
-    info(f'*Inferred vs. reported sex:*')
+    info('*Inferred vs. reported sex:*')
     # Rename Ped sex to human-readable tags
     df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
     df.original_pedigree_sex = df.original_pedigree_sex.apply(lambda x: {'-9': 'unknown'}.get(x, x))
@@ -153,7 +153,7 @@ def run(
                 f' {row_.sample_id} ('
                 f'provided: {row_.original_pedigree_sex}, '
                 f'inferred: {row_.sex}, '
-                f'mean depth: {row_.gt_depth_mean})'
+                f'mean depth: {row_.gt_depth_mean})',
             )
 
     if mismatching_sex.any():
@@ -169,11 +169,11 @@ def run(
     matching_cnt = len(df[matching_sex])
     info(
         f'✅ Sex inferred for {inferred_cnt}/{len(df)} samples, matching '
-        f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.'
+        f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.',
     )
     info('')
 
-    info(f'*Relatedness:*')
+    info('*Relatedness:*')
     expected_ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
     inferred_ped_sample_by_id = {s.sample_id: s for s in inferred_ped.samples()}
 
@@ -239,19 +239,19 @@ def run(
         info(
             f'⚠️ Found {len(mismatching_unrelated_to_related)} '
             f'sample pair(s) that are provided as unrelated, are inferred as '
-            f'related:'
+            f'related:',
         )
         for i, pair in enumerate(mismatching_unrelated_to_related):
             info(f' {i + 1}. {pair}')
     if mismatching_related_to_unrelated:
         info(
             f'❗ Found {len(mismatching_related_to_unrelated)} sample pair(s) '
-            f'that are provided as related, but inferred as unrelated:'
+            f'that are provided as related, but inferred as unrelated:',
         )
         for i, pair in enumerate(mismatching_related_to_unrelated):
             info(f' {i + 1}. {pair}')
     if not mismatching_unrelated_to_related and not mismatching_related_to_unrelated:
-        info(f'✅ Inferred pedigree matches for all provided related pairs.')
+        info('✅ Inferred pedigree matches for all provided related pairs.')
     info('')
 
     print_contents(

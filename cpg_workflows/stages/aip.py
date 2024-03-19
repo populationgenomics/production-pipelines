@@ -64,8 +64,6 @@ from cpg_utils.hail_batch import (
     get_batch,
     image_path,
 )
-from metamist.graphql import gql
-
 from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
@@ -75,7 +73,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     stage,
 )
-
+from metamist.graphql import gql
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
@@ -90,7 +88,7 @@ MTA_QUERY = gql(
             }
         }
     }
-"""
+""",
 )
 
 
@@ -199,7 +197,7 @@ class GeneratePanelData(DatasetStage):
             f'python3 reanalysis/hpo_panel_match.py '
             f'--dataset "{query_dataset}" '
             f'--hpo "{hpo_file}" '
-            f'--out "{str(expected_out["hpo_panels"])}" '
+            f'--out "{str(expected_out["hpo_panels"])}" ',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -229,7 +227,7 @@ class QueryPanelapp(DatasetStage):
             f'python3 reanalysis/query_panelapp.py '
             f'--panels "{str(hpo_panel_json)}" '
             f'--out_path "{str(expected_out["panel_data"])}" '
-            f'--dataset {dataset.name} '
+            f'--dataset {dataset.name} ',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -272,7 +270,7 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
             f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
-            f'--dataset {dataset.name} '
+            f'--dataset {dataset.name} ',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -317,7 +315,7 @@ class RunHailSVFiltering(DatasetStage):
             f'--mt "{sv_mt}" '
             f'--panelapp "{panelapp_json}" '
             f'--pedigree "{local_ped}" '
-            f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
+            f'--vcf_out "{str(expected_out["labelled_vcf"])}" ',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -374,7 +372,7 @@ class ValidateMOI(DatasetStage):
                 **{
                     'vcf.bgz': str(hail_sv_inputs['labelled_vcf']),
                     'vcf.bgz.tbi': f'{hail_sv_inputs["labelled_vcf"]}.tbi',
-                }
+                },
             )['vcf.bgz']
             sv_vcf_arg = f'--labelled_sv "{labelled_sv_vcf}" '
 
@@ -385,7 +383,7 @@ class ValidateMOI(DatasetStage):
             **{
                 'vcf.bgz': str(hail_inputs['labelled_vcf']),
                 'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi',
-            }
+            },
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
         job.command(
@@ -396,7 +394,7 @@ class ValidateMOI(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--input_path "{input_path}" '
             f'--participant_panels "{hpo_panels}" '
-            f'--dataset "{dataset.name}" {sv_vcf_arg}'
+            f'--dataset "{dataset.name}" {sv_vcf_arg}',
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -449,7 +447,7 @@ class CreateAIPHTML(DatasetStage):
             f'--pedigree "{local_ped}" '
             f'--output "{expected_out["results_html"]}" '
             f'--latest "{expected_out["latest_html"]}" '
-            f'--dataset "{dataset.name}" '
+            f'--dataset "{dataset.name}" ',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -476,7 +474,7 @@ class GenerateSeqrFile(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
         cohort_seq_type_section = get_config()['cohorts'][dataset.name].get(
-            get_config()['workflow'].get('sequencing_type', {})
+            get_config()['workflow'].get('sequencing_type', {}),
         )
 
         # if there's no lookup file, do nothing
@@ -493,7 +491,7 @@ class GenerateSeqrFile(DatasetStage):
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             f'python3 reanalysis/minimise_output_for_seqr.py '
-            f'{input_localised} {job.out_json} --external_map {lookup_in_batch}'
+            f'{input_localised} {job.out_json} --external_map {lookup_in_batch}',
         )
 
         # write the results out

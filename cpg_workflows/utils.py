@@ -10,16 +10,16 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
-
 from itertools import chain, islice
 from os.path import basename, dirname, join
 from random import choices
 from typing import Union, cast
 
 import hail as hl
+from hailtop.batch import ResourceFile
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from hailtop.batch import ResourceFile
 
 
 def chunks(iterable, chunk_size):
@@ -75,7 +75,10 @@ def read_hail(path):
 
 
 def checkpoint_hail(
-    t: hl.Table | hl.MatrixTable, file_name: str, checkpoint_prefix: str | None = None, allow_reuse=False
+    t: hl.Table | hl.MatrixTable,
+    file_name: str,
+    checkpoint_prefix: str | None = None,
+    allow_reuse=False,
 ):
     """
     checkpoint method

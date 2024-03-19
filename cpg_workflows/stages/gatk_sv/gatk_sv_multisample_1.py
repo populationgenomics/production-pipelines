@@ -10,7 +10,6 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -140,7 +139,7 @@ class GatherBatchEvidence(CohortStage):
                 {'cnmops_allo_file': 'allosome_file'},
                 'cytoband',
                 'mei_bed',
-            ]
+            ],
         )
 
         # reference panel gCNV models
@@ -157,7 +156,7 @@ class GatherBatchEvidence(CohortStage):
                 'condense_counts_docker',
                 'gatk_docker',
                 'cnmops_docker',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -234,7 +233,7 @@ class ClusterBatch(CohortStage):
                 'gatk_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -242,7 +241,7 @@ class ClusterBatch(CohortStage):
                 {'contig_list': 'primary_contigs_list'},
                 {'depth_exclude_intervals': 'depth_exclude_list'},
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -311,7 +310,7 @@ class GenerateBatchMetrics(CohortStage):
                 'sv_base_docker',
                 'sv_pipeline_base_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -321,7 +320,7 @@ class GenerateBatchMetrics(CohortStage):
                 'segdups',
                 {'autosome_contigs': 'autosome_file'},
                 {'allosome_contigs': 'allosome_file'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -406,13 +405,13 @@ class FilterBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
             [
                 'primary_contigs_list',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -597,7 +596,7 @@ class GenotypeBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_pipeline_rdtest_docker',
                 'linux_docker',
-            ]
+            ],
         )
         input_dict |= get_references(['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list'])
         # 2 additional (optional) references CPG doesn't have:

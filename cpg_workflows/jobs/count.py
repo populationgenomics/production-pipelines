@@ -4,19 +4,20 @@ Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
+
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path
 from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.resources import STANDARD
+from cpg_utils.hail_batch import command, image_path
 from cpg_workflows.filetypes import (
     BamPath,
     CramPath,
 )
+from cpg_workflows.jobs.bam_to_cram import cram_to_bam
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import can_reuse
 from cpg_workflows.workflow import (
     SequencingGroup,
 )
-from cpg_workflows.jobs.bam_to_cram import cram_to_bam
 
 
 def count_res_group(b: hb.Batch) -> hb.ResourceGroup:
@@ -93,12 +94,12 @@ class FeatureCounts:
         if not both_ends_same_chr:
             self.command.append('-C')
 
-        self.tmp_output = f'$BATCH_TMPDIR/count_out/count'
+        self.tmp_output = '$BATCH_TMPDIR/count_out/count'
         self.tmp_output_summary = f'{self.tmp_output}.summary'
 
         self.command.extend(['-o', self.tmp_output, str(input_bam)])
 
-        self.make_tmpdir_command = f'mkdir -p $BATCH_TMPDIR/count_out'
+        self.make_tmpdir_command = 'mkdir -p $BATCH_TMPDIR/count_out'
 
         self.finalise_outputs_command = (
             f'ln {self.tmp_output} {output_path} && ln {self.tmp_output_summary} {summary_path}'
@@ -110,7 +111,7 @@ class FeatureCounts:
                 self.make_tmpdir_command,
                 ' '.join(self.command),
                 self.finalise_outputs_command,
-            ]
+            ],
         )
 
     def __repr__(self):
@@ -144,7 +145,7 @@ def count(
             **{
                 'bam': str(input_cram_or_bam.path),
                 'bam.bai': str(input_cram_or_bam.index_path),
-            }
+            },
         )
     elif isinstance(input_cram_or_bam, CramPath):
         # Localise input
@@ -152,7 +153,7 @@ def count(
             **{
                 'cram': str(input_cram_or_bam.path),
                 'cram.crai': str(input_cram_or_bam.index_path),
-            }
+            },
         )
         # Convert CRAM to BAM
         j, input_bam_reads = cram_to_bam(
@@ -190,7 +191,7 @@ def count(
         count_output={
             'count': '{root}.count',
             'count.summary': '{root}.count.summary',
-        }
+        },
     )
 
     # Create counting command

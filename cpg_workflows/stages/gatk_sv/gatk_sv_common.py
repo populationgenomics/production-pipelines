@@ -9,6 +9,8 @@ from os.path import join
 from random import randint
 from typing import Any
 
+from hailtop.batch.job import Job
+
 from analysis_runner.cromwell import (
     CromwellOutputType,
     run_cromwell_workflow_from_repo_and_get_outputs,
@@ -16,8 +18,6 @@ from analysis_runner.cromwell import (
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, get_config
 from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
-from hailtop.batch.job import Job
-
 from cpg_workflows.batch import make_job_name
 from cpg_workflows.workflow import Cohort, Dataset
 
@@ -344,7 +344,7 @@ def queue_annotate_sv_jobs(
             'protein_coding_gtf',
             {'ref_bed': 'external_af_ref_bed'},
             {'contig_list': 'primary_contigs_list'},
-        ]
+        ],
     )
 
     # images!
@@ -353,7 +353,7 @@ def queue_annotate_sv_jobs(
             'sv_pipeline_docker',
             'sv_base_mini_docker',
             'gatk_docker',
-        ]
+        ],
     )
     jobs = add_gatk_sv_jobs(
         dataset=cohort.analysis_dataset,

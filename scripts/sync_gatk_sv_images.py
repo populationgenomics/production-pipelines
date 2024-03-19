@@ -3,12 +3,12 @@ A simple script to copy docker images specified in a json file to
 CPG artefact registry.
 """
 
-import subprocess
 import json
-import toml
+import subprocess
 from urllib.request import urlopen
-import click
 
+import click
+import toml
 
 # Path to the gatk-sv dockers
 DOCKERS_URL = 'https://raw.githubusercontent.com/populationgenomics/gatk-sv/main/' 'inputs/values/dockers.json'

@@ -9,7 +9,6 @@ from typing import Any
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
 from cpg_workflows.stages.align import Align

@@ -5,21 +5,23 @@ Content relating to the hap.py validation process
 """
 
 import logging
+
 from cpg_utils.config import get_config
+from cpg_workflows.jobs.validation import (
+    parse_and_post_results,
+    run_happy_on_vcf,
+    validation_mt_to_vcf_job,
+)
+from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
 from cpg_workflows.workflow import (
-    stage,
-    SequencingGroupStage,
     SequencingGroup,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
     get_workflow,
+    stage,
 )
-from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
-from cpg_workflows.jobs.validation import (
-    validation_mt_to_vcf_job,
-    run_happy_on_vcf,
-    parse_and_post_results,
-)
+
 from .. import get_batch
 
 

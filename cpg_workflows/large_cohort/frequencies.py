@@ -1,15 +1,16 @@
-import hail as hl
 import logging
+
+import hail as hl
 
 from cpg_utils import Path
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (
-    get_adj_expr,
     age_hists_expr,
     bi_allelic_site_inbreeding_expr,
     faf_expr,
+    get_adj_expr,
     pop_max_expr,
     qual_hist_expr,
 )
@@ -96,7 +97,7 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
                 mt.adj,
                 mt.GT,
                 mt.age,
-            )
+            ),
         )
         # Compute callset-wide age histogram global
         mt = mt.annotate_globals(
@@ -106,8 +107,8 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
                     30,
                     80,
                     10,
-                )
-            )
+                ),
+            ),
         )
     return mt
 
@@ -123,7 +124,9 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_globals(faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta))
     mt = mt.annotate_rows(
-        popmax=mt.popmax.annotate(faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95)
+        popmax=mt.popmax.annotate(
+            faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
+        ),
     )
     return mt
 

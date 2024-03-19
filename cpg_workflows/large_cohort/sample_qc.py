@@ -5,14 +5,13 @@ Impute sex. Add soft filters for samples.
 import logging
 
 import hail as hl
-from gnomad.sample_qc.pipeline import annotate_sex
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
+from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
@@ -106,10 +105,11 @@ def impute_sex(
         if interval_table.count() > 0:
             # remove all rows where the locus falls within a defined interval
             tmp_variant_data = vds.variant_data.filter_rows(
-                hl.is_defined(interval_table[vds.variant_data.locus]), keep=False
+                hl.is_defined(interval_table[vds.variant_data.locus]),
+                keep=False,
             )
             vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                str(tmp_prefix / f'{name}_checkpoint.vds')
+                str(tmp_prefix / f'{name}_checkpoint.vds'),
             )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
@@ -134,7 +134,7 @@ def impute_sex(
             n_called=sex_ht.n_called,
             expected_homs=sex_ht.expected_homs,
             observed_homs=sex_ht.observed_homs,
-        )
+        ),
     )
     sex_ht = sex_ht.checkpoint(str(checkpoint_path), overwrite=True)
     return sex_ht

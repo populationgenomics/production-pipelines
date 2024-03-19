@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Optional
 
 import pandas as pd
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import dataset_path, reference_path, web_url
@@ -51,8 +52,8 @@ class Target:
                     ' '.join(sorted(str(alignment_input) for alignment_input in s.alignment_input_by_seq_type.values()))
                     for s in self.get_sequencing_groups()
                     if s.alignment_input_by_seq_type
-                ]
-            )
+                ],
+            ),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
         return f'{h}_{len(self.get_sequencing_group_ids())}'
@@ -288,7 +289,7 @@ class Dataset(Target):
                 self._seq_type_subdir(),
                 dataset=self.name,
                 **kwargs,
-            )
+            ),
         )
 
     def tmp_prefix(self, **kwargs) -> Path:
@@ -301,7 +302,7 @@ class Dataset(Target):
                 dataset=self.name,
                 category='tmp',
                 **kwargs,
-            )
+            ),
         )
 
     def analysis_prefix(self, **kwargs) -> Path:
@@ -314,7 +315,7 @@ class Dataset(Target):
                 dataset=self.name,
                 category='analysis',
                 **kwargs,
-            )
+            ),
         )
 
     def web_prefix(self, **kwargs) -> Path:
@@ -328,7 +329,7 @@ class Dataset(Target):
                 dataset=self.name,
                 category='web',
                 **kwargs,
-            )
+            ),
         )
 
     def web_url(self) -> str | None:
@@ -492,7 +493,7 @@ class SequencingGroup(Target):
             'active': str(self.active),
             'meta': str(self.meta),
             'alignment_inputs': ','.join(
-                [f'{seq_t}: {al_inp}' for seq_t, al_inp in self.alignment_input_by_seq_type.items()]
+                [f'{seq_t}: {al_inp}' for seq_t, al_inp in self.alignment_input_by_seq_type.items()],
             ),
             'pedigree': self.pedigree,
         }

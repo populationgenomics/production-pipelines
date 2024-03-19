@@ -9,10 +9,10 @@ analysis-runner --dataset thousand-genomes --access-level standard <script>
 import logging
 
 import pandas as pd
+
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import dataset_path, output_path
-
 from cpg_workflows import get_batch, get_cohort
 
 # benchmark matrix:
@@ -24,7 +24,7 @@ def main():
     df = pd.DataFrame([{'s': s.id, 'gvcf': s.gvcf} for s in get_cohort().get_sequencing_groups() if s.gvcf.exists()])
     logging.info(
         f'Found {len(df)}/{len(get_cohort().get_sequencing_groups())} sequencing groups '
-        f'in {get_config()["workflow"]["dataset"]} with GVCFs'
+        f'in {get_config()["workflow"]["dataset"]} with GVCFs',
     )
 
     out_prefix = to_path(dataset_path('benchmark-combiner'))

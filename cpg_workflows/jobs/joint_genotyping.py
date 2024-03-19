@@ -7,19 +7,20 @@ import math
 from enum import Enum
 
 import pandas as pd
-from cpg_utils.config import get_config
-from cpg_workflows.utils import can_reuse
-from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path, command
-from cpg_utils import Path, to_path
+
 import hailtop.batch as hb
 from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
-from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
+from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows.filetypes import GvcfPath
+from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
+from cpg_workflows.utils import can_reuse
 
-from .vcf import gather_vcfs
 from .picard import get_intervals
+from .vcf import gather_vcfs
 
 
 class JointGenotyperTool(Enum):
@@ -63,7 +64,7 @@ def make_joint_genotyping_jobs(
     if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
         return []
 
-    logging.info(f'Submitting joint-calling jobs')
+    logging.info('Submitting joint-calling jobs')
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -158,7 +159,7 @@ def make_joint_genotyping_jobs(
             jobs.append(siteonly_j)
 
     if scatter_count > 1:
-        logging.info(f'Queueing gather VCFs job')
+        logging.info('Queueing gather VCFs job')
         jobs.extend(
             gather_vcfs(
                 b,
@@ -167,10 +168,10 @@ def make_joint_genotyping_jobs(
                 sequencing_group_count=len(gvcf_by_sgid),
                 job_attrs=job_attrs,
                 out_vcf_path=out_vcf_path,
-            )
+            ),
         )
 
-        logging.info(f'Queueing gather site-only VCFs job')
+        logging.info('Queueing gather site-only VCFs job')
         jobs.extend(
             gather_vcfs(
                 b,
@@ -178,7 +179,7 @@ def make_joint_genotyping_jobs(
                 site_only=True,
                 job_attrs=job_attrs,
                 out_vcf_path=out_siteonly_vcf_path,
-            )
+            ),
         )
 
     jobs = [j for j in jobs if j is not None]
@@ -313,7 +314,7 @@ def _add_joint_genotyper_job(
             **{
                 'vcf.gz': str(output_vcf_path),
                 'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-            }
+            },
         )
     job_name = f'{tool.name}'
     job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
@@ -359,7 +360,7 @@ def _add_joint_genotyper_job(
     --only-output-calls-starting-in-intervals \\
     """
     if tool == JointGenotyperTool.GnarlyGenotyper:
-        cmd += f"""\
+        cmd += """\
     --keep-all-sites \\
     --create-output-variant-index
     """
@@ -406,7 +407,7 @@ def _add_excess_het_filter(
             **{
                 'vcf.gz': str(output_vcf_path),
                 'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-            }
+            },
         )
 
     job_name = 'ExcessHet filter'
@@ -434,8 +435,8 @@ def _add_excess_het_filter(
     if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
         tabix -p vcf {j.output_vcf['vcf.gz']}
     fi
-    """
-        )
+    """,
+        ),
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
@@ -460,7 +461,7 @@ def add_make_sitesonly_job(
             **{
                 'vcf.gz': str(output_vcf_path),
                 'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-            }
+            },
         )
 
     job_name = 'MakeSitesOnlyVcf'
@@ -484,8 +485,8 @@ def add_make_sitesonly_job(
     if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
         tabix -p vcf {j.output_vcf['vcf.gz']}
     fi
-    """
-        )
+    """,
+        ),
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))

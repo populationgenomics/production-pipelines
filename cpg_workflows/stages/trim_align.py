@@ -7,20 +7,19 @@ import re
 from dataclasses import dataclass
 from os.path import basename
 
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-from hailtop.batch.job import Job
-
-from cpg_workflows.filetypes import FastqPair, FastqPairs, BamPath, CramPath
-from cpg_workflows.jobs import align_rna
-from cpg_workflows.jobs import trim
+from cpg_workflows.filetypes import BamPath, CramPath, FastqPair, FastqPairs
+from cpg_workflows.jobs import align_rna, trim
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
 
 
@@ -74,7 +73,7 @@ def get_input_output_pairs(sequencing_group: SequencingGroup) -> list[InOutFastq
                 str(i),  # ID
                 pair,  # input FASTQ pair
                 FastqPair(output_r1, output_r2),  # output FASTQ pair
-            )
+            ),
         )
     return input_output_pairs
 
@@ -122,7 +121,7 @@ class TrimAlignRNA(SequencingGroupStage):
         # Run trim
         input_fq_pairs = get_trim_inputs(sequencing_group)
         if not input_fq_pairs:
-            return self.make_outputs(target=sequencing_group, error_msg=f'No FASTQ input found')
+            return self.make_outputs(target=sequencing_group, error_msg='No FASTQ input found')
         assert isinstance(input_fq_pairs, FastqPairs)
         trimmed_fastq_pairs = []
         for fq_pair in input_fq_pairs:

@@ -7,11 +7,10 @@ import logging
 import hail as hl
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, genome_build
-from hail_scripts.computed_fields import vep, variant_id
-
+from cpg_utils.hail_batch import genome_build, reference_path
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
+from hail_scripts.computed_fields import variant_id, vep
 
 
 def annotate_cohort(
@@ -44,7 +43,7 @@ def annotate_cohort(
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
     logging.info(
-        f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions'
+        f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions',
     )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
@@ -119,14 +118,14 @@ def annotate_cohort(
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
-        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
+        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)',
     )
     mt = mt.annotate_rows(
         domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(mt.sortedTranscriptConsequences),
         transcriptConsequenceTerms=vep.get_expr_for_vep_consequence_terms_set(mt.sortedTranscriptConsequences),
         transcriptIds=vep.get_expr_for_vep_transcript_ids_set(mt.sortedTranscriptConsequences),
         mainTranscript=vep.get_expr_for_worst_transcript_consequence_annotations_struct(
-            mt.sortedTranscriptConsequences
+            mt.sortedTranscriptConsequences,
         ),
         geneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences),
         codingGeneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences, only_coding_genes=True),
@@ -149,7 +148,7 @@ def annotate_cohort(
                 'allele_id': mt.clinvar_data.info.ALLELEID,
                 'clinical_significance': hl.delimit(mt.clinvar_data.info.CLNSIG),
                 'gold_stars': mt.clinvar_data.gold_stars,
-            }
+            },
         ),
     )
     mt = mt.annotate_globals(
@@ -218,7 +217,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str |
     logging.info(
         f'Finished subsetting to {len(sample_ids)} samples. '
         f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
-        f'{mt.count_rows()}/{n_rows_before} rows'
+        f'{mt.count_rows()}/{n_rows_before} rows',
     )
     mt.write(str(out_mt_path), overwrite=True)
     logging.info(f'Written {out_mt_path}')
@@ -306,10 +305,10 @@ def annotate_dataset_mt(mt_path, out_mt_path):
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
         samples_num_alt=hl.struct(**{('%i' % i): _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
         samples_gq=hl.struct(
-            **{('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 95, 5)}
+            **{('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 95, 5)},
         ),
         samples_ab=hl.struct(
-            **{'%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i)) for i in range(0, 45, 5)}
+            **{'%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i)) for i in range(0, 45, 5)},
         ),
     )
     mt.describe()

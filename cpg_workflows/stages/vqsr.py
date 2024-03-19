@@ -4,18 +4,18 @@ Stage that performs AS-VQSR.
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
+from cpg_workflows.jobs import vqsr
 from cpg_workflows.workflow import (
-    stage,
+    Cohort,
+    CohortStage,
     StageInput,
     StageOutput,
-    CohortStage,
-    Cohort,
+    stage,
 )
 
-from cpg_workflows.jobs import vqsr
-from .joint_genotyping import JointGenotyping
 from .. import get_batch
 from ..resources import joint_calling_scatter_count
+from .joint_genotyping import JointGenotyping
 
 
 @stage(required_stages=JointGenotyping)

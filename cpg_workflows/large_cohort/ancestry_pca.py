@@ -1,15 +1,15 @@
 import logging
 import pickle
 
-import hail as hl
 import pandas as pd
+
+import hail as hl
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
-
 from cpg_utils.hail_batch import reference_path
 from cpg_workflows.utils import can_reuse
-
+from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
@@ -93,7 +93,7 @@ def run(
         dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
 
     logging.info(
-        f'Running PCA on {dense_mt.count_cols()} samples, ' f'{dense_mt.count_rows()} sites, ' f'using {n_pcs} PCs'
+        f'Running PCA on {dense_mt.count_cols()} samples, ' f'{dense_mt.count_rows()} sites, ' f'using {n_pcs} PCs',
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
@@ -168,13 +168,13 @@ def _run_pca_ancestry_analysis(
         samples_to_use -= samples_to_drop
         logging.info(
             f'Removing the {samples_to_drop} relateds from the list of samples used '
-            f'for PCA, got remaining {samples_to_use} samples'
+            f'for PCA, got remaining {samples_to_use} samples',
         )
 
     if samples_to_use < MIN_N_SAMPLES:
         raise ValueError(
             f'The number of samples after removing relateds if too low for the PCA '
-            f'analysis. Got {samples_to_use}, but need at least {MIN_N_SAMPLES}'
+            f'analysis. Got {samples_to_use}, but need at least {MIN_N_SAMPLES}',
         )
 
     if n_pcs > samples_to_use:
@@ -231,7 +231,7 @@ def _infer_pop_labels(
     if training_pop_ht.count() < 2:
         logging.warning(
             'Need at least 2 samples with known `population` label to run PCA '
-            'and assign population labels to remaining samples'
+            'and assign population labels to remaining samples',
         )
         pop_ht = scores_ht.annotate(
             training_pop=hl.missing(hl.tstr),
@@ -243,7 +243,7 @@ def _infer_pop_labels(
 
     logging.info(
         'Using calculated PCA scores as well as training samples with known '
-        '`population` label to assign population labels to remaining samples'
+        '`population` label to assign population labels to remaining samples',
     )
     scores_ht = scores_ht.annotate(training_pop=training_pop_ht[scores_ht.key].training_pop)
 
@@ -264,12 +264,12 @@ def _infer_pop_labels(
         logging.info(
             f'Found {n_mislabeled_samples} samples '
             f'labeled differently from their known pop. '
-            f'Re-running without them.'
+            f'Re-running without them.',
         )
 
         pop_ht = pop_ht[scores_ht.key]
         pop_pca_scores_ht = scores_ht.annotate(
-            training_pop=hl.or_missing((pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop)
+            training_pop=hl.or_missing((pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop),
         ).persist()
 
         pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(pop_pca_scores_ht, min_prob)
