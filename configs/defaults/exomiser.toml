@@ -2,3 +2,8 @@
 'nothing' = 'here'
 
 status_reporter = 'metamist'
+
+[references.exomiser_remm]
+remm_tsv = "gs://cpg-common-main/references/exomiser/remm/ReMM.v0.3.1.tsv.gz"
+remm_index = "gs://cpg-common-main/references/exomiser/remm/ReMM.v0.3.1.tsv.gz.tbi"
+
