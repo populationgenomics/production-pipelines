@@ -149,42 +149,42 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
 
     # find the exomiser references
     # first - the core ones
-    clinvar_file = reference_path('references/exomiser_core/clinvar_whitelist')
+    clinvar_file = reference_path('exomiser_core/clinvar_whitelist')
     core_group = get_batch().read_input_group(
         **{
             'clinvar': str(clinvar_file),
             'clinvar_index': f'{clinvar_file}.tbi',
-            'genome_h2': str(reference_path('references/exomiser_core/genome_h2')),
-            'ensembl': str(reference_path('references/exomiser_core/ensembl_transcripts')),
-            'variants': str(reference_path('references/exomiser_core/variants')),
+            'genome_h2': str(reference_path('exomiser_core/genome_h2')),
+            'ensembl': str(reference_path('exomiser_core/ensembl_transcripts')),
+            'variants': str(reference_path('exomiser_core/variants')),
         }
     )
 
     # cadd
     cadd_group = get_batch().read_input_group(
         **{
-            'cadd_indel': str(reference_path('references/exomiser_cadd/indel_tsv')),
-            'cadd_indel_index': str(reference_path('references/exomiser_cadd/indel_index')),
-            'cadd_snv': str(reference_path('references/exomiser_cadd/snv_tsv')),
-            'cadd_snv_index': str(reference_path('references/exomiser_cadd/snv_index')),
+            'cadd_indel': str(reference_path('exomiser_cadd/indel_tsv')),
+            'cadd_indel_index': str(reference_path('exomiser_cadd/indel_index')),
+            'cadd_snv': str(reference_path('exomiser_cadd/snv_tsv')),
+            'cadd_snv_index': str(reference_path('exomiser_cadd/snv_index')),
         }
     )
 
     # phenotype
     phenotype = get_batch().read_input_group(
         **{
-            'pheno_db': str(reference_path('references/exomiser_phenotype/pheno_db')),
-            'hpo_obo': str(reference_path('references/exomiser_phenotype/hpo_obo')),
-            'rw_string': str(reference_path('references/exomiser_phenotype/rw_string')),
-            'phenix_tar': f'{reference_path("references/exomiser_phenotype/phenix")}.tar.gz',
+            'pheno_db': str(reference_path('exomiser_phenotype/pheno_db')),
+            'hpo_obo': str(reference_path('exomiser_phenotype/hpo_obo')),
+            'rw_string': str(reference_path('exomiser_phenotype/rw_string')),
+            'phenix_tar': f'{reference_path("exomiser_phenotype/phenix")}.tar.gz',
         }
     )
 
     # remm
     remm_group = get_batch().read_input_group(
         **{
-            'remm': str(reference_path('references/exomiser_remm/remm')),
-            'remm_index': str(reference_path('references/exomiser_remm/remm_tsv')),
+            'remm': str(reference_path('exomiser_remm/remm')),
+            'remm_index': str(reference_path('exomiser_remm/remm_tsv')),
         }
     )
 
