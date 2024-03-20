@@ -417,8 +417,7 @@ def postprocess_calls(
         # flake8: noqa
         j.command(
             f"""
-        #use wc instead of grep -c so zero count isn't non-zero exit
-        #use grep -P to recognize tab character
+        #use awk instead of grep - grep returning no lines causes a pipefailure
         NUM_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ {{count++}} END {{print count}}')
         NUM_PASS_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ && /PASS/ {{count++}} END {{print count}}')
         if [ $NUM_SEGMENTS -lt {max_events} ]; then
