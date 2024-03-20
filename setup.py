@@ -34,10 +34,7 @@ setup(
         'click',
     ],
     extras_require={
-        'test': [
-            'pytest',
-            'pytest-mock',
-        ],
+        'test': ['pytest', 'pytest-mock', 'gitpython'],
     },
     package_data={
         'cpg_workflows': ['defaults.toml'],
