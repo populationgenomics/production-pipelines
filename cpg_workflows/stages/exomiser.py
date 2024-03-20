@@ -119,7 +119,6 @@ class CreateFamilyVCFs(DatasetStage):
         }
 
         mt_path = query_for_latest_mt(dataset.name)
-        # mt_path = 'gs://cpg-acute-care-test/mt/9b8fa425cf500067c4802e030d8be35598a792_3-acute-care.mt'
         vcf_jobs = extract_vcf_jobs(
             families_to_process,
             mt_path,
@@ -132,6 +131,8 @@ class CreateFamilyVCFs(DatasetStage):
 class MakePedExtracts(DatasetStage):
     """
     from the dataset MT, we make a PED per-family
+
+    todo actually, don't. Make phenopackets...
     """
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
