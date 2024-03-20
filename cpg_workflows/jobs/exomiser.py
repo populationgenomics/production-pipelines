@@ -156,8 +156,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
             'clinvar_index': f'{clinvar_file}.tbi',
             'genome_h2': str(reference_path('references/exomiser_core/genome_h2')),
             'ensembl': str(reference_path('references/exomiser_core/ensembl_transcripts')),
-            # 'refseq': str(reference_path('references/exomiser_core/refseq_transcripts')),
-            # 'ucsc': str(reference_path('references/exomiser_core/ucsc_transcripts')),
             'variants': str(reference_path('references/exomiser_core/variants')),
         }
     )
@@ -169,6 +167,16 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
             'cadd_indel_index': str(reference_path('references/exomiser_cadd/indel_index')),
             'cadd_snv': str(reference_path('references/exomiser_cadd/snv_tsv')),
             'cadd_snv_index': str(reference_path('references/exomiser_cadd/snv_index')),
+        }
+    )
+
+    # phenotype
+    phenotype = get_batch().read_input_group(
+        **{
+            'pheno_db': str(reference_path('references/exomiser_phenotype/pheno_db')),
+            'hpo_obo': str(reference_path('references/exomiser_phenotype/hpo_obo')),
+            'rw_string': str(reference_path('references/exomiser_phenotype/rw_string')),
+            'phenix_tar': str(reference_path('references/exomiser_phenotype/phenix_tar')),
         }
     )
 
@@ -194,13 +202,12 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
 
         # todo phenotype data is sprawling, maybe compress that and uncompress inside the image
         # todo sigh deeply
-        """
-        mkdir -p data/2303_hg38
+        f"""
         mkdir -p data/2303_phenotype
-        mkdir -p data/cadd
-        mkdir -p data/remm
         ln -s {cadd_group} data/cadd
-        ...
+        ln -s {remm_group} data/remm
+        ln -s {core_group} data/2303_hg38
+        
         """
         application_properties = (
             'remm.version=0.3.1.post1\n'

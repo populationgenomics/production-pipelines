@@ -204,4 +204,4 @@ class RunExomiser(DatasetStage):
 
         jobs = run_exomiser_batches(single_dict)
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
