@@ -419,7 +419,7 @@ def postprocess_calls(
             f"""
         #use wc instead of grep -c so zero count isn't non-zero exit
         #use grep -P to recognize tab character
-        NUM_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ {{count++}} END {{print count}})
+        NUM_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ {{count++}} END {{print count}}')
         NUM_PASS_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ && /PASS/ {{count++}} END {{print count}}')
         if [ $NUM_SEGMENTS -lt {max_events} ]; then
             if [ $NUM_PASS_SEGMENTS -lt {max_pass_events} ]; then
