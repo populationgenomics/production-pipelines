@@ -418,6 +418,8 @@ def postprocess_calls(
             f"""
         #use wc instead of grep -c so zero count isn't non-zero exit
         #use grep -P to recognize tab character
+        VARIANTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']})
+        echo "Num Variants: $VARIANTS"
         NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
         NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l)
         if [ $NUM_SEGMENTS -lt {max_events} ]; then
@@ -429,6 +431,7 @@ def postprocess_calls(
         else
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
+        cat {j.qc_file}
         """
         )
         get_batch().write_output(j.qc_file, qc_file)
