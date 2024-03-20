@@ -176,7 +176,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
             'pheno_db': str(reference_path('references/exomiser_phenotype/pheno_db')),
             'hpo_obo': str(reference_path('references/exomiser_phenotype/hpo_obo')),
             'rw_string': str(reference_path('references/exomiser_phenotype/rw_string')),
-            'phenix_tar': str(reference_path('references/exomiser_phenotype/phenix_tar')),
+            'phenix_tar': f'{reference_path("references/exomiser_phenotype/phenix")}.tar.gz',
         }
     )
 
@@ -195,43 +195,20 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     # UGH, we need phenopackets?!
     for instructions in chunks(content_dict, chunk_size):
         # todo ok, so we need to overwrite the application.properties file...
-        # it's mostly commented out, but we need to replace it with runtime attributes
-
-        # todo a bunch of stuff
-        # todo alternative - make a data directory and symlink the resources
-
-        # todo phenotype data is sprawling, maybe compress that and uncompress inside the image
-        # todo sigh deeply
-        f"""
-        mkdir -p data/2303_phenotype
-        ln -s {cadd_group} data/cadd
-        ln -s {remm_group} data/remm
-        ln -s {core_group} data/2303_hg38
-        
-        """
-        application_properties = (
-            'remm.version=0.3.1.post1\n'
-            'cadd.version=1.6\n'
-            f'exomiser.hg38.variant-white-list-path={core_group["clinvar"]}\n'
-            'exomiser.phenotype.data-version=2302\n'
-            '#exomiser.phenotype.data-directory=${exomiser.data-directory}/${exomiser.phenotype.data-version}_phenotype'
-            'logging.level.com.zaxxer.hikari=ERROR\n'
-            f'exomiser.hg19.remm-path={remm_group["remm"]}\n'
-            f'exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]}\n'
-            f'exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]}\n'
-            'pathogenicitySources: [POLYPHEN, MUTATION_TASTER, SIFT, CADD, REMM]\n'
-            'exomiser.hg38.clin-var-data-version=2302\n'
-            'exomiser.hg38.use-clinvar-white-list=true'
-        )
-
-        original = """
-        remm.version=0.3.1.post1
-        cadd.version=1.4
-        exomiser.hg19.data-version=2402
-        exomiser.phenotype.data-version=2402
-        logging.level.com.zaxxer.hikari=ERROR
-        """
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         families = list(instructions.keys())
         job = get_batch().new_bash_job(f'Run Exomiser for {families}')
+        job.storage('200Gi')
+        job.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0')
+        job.command(f"""
+        mkdir -p data/2303_phenotype
+        tar xzf {phenotype['phenix_tar']} -C data/2303_phenotype
+        mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} data/2303_phenotype/
+        ln -s {core_group} data/2303_hg38
+        echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
+        echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
+        echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
+        tree data
+        cat application.properties
+        """)
