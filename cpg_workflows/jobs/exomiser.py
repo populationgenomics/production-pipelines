@@ -193,12 +193,12 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     # now chunk the jobs - load resources, then run a bunch of families
     # TODO can we load more cores and run tasks in parallel? e.g. end with &
     # UGH, we need phenopackets?!
-    for instructions in chunks(content_dict, chunk_size):
+    families = sorted(content_dict.keys())
+    for family_chunk in chunks(families, chunk_size):
         # todo ok, so we need to overwrite the application.properties file...
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
-        families = list(instructions.keys())
-        job = get_batch().new_bash_job(f'Run Exomiser for {families}')
+        job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
         job.storage('200Gi')
         job.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0')
         job.command(f"""
