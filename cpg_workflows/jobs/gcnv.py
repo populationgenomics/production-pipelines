@@ -420,8 +420,8 @@ def postprocess_calls(
         #use grep -P to recognize tab character
         VARIANTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']})
         echo "Num Variants: $VARIANTS"
-        NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
-        NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l)
+        NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l | xargs)
+        NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l | xargs)
         if [ $NUM_SEGMENTS -lt {max_events} ]; then
             if [ $NUM_PASS_SEGMENTS -lt {max_pass_events} ]; then
               echo "PASS" >> {j.qc_file}
