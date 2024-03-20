@@ -414,6 +414,7 @@ def postprocess_calls(
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
         # do some additional stuff to determine pass/fail
+        # flake8: noqa
         j.command(
             f"""
         #use wc instead of grep -c so zero count isn't non-zero exit
