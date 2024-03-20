@@ -183,7 +183,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     # remm
     remm_group = get_batch().read_input_group(
         **{
-            'remm': str(reference_path('exomiser_remm/remm')),
+            'remm': str(reference_path('exomiser_remm/remm_tsv')),
             'remm_index': str(reference_path('exomiser_remm/remm_tsv')),
         }
     )
