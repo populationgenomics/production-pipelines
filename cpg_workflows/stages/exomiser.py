@@ -18,7 +18,7 @@ from cpg_workflows.jobs.exomiser import (
     run_exomiser_batches,
     create_vds_jobs
 )
-# from cpg_workflows.stages.aip import query_for_latest_mt
+from cpg_workflows.stages.aip import query_for_latest_mt
 from cpg_workflows.workflow import (
     get_workflow,
     StageInput,
@@ -118,8 +118,8 @@ class CreateFamilyVCFs(DatasetStage):
             k: v for k, v in dataset_families.items() if k in expected_out
         }
 
-        # mt_path = query_for_latest_mt(dataset.name)
-        mt_path = 'gs://cpg-acute-care-test/mt/9b8fa425cf500067c4802e030d8be35598a792_3-acute-care.mt'
+        mt_path = query_for_latest_mt(dataset.name)
+        # mt_path = 'gs://cpg-acute-care-test/mt/9b8fa425cf500067c4802e030d8be35598a792_3-acute-care.mt'
         vcf_jobs = extract_vcf_jobs(
             families_to_process,
             mt_path,
