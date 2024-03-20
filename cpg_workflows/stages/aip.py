@@ -59,17 +59,9 @@ from os.path import join
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env, get_batch, image_path
-from metamist.graphql import gql
-
 from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.workflow import (
-    Dataset,
-    DatasetStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -285,9 +277,7 @@ class RunHailSVFiltering(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
         sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
-        sv_mt = get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
-        )
+        sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type))
 
         # this might work? May require some config entries
         if sv_mt is None:
@@ -360,9 +350,7 @@ class ValidateMOI(DatasetStage):
         # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
         sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
-        if sv_path := get_config()['workflow'].get(
-            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
-        ):
+        if sv_path := get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)):
             # bump input_path to contain both source files if appropriate
             input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
