@@ -58,12 +58,9 @@ from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import (
-    authenticate_cloud_credentials_in_job,
-    copy_common_env,
-    get_batch,
-    image_path,
-)
+from cpg_utils.hail_batch import copy_common_env, get_batch, image_path
+from metamist.graphql import gql
+
 from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import (
@@ -183,7 +180,6 @@ class GeneratePanelData(DatasetStage):
         job.image(image_path('aip'))
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         expected_out = self.expected_outputs(dataset)
@@ -218,7 +214,6 @@ class QueryPanelapp(DatasetStage):
         job.image(image_path('aip'))
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
@@ -255,7 +250,6 @@ class RunHailFiltering(DatasetStage):
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
@@ -290,7 +284,10 @@ class RunHailSVFiltering(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name))
+        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
+        sv_mt = get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
+        )
 
         # this might work? May require some config entries
         if sv_mt is None:
@@ -302,7 +299,6 @@ class RunHailSVFiltering(DatasetStage):
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
@@ -355,7 +351,6 @@ class ValidateMOI(DatasetStage):
 
         # auth and copy env
         job.image(image_path('aip'))
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
@@ -364,7 +359,10 @@ class ValidateMOI(DatasetStage):
 
         # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
-        if sv_path := get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name)):
+        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
+        if sv_path := get_config()['workflow'].get(
+            'sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)
+        ):
             # bump input_path to contain both source files if appropriate
             input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
@@ -431,7 +429,6 @@ class CreateAIPHTML(DatasetStage):
         job.image(image_path('aip'))
 
         # auth and copy env
-        authenticate_cloud_credentials_in_job(job)
         copy_common_env(job)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
