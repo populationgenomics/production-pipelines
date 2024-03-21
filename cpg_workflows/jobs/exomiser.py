@@ -5,7 +5,6 @@ import datetime
 import json
 
 import pandas as pd
-from os import path
 
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
@@ -209,7 +208,6 @@ def make_phenopackets(
     Args:
         family_dict ():
         out_path ():
-        vcf ():
 
     Returns:
         the phenopacket as a dictionary
