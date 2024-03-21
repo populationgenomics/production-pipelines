@@ -140,6 +140,22 @@ def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: 
     return vcf_jobs
 
 
+def make_phenopackets(family_dict: dict[str, list[str]], mt_path: str, out_path: Path):
+    """
+    make the phenopackets for the families
+    Args:
+        family_dict ():
+        mt_path ():
+        out_path ():
+
+    Returns:
+
+    """
+    ...
+
+
+
+
 def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     """
     run the exomiser batch
