@@ -216,7 +216,7 @@ def make_phenopackets(
     for family, members in family_dict.items():
 
         # get all affected and unaffected
-        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '1']
+        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
 
         if not affected:
             print(family, members)
