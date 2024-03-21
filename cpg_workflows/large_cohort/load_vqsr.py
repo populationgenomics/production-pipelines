@@ -1,21 +1,22 @@
-import hail as hl
 import logging
 
+import hail as hl
 from cpg_utils import Path
 from cpg_utils.hail_batch import genome_build
+
 from cpg_workflows.utils import can_reuse
 
 
 def run(
-    site_only_vcf_path: Path,
-    out_ht_path: Path,
+    site_only_vcf_path: str,
+    out_ht_path: str,
 ):
     load_vqsr(site_only_vcf_path, out_ht_path)
 
 
 def load_vqsr(
-    site_only_vcf_path: Path,
-    out_ht_path: Path | None = None,
+    site_only_vcf_path: str,
+    out_ht_path: str | None = None,
 ) -> hl.Table:
     """
     Convert VQSR VCF to HT
