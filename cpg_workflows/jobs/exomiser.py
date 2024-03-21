@@ -219,7 +219,7 @@ def make_phenopackets(
         affected = [sg for sg in members if str(sg.pedigree.phenotype) == '1']
 
         if not affected:
-            print(family)
+            print(family, members)
             raise ValueError('No affected individuals in family')
 
         # arbitrarily select a proband for now
