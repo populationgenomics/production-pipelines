@@ -357,6 +357,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                 job.declare_resource_group(mappings={family: {f'{family}_json': '{root}.json'}})
                 # now run it
                 job.command(f'java -Xmx10g -jar exomiser-cli-14.0.0.jar --analysis-settings {local_analysis_file} --vcf {vcf} --ped {ped} --sample {ppk} --output-filename {job[family]} &')
-                get_batch().write_output(job.output, str(content_dict[family]['output']).removesuffix('.json'))
+                get_batch().write_output(job[family], str(content_dict[family]['output']).removesuffix('.json'))
             job.command('wait')
     return all_jobs
