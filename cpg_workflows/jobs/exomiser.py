@@ -160,6 +160,9 @@ def phenopacket_proband(proband: SequencingGroup) -> dict:
 
     hpo_term_string = proband.meta.get(HPO_KEY, '')
     hpo_terms = hpo_term_string.split(',')
+    # todo another greasy hack
+    if not hpo_terms:
+        hpo_terms = ['HP:0000520']
 
     return {
         'subject': {'id': proband.id, 'sex': proband.pedigree.sex.name},
