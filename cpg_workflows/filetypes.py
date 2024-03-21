@@ -49,7 +49,8 @@ class CramOrBamPath(AlignmentInput, ABC):
 
     @property
     @abstractmethod
-    def ext(self) -> str: ...
+    def ext(self) -> str:
+        """The canonical extension for the file type, without a '.' at the start."""
 
     @property
     @abstractmethod
