@@ -54,7 +54,8 @@ class CramOrBamPath(AlignmentInput, ABC):
 
     @property
     @abstractmethod
-    def index_ext(self) -> str: ...
+    def index_ext(self) -> str:
+        """The canonical index file extension, without a '.' at the start."""
 
     def __str__(self) -> str:
         return str(self.path)
