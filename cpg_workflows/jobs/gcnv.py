@@ -264,7 +264,7 @@ def shard_gcnv(
         j.image(image_path('gatk_gcnv'))
 
         # set highmem resources for this job
-        job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
+        job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
         resource_string = (
             '--java-options '
@@ -397,8 +397,7 @@ def postprocess_calls(
       --sample-index {sample_index} \\
       --output-genotyped-intervals {j.output['intervals.vcf.gz']} \\
       --output-genotyped-segments {j.output['segments.vcf.gz']} \\
-      --output-denoised-copy-ratios {j.output['ratios.tsv']} \\
-      {extra_args}
+      --output-denoised-copy-ratios {j.output['ratios.tsv']} {extra_args}
     """
     )
 
@@ -415,12 +414,12 @@ def postprocess_calls(
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
         # do some additional stuff to determine pass/fail
+        # flake8: noqa
         j.command(
             f"""
-        #use wc instead of grep -c so zero count isn't non-zero exit
-        #use grep -P to recognize tab character
-        NUM_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep '' | wc -l)
-        NUM_PASS_SEGMENTS=$(zgrep '^[^#]' {j.output['segments.vcf.gz']} | grep -v '0/0' | grep -v -P '\t0:1:' | grep 'PASS' | wc -l)
+        #use awk instead of grep - grep returning no lines causes a pipefailure
+        NUM_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ {{count++}} END {{print count}}')
+        NUM_PASS_SEGMENTS=$(zcat {j.output['segments.vcf.gz']} | awk '!/^#/ && !/0\/0/ && !/\t0:1:/ && /PASS/ {{count++}} END {{print count}}')
         if [ $NUM_SEGMENTS -lt {max_events} ]; then
             if [ $NUM_PASS_SEGMENTS -lt {max_pass_events} ]; then
               echo "PASS" >> {j.qc_file}
@@ -430,6 +429,7 @@ def postprocess_calls(
         else
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
+        cat {j.qc_file}
         """
         )
         get_batch().write_output(j.qc_file, qc_file)
