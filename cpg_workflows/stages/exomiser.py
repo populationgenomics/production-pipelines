@@ -14,13 +14,15 @@ from cpg_utils import to_path, Path
 from cpg_workflows.jobs.exomiser import (
     extract_vcf_jobs,
     extract_mini_ped_files,
+    make_phenopackets,
     mt_from_vds,
     run_exomiser_batches,
-    create_vds_jobs
+    create_vds_jobs,
 )
 from cpg_workflows.stages.aip import query_for_latest_mt
 from cpg_workflows.workflow import (
     get_workflow,
+    SequencingGroup,
     StageInput,
     StageOutput,
     DatasetStage,
@@ -31,15 +33,15 @@ from cpg_workflows.utils import exists
 
 
 @lru_cache(maxsize=0)
-def find_families(dataset: Dataset) -> dict[str, list[str]]:
+def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     """
     Find all the families in the project
     group on family ID and return the list of IDs
     """
-    dict_by_family: dict[str, list[str]] = {}
+    dict_by_family: dict[str, list[SequencingGroup]] = {}
     for sg in dataset.get_sequencing_groups():
         family_id = str(sg.pedigree.fam_id)
-        dict_by_family.setdefault(family_id, []).append(sg.id)
+        dict_by_family.setdefault(family_id, []).append(sg)
 
     return dict_by_family
 
@@ -62,11 +64,7 @@ class RDCombiner(DatasetStage):
         return self.make_outputs(dataset, output, jobs=jobs)
 
 
-@stage(
-    required_stages=RDCombiner,
-    analysis_keys=['mt'],
-    analysis_type='custom'
-)
+@stage(required_stages=RDCombiner, analysis_keys=['mt'], analysis_type='custom')
 class VDStoMT(DatasetStage):
     """
     make a VDS from that MT
@@ -119,21 +117,54 @@ class CreateFamilyVCFs(DatasetStage):
         }
 
         mt_path = query_for_latest_mt(dataset.name)
-        vcf_jobs = extract_vcf_jobs(
-            families_to_process,
-            mt_path,
-            dataset.tmp_prefix() / self.name,
-        )
+        vcf_jobs = extract_vcf_jobs(families_to_process, mt_path, expected_out)
         return self.make_outputs(dataset, data=expected_out, jobs=vcf_jobs)
+
+
+@stage
+class MakePhenopackets(DatasetStage):
+    """
+    for each relevant family, make some Phenopackets
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        family_dict = find_families(dataset)
+        families_without_results = []
+
+        # the output path of the next step
+        batch_prefix = get_workflow().prefix / 'RunExomiser'
+
+        # get all families without results
+        for family in family_dict.keys():
+            if not exists(batch_prefix / f'{family}_results.json'):
+                families_without_results.append(family)
+
+        return {
+            family: self.prefix / f'{family}_phenopacket.json'
+            for family in families_without_results
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        this actually doesn't run as Jobs, but as a function...
+        bit of an anti-pattern in this pipeline?
+        """
+
+        dataset_families = find_families(dataset)
+        expected_out = self.expected_outputs(dataset)
+        families_to_process = {
+            k: v for k, v in dataset_families.items() if k in expected_out
+        }
+        make_phenopackets(families_to_process, expected_out)
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[])
 
 
 @stage
 class MakePedExtracts(DatasetStage):
     """
     from the dataset MT, we make a PED per-family
-
-    todo actually, don't. Make phenopackets...
     """
+
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
         families_without_results = []
@@ -157,12 +188,11 @@ class MakePedExtracts(DatasetStage):
         families_to_process = {
             k: v for k, v in dataset_families.items() if k in expected_out
         }
-        out_path = dataset.tmp_prefix() / self.name
-        extract_mini_ped_files(dataset, families_to_process, out_path)
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[])
+        extract_mini_ped_files(families_to_process, expected_out)
+        return self.make_outputs(dataset, data=expected_out, jobs=[])
 
 
-@stage(required_stages=[CreateFamilyVCFs, MakePedExtracts])
+@stage(required_stages=[CreateFamilyVCFs, MakePedExtracts, MakePhenopackets])
 class RunExomiser(DatasetStage):
     """
     Run exomiser on the family VCFs, using the mini-vcf and mini-ped
@@ -183,7 +213,7 @@ class RunExomiser(DatasetStage):
                 families_without_results.append(family)
         return {
             family: dataset.prefix() / f'{family}_results.json'
-            for family in family_dict.keys()
+            for family in families_without_results
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -191,6 +221,7 @@ class RunExomiser(DatasetStage):
         output_dict = self.expected_outputs(dataset)
         vcf_inputs = inputs.as_dict(target=dataset, stage=CreateFamilyVCFs)
         ped_inputs = inputs.as_dict(target=dataset, stage=MakePedExtracts)
+        ppk_files = inputs.as_dict(target=dataset, stage=MakePhenopackets)
 
         # expecting all the keys to be the same...
         single_dict = {
@@ -198,10 +229,13 @@ class RunExomiser(DatasetStage):
                 'output': output_dict[family],
                 'vcf': vcf_inputs[family],
                 'ped': ped_inputs[family],
+                'phenopacket': ppk_files[family],
             }
             for family in output_dict.keys()
         }
 
-        jobs = run_exomiser_batches(single_dict)
+        jobs = run_exomiser_batches(single_dict, tempdir=self.tmp_prefix / 'exomiser')
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(
+            dataset, data=self.expected_outputs(dataset), jobs=jobs
+        )

@@ -1,13 +1,30 @@
 """
 jobs required for the exomiser workflow
 """
+import datetime
+import json
+
 import pandas as pd
+from os import path
+
 from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, authenticate_cloud_credentials_in_job, reference_path
-from cpg_workflows.scripts import extract_vcf_from_mt, mt_from_vds as vds2mt, vds_from_gvcfs
-from cpg_workflows.targets import Dataset, SequencingGroup
+from cpg_utils.hail_batch import (
+    get_batch,
+    authenticate_cloud_credentials_in_job,
+    reference_path,
+)
+
+from cpg_workflows.scripts import (
+    extract_vcf_from_mt,
+    mt_from_vds as vds2mt,
+    vds_from_gvcfs,
+)
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
+
+
+HPO_KEY: str = 'HPO Terms (present)'
 
 
 def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
@@ -28,7 +45,9 @@ def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
     job = get_batch().new_job('Make VDS from gVCFs')
     authenticate_cloud_credentials_in_job(job)
     job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {vds_script} --gvcfs {gvcf_paths} --sgids {sequencing_group_names} --out {out_path}')
+    job.command(
+        f'python3 {vds_script} --gvcfs {gvcf_paths} --sgids {sequencing_group_names} --out {out_path}'
+    )
     job.storage('10Gi')
     job.cpu(4)
     job.memory('standard')
@@ -59,53 +78,40 @@ def mt_from_vds(vds_path: str, out_path: str):
 
 
 def extract_mini_ped_files(
-    dataset: Dataset, family_dict: dict[str, list[str]], out_prefix: Path
+    family_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]
 ):
     """
     write the mini-ped for each family
 
     Args:
-        dataset (Dataset): the dataset
-        family_dict (dict[str, list[str]]): family ID to list of SG IDs
-        out_prefix (Path): temp dir to write the mini-peds to
+        family_dict (dict[str, list[SequencingGroup]]): family ID to list of SG IDs
+        out_paths (Path): temp dir to write the mini-peds to
     """
 
-    # collect all members per-family
-    datasets_by_family: dict[str, list[dict]] = {}
-
-    # limit PEDs to only those in the family_dict
-    relevant_families = set(family_dict.keys())
-
     # query for SG entities, group by family
-    for sg in dataset.get_sequencing_groups():
-        ped_details = sg.pedigree.get_ped_dict()
+    for family_id, members in family_dict.items():
 
-        # skip ones we're no interested in
-        if ped_details['Family.ID'] not in relevant_families:
-            continue
-
-        # add to the list for the family
-        datasets_by_family.setdefault(ped_details['Family.ID'], []).append(ped_details)
-
-    # now make the pedigree for each family
-    for family, members in datasets_by_family.items():
-        df = pd.DataFrame(members)
-        ped_path = out_prefix / f'{family}.ped'
-
+        ped_path = out_paths[family_id]
         # don't recreate if it exists
         if not ped_path.exists():
+            # make the pedigree for this family
+            df = pd.DataFrame([sg.pedigree.get_ped_dict() for sg in members])
             with ped_path.open('w') as ped_file:
                 df.to_csv(ped_file, sep='\t', index=False, header=False)
 
 
-def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: Path):
+def extract_vcf_jobs(
+    family_dict: dict[str, list[SequencingGroup]],
+    mt_path: str,
+    out_path: dict[str, Path],
+):
     """
     create the jobs to extract the VCFs from the MT
 
     Args:
         family_dict (dict[str, list[str]]): family ID to list of SG IDs
         mt_path (str): path to the MT
-        out_path (str): temp dir to write the VCFs to
+        out_path (dict): path to each family's output file
 
     Returns:
         list[hb.Job]: the list of jobs
@@ -114,10 +120,12 @@ def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: 
     vcf_jobs = []
 
     # find the path to the script in _this_ container
-    script_path = str(extract_vcf_from_mt.__file__).removeprefix('/production-pipelines')
+    script_path = str(extract_vcf_from_mt.__file__).removeprefix(
+        '/production-pipelines'
+    )
     for family_id, sg_ids in family_dict.items():
 
-        vcf_target = out_path / f'{family_id}.vcf.bgz'
+        vcf_target = out_path[family_id]
         if vcf_target.exists():
             continue
 
@@ -135,28 +143,120 @@ def extract_vcf_jobs(family_dict: dict[str, list[str]], mt_path: str, out_path: 
         # )
 
         authenticate_cloud_credentials_in_job(job)
-        job.command(f'python3 {script_path} {mt_path} {" ".join(sg_ids)} {vcf_target}')
+        sgid_ids = ','.join([sg.id for sg in family_dict[family_id]])
+        job.command(f'python3 {script_path} {mt_path} {sgid_ids} {vcf_target}')
         vcf_jobs.append(job)
     return vcf_jobs
 
 
-def make_phenopackets(family_dict: dict[str, list[str]], mt_path: str, out_path: Path):
+def phenopacket_proband(proband: SequencingGroup) -> dict:
     """
-    make the phenopackets for the families
+    generates a phenopacket for a single proband
     Args:
-        family_dict ():
-        mt_path ():
-        out_path ():
+        proband (SequencingGroup):
 
     Returns:
-
+        ppk format dictionary
     """
-    ...
+
+    hpo_term_string = proband.meta.get(HPO_KEY, '')
+    hpo_terms = hpo_term_string.split(',')
+
+    return {
+        'subject': {'id': proband.id, 'sex': proband.pedigree.sex.name},
+        'phenotypicFeatures': [
+            {'type': {'id': hpo, 'label': hpo}} for hpo in hpo_terms
+        ],
+    }
 
 
+def phenopacket_relatives(members: list[SequencingGroup]) -> list[dict]:
+    """
+    generates a phenopacket pedigree for the whole family
+
+    Args:
+        members (list[SequencingGroup]):
+
+    Returns:
+        ppk format dictionary
+    """
+
+    phenopackets: list[dict] = []
+    for sg in members:
+        ped_deets = sg.get_ped_dict()
+        sg_dict = {
+            'individualId': sg.id,
+            'sex': sg.pedigree.sex.name,
+            'affectedStatus': 'AFFECTED'
+            if str(sg.pedigree.phenotype) == '1'
+            else 'UNAFFECTED',
+        }
+        if ped_deets['Father.ID']:
+            sg_dict['paternalId'] = ped_deets['Father.ID']
+        if ped_deets['Mother.ID']:
+            sg_dict['paternalId'] = ped_deets['Mother.ID']
+    return phenopackets
 
 
-def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
+def make_phenopackets(
+    family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]
+):
+    """
+    make the phenopackets for the families
+    this gets added as --sample
+    also requires the ped with --ped
+
+    Args:
+        family_dict ():
+        out_path ():
+        vcf ():
+
+    Returns:
+        the phenopacket as a dictionary
+    """
+
+    for family, members in family_dict.items():
+
+        # get all affected and unaffected
+        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '1']
+
+        if not affected:
+            print(family)
+            raise ValueError('No affected individuals in family')
+
+        # arbitrarily select a proband for now
+        proband = affected.pop()
+
+        # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
+        phenopacket: dict = {
+            'id': family,
+            'proband': phenopacket_proband(proband),
+            'pedigree': phenopacket_relatives(members),
+            'metaData': {
+                'created': datetime.datetime.now(),
+                'createdBy': 'cpg_workflows',
+                'resources': [
+                    {
+                        "id": "hp",
+                        "name": "Human Phenotype Ontology",
+                        "url": "http://purl.obolibrary.org/obo/hp.owl",
+                        "version": "17-06-2019",
+                        "namespacePrefix": "HP",
+                        "iriPrefix": "http://purl.obolibrary.org/obo/HP_",
+                    }
+                ],
+                'phenopacketSchemaVersion': 1.0,
+            },
+        }
+
+        if affected:
+            phenopacket['relatives'] = [phenopacket_proband(each_aff) for each_aff in affected]
+
+        with out_path[family].open('w') as ppk_file:
+            json.dump(phenopacket, ppk_file, indent=2)
+
+
+def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path):
     """
     run the exomiser batch
     """
@@ -204,18 +304,27 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         }
     )
 
+    # copy in the analysis file
+    dest = tempdir / 'analysis_settings.json'
+    path_to_analyis = to_path(__file__).parent / 'exomiser_analysis.yaml'
+    path_to_analyis.copy(dest)
+    local_analysis_file = get_batch().read_input(str(dest))
+
     # now chunk the jobs - load resources, then run a bunch of families
-    # TODO can we load more cores and run tasks in parallel? e.g. end with &
-    # UGH, we need phenopackets?!
     families = sorted(content_dict.keys())
+    all_jobs = []
     for family_chunk in chunks(families, chunk_size):
-        # todo ok, so we need to overwrite the application.properties file...
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
+        all_jobs.append(job)
         job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
-        job.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0')
-        job.command(f"""
+        job.memory('60Gi')
+        job.image(
+            'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0'
+        )
+        job.command(
+            f"""
         mkdir -p data/2303_phenotype
         tar xzf {phenotype['phenix_tar']} -C data/2303_phenotype
         mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} data/2303_phenotype/
@@ -226,3 +335,30 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         tree data
         cat application.properties
         """)
+
+        # make this prettier
+
+        for parallel_chunk in chunks(family_chunk, 4):
+            for family in parallel_chunk:
+                # read in VCF & index
+                vcf = get_batch().read_input_group(
+                    **{
+                        f'{family}_vcf': str(content_dict[family]['vcf']),
+                        f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
+                    }
+                )
+                # read in phenopacket
+                ppk = get_batch().read_input_group(
+                    **{
+                        f'{family}_phenopacket': str(content_dict[family]['phenopacket']),
+                    }
+                )
+                # read in ped
+                ped = get_batch().read_input(str(content_dict[family]['ped']))
+
+                job.declare_resource_group(mappings={family: {f'{family}_json': '{root}.json'}})
+                # now run it
+                job.command(f'java -Xmx10g -jar exomiser-cli-14.0.0.jar --analysis-settings {local_analysis_file} --vcf {vcf} --ped {ped} --sample {ppk} --output-filename {job[family]} &')
+                get_batch().write_output(job.output, str(content_dict[family]['output']).removesuffix('.json'))
+            job.command('wait')
+    return all_jobs
