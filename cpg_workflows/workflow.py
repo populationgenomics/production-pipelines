@@ -284,7 +284,7 @@ class StageInput:
             )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFoundError(
-                f'Not found output for {target} from stage {stage.__name__}, required ' f'for stage {self.stage.name}',
+                f'Not found output for {target} from stage {stage.__name__}, required for stage {self.stage.name}',
             )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
@@ -648,14 +648,14 @@ class Stage(Generic[TargetT], ABC):
         if reusable and not first_missing_path:
             if target.forced:
                 logging.info(
-                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target ' f'to rerun this stage)',
+                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target to rerun this stage)',
                 )
                 return Action.QUEUE
             elif self.forced:
-                logging.info(f'{self.name}: {target} [QUEUE] (can reuse, but forcing the stage ' f'to rerun)')
+                logging.info(f'{self.name}: {target} [QUEUE] (can reuse, but forcing the stage to rerun)')
                 return Action.QUEUE
             else:
-                logging.info(f'{self.name}: {target} [REUSE] (expected outputs exist: ' f'{expected_out})')
+                logging.info(f'{self.name}: {target} [REUSE] (expected outputs exist: {expected_out})')
                 return Action.REUSE
 
         logging.info(f'{self.name}: {target} [QUEUE]')
@@ -973,7 +973,7 @@ class Workflow:
         for fs in first_stages:
             for descendant in nx.descendants(graph, fs):
                 if not stages_d[descendant].skipped:
-                    logging.info(f'Skipping stage {descendant} (precedes {fs} listed in ' f'first_stages)')
+                    logging.info(f'Skipping stage {descendant} (precedes {fs} listed in first_stages)')
                     stages_d[descendant].skipped = True
                 for grand_descendant in nx.descendants(graph, descendant):
                     if not stages_d[grand_descendant].assume_outputs_exist:
@@ -1064,7 +1064,7 @@ class Workflow:
                 + "'first_stages', 'last_stages' and/or 'skip_stages'",
             )
 
-        logging.info(f'End stages for the workflow "{self.name}": ' f'{[cls.__name__ for cls in requested_stages]}')
+        logging.info(f'End stages for the workflow "{self.name}": {[cls.__name__ for cls in requested_stages]}')
         logging.info('Stages additional configuration:')
         logging.info(f'  workflow/skip_stages: {skip_stages}')
         logging.info(f'  workflow/only_stages: {only_stages}')
@@ -1100,7 +1100,7 @@ class Workflow:
                     newly_implicitly_added_d[reqstg.name] = reqstg
 
             if newly_implicitly_added_d:
-                logging.info(f'Additional implicit stages: ' f'{list(newly_implicitly_added_d.keys())}')
+                logging.info(f'Additional implicit stages: {list(newly_implicitly_added_d.keys())}')
                 _stages_d |= newly_implicitly_added_d
             else:
                 # No new implicit stages added, so can stop the depth-search here
@@ -1137,7 +1137,7 @@ class Workflow:
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
 
-        logging.info(f'Final list of stages after applying stage configuration options:\n' f'{final_set_of_stages}')
+        logging.info(f'Final list of stages after applying stage configuration options:\n{final_set_of_stages}')
 
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:

@@ -207,7 +207,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str |
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    logging.info(f'Found {len(mt_sample_ids)} samples in mt, ' f'subsetting to {len(sample_ids)} samples.')
+    logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(sample_ids)} samples.')
 
     n_rows_before = mt.count_rows()
 

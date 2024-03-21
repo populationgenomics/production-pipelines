@@ -78,7 +78,7 @@ def set_config(
         elif isinstance(config, str):
             f.write(config)
         else:
-            raise TypeError(f'Expected config to be a string, dict, or IDictRepresentable, but' f'got {type(config)}')
+            raise TypeError(f'Expected config to be a string, dict, or IDictRepresentable, butgot {type(config)}')
 
         f.flush()
 

@@ -107,7 +107,7 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
                 new_line, new_len = translate[field['SN']]
                 if field['LN'] != new_len:
                     raise ValueError(
-                        f'{incram}:{field["SN"]}: new length {new_len} differs ' f'from existing {field["LN"]}',
+                        f'{incram}:{field["SN"]}: new length {new_len} differs from existing {field["LN"]}',
                     )
                 print(new_line, file=newhdr)
             else:

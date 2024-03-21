@@ -86,7 +86,7 @@ def complete_analysis_job(
         traceback.print_exc()
         raise
     else:
-        print(f'Created Analysis(id={a_id}, type={analysis_type}, ' f'output={output}) in {project_name}')
+        print(f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}')
         return
 
 

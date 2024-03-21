@@ -103,7 +103,7 @@ def collect_read_counts(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
+    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     cmd = f"""
     gatk {resource_string} CollectReadCounts \\
@@ -155,7 +155,7 @@ def filter_and_determine_ploidy(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
+    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     counts_input_args = _counts_input_args(counts_paths)
     cmd = ''
@@ -254,7 +254,7 @@ def shard_gcnv(
         # set highmem resources for this job
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
-        resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
+        resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
@@ -312,7 +312,7 @@ def postprocess_calls(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=20)
     job_res.set_to_job(j)
-    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
+    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     reference = fasta_res_group(get_batch())
 
@@ -431,7 +431,7 @@ def joint_segment_vcfs(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(job)
-    resource_string = '--java-options ' f'"-Xms{job_res.get_java_mem_mb()}m ' f'-Xmx{job_res.get_java_mem_mb()}m"'
+    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     vcf_string = ''
     for each_vcf in segment_vcfs:

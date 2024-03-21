@@ -93,7 +93,7 @@ def run(
         dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
 
     logging.info(
-        f'Running PCA on {dense_mt.count_cols()} samples, ' f'{dense_mt.count_rows()} sites, ' f'using {n_pcs} PCs',
+        f'Running PCA on {dense_mt.count_cols()} samples, {dense_mt.count_rows()} sites, using {n_pcs} PCs',
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
@@ -178,7 +178,7 @@ def _run_pca_ancestry_analysis(
         )
 
     if n_pcs > samples_to_use:
-        logging.info('Adjusting the number of PCs not to exceed the number of samples:' f'{n_pcs} -> {samples_to_use}')
+        logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
 
     eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)

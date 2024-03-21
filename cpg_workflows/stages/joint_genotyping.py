@@ -56,7 +56,7 @@ class JointGenotyping(CohortStage):
                 logging.error(f'Joint genotyping: could not find GVCF for {sgid}')
                 not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
-            raise WorkflowError(f'Joint genotyping: could not find {len(not_found_gvcfs)} ' f'GVCFs, exiting')
+            raise WorkflowError(f'Joint genotyping: could not find {len(not_found_gvcfs)} GVCFs, exiting')
 
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']

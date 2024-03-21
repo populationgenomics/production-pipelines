@@ -283,7 +283,7 @@ def print_contents(
     """
     if len(samples_df) < 400:
         samples_str = samples_df.to_string()
-        logging.info(f'Somalier results, samples (based on {somalier_samples_fpath}):\n' f'{samples_str}\n')
+        logging.info(f'Somalier results, samples (based on {somalier_samples_fpath}):\n{samples_str}\n')
     if len(pairs_df) < 400:
         pairs_str = pairs_df[
             [
@@ -296,7 +296,7 @@ def print_contents(
                 'expected_relatedness',
             ]
         ].to_string()
-        logging.info(f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n' f'{pairs_str}\n')
+        logging.info(f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n{pairs_str}\n')
 
 
 if __name__ == '__main__':

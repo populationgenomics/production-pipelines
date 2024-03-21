@@ -326,7 +326,7 @@ def _align_one(
 
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     if shard_number is not None and number_of_shards_for_realignment is not None:
-        job_name = f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
+        job_name = f'{job_name} {shard_number + 1}/{number_of_shards_for_realignment} '
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
