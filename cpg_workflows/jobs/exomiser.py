@@ -253,7 +253,9 @@ def make_phenopackets(
         }
 
         if affected:
-            phenopacket['relatives'] = [phenopacket_proband(each_aff) for each_aff in affected]
+            phenopacket['relatives'] = [
+                phenopacket_proband(each_aff) for each_aff in affected
+            ]
 
         with out_path[family].open('w') as ppk_file:
             json.dump(phenopacket, ppk_file, indent=2)
@@ -340,7 +342,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
         tree data
         cat application.properties
-        """)
+        """
+        )
 
         # make this prettier
 
@@ -356,20 +359,36 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                 # read in phenopacket
                 ppk = get_batch().read_input_group(
                     **{
-                        f'{family}_phenopacket': str(content_dict[family]['phenopacket']),
+                        f'{family}_phenopacket': str(
+                            content_dict[family]['phenopacket']
+                        ),
                     }
                 )
                 # read in ped
                 ped = get_batch().read_input(str(content_dict[family]['ped']))
 
-                job.declare_resource_group(**{family:{'json': '{root}.json'}})
+                job.declare_resource_group(**{family: {'json': '{root}.json'}})
 
                 # now run it
-                job.command(f'java -Xmx10g -jar exomiser-cli-14.0.0.jar --analysis {local_analysis_file} --vcf {vcf} --assembly hg38 --ped {ped} --sample {ppk} --output-directory results &')
+                job.command(
+                    f'java -Xmx10g -jar exomiser-cli-14.0.0.jar '
+                    f'--analysis {local_analysis_file} '
+                    f'--ped {ped} '
+                    f'--sample {ppk} '
+                    f'--vcf {vcf} '
+                    '--assembly hg38 '
+                    '--output-directory results '
+                    '&'  # run in the background
+                )
             job.command('wait')
 
             # move the results, then copy out
+            # todo - this is a bit of a hack
+            # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
                 job.command(f'mv results/{family}.json {job[family]["json"]}')
-                get_batch().write_output(job[family], str(content_dict[family]['output']).removesuffix('.json'))
+                get_batch().write_output(
+                    job[family],
+                    str(content_dict[family]['output']).removesuffix('.json'),
+                )
     return all_jobs
