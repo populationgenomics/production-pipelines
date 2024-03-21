@@ -1,7 +1,8 @@
-pre-commit
-pylint
 bump2version
 black
+mypy
+pre-commit
+pylint
 pytest
 pytest_mock
 mypy

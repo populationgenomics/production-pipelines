@@ -145,10 +145,10 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     run the exomiser batch
     """
 
+    # each container runs this many families
     chunk_size: int = get_config()['workflow'].get('exomiser_chunk_size', 5)
 
-    # find the exomiser references
-    # first - the core ones
+    # localise the exomiser references
     clinvar_file = reference_path('exomiser_core/clinvar_whitelist')
     core_group = get_batch().read_input_group(
         **{
@@ -188,8 +188,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         }
     )
 
-    # blah
-    ...
     # now chunk the jobs - load resources, then run a bunch of families
     # TODO can we load more cores and run tasks in parallel? e.g. end with &
     # UGH, we need phenopackets?!
@@ -199,7 +197,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
-        job.storage('200Gi')
+        job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
         job.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0')
         job.command(f"""
         mkdir -p data/2303_phenotype

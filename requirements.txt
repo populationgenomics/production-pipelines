@@ -1,0 +1,20 @@
+analysis-runner>=2.43.3
+bokeh
+click
+coloredlogs
+cpg-utils>=4.18.3
+cyvcf2==0.30.18
+elasticsearch==8.*
+fsspec
+hail!=0.2.120  # Temporarily work around hail-is/hail#13337
+metamist>=6.0.4
+networkx>=2.8.3
+numpy
+obonet>=0.3.1  # for HPO parsing
+onnx
+onnxruntime
+pandas
+peddy
+phenopackets>=2.0.2.post1
+skl2onnx
+slack_sdk
