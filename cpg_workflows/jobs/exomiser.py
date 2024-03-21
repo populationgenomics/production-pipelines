@@ -231,7 +231,7 @@ def make_phenopackets(
             'proband': phenopacket_proband(proband),
             'pedigree': phenopacket_relatives(members),
             'metaData': {
-                'created': datetime.datetime.now(),
+                'created': '2024-03-21 21:02:34.209021',
                 'createdBy': 'cpg_workflows',
                 'resources': [
                     {
