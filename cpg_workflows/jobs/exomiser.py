@@ -314,7 +314,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         content = source.readlines()
         with destination.open('w') as dest:
             dest.writelines(content)
-    local_analysis_file = get_batch().read_input(str(dest))
+    local_analysis_file = get_batch().read_input(str(destination))
 
     # now chunk the jobs - load resources, then run a bunch of families
     families = sorted(content_dict.keys())
