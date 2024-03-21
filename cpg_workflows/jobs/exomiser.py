@@ -308,9 +308,12 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
     )
 
     # copy in the analysis file
-    dest = tempdir / 'analysis_settings.json'
+    destination = tempdir / 'analysis_settings.yaml'
     path_to_analyis = to_path(__file__).parent / 'exomiser_analysis.yaml'
-    path_to_analyis.copy(dest)
+    with path_to_analyis.open() as source:
+        content = source.readlines()
+        with destination.open('w') as dest:
+            dest.writelines(content)
     local_analysis_file = get_batch().read_input(str(dest))
 
     # now chunk the jobs - load resources, then run a bunch of families
