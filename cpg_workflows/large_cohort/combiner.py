@@ -86,7 +86,7 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
         params.setdefault('use_genome_default_intervals', True)
     else:
         raise ValueError(
-            'Either combiner/intervals must be set, or workflow/sequencing_type ' 'must be one of: "exome", "genome"',
+            'Either combiner/intervals must be set, or workflow/sequencing_type must be one of: "exome", "genome"',
         )
 
     sequencing_group_names = [s.id for s in sequencing_groups]

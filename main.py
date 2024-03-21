@@ -97,7 +97,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     '--list-last-stages',
     'list_last_stages',
     is_flag=True,
-    help='Only list possible end stages for a workflow, that can be specified ' 'with `workflow/last_stages` in config',
+    help='Only list possible end stages for a workflow, that can be specified with `workflow/last_stages` in config',
 )
 @click.option(
     '--dry-run',

@@ -11,7 +11,7 @@ import click
 import toml
 
 # Path to the gatk-sv dockers
-DOCKERS_URL = 'https://raw.githubusercontent.com/populationgenomics/gatk-sv/main/' 'inputs/values/dockers.json'
+DOCKERS_URL = 'https://raw.githubusercontent.com/populationgenomics/gatk-sv/main/inputs/values/dockers.json'
 
 EXCLUDE_KEYS = [
     'melt_docker',

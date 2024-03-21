@@ -54,7 +54,7 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if len(gvcf_by_sgid) == 0:
-        raise ValueError('Provided samples collection for joint calling should contain ' 'at least one active sample')
+        raise ValueError('Provided samples collection for joint calling should contain at least one active sample')
     scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sgid))
 
     all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
