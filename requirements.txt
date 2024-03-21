@@ -15,6 +15,5 @@ onnx
 onnxruntime
 pandas
 peddy
-phenopackets>=2.0.2.post1
 skl2onnx
 slack_sdk

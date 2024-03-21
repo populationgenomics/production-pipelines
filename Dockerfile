@@ -6,4 +6,6 @@ COPY setup.py .
 COPY cpg_workflows cpg_workflows
 COPY seqr-loading-pipelines/hail_scripts hail_scripts
 COPY gnomad_methods/gnomad gnomad
+COPY requirements.txt .
+COPY requirements-dev.txt .
 RUN pip install .
