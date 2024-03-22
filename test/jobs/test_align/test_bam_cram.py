@@ -210,7 +210,7 @@ class TestPreProcessing:
 
         # Test sorts and indexes alignment input,
         assert re.search(
-            (fr'samtools sort \${{BATCH_TMPDIR}}/inputs/\w+/{file}' r' .* > \$BATCH_TMPDIR/sorted\.bam'),
+            (fr'samtools sort \${{BATCH_TMPDIR}}/inputs/\w+/{file} .* > \$BATCH_TMPDIR/sorted\.bam'),
             cmd,
         )
         # Test override original input
