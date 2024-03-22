@@ -16,14 +16,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          submodules: 'true'
+          submodules: "true"
 
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Install
-        run: pip install .[test]
+        run:
+          pip install 'git+https://github.com/populationgenomics/cpg-utils.git@refactor-repo'
+          pip install .[test]
 
       - name: Run unit tests
         timeout-minutes: 20
