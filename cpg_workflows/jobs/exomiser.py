@@ -1,7 +1,6 @@
 """
 jobs required for the exomiser workflow
 """
-import datetime
 import json
 
 import pandas as pd
@@ -340,7 +339,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
         echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
-        tree .
+        tree -l .
         cat application.properties
         """
         )
@@ -378,8 +377,9 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'--vcf {vcf} '
                     '--assembly hg38 '
                     '--output-directory results '
-                    '&'  # run in the background
+                    # '&'  # run in the background
                 )
+                break
             job.command('wait')
 
             # move the results, then copy out
@@ -391,4 +391,5 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
                 )
+                break
     return all_jobs
