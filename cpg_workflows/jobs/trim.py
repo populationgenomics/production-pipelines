@@ -8,8 +8,8 @@ from enum import Enum
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import Batch, command, image_path
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import Batch, command
 from cpg_workflows.filetypes import FastqPair
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse

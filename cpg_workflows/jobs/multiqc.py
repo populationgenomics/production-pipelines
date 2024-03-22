@@ -9,8 +9,8 @@ from hailtop.batch import Batch, ResourceFile
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, copy_common_env, image_path
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import command, copy_common_env
 from cpg_workflows.python_scripts import check_multiqc
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset

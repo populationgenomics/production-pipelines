@@ -8,7 +8,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.hail_batch import command, image_path
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import command
 from cpg_workflows.filetypes import (
     BamPath,
     FastqPath,

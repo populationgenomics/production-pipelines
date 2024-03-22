@@ -18,8 +18,7 @@ import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path
+from cpg_utils.config import get_config, reference_path
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'

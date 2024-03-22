@@ -10,8 +10,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align

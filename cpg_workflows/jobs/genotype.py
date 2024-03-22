@@ -8,8 +8,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows import utils
 from cpg_workflows.filetypes import CramPath, GvcfPath
 from cpg_workflows.resources import HIGHMEM, STANDARD

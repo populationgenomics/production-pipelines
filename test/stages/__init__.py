@@ -5,7 +5,8 @@ Test building stages DAG.
 from typing import Callable, Type
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import dataset_path, get_batch
+from cpg_utils.config import dataset_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import (
     SequencingGroupStage,

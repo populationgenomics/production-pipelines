@@ -6,8 +6,8 @@ import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
