@@ -327,6 +327,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         all_jobs.append(job)
         job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
         job.memory('60Gi')
+        job.cpu(4)
         job.image(
             'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:14.0.0'
         )
