@@ -199,7 +199,48 @@ def phenopacket_relatives(members: list[SequencingGroup]) -> list[dict]:
     return phenopackets
 
 
-def make_phenopackets(
+def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]):
+    """
+    find the minimal data to run an exomiser analysis
+
+    Args:
+        family_dict ():
+        out_path ():
+
+    Returns:
+
+    """
+
+    for family, members in family_dict.items():
+
+        # get all affected and unaffected
+        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
+
+        if not affected:
+            affected = members
+            print(family, members)
+            print('No affected individuals in family')
+
+        # arbitrarily select a proband for now
+        proband = affected.pop()
+
+        hpo_term_string = proband.meta.get(HPO_KEY, '')
+        hpo_terms = hpo_term_string.split(',')
+        if not hpo_terms:
+            hpo_terms = ['HP:0000520']
+
+        # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
+        phenopacket: dict = {
+            'family': family,
+            'proband': proband.id,
+            'hpoIds': hpo_terms,
+        }
+
+        with out_path[family].open('w') as ppk_file:
+            json.dump(phenopacket, ppk_file, indent=2)
+
+
+def old_make_phenopackets(
     family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]
 ):
     """
@@ -265,9 +306,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
     run the exomiser batch
     """
 
-    # each container runs this many families
-    chunk_size: int = get_config()['workflow'].get('exomiser_chunk_size', 5)
-
     # localise the exomiser references
     clinvar_file = reference_path('exomiser_core/clinvar_whitelist')
     core_group = get_batch().read_input_group(
@@ -308,19 +346,10 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         }
     )
 
-    # copy in the analysis file
-    destination = tempdir / 'analysis_settings.yaml'
-    path_to_analyis = to_path(__file__).parent / 'exomiser_analysis.yaml'
-    with path_to_analyis.open() as source:
-        content = source.readlines()
-        with destination.open('w') as dest:
-            dest.writelines(content)
-    local_analysis_file = get_batch().read_input(str(destination))
-
     # now chunk the jobs - load resources, then run a bunch of families
     families = sorted(content_dict.keys())
     all_jobs = []
-    for family_chunk in chunks(families, chunk_size):
+    for family_chunk in chunks(families, get_config()['workflow'].get('exomiser_chunk_size', 5)):
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
@@ -346,8 +375,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         """
         )
 
-        # make this prettier
-
         for parallel_chunk in chunks(family_chunk, 4):
             for family in parallel_chunk:
                 # read in VCF & index
@@ -356,35 +383,36 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                         f'{family}_vcf': str(content_dict[family]['vcf']),
                         f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
                     }
-                )
+                )[f'{family}_vcf']
+
                 # read in phenopacket
-                ppk = get_batch().read_input_group(
-                    **{
-                        f'{family}_phenopacket': str(
-                            content_dict[family]['phenopacket']
-                        ),
-                    }
-                )
+                ppk = get_batch().read_input(str(content_dict[family]['phenopacket']))
+
                 # read in ped
                 ped = get_batch().read_input(str(content_dict[family]['ped']))
 
-                job.declare_resource_group(**{family: {'json': '{root}.json'}})
+                # # this was really satisfying to work out, but isn't needed
+                job.declare_resource_group(
+                    **{
+                        family: {
+                            'json': '{root}.json',
+                            'yaml': '{root}.yaml'
+                        }
+                    }
+                )
+
+                job.command(f'python3 config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
 
                 # now run it
                 job.command(
                     f'java -Xmx10g -jar exomiser-cli-14.0.0.jar '
-                    f'--analysis {local_analysis_file} '
-                    f'--ped {ped} '
-                    f'--sample {ppk} '
-                    f'--vcf {vcf} '
-                    '--exomiser.data-directory=/exomiser-cli-14.0.0/data/ '
+                    f'--analysis {job[family]["yaml"]} '
                     '--spring.config.location=/exomiser-cli-14.0.0/application.properties '
-                    '--assembly hg38 '
-                    '--output-directory results '
-                    # '&'  # run in the background
+                    '&'  # run in the background
                 )
-                break
+                # break
             job.command('wait')
+            job.command('ls')
 
             # move the results, then copy out
             # todo - this is a bit of a hack
@@ -395,5 +423,5 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
                 )
-                break
+                # break
     return all_jobs
