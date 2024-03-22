@@ -354,7 +354,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
         echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
-        tree -l .
+        tree -l data
         cat application.properties
         set -x
         """,
@@ -380,6 +380,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                 job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
 
                 job.command(f'python3 config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
+                job.command('ls')
 
                 # now run it
                 job.command(
@@ -387,6 +388,11 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'--analysis {job[family]["yaml"]} '
                     '--spring.config.location=/exomiser-cli-14.0.0/application.properties '
                     '&',  # run in the background
+                )
+                job.command(
+                    f'java -Xmx10g -jar exomiser-cli-14.0.0.jar '
+                    f'--analysis examples/test-analysis-multisample.yml '
+                    '&& ls && cat results/Pfeiffer_exomiser.json && cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json &',  # run in the background
                 )
                 # break
             job.command('wait')
