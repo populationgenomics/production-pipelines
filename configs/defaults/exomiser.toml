@@ -1,0 +1,5 @@
+[workflow]
+'nothing' = 'here'
+
+status_reporter = 'metamist'
+exomiser_storage = '200Gi'
