@@ -58,16 +58,11 @@ class FeatureCounts:
     ) -> None:
         self.command = [
             'featureCounts',
-            '-t',
-            feature_type,
-            '-g',
-            attribute,
-            '-s',
-            {'none': '0', 'forward': '1', 'reverse': '2'}[strandness],
-            '-a',
-            str(gtf_file),
-            '-T',
-            str(threads),
+            *('-t', feature_type),
+            *('-g', attribute),
+            *('-s', {'none': '0', 'forward': '1', 'reverse': '2'}[strandness]),
+            *('-a', str(gtf_file)),
+            *('-T', str(threads)),
         ]
 
         if paired_end:

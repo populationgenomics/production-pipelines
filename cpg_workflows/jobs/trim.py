@@ -87,18 +87,14 @@ class Cutadapt:
             raise ValueError(f'Invalid adapter type: {adapter_type}')
         self.command = [
             'cutadapt',
-            '-o',
-            str(output_fastq_pair.r1),
-            '-a',
-            adapters.r1.sequence,
+            *('-o', str(output_fastq_pair.r1)),
+            *('-a', adapters.r1.sequence),
         ]
         if paired:
             self.command.extend(
                 [
-                    '-p',
-                    str(output_fastq_pair.r2),
-                    '-A',
-                    adapters.r2.sequence,
+                    *('-p', str(output_fastq_pair.r2)),
+                    *('-A', adapters.r2.sequence),
                 ],
             )
         if quality_trim:
@@ -143,26 +139,18 @@ class Fastp:
             raise ValueError(f'Invalid adapter type: {adapter_type}')
         self.command = [
             'fastp',
-            '--in1',
-            str(input_fastq_pair.r1),
-            '--out1',
-            str(output_fastq_pair.r1),
-            '--length_required',
-            str(min_length),
-            '--adapter_sequence',
-            adapters.r1.sequence,
-            '--thread',
-            str(nthreads),
+            *('--in1', str(input_fastq_pair.r1)),
+            *('--out1', str(output_fastq_pair.r1)),
+            *('--length_required', str(min_length)),
+            *('--adapter_sequence', adapters.r1.sequence),
+            *('--thread', str(nthreads)),
         ]
         if paired:
             self.command.extend(
                 [
-                    '--in2',
-                    str(input_fastq_pair.r2),
-                    '--out2',
-                    str(output_fastq_pair.r2),
-                    '--adapter_sequence_r2',
-                    adapters.r2.sequence,
+                    *('--in2', str(input_fastq_pair.r2)),
+                    *('--out2', str(output_fastq_pair.r2)),
+                    *('--adapter_sequence_r2', adapters.r2.sequence),
                 ],
             )
         if not polyG:
