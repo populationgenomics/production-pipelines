@@ -193,9 +193,7 @@ hail = [
     "hail",
     "hailtop",
 ]
-# Adjust these for each repository, e.g., removing those that should be
-# local rather than CPG. Also fill in extend_skip below if there are any
-# subdirectories that should be ignored.
+
 cpg = [
     "analysis_runner",
     "cpg_infra",
