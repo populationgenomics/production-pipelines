@@ -11,14 +11,8 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from cpg_workflows.stages.aip import (
-    CreateAIPHTML,
-    GeneratePanelData,
-    GenerateSeqrFile,
-    QueryPanelapp,
-    RunHailFiltering,
-    ValidateMOI,
-)
+from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
+from cpg_workflows.stages.exomiser import RunExomiser
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -27,11 +21,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
     GenotypeBatch,
     MergeBatchSites,
 )
-from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import (
-    AnnotateDatasetSv,
-    AnnotateVcf,
-    MtToEsSv,
-)
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
@@ -48,14 +38,8 @@ from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'aip': [
-        GeneratePanelData,
-        QueryPanelapp,
-        RunHailFiltering,
-        ValidateMOI,
-        CreateAIPHTML,
-        GenerateSeqrFile,
-    ],
+    'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
+    'exomiser': [RunExomiser],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
         DatasetVCF,
@@ -71,7 +55,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
     'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
-    'gatk_sv_multisample_2': [AnnotateVcf, AnnotateDatasetSv, MtToEsSv],
+    'gatk_sv_multisample_2': [MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
 }
