@@ -333,14 +333,14 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         )
         job.command(
             f"""
-        mkdir -p data/2303_phenotype
-        tar xzf {phenotype['phenix_tar']} -C data/2303_phenotype
-        mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} data/2303_phenotype/
-        ln -s {core_group} data/2303_hg38
+        mkdir -p data/2302_phenotype
+        tar xzf {phenotype['phenix_tar']} -C data/2302_phenotype
+        mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} data/2302_phenotype/
+        ln -s {core_group} data/2302_hg38
         echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
         echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
-        tree data
+        tree .
         cat application.properties
         """
         )
