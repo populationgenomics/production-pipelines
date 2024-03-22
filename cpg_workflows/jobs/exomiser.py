@@ -342,6 +342,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
         tree -l .
         cat application.properties
+        set -x
         """
         )
 
