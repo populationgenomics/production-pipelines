@@ -10,8 +10,8 @@ import requests
 import hail as hl
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader

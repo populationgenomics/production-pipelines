@@ -41,7 +41,8 @@ def test_batch_job(tmp_path):
     """
     set_config(config, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import command, dataset_path, get_batch, reset_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import command, get_batch, reset_batch
 
     reset_batch()
     b = get_batch('Test batch job')
@@ -110,7 +111,8 @@ def test_attributes(mocker: MockFixture, tmp_path):
     cpg_workflows = "stub"
     """
 
-    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch, reset_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (

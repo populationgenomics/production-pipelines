@@ -52,7 +52,8 @@ def test_workflow(tmp_path):
     conf = TOML.format(directory=tmp_path)
     set_config(conf, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.workflow import (
         CohortStage,

@@ -6,8 +6,8 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, image_path, query_command
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.query_modules import seqr_loader
 
 

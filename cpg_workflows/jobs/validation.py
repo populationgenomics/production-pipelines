@@ -9,8 +9,8 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import fasta_res_group, image_path, query_command
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import fasta_res_group, query_command
 from cpg_workflows.workflow import SequencingGroup
 
 from ..metamist import AnalysisStatus, get_metamist

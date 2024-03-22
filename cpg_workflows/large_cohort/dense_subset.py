@@ -3,8 +3,7 @@ from pathlib import Path
 
 import hail as hl
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path
+from cpg_utils.config import get_config, reference_path
 from cpg_workflows.utils import can_reuse
 
 

@@ -3,8 +3,8 @@ Stages that implement GATK-gCNV.
 """
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
+from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv

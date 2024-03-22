@@ -16,8 +16,8 @@ from analysis_runner.cromwell import (
     run_cromwell_workflow_from_repo_and_get_outputs,
 )
 from cpg_utils import Path, to_path
-from cpg_utils.config import ConfigError, get_config
-from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
+from cpg_utils.config import ConfigError, get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, get_batch
 from cpg_workflows.batch import make_job_name
 from cpg_workflows.workflow import Cohort, Dataset
 

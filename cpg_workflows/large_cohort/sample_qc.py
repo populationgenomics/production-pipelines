@@ -7,8 +7,8 @@ import logging
 import hail as hl
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex

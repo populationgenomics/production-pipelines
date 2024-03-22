@@ -7,8 +7,8 @@ import logging
 from hailtop.batch import ResourceGroup
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
 

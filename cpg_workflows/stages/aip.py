@@ -57,8 +57,8 @@ from functools import lru_cache
 from os.path import join
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import copy_common_env, get_batch, image_path
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import copy_common_env, get_batch
 from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage

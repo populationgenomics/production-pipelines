@@ -7,8 +7,8 @@ from typing import Literal
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, fasta_res_group, image_path
+from cpg_utils import Path, image_path, to_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 

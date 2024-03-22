@@ -17,8 +17,8 @@ from bokeh.transform import factor_cmap, factor_mark
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 
 PROVIDED_LABEL = 'Provided ancestry'
 INFERRED_LABEL = 'Inferred ancestry'
