@@ -304,7 +304,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
     remm_group = get_batch().read_input_group(
         **{
             'remm': str(reference_path('exomiser_remm/remm_tsv')),
-            'remm_index': str(reference_path('exomiser_remm/remm_tsv')),
+            'remm_index': str(reference_path('exomiser_remm/remm_index')),
         }
     )
 
@@ -375,6 +375,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'--ped {ped} '
                     f'--sample {ppk} '
                     f'--vcf {vcf} '
+                    '--exomiser.data-directory=/exomiser-cli-14.0.0/data/ '
+                    '--spring.config.location=/exomiser-cli-14.0.0/application.properties '
                     '--assembly hg38 '
                     '--output-directory results '
                     # '&'  # run in the background
