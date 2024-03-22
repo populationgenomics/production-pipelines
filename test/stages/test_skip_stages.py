@@ -1,6 +1,7 @@
 """
 Test building stages DAG.
 """
+
 from pytest_mock import MockFixture
 
 from .. import set_config
@@ -27,7 +28,7 @@ def test_skip_stages(mocker: MockFixture, tmp_path):
 
     # Skip stages with outputs that already exist
     check_expected_outputs = false
-    
+
     skip_stages = ['A2']
 
     [storage.default]

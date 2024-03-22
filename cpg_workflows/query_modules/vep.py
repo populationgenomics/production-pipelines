@@ -166,7 +166,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                 }>,
                 variant_class:str
             }
-        """
+        """,
         )
     elif vep_version == '105':
         json_schema = hl.dtype(
@@ -226,7 +226,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                         ClinVar:array<str>,
                         UniProt:array<str>,
                         OMIM:array<float64>
-                    } 
+                    }
                 }>,
                 context:str,
                 end:int32,
@@ -320,15 +320,13 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                     variant_allele:str
                 }>,
                 variant_class:str
-            }"""
+            }""",
         )
 
     else:
         raise AssertionError(f'VEP version {vep_version} not supported')
 
-    ht = hl.import_table(
-        paths=vep_result_paths, no_header=True, types={'f0': json_schema}
-    )
+    ht = hl.import_table(paths=vep_result_paths, no_header=True, types={'f0': json_schema})
     ht = ht.transmute(vep=ht.f0)
     # Can't use ht.vep.start for start because it can be modified by VEP (e.g. it
     # happens for indels). So instead parsing POS from the original VCF line stored

@@ -4,7 +4,6 @@ from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
 
 from .types import DatasetId
 
-
 DEFAULT_DATASET_NAME: DatasetId = 'local-test'
 
 

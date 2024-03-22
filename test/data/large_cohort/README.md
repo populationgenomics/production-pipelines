@@ -5,8 +5,8 @@ To prepare data:
 export GCS_OAUTH_TOKEN=$(gcloud auth application-default print-access-token)
 mkdir -p gvcf
 for s in SAMPLE1 SAMPLE2
-do 
-  bcftools view -R intervals.bed gs://cpg-thousand-genomes-main/gvcf/$s.g.vcf.gz -Oz -o gvcf/$s.g.vcf.gz 
+do
+  bcftools view -R intervals.bed gs://cpg-thousand-genomes-main/gvcf/$s.g.vcf.gz -Oz -o gvcf/$s.g.vcf.gz
   tabix gvcf/$s.g.vcf.gz
 done
 

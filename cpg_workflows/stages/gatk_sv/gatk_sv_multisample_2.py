@@ -15,7 +15,6 @@ from cpg_utils.hail_batch import (
     get_batch,
     image_path,
 )
-
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.seqr_loader_sv import (
     annotate_cohort_jobs_sv,
@@ -101,8 +100,7 @@ class CombineExclusionLists(CohortStage):
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
 
         all_filter_lists = [
-            str(batch_prefix / batch_name / 'FilterBatch' / 'outliers.samples.list')
-            for batch_name in batch_names
+            str(batch_prefix / batch_name / 'FilterBatch' / 'outliers.samples.list') for batch_name in batch_names
         ]
 
         # check for the existence of each file? Should all exist, even if empty
@@ -112,7 +110,7 @@ class CombineExclusionLists(CohortStage):
         authenticate_cloud_credentials_in_job(job)
         job.command(
             'gcloud storage objects compose '
-            f'{" ".join(all_filter_lists)} {self.expected_outputs(cohort)["exclusion_list"]}'
+            f'{" ".join(all_filter_lists)} {self.expected_outputs(cohort)["exclusion_list"]}',
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
@@ -177,64 +175,36 @@ class MakeCohortVcf(CohortStage):
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix
-            / batch_name
-            / 'GenotypeBatch'
-            / f'{cohort_partial_hash}_pesr.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_pesr.vcf.gz'
             for batch_name in batch_names
         ]
         depth_vcfs = [
-            batch_prefix
-            / batch_name
-            / 'GenotypeBatch'
-            / f'{cohort_partial_hash}_depth.vcf.gz'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.vcf.gz'
             for batch_name in batch_names
         ]
         sr_pass = [
-            batch_prefix
-            / batch_name
-            / 'GenotypeBatch'
-            / f'{cohort_partial_hash}_genotype_SR_part2_bothside_pass.txt'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_genotype_SR_part2_bothside_pass.txt'
             for batch_name in batch_names
         ]
         sr_fail = [
-            batch_prefix
-            / batch_name
-            / 'GenotypeBatch'
-            / f'{cohort_partial_hash}_genotype_SR_part2_background_fail.txt'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_genotype_SR_part2_background_fail.txt'
             for batch_name in batch_names
         ]
         depth_depth_cutoff = [
-            batch_prefix
-            / batch_name
-            / 'GenotypeBatch'
-            / f'{cohort_partial_hash}_depth.depth_sepcutoff.txt'
+            batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_depth.depth_sepcutoff.txt'
             for batch_name in batch_names
         ]
-        filter_batch_cutoffs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'cutoffs'
-            for batch_name in batch_names
-        ]
+        filter_batch_cutoffs = [batch_prefix / batch_name / 'FilterBatch' / 'cutoffs' for batch_name in batch_names]
         bincov_files = [
-            batch_prefix
-            / batch_name
-            / 'GatherBatchEvidence'
-            / 'GatherBatchEvidence.RD.txt.gz'
+            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.RD.txt.gz'
             for batch_name in batch_names
         ]
         disc_files = [
-            batch_prefix
-            / batch_name
-            / 'GatherBatchEvidence'
-            / 'GatherBatchEvidence.pe.txt.gz'
+            batch_prefix / batch_name / 'GatherBatchEvidence' / 'GatherBatchEvidence.pe.txt.gz'
             for batch_name in batch_names
         ]
         median_cov_files = [
-            batch_prefix
-            / batch_name
-            / 'GatherBatchEvidence'
-            / 'medianCov.transposed.bed'
-            for batch_name in batch_names
+            batch_prefix / batch_name / 'GatherBatchEvidence' / 'medianCov.transposed.bed' for batch_name in batch_names
         ]
 
         input_dict: dict[str, Any] = {
@@ -276,7 +246,7 @@ class MakeCohortVcf(CohortStage):
                 {'allosome_fai': 'allosome_file'},
                 {'cytobands': 'cytoband'},
                 {'pe_exclude_list': 'pesr_exclude_list'},
-            ]
+            ],
         )
 
         # images!
@@ -290,7 +260,7 @@ class MakeCohortVcf(CohortStage):
                 'sv_pipeline_qc_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
-            ]
+            ],
         )
         expected_d = self.expected_outputs(cohort)
 
@@ -372,8 +342,7 @@ class JoinRawCalls(CohortStage):
 
         return {
             'joined_raw_calls_vcf': self.prefix / 'raw_clustered_calls.vcf.gz',
-            'joined_raw_calls_vcf_index': self.prefix
-            / 'raw_clustered_calls.vcf.gz.tbi',
+            'joined_raw_calls_vcf_index': self.prefix / 'raw_clustered_calls.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -387,9 +356,7 @@ class JoinRawCalls(CohortStage):
             'reference_fasta_fai': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
         }
-        input_dict |= get_images(
-            ['gatk_docker', 'sv_pipeline_docker', 'sv_base_mini_docker']
-        )
+        input_dict |= get_images(['gatk_docker', 'sv_pipeline_docker', 'sv_base_mini_docker'])
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         # add all clustered _caller_ files, plus indices
@@ -397,17 +364,10 @@ class JoinRawCalls(CohortStage):
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         for caller in SV_CALLERS + ['depth']:
             input_dict[f'clustered_{caller}_vcfs'] = [
-                batch_prefix
-                / batch_name
-                / 'ClusterBatch'
-                / f'clustered-{caller}.vcf.gz'
-                for batch_name in batch_names
+                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz' for batch_name in batch_names
             ]
             input_dict[f'clustered_{caller}_vcf_indexes'] = [
-                batch_prefix
-                / batch_name
-                / 'ClusterBatch'
-                / f'clustered-{caller}.vcf.gz.tbi'
+                batch_prefix / batch_name / 'ClusterBatch' / f'clustered-{caller}.vcf.gz.tbi'
                 for batch_name in batch_names
             ]
         expected_d = self.expected_outputs(cohort)
@@ -538,10 +498,8 @@ class FilterGenotypes(CohortStage):
             'filtered_vcf': self.prefix / 'filtered.vcf.gz',
             'filtered_vcf_index': self.prefix / 'filtered.vcf.gz.tbi',
             'main_vcf_qc_tarball': self.prefix / 'filtered_SV_VCF_QC_output.tar.gz',
-            'unfiltered_recalibrated_vcf': self.prefix
-            / 'unfiltered_recalibrated.vcf.gz',
-            'unfiltered_recalibrated_vcf_index': self.prefix
-            / 'unfiltered_recalibrated.vcf.gz.tbi',
+            'unfiltered_recalibrated_vcf': self.prefix / 'unfiltered_recalibrated.vcf.gz',
+            'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi',
             # 'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
             # 'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
         }
@@ -553,35 +511,25 @@ class FilterGenotypes(CohortStage):
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': make_combined_ped(cohort, self.prefix),
             'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
-            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get(
-                'recalibrate_gq_args'
-            ),
-            'sl_filter_args': get_config()['references']['gatk_sv'].get(
-                'sl_filter_args'
-            ),
+            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get('recalibrate_gq_args'),
+            'sl_filter_args': get_config()['references']['gatk_sv'].get('sl_filter_args'),
         }
         assert input_dict['recalibrate_gq_args']
         assert input_dict['sl_filter_args']
 
-        input_dict |= get_images(
-            ['linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker']
-        )
+        input_dict |= get_images(['linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker'])
         # use a non-standard GATK image containing required filtering tool
-        input_dict['gatk_docker'] = get_images(['gq_recalibrator_docker'])[
-            'gq_recalibrator_docker'
-        ]
+        input_dict['gatk_docker'] = get_images(['gq_recalibrator_docker'])['gq_recalibrator_docker']
         input_dict |= get_references(
             [
                 {'gq_recalibrator_model_file': 'aou_filtering_model'},
                 'primary_contigs_fai',
-            ]
+            ],
         )
 
         # something a little trickier - we need to get various genome tracks
         input_dict['genome_tracks'] = list(
-            get_references(
-                get_config()['references']['gatk_sv'].get('genome_tracks', [])
-            ).values()
+            get_references(get_config()['references']['gatk_sv'].get('genome_tracks', [])).values(),
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -666,9 +614,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        strv_job = get_batch().new_job(
-            'StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'}
-        )
+        strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
         strv_job.storage('20Gi')
@@ -685,9 +631,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
             vcf_index=str(input_dict['annotated_vcf_index']),
         )['vcf']
 
-        strv_job.declare_resource_group(
-            output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-        )
+        strv_job.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
         # run strvctvre
         strv_job.command(
@@ -695,13 +639,11 @@ class AnnotateVcfWithStrvctvre(CohortStage):
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
-            f'-p {phylop_in_batch}'
+            f'-p {phylop_in_batch}',
         )
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
 
-        get_batch().write_output(
-            strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', '')
-        )
+        get_batch().write_output(strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', ''))
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
 
@@ -729,12 +671,8 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(
-            target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf'
-        )
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')
+        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
 
         job = annotate_cohort_jobs_sv(
             vcf_path=vcf_path,
@@ -774,11 +712,7 @@ class AnnotateDatasetSv(DatasetStage):
         """
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (
-                dataset.prefix()
-                / 'mt'
-                / f'SV-{get_workflow().output_version}-{dataset.name}.mt'
-            ),
+            'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -792,16 +726,10 @@ class AnnotateDatasetSv(DatasetStage):
         """
 
         assert dataset.cohort
-        mt_path = inputs.as_path(
-            target=dataset.cohort, stage=AnnotateCohortSv, key='mt'
-        )
-        exclusion_file = inputs.as_path(
-            target=dataset.cohort, stage=CombineExclusionLists, key='exclusion_list'
-        )
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohortSv, key='mt')
+        exclusion_file = inputs.as_path(target=dataset.cohort, stage=CombineExclusionLists, key='exclusion_list')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
 
         jobs = annotate_dataset_jobs_sv(
             mt_path=mt_path,
@@ -813,9 +741,7 @@ class AnnotateDatasetSv(DatasetStage):
             exclusion_file=str(exclusion_file),
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
 def _gatk_sv_index_meta(
@@ -860,16 +786,14 @@ class MtToEsSv(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(
-            target=dataset, stage=AnnotateDatasetSv, key='mt'
-        )
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         from analysis_runner import dataproc

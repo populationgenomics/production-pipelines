@@ -5,11 +5,11 @@ Trim raw FASTQ reads using cutadapt
 from dataclasses import dataclass
 from enum import Enum
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import Batch, command, image_path
 from cpg_workflows.filetypes import FastqPair
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
@@ -18,11 +18,13 @@ from cpg_workflows.workflow import SequencingGroup
 
 class MissingFastqInputException(Exception):
     """Raise if alignment input is missing"""
+
     pass
 
 
 class InvalidSequencingTypeException(Exception):
     """Raise if alignment type is not 'rna'"""
+
     pass
 
 
@@ -85,14 +87,16 @@ class Cutadapt:
             raise ValueError(f'Invalid adapter type: {adapter_type}')
         self.command = [
             'cutadapt',
-            '-o', str(output_fastq_pair.r1),
-            '-a', adapters.r1.sequence,
+            *('-o', str(output_fastq_pair.r1)),
+            *('-a', adapters.r1.sequence),
         ]
         if paired:
-            self.command.extend([
-                '-p', str(output_fastq_pair.r2),
-                '-A', adapters.r2.sequence,
-            ])
+            self.command.extend(
+                [
+                    *('-p', str(output_fastq_pair.r2)),
+                    *('-A', adapters.r2.sequence),
+                ],
+            )
         if quality_trim:
             if two_colour:
                 self.command.append(f'--nextseq-trim={quality_trim}')
@@ -108,7 +112,7 @@ class Cutadapt:
 
     def __str__(self) -> str:
         return ' '.join(self.command)
-    
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -135,18 +139,20 @@ class Fastp:
             raise ValueError(f'Invalid adapter type: {adapter_type}')
         self.command = [
             'fastp',
-            '--in1', str(input_fastq_pair.r1),
-            '--out1', str(output_fastq_pair.r1),
-            '--length_required', str(min_length),
-            '--adapter_sequence', adapters.r1.sequence,
-            '--thread', str(nthreads),
+            *('--in1', str(input_fastq_pair.r1)),
+            *('--out1', str(output_fastq_pair.r1)),
+            *('--length_required', str(min_length)),
+            *('--adapter_sequence', adapters.r1.sequence),
+            *('--thread', str(nthreads)),
         ]
         if paired:
-            self.command.extend([
-                '--in2', str(input_fastq_pair.r2),
-                '--out2', str(output_fastq_pair.r2),
-                '--adapter_sequence_r2', adapters.r2.sequence,
-            ])
+            self.command.extend(
+                [
+                    *('--in2', str(input_fastq_pair.r2)),
+                    *('--out2', str(output_fastq_pair.r2)),
+                    *('--adapter_sequence_r2', adapters.r2.sequence),
+                ],
+            )
         if not polyG:
             self.command.append('--disable_trim_poly_g')
         if polyX:
@@ -154,7 +160,7 @@ class Fastp:
 
     def __str__(self) -> str:
         return ' '.join(self.command)
-    
+
     def __repr__(self) -> str:
         return str(self)
 
@@ -173,35 +179,31 @@ def trim(
     Takes an input FastqPair object, and creates a job to trim the FASTQs using cutadapt.
     """
     # Don't run if all output files exist and can be reused
-    if (
-        output_fq_pair and
-        can_reuse(output_fq_pair.r1, overwrite) and
-        can_reuse(output_fq_pair.r2, overwrite)
-    ):
+    if output_fq_pair and can_reuse(output_fq_pair.r1, overwrite) and can_reuse(output_fq_pair.r2, overwrite):
         return None, output_fq_pair.as_resources(b)
-    
+
     base_job_name = 'TrimFastqs'
     if extra_label:
         base_job_name += f' {extra_label}'
-    
+
     if not get_config()['workflow']['sequencing_type'] == 'transcriptome':
         raise InvalidSequencingTypeException(
-            f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'" +
-            f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'"
+            f"Invalid sequencing type '{get_config()['workflow']['sequencing_type']}'"
+            + f" for job type '{base_job_name}'; sequencing type must be 'transcriptome'",
         )
-    
+
     try:
         adapter_type = get_config()['trim']['adapter_type']
     except KeyError:
         raise ValueError('No adapter type specified in config file')
-    
+
     trim_tool = 'fastp'
 
     trim_j_name = base_job_name
     trim_j_attrs = (job_attrs or {}) | dict(label=base_job_name, tool=trim_tool)
     trim_j = b.new_job(trim_j_name, trim_j_attrs)
     trim_j.image(image_path('fastp'))
-    
+
     # Set resource requirements
     nthreads = requested_nthreads or 8
     res = STANDARD.set_resources(

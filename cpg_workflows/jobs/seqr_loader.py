@@ -30,9 +30,7 @@ def annotate_dataset_jobs(
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
-    subset_j = get_batch().new_job(
-        'Subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    subset_j = get_batch().new_job('Subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
     subset_j.image(image_path('cpg_workflows'))
     assert sequencing_group_ids
     subset_j.command(
@@ -43,14 +41,12 @@ def annotate_dataset_jobs(
             sequencing_group_ids,
             str(subset_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         subset_j.depends_on(*depends_on)
 
-    annotate_j = get_batch().new_job(
-        'Annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    annotate_j = get_batch().new_job('Annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))
     annotate_j.command(
         query_command(
@@ -59,7 +55,7 @@ def annotate_dataset_jobs(
             str(subset_mt_path),
             str(out_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     annotate_j.depends_on(subset_j)
     return [subset_j, annotate_j]
@@ -96,7 +92,7 @@ def cohort_to_vcf_job(
             str(mt_path),
             str(out_vcf_path),
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         vcf_j.depends_on(*depends_on)

@@ -1,12 +1,12 @@
 """
 Stage that runs FastQC on alignment inputs.
 """
+
 import dataclasses
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.filetypes import BamPath, FastqPairs
 from cpg_workflows.jobs import fastqc
 from cpg_workflows.jobs.multiqc import multiqc
@@ -38,11 +38,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
     Collect input and output paths for FASTQC for all paths in alignment inputs.
     """
     sequencing_type = get_config()['workflow']['sequencing_type']
-    if not (
-        alignment_input := sequencing_group.alignment_input_by_seq_type.get(
-            sequencing_type
-        )
-    ):
+    if not (alignment_input := sequencing_group.alignment_input_by_seq_type.get(sequencing_type)):
         # Only running FASTQC if sequencing inputs are available.
         return []
 
@@ -59,7 +55,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
                 alignment_input.path,
                 prefix / (sequencing_group.id + '_fastqc.html'),
                 prefix / (sequencing_group.id + '_fastqc.zip'),
-            )
+            ),
         ]
     elif isinstance(alignment_input, FastqPairs):
         outs: list[OneFastqc] = []
@@ -73,7 +69,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
                         pair[pair_id],
                         prefix / f'{sequencing_group.id}{suffix}_fastqc.html',
                         prefix / f'{sequencing_group.id}{suffix}_fastqc.zip',
-                    )
+                    ),
                 )
         return outs
     return []
@@ -85,9 +81,7 @@ class FastQC(SequencingGroupStage):
     Run FASTQC on all paths in alignment inputs.
     """
 
-    def expected_outputs(
-        self, sequencing_group: SequencingGroup
-    ) -> dict[str, Path] | None:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path] | None:
         """
         Generates one FASTQC HTML report per "sequence" path
         (a FASTQ path, or a BAM path depending on the inputs type).
@@ -100,9 +94,7 @@ class FastQC(SequencingGroupStage):
             }
         return outs
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         if not (fqc_outs := _collect_fastq_outs(sequencing_group)):
             return self.make_outputs(sequencing_group, skipped=True)
 
@@ -119,9 +111,7 @@ class FastQC(SequencingGroupStage):
             j.name = f'{j.name}{fqc_out.suffix}'
             jobs.append(j)
 
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
 @stage(required_stages=FastQC)
@@ -152,9 +142,7 @@ class FastQCMultiQC(DatasetStage):
             for fqc_out in _collect_fastq_outs(sequencing_group):
                 paths.append(fqc_out.out_zip)
                 fq_name = fqc_out.input_path.name.removesuffix('.gz').split('.')[0]
-                sequencing_group_id_map[
-                    fq_name
-                ] = f'{sequencing_group.rich_id}{fqc_out.suffix}'
+                sequencing_group_id_map[fq_name] = f'{sequencing_group.rich_id}{fqc_out.suffix}'
 
         jobs = multiqc(
             get_batch(),
@@ -168,6 +156,4 @@ class FastQCMultiQC(DatasetStage):
             sequencing_group_id_map=sequencing_group_id_map,
             label='FASTQC',
         )
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

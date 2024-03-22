@@ -13,7 +13,7 @@ on:
 permissions:
   id-token: write
   contents: read
-  
+
 env:
   VERSION: 1.21.2
 
@@ -41,7 +41,7 @@ jobs:
         with:
           workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "gh-images-deployer@cpg-common.iam.gserviceaccount.com"
-  
+
       - name: set up gcloud sdk
         uses: google-github-actions/setup-gcloud@v1
         with:

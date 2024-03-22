@@ -4,12 +4,11 @@ Run hap.py validation/concordance stats on a sample GVCF or joint VCF.
 
 import logging
 
-from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, image_path, fasta_res_group
 from hailtop.batch import ResourceGroup
 
-from cpg_utils.hail_batch import command
+from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
 
@@ -26,17 +25,10 @@ def happy(
     Run hap.py validation/concordance stats on a sequencing group GVCF or joint VCF.
     """
     if 'validation' not in get_config():
-        logging.warning(
-            'workflow/validation section is not defined in config, skip running hap.py'
-        )
+        logging.warning('workflow/validation section is not defined in config, skip running hap.py')
         return
 
-    truth_sample_id = (
-        get_config()
-        .get('validation', {})
-        .get('sample_map', {})
-        .get(sequencing_group.participant_id)
-    )
+    truth_sample_id = get_config().get('validation', {}).get('sample_map', {}).get(sequencing_group.participant_id)
     if not truth_sample_id:
         return
 
@@ -82,10 +74,10 @@ def happy(
     res = STANDARD.set_resources(j, fraction=1)
     cmd = f"""\
     {extract_sample_cmd}
-    
+
     grep -v ^@ {b.read_input(str(eval_intervals_path))} > intervals.bed
     head intervals.bed
-    
+
     /opt/hap.py/bin/pre.py \
     --threads {res.get_nthreads()} \
     --pass-only \
@@ -103,7 +95,7 @@ def happy(
     --false-positives {b.read_input(str(truth_bed_path))} \
     --report-prefix $BATCH_TMPDIR/prefix \
     --reference {reference["base"]}
-    
+
     cp $BATCH_TMPDIR/prefix.summary.csv {j.summary_csv}
     """
     j.command(command(cmd))

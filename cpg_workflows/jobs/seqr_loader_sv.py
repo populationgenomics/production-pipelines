@@ -2,8 +2,8 @@
 Hail Query Batch-Backend jobs for seqr-loader.
 """
 
-from hailtop.batch.job import Job
 from hailtop.batch import Batch
+from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -16,7 +16,7 @@ def annotate_cohort_jobs_sv(
     out_mt_path: Path,
     checkpoint_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None
+    depends_on: list[Job] | None = None,
 ) -> Job:
     """
     Annotate cohort for seqr loader, SV style.
@@ -33,7 +33,7 @@ def annotate_cohort_jobs_sv(
             str(out_mt_path),
             str(checkpoint_prefix),
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         j.depends_on(*depends_on)
@@ -47,7 +47,7 @@ def annotate_dataset_jobs_sv(
     tmp_prefix: Path,
     job_attrs: dict | None = None,
     depends_on: list[Job] | None = None,
-    exclusion_file: str | None = None
+    exclusion_file: str | None = None,
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -69,9 +69,7 @@ def annotate_dataset_jobs_sv(
 
     subset_mt_path = tmp_prefix / 'cohort-subset.mt'
 
-    subset_j = get_batch().new_job(
-        f'subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    subset_j = get_batch().new_job('subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
     subset_j.image(image_path('cpg_workflows'))
     subset_j.command(
         query_command(
@@ -82,14 +80,12 @@ def annotate_dataset_jobs_sv(
             str(subset_mt_path),
             exclusion_file,
             setup_gcp=True,
-        )
+        ),
     )
     if depends_on:
         subset_j.depends_on(*depends_on)
 
-    annotate_j = get_batch().new_job(
-        f'annotate dataset', (job_attrs or {}) | {'tool': 'hail query'}
-    )
+    annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))
     annotate_j.command(
         query_command(
@@ -98,7 +94,7 @@ def annotate_dataset_jobs_sv(
             str(subset_mt_path),
             str(out_mt_path),
             setup_gcp=True,
-        )
+        ),
     )
     annotate_j.depends_on(subset_j)
     return [subset_j, annotate_j]

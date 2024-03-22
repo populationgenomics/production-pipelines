@@ -5,10 +5,10 @@ Run VEP in parallel using batch backend
 """
 
 import click
+
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, output_path, query_command
-
 from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.query_modules import seqr_loader
 
@@ -34,9 +34,7 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
     vep_version = get_config()['workflow']['vep_version']
     vep_image = image_path(f'vep_{vep_version}')
     scatter_count = get_config()['vep']['scatter_count']
-    b = get_batch(
-        f'Run VEP with Batch Backend, image {vep_image}, scatter count {scatter_count}'
-    )
+    b = get_batch(f'Run VEP with Batch Backend, image {vep_image}, scatter count {scatter_count}')
     vep_ht = output_path(output_ht)
     vep_jobs = add_vep_jobs(
         b=b,
@@ -58,7 +56,7 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
                 vep_mt,
                 vep_ht,
                 setup_gcp=True,
-            )
+            ),
         )
         if vep_jobs:
             j.depends_on(*vep_jobs)

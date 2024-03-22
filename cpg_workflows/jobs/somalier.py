@@ -1,9 +1,14 @@
 """
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
+
 from typing import cast
 
 import pandas as pd
+
+from hailtop.batch import Batch, Resource
+from hailtop.batch.job import Job
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
@@ -13,9 +18,6 @@ from cpg_utils.hail_batch import (
     image_path,
     reference_path,
 )
-from hailtop.batch import Batch, Resource
-from hailtop.batch.job import Job
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
 from cpg_workflows.resources import STANDARD
@@ -92,12 +94,7 @@ def _make_sample_map(dataset: Dataset):
     Creating sample map to remap internal IDs to participant IDs
     """
     sample_map_fpath = dataset.tmp_prefix() / 'pedigree' / 'sample_map.tsv'
-    df = pd.DataFrame(
-        [
-            {'id': sg.id, 'pid': sg.participant_id}
-            for sg in dataset.get_sequencing_groups()
-        ]
-    )
+    df = pd.DataFrame([{'id': sg.id, 'pid': sg.participant_id} for sg in dataset.get_sequencing_groups()])
     if not get_config()['workflow'].get('dry_run', False):
         with sample_map_fpath.open('w') as fp:
             df.to_csv(fp, sep='\t', index=False, header=False)
@@ -154,7 +151,7 @@ def _check_pedigree(
             cmd,
             python_script_path=script_path,
             setup_gcp=True,
-        )
+        ),
     )
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))
@@ -194,9 +191,7 @@ def _relate(
         if verifybamid_by_sgid:
             if sequencing_group_id not in verifybamid_by_sgid:
                 continue
-            somalier_file = b.read_input(
-                str(somalier_path_by_sgid[sequencing_group_id])
-            )
+            somalier_file = b.read_input(str(somalier_path_by_sgid[sequencing_group_id]))
             cmd += f"""
             FREEMIX=$(cat {b.read_input(str(verifybamid_by_sgid[sequencing_group_id]))} | tail -n1 | cut -f7)
             if [[ $(echo "$FREEMIX > {MAX_FREEMIX}" | bc) -eq 0 ]]; then \
@@ -205,9 +200,7 @@ def _relate(
             fi
             """
         else:
-            somalier_file = b.read_input(
-                str(somalier_path_by_sgid[sequencing_group_id])
-            )
+            somalier_file = b.read_input(str(somalier_path_by_sgid[sequencing_group_id]))
             cmd += f"""
             echo "{somalier_file}" >> {input_files_file}
             echo "{sequencing_group_id}" >> {sequencing_groups_ids_file}
@@ -216,7 +209,7 @@ def _relate(
     cmd += f"""
     cat {b.read_input(str(expected_ped_path))} | \
     grep -v Family.ID | \
-    grep -f {sequencing_groups_ids_file} > expected.ped 
+    grep -f {sequencing_groups_ids_file} > expected.ped
     """
 
     cmd += f"""
@@ -261,9 +254,7 @@ def extract(
 
     j.image(image_path('somalier'))
     if not cram_path.index_path:
-        raise ValueError(
-            f'CRAM for somalier is required to have CRAI index ({cram_path})'
-        )
+        raise ValueError(f'CRAM for somalier is required to have CRAI index ({cram_path})')
     storage_gb = None  # avoid extra disk by default
     if get_config()['workflow']['sequencing_type'] == 'genome':
         storage_gb = 100
@@ -278,7 +269,7 @@ def extract(
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
-    
+
     # Retrying copying to avoid google bandwidth limits
     retry_gs_cp {str(cram_path.path)} $CRAM
     retry_gs_cp {str(cram_path.index_path)} $CRAI

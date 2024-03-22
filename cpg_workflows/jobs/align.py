@@ -2,31 +2,29 @@
 FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 """
 
+import logging
 from enum import Enum
 from textwrap import dedent
 from typing import cast
-import logging
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
-from cpg_utils.hail_batch import command
-from cpg_workflows.targets import SequencingGroup
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows.filetypes import (
     AlignmentInput,
-    FastqPairs,
-    CramPath,
     BamPath,
+    CramPath,
     FastqPair,
+    FastqPairs,
 )
-from cpg_workflows.resources import STANDARD, HIGHMEM
+from cpg_workflows.resources import HIGHMEM, STANDARD
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse
 
 from . import picard
-
 
 BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
 BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
@@ -64,7 +62,7 @@ def _get_cram_reference_from_version(cram_version) -> str:
     if cram_version in cram_version_map:
         return cram_version_map[cram_version]
     raise ValueError(
-        f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}'
+        f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}',
     )
 
 
@@ -81,12 +79,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
-            path := (
-                sequencing_group.dataset.prefix()
-                / 'cram'
-                / realign_cram_ver
-                / f'{sequencing_group.id}.cram'
-            )
+            path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
         ).exists():
             logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
             alignment_input = CramPath(
@@ -97,14 +90,14 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
-            + (f': {alignment_input}' if alignment_input else '')
+            + (f': {alignment_input}' if alignment_input else ''),
         )
 
     if get_config()['workflow'].get('check_inputs', True):
         if not alignment_input.exists():
             raise MissingAlignmentInputException(
                 f'Alignment inputs for sequencing group {sequencing_group} do not exist '
-                + (f': {alignment_input}' if alignment_input else '')
+                + (f': {alignment_input}' if alignment_input else ''),
             )
 
     return alignment_input
@@ -168,9 +161,7 @@ def align(
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = (
-        isinstance(alignment_input, CramPath | BamPath)
-        and alignment_input.index_path
-        and realignment_shards_num > 1
+        isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path and realignment_shards_num > 1
     )
     sharded = sharded_fq or sharded_bazam
 
@@ -240,9 +231,7 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
-        merge_j = b.new_job(
-            'Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge')
-        )
+        merge_j = b.new_job('Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge'))
         merge_j.image(image_path('samtools'))
 
         nthreads = STANDARD.set_resources(
@@ -306,10 +295,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
         if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
             storage_gb = 400
         # For unindexed/unsorted CRAM or BAM inputs, extra storage is needed for tmp
-        if (
-            isinstance(alignment_input, CramPath | BamPath)
-            and not alignment_input.index_path
-        ):
+        if isinstance(alignment_input, CramPath | BamPath) and not alignment_input.index_path:
             storage_gb += 150
     return storage_gb
 
@@ -340,9 +326,7 @@ def _align_one(
 
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     if shard_number is not None and number_of_shards_for_realignment is not None:
-        job_name = (
-            f'{job_name} ' f'{shard_number + 1}/{number_of_shards_for_realignment} '
-        )
+        job_name = f'{job_name} {shard_number + 1}/{number_of_shards_for_realignment} '
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
@@ -410,14 +394,14 @@ def _align_one(
             # "i" to the alignment_path. This should work for both .cram and .bam files.
             alignment_path="{group[alignment_input.ext]}"
             samtools index -@{nthreads - 1} $alignment_path  ${{alignment_path%m}}i
-            """
+            """,
             )
 
         bazam_cmd = dedent(
             f"""\
         bazam -Xmx16g {bazam_ref_cmd} \
         -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
-        """
+        """,
         )
         prepare_fastq_cmd = ''
         r1_param = 'r1'
@@ -435,7 +419,7 @@ def _align_one(
             f"""\
         mv {fastq_pair.r1} {r1_param}
         mv {fastq_pair.r2} {r2_param}
-        """
+        """,
         )
 
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
@@ -465,10 +449,7 @@ def _align_one(
     elif aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
-            **{
-                k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k)
-                for k in DRAGMAP_INDEX_FILES
-            }
+            **{k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k) for k in DRAGMAP_INDEX_FILES},
         )
         if use_bazam:
             input_params = f'--interleaved=1 -b {r1_param}'
@@ -498,14 +479,12 @@ def _align_one(
             mkfifo {fname}
             {cmd} > {fname} &
             pid_{fname}=$!
-        """
+        """,
             ).strip()
             for fname, cmd in fifo_commands.items()
         ]
 
-        _fifo_waits = ' && '.join(
-            f'wait $pid_{fname}' for fname in fifo_commands.keys()
-        )
+        _fifo_waits = ' && '.join(f'wait $pid_{fname}' for fname in fifo_commands.keys())
         fifo_post = dedent(
             f"""
             if {_fifo_waits}
@@ -515,7 +494,7 @@ def _align_one(
                 # Background processes failed
                 trap 'error1' ERR
             fi
-        """
+        """,
         ).strip()
 
         # Now prepare command
@@ -568,7 +547,7 @@ def sort_cmd(requested_nthreads: int) -> str:
     return dedent(
         f"""\
     | samtools sort -@{min(nthreads, 6) - 1} -T $BATCH_TMPDIR/samtools-sort-tmp -Obam
-    """
+    """,
     ).strip()
 
 
@@ -600,7 +579,7 @@ def finalise_alignment(
             output_cram={
                 'cram': '{root}.cram',
                 'cram.crai': '{root}.cram.crai',
-            }
+            },
         )
         assert isinstance(j.output_cram, hb.ResourceGroup)
         align_cmd = f"""\

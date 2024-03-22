@@ -1,22 +1,23 @@
 #!/usr/bin/env python3
 
 """
-Checks metrics in MultiQC output, based on thresholds in the qc_thresholds 
+Checks metrics in MultiQC output, based on thresholds in the qc_thresholds
 config section.
 
 Script can send a report to a Slack channel. To enable that, set SLACK_TOKEN
-and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into 
+and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into
 a channel with:
 
 /invite @Seqr Loader
 """
-import logging
 import json
+import logging
 import pprint
 from collections import defaultdict
 from typing import Optional
 
 import click
+
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.slack import send_message
@@ -93,9 +94,7 @@ def run(
             lambda val_, thresh_: val_ > thresh_,
         ),
     ]:
-        threshold_d = (
-            get_config()['qc_thresholds'].get(seq_type, {}).get(config_key, {})
-        )
+        threshold_d = get_config()['qc_thresholds'].get(seq_type, {}).get(config_key, {})
         for section in sections:
             for sample, val_by_metric in section.items():
                 for metric, threshold in threshold_d.items():

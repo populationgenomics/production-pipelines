@@ -6,11 +6,11 @@ import os
 from os.path import exists
 from pathlib import Path
 
+from pytest_mock import MockFixture
+
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
 from cpg_utils.hail_batch import start_query_context
-from pytest_mock import MockFixture
-
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.large_cohort import (
     ancestry_pca,
@@ -27,18 +27,13 @@ from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
 from .factories.types import SequencingType
 
-
 ref_prefix = to_path(__file__).parent / 'data/large_cohort/reference'
 gnomad_prefix = ref_prefix / 'gnomad/v0'
 broad_prefix = ref_prefix / 'hg38/v0'
 
 
-DEFAULT_CONFIG = Path(
-    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
-)
-LARGE_COHORT_CONFIG = Path(
-    to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml'
-)
+DEFAULT_CONFIG = Path(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml')
+LARGE_COHORT_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'defaults' / 'large_cohort.toml')
 
 
 def create_config(
@@ -72,47 +67,27 @@ def create_config(
         references={
             'genome_build': 'GRCh38',
             'ancestry': {
-                'sites_table': (
-                    gnomad_prefix / 'sample_qc-test' / 'pre_ld_pruning_qc_variants.ht'
-                ),
+                'sites_table': (gnomad_prefix / 'sample_qc-test' / 'pre_ld_pruning_qc_variants.ht'),
             },
             'gnomad': {
                 'tel_and_cent_ht': (
-                    gnomad_prefix
-                    / 'telomeres_and_centromeres'
-                    / 'hg38.telomeresAndMergedCentromeres.ht'
+                    gnomad_prefix / 'telomeres_and_centromeres' / 'hg38.telomeresAndMergedCentromeres.ht'
                 ),
-                'lcr_intervals_ht': (
-                    gnomad_prefix / 'lcr_intervals' / 'LCRFromHengHg38.ht'
-                ),
-                'seg_dup_intervals_ht': (
-                    gnomad_prefix / 'seg_dup_intervals' / 'GRCh38_segdups.ht'
-                ),
+                'lcr_intervals_ht': (gnomad_prefix / 'lcr_intervals' / 'LCRFromHengHg38.ht'),
+                'seg_dup_intervals_ht': (gnomad_prefix / 'seg_dup_intervals' / 'GRCh38_segdups.ht'),
                 'clinvar_ht': (gnomad_prefix / 'clinvar' / 'clinvar_20190923.ht'),
                 'hapmap_ht': (gnomad_prefix / 'hapmap' / 'hapmap_3.3.hg38.ht'),
                 'kgp_omni_ht': (gnomad_prefix / 'kgp' / '1000G_omni2.5.hg38.ht'),
-                'kgp_hc_ht': (
-                    gnomad_prefix / 'kgp' / '1000G_phase1.snps.high_confidence.hg38.ht'
-                ),
-                'mills_ht': (
-                    gnomad_prefix
-                    / 'mills'
-                    / 'Mills_and_1000G_gold_standard.indels.hg38.ht'
-                ),
+                'kgp_hc_ht': (gnomad_prefix / 'kgp' / '1000G_phase1.snps.high_confidence.hg38.ht'),
+                'mills_ht': (gnomad_prefix / 'mills' / 'Mills_and_1000G_gold_standard.indels.hg38.ht'),
             },
             'gatk_sv': {
                 'protein_coding_gtf': (
-                    broad_prefix
-                    / 'sv-resources'
-                    / 'resources'
-                    / 'v1'
-                    / 'MANE.GRCh38.v0.95.select_ensembl_genomic.gtf'
+                    broad_prefix / 'sv-resources' / 'resources' / 'v1' / 'MANE.GRCh38.v0.95.select_ensembl_genomic.gtf'
                 ),
             },
             'broad': {
-                'genome_calling_interval_lists': (
-                    broad_prefix / 'wgs_calling_regions.hg38.interval_list'
-                ),
+                'genome_calling_interval_lists': (broad_prefix / 'wgs_calling_regions.hg38.interval_list'),
             },
         },
         large_cohort={
@@ -120,9 +95,7 @@ def create_config(
             'sample_qc_cutoffs': {
                 'min_n_snps': 2500,
             },
-            'combiner': {
-                'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end']
-            },
+            'combiner': {'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end']},
         },
     )
 
@@ -161,12 +134,8 @@ class TestAllLargeCohortMethods:
         )
         # skip can_reuse, implicit skip of existence checks
         mocker.patch('cpg_workflows.large_cohort.combiner.can_reuse', lambda x: False)
-        mocker.patch(
-            'cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False
-        )
-        mocker.patch(
-            'cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False
-        )
+        mocker.patch('cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False)
+        mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
 
         start_query_context()
 

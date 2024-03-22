@@ -11,7 +11,6 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, image_path
-
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
 
@@ -32,7 +31,8 @@ class Outrider:
     ) -> None:
         self.input_counts = input_counts
         assert isinstance(
-            self.input_counts, list
+            self.input_counts,
+            list,
         ), f'input_counts must be a list, instead got {type(self.input_counts)}: {self.input_counts}'
         self.input_counts_r_str = ', '.join([f'"{str(f)}"' for f in self.input_counts])
         self.gtf_file_path = str(gtf_file)
@@ -336,7 +336,7 @@ def outrider(
             'volcano_plots.tar.gz': '{root}.volcano_plots.tar.gz',
             'gene_plots.tar.gz': '{root}.gene_plots.tar.gz',
             'stats_plots.tar.gz': '{root}.stats_plots.tar.gz',
-        }
+        },
     )
 
     # Create counting command

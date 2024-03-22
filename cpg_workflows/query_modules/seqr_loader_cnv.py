@@ -1,6 +1,7 @@
 """
 Hail Query functions for seqr loader; SV edition.
 """
+
 import datetime
 import logging
 
@@ -8,9 +9,12 @@ import hail as hl
 
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
-from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local, download_gencode_gene_id_mapping
-from cpg_workflows.utils import read_hail, checkpoint_hail
-
+from cpg_workflows.query_modules.seqr_loader_sv import (
+    download_gencode_gene_id_mapping,
+    get_expr_for_xpos,
+    parse_gtf_from_local,
+)
+from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 GENE_SYMBOL = 'gene_symbol'
@@ -26,9 +30,7 @@ NON_GENE_PREDICTIONS = {
 }
 
 
-def annotate_cohort_gcnv(
-    vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
-):
+def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
     """
     Translate an annotated gCNV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -59,7 +61,7 @@ def annotate_cohort_gcnv(
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
         datasetType='SV',
-        sampleType='WES'
+        sampleType='WES',
     )
 
     # reimplementation of
@@ -84,37 +86,34 @@ def annotate_cohort_gcnv(
         xpos=get_expr_for_xpos(mt.locus),
         xstart=get_expr_for_xpos(mt.locus),
         xstop=get_expr_for_xpos(hl.struct(contig=mt.locus.contig, position=mt.info.END)),
-        num_exon=hl.agg.max(mt.NP)
+        num_exon=hl.agg.max(mt.NP),
     )
 
     # save those changes
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(
-        get_config().get('gencode_release', '42')
-    )
+    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '42'))
     gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
     # find all the column names which contain Gene symbols
     conseq_predicted_gene_cols = [
         gene_col
         for gene_col in mt.info
-        if (
-                gene_col.startswith(CONSEQ_PREDICTED_PREFIX)
-                and gene_col not in NON_GENE_PREDICTIONS
-        )
+        if (gene_col.startswith(CONSEQ_PREDICTED_PREFIX) and gene_col not in NON_GENE_PREDICTIONS)
     ]
 
     # bank all those symbols before overwriting them - may not be required
     # might have to drop this for the Seqr ingest
     mt = mt.annotate_rows(
-        geneSymbols=hl.set(hl.filter(
-            hl.is_defined,
-            [
-                mt.info[gene_col] for gene_col in conseq_predicted_gene_cols
-            ]
-        ).flatmap(lambda x: x))
+        geneSymbols=hl.set(
+            hl.filter(
+                hl.is_defined,
+                [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols],
+            ).flatmap(
+                lambda x: x,
+            ),
+        ),
     )
 
     # overwrite symbols with ENSG IDs in these columns
@@ -123,21 +122,21 @@ def annotate_cohort_gcnv(
     for col_name in conseq_predicted_gene_cols:
         mt = mt.annotate_rows(
             info=mt.info.annotate(
-                **{
-                    col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])
-                }
-            )
+                **{col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])},
+            ),
         )
 
     mt = mt.annotate_rows(
         # this expected mt.variant_name to be present, and it's not
         variantId=hl.format(f'%s_%s_{datetime.date.today():%m%d%Y}', mt.rsid, mt.svType),
-        geneIds=hl.set(hl.filter(
-            hl.is_defined,
-            [
-                mt.info[gene_col] for gene_col in conseq_predicted_gene_cols
-            ]
-        ).flatmap(lambda x: x))
+        geneIds=hl.set(
+            hl.filter(
+                hl.is_defined,
+                [mt.info[gene_col] for gene_col in conseq_predicted_gene_cols],
+            ).flatmap(
+                lambda x: x,
+            ),
+        ),
     )
 
     lof_genes = hl.set(mt.info.PREDICTED_LOF)
@@ -156,16 +155,18 @@ def annotate_cohort_gcnv(
                 ),
             ),
             mt.geneIds,
-        )
+        ),
     )
 
     # transcriptConsequenceTerms
     default_consequences = [hl.format('gCNV_%s', mt.svType)]
-    gene_major_consequences = hl.array(hl.set(
-        mt.sortedTranscriptConsequences
-        .filter(lambda x: hl.is_defined(x.major_consequence))
-        .map(lambda x: x.major_consequence)
-    ))
+    gene_major_consequences = hl.array(
+        hl.set(
+            mt.sortedTranscriptConsequences.filter(lambda x: hl.is_defined(x.major_consequence)).map(
+                lambda x: x.major_consequence,
+            ),
+        ),
+    )
     mt = mt.annotate_rows(
         transcriptConsequenceTerms=gene_major_consequences.extend(default_consequences),
         docId=mt.variantId[0:512],
@@ -199,9 +200,9 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
                 num_exon=mt.NP,
                 start=mt.start,
                 geneIds=mt.geneIds,
-                gt=mt.GT
-            )
-        )
+                gt=mt.GT,
+            ),
+        ),
     )
 
     def _genotype_filter_samples(fn):
@@ -210,11 +211,7 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
 
     def _genotype_filter_samples_cn2():
         # Filter on the genotypes.
-        return hl.set(
-            mt.genotypes.filter(
-                lambda g: ((g.gt.is_haploid()) & (g.cn == 2))
-            ).map(lambda g: g.sample_id)
-        )
+        return hl.set(mt.genotypes.filter(lambda g: ((g.gt.is_haploid()) & (g.cn == 2))).map(lambda g: g.sample_id))
 
     # top level - decorator
     def _capture_i_decorator(func):
@@ -246,32 +243,18 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
         # samples=_genotype_filter_samples(lambda g: True),
         # dubious about this annotation - expected field is qs, I'm using gq, derived from CNQ
         samples_qs=hl.struct(
-            **{
-                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i))
-                for i in range(0, 1000, 10)
-            }, **{
-                'gt_1000': _genotype_filter_samples(lambda g: g.gq >= 1000)
-            }
+            **{('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 1000, 10)},
+            **{'gt_1000': _genotype_filter_samples(lambda g: g.gq >= 1000)},
         ),
         # ok, here's what we're
         samples_cn=hl.struct(
-            **{
-                str(i): _genotype_filter_samples(_filter_sample_cn(i))
-                for i in [0, 1, 3]
-            },
-            **{
-                'gte_4': _genotype_filter_samples(lambda g: g.cn >= 4)
-            },
+            **{str(i): _genotype_filter_samples(_filter_sample_cn(i)) for i in [0, 1, 3]},
+            **{'gte_4': _genotype_filter_samples(lambda g: g.cn >= 4)},
             # and a special case for male sex-chrom CN
             **{'2': _genotype_filter_samples_cn2()},
         ),
         # re-embedding the samples_num_alt, derived from hl.call().n_alt_alleles()
-        samples_num_alt=hl.struct(
-            **{
-                '%i' % i: _genotype_filter_samples(_filter_num_alt(i))
-                for i in range(1, 3, 1)
-            }
-        ),
+        samples_num_alt=hl.struct(**{'%i' % i: _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
     )
 
     # removing GT again, out of an abundance of caution
@@ -286,8 +269,8 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
                 num_exon=mt.NP,
                 start=mt.start,
                 geneIds=mt.geneIds,
-            )
-        )
+            ),
+        ),
     )
     logging.info('Genotype fields annotated')
     mt.describe()

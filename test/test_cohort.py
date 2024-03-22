@@ -96,7 +96,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -147,7 +147,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -189,9 +189,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_sg_entries', mock_get_sgs)
-    mocker.patch(
-        'cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs
-    )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
 
     caplog.set_level(logging.WARNING)
 
@@ -255,9 +253,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     # )
 
 
-def mock_get_sgs_with_missing_reads(
-    *args, **kwargs
-) -> list[dict]:  # pylint: disable=unused-argument
+def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
     return [
         {
             'id': 'CPGLCL17',
@@ -307,7 +303,7 @@ def mock_get_sgs_with_missing_reads(
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -340,7 +336,7 @@ def mock_get_sgs_with_missing_reads(
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -361,9 +357,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
         'cpg_workflows.metamist.Metamist.get_sg_entries',
         mock_get_sgs_with_missing_reads,
     )
-    mocker.patch(
-        'cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs
-    )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
 
     # from cpg_workflows.filetypes import BamPath
     from cpg_workflows.inputs import get_cohort
@@ -415,9 +409,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     assert test_sg2.alignment_input_by_seq_type == {}
 
 
-def mock_get_sgs_with_mixed_reads(
-    *args, **kwargs
-) -> list[dict]:  # pylint: disable=unused-argument
+def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
     return [
         {
             'id': 'CPGccc',
@@ -467,7 +459,7 @@ def mock_get_sgs_with_mixed_reads(
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -500,7 +492,7 @@ def mock_get_sgs_with_mixed_reads(
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
         {
@@ -551,7 +543,7 @@ def mock_get_sgs_with_mixed_reads(
                         'sequencing_platform': 'illumina',
                     },
                     'type': 'sequencing',
-                }
+                },
             ],
         },
     ]
@@ -573,9 +565,7 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
         'cpg_workflows.metamist.Metamist.get_sg_entries',
         mock_get_sgs_with_mixed_reads,
     )
-    mocker.patch(
-        'cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs
-    )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
     from cpg_workflows.inputs import get_cohort
 
     cohort = get_cohort()
@@ -605,7 +595,6 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
 
 
 def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
-
     mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: True)
 
     def mock_get_pedigree_empty(*args, **kwargs):
@@ -614,9 +603,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
     def mock_get_families_empty(*args, **kwargs):
         return []
 
-    def mock_get_sgs_with_mixed_reads(
-        *args, **kwargs
-    ) -> list[dict]:  # pylint: disable=unused-argument
+    def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
         return [
             {
                 'id': 'CPGccc',
@@ -649,7 +636,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                             'sequencing_platform': 'illumina',
                         },
                         'type': 'sequencing',
-                    }
+                    },
                 ],
             },
             {
@@ -700,7 +687,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                             'sequencing_platform': 'illumina',
                         },
                         'type': 'sequencing',
-                    }
+                    },
                 ],
             },
         ]
@@ -708,17 +695,13 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
     caplog.set_level(logging.WARNING)
     set_config(_cohort_config(tmp_path), tmp_path / 'config.toml')
 
-    mocker.patch(
-        'cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree_empty
-    )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree_empty)
 
     mocker.patch(
         'cpg_workflows.metamist.Metamist.get_sg_entries',
         mock_get_sgs_with_mixed_reads,
     )
-    mocker.patch(
-        'cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs
-    )
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import Sex
 

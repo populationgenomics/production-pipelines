@@ -1,13 +1,14 @@
 """
 Helper Hail Batch jobs useful for both individual and joint variant calling.
 """
+
 from typing import Literal
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group, command
+from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 
@@ -24,9 +25,7 @@ def subset_vcf(
     Subset VCF to provided intervals.
     """
     if not interval and not variant_types:
-        raise ValueError(
-            'Either interval or variant_types must be defined for subset_vcf'
-        )
+        raise ValueError('Either interval or variant_types must be defined for subset_vcf')
 
     job_name = 'Subset VCF'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk SelectVariants'}
@@ -34,14 +33,10 @@ def subset_vcf(
     j.image(image_path('gatk'))
     STANDARD.set_resources(j, ncpu=2)
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     reference = fasta_res_group(b)
     assert isinstance(j.output_vcf, hb.ResourceGroup)
-    variant_types_param = ' '.join(
-        f'--select-type-to-include {vt}' for vt in (variant_types or [])
-    )
+    variant_types_param = ' '.join(f'--select-type-to-include {vt}' for vt in (variant_types or []))
     cmd = f"""
     gatk SelectVariants \\
     -R {reference.base} \\
@@ -54,7 +49,7 @@ def subset_vcf(
         command(
             cmd,
             monitor_space=True,
-        )
+        ),
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
@@ -103,9 +98,7 @@ def gather_vcfs(
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
         j.image(image_path('bcftools'))
-        res = STANDARD.set_resources(
-            j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only)
-        )
+        res = STANDARD.set_resources(j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only))
         cmd = f"""
         bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in vcfs_in_batch)} \
         -Oz -o {j.output_vcf}
@@ -130,7 +123,7 @@ def gather_vcfs(
                     job_attrs=job_attrs,
                     sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
-                )
+                ),
             )
         else:
             jobs.append(
@@ -141,7 +134,7 @@ def gather_vcfs(
                     job_attrs=job_attrs,
                     sequencing_group_count=sequencing_group_count,
                     site_only=site_only,
-                )
+                ),
             )
     return [j for j in jobs if j is not None]
 
@@ -167,9 +160,7 @@ def sort_vcf(
         storage_gb *= 2  # sort needs extra tmp space
     STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
 
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     cmd = f"""
     bcftools sort {vcf} \
@@ -208,9 +199,7 @@ def tabix_vcf(
         fraction=1,
         storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only),
     )
-    j.declare_resource_group(
-        output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(output_tbi={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     assert isinstance(j.output_tbi, hb.ResourceGroup)
     cmd = f"""
     mv {vcf} $BATCH_TMPDIR/result.vcf.gz

@@ -10,7 +10,6 @@ from typing import Any
 
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -100,31 +99,19 @@ class GatherBatchEvidence(CohortStage):
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.coverage_counts.tsv.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.coverage_counts.tsv.gz')
                 for sequencing_group in sequencing_groups
             ],
             'SR_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.sr.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sr.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'PE_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.pe.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.pe.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'SD_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.sd.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sd.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'ref_copy_number_autosomal_contigs': 2,
@@ -138,10 +125,7 @@ class GatherBatchEvidence(CohortStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.{caller}.vcf.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz')
                 for sequencing_group in sequencing_groups
             ]
 
@@ -155,7 +139,7 @@ class GatherBatchEvidence(CohortStage):
                 {'cnmops_allo_file': 'allosome_file'},
                 'cytoband',
                 'mei_bed',
-            ]
+            ],
         )
 
         # reference panel gCNV models
@@ -172,7 +156,7 @@ class GatherBatchEvidence(CohortStage):
                 'condense_counts_docker',
                 'gatk_docker',
                 'cnmops_docker',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -212,9 +196,7 @@ class ClusterBatch(CohortStage):
         }
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
-            ending_by_key[
-                f'clustered_{caller}_vcf_index'
-            ] = f'clustered-{caller}.vcf.gz.tbi'
+            ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
         return {key: self.prefix / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -242,9 +224,7 @@ class ClusterBatch(CohortStage):
         }
 
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcf_tar'] = str(
-                batch_evidence_d[f'std_{caller}_vcf_tar']
-            )
+            input_dict[f'{caller}_vcf_tar'] = str(batch_evidence_d[f'std_{caller}_vcf_tar'])
 
         input_dict |= get_images(
             [
@@ -253,7 +233,7 @@ class ClusterBatch(CohortStage):
                 'gatk_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -261,7 +241,7 @@ class ClusterBatch(CohortStage):
                 {'contig_list': 'primary_contigs_list'},
                 {'depth_exclude_intervals': 'depth_exclude_list'},
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -330,7 +310,7 @@ class GenerateBatchMetrics(CohortStage):
                 'sv_base_docker',
                 'sv_pipeline_base_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -340,7 +320,7 @@ class GenerateBatchMetrics(CohortStage):
                 'segdups',
                 {'autosome_contigs': 'autosome_file'},
                 {'allosome_contigs': 'allosome_file'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -390,16 +370,11 @@ class FilterBatch(CohortStage):
 
             # unsure why, scramble doesn't export this file
             if caller != 'scramble':
-                ending_by_key[
-                    f'sites_filtered_{caller}_vcf'
-                ] = f'sites-filtered-{caller}.vcf.gz'
+                ending_by_key[f'sites_filtered_{caller}_vcf'] = f'sites-filtered-{caller}.vcf.gz'
 
-        ending_by_key['sv_counts'] = [
-            f'{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']
-        ]
+        ending_by_key['sv_counts'] = [f'{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']]
         ending_by_key['sv_count_plots'] = [
-            f'{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png'
-            for caller in SV_CALLERS + ['depth']
+            f'{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png' for caller in SV_CALLERS + ['depth']
         ]
         d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
@@ -430,13 +405,13 @@ class FilterBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
             [
                 'primary_contigs_list',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
@@ -498,13 +473,9 @@ class MergeBatchSites(CohortStage):
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz'
-            for batch_name in batch_names
+            batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz' for batch_name in batch_names
         ]
-        depth_vcfs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz'
-            for batch_name in batch_names
-        ]
+        depth_vcfs = [batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz' for batch_name in batch_names]
 
         input_dict: dict[str, Any] = {
             'cohort': cohort.name,
@@ -591,10 +562,7 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {
-            key: self.prefix / f'{cohort_hash}_{fname}'
-            for key, fname in ending_by_key.items()
-        }
+        return {key: self.prefix / f'{cohort_hash}_{fname}' for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
@@ -619,9 +587,7 @@ class GenotypeBatch(CohortStage):
         # pull out the merged VCF from MergeBatchSites
         for mode in ['pesr', 'depth']:
             input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][
-                f'cohort_{mode}_vcf'
-            ]
+            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][f'cohort_{mode}_vcf']
 
         input_dict |= get_images(
             [
@@ -630,11 +596,9 @@ class GenotypeBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_pipeline_rdtest_docker',
                 'linux_docker',
-            ]
+            ],
         )
-        input_dict |= get_references(
-            ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
-        )
+        input_dict |= get_references(['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list'])
         # 2 additional (optional) references CPG doesn't have:
         # - sr_hom_cutoff_multiplier
         # - sr_median_hom_ins
