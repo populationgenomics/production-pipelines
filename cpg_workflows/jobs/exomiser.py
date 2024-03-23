@@ -354,11 +354,11 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
         echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
-        tree -l data
         cat application.properties
         set -x
         """,
         )
+        # tree -l data
 
         job.command(
             f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
