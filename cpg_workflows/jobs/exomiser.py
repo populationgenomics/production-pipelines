@@ -387,14 +387,13 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                 job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
 
                 job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
-                job.command('ls')
 
                 # now run it
                 job.command(
                     f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} '
                     f'--spring.config.location={exomiser_dir}/application.properties '
-                    '&',  # run in the background
+                    # '&',  # run in the background
                 )
             job.command('wait')
             job.command('ls')
