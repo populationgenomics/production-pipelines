@@ -3,3 +3,6 @@
 
 status_reporter = 'metamist'
 exomiser_storage = '200Gi'
+
+[images]
+exomiser = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:13.3.0'

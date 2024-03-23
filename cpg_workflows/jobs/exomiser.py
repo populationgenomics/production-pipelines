@@ -11,15 +11,11 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import (
     authenticate_cloud_credentials_in_job,
     get_batch,
+    image_path,
     reference_path,
 )
-from cpg_workflows.scripts import (
-    extract_vcf_from_mt,
-    vds_from_gvcfs,
-)
-from cpg_workflows.scripts import (
-    mt_from_vds as vds2mt,
-)
+from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
+from cpg_workflows.scripts import mt_from_vds as vds2mt
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -293,6 +289,10 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
     run the exomiser batch
     """
 
+    exomiser_image = image_path('exomiser')
+    exomiser_version = exomiser_image.split(':')[-1]
+    exomiser_dir = f'/exomiser/exomiser-cli-{exomiser_version}'
+
     # localise the exomiser references
     clinvar_file = reference_path('exomiser_core/clinvar_whitelist')
     core_group = get_batch().read_input_group(
@@ -344,17 +344,17 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
         job.memory('60Gi')
         job.cpu(4)
-        job.image('australia-southeast1-docker.pkg.dev/cpg-common/images-dev/exomiser:13.3.0')
+        job.image(exomiser_image)
         job.command(
             f"""
-        mkdir -p data/2302_phenotype
-        tar xzf {phenotype['phenix_tar']} -C data/2302_phenotype
-        mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} data/2302_phenotype/
-        ln -s {core_group} data/2302_hg38
-        echo exomiser.hg38.remm-path={remm_group["remm"]} >> application.properties
-        echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> application.properties
-        echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> application.properties
-        cat application.properties
+        mkdir -p {exomiser_dir}/data/2302_phenotype
+        tar xzf {phenotype['phenix_tar']} -C {exomiser_dir}/data/2302_phenotype
+        mv {phenotype['pheno_db']} {phenotype['hpo_obo']} {phenotype['rw_string']} {exomiser_dir}/data/2302_phenotype/
+        ln -s {core_group} {exomiser_dir}/data/2302_hg38
+        echo exomiser.hg38.remm-path={remm_group["remm"]} >> {exomiser_dir}/application.properties
+        echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> {exomiser_dir}/application.properties
+        echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> {exomiser_dir}/application.properties
+        cat {exomiser_dir}/application.properties
         set -x
         """,
         )
@@ -386,21 +386,20 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                 # # this was really satisfying to work out, but isn't needed
                 job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
 
-                job.command(f'python3 config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
+                job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
                 job.command('ls')
 
                 # now run it
                 job.command(
-                    f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
+                    f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} '
-                    '--spring.config.location=/exomiser-cli-13.3.0/application.properties '
+                    f'--spring.config.location={exomiser_dir}/application.properties '
                     '&',  # run in the background
                 )
             job.command('wait')
             job.command('ls')
 
             # move the results, then copy out
-            # todo - this is a bit of a hack
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
                 job.command(f'mv results/{family}.json {job[family]["json"]}')
