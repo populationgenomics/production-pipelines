@@ -360,59 +360,53 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         )
         # tree -l data
 
-        job.command(
-            f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
-            f'--analysis examples/test-analysis-multisample.yml '
-            '&& ls && cat results/Pfeiffer_exomiser.json && cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json &',
-            # run in the background
-        )
+        # job.command(
+        #     f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
+        #     f'--analysis examples/test-analysis-multisample.yml '
+        #     '&& ls && cat results/Pfeiffer_exomiser.json && cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json &',
+        #     # run in the background
+        # )
 
-        # for parallel_chunk in chunks(family_chunk, 4):
-        #     for family in parallel_chunk:
-        #         # read in VCF & index
-        #         vcf = get_batch().read_input_group(
-        #             **{
-        #                 f'{family}_vcf': str(content_dict[family]['vcf']),
-        #                 f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
-        #             },
-        #         )[f'{family}_vcf']
-        #
-        #         # read in phenopacket
-        #         ppk = get_batch().read_input(str(content_dict[family]['phenopacket']))
-        #
-        #         # read in ped
-        #         ped = get_batch().read_input(str(content_dict[family]['ped']))
-        #
-        #         # # this was really satisfying to work out, but isn't needed
-        #         job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
-        #
-        #         job.command(f'python3 config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
-        #         job.command('ls')
-        #
-        #         # now run it
-        #         job.command(
-        #             f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
-        #             f'--analysis {job[family]["yaml"]} '
-        #             '--spring.config.location=/exomiser-cli-13.3.0/application.properties '
-        #             '&',  # run in the background
-        #         )
-        #         job.command(
-        #             f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
-        #             f'--analysis examples/test-analysis-multisample.yml '
-        #             '&& ls && cat results/Pfeiffer_exomiser.json && cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json &',  # run in the background
-        #         )
-        #         # break
-        #     job.command('wait')
-        #     job.command('ls')
-        #
-        #     # move the results, then copy out
-        #     # todo - this is a bit of a hack
-        #     # the output-prefix value can't take a path with a / in it, so we can't use the resource group
-        #     for family in parallel_chunk:
-        #         job.command(f'mv results/{family}.json {job[family]["json"]}')
-        #         get_batch().write_output(
-        #             job[family],
-        #             str(content_dict[family]['output']).removesuffix('.json'),
-        #         )
-        #         # break
+        for parallel_chunk in chunks(family_chunk, 4):
+            for family in parallel_chunk:
+                # read in VCF & index
+                vcf = get_batch().read_input_group(
+                    **{
+                        f'{family}_vcf': str(content_dict[family]['vcf']),
+                        f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
+                    },
+                )[f'{family}_vcf']
+
+                # read in phenopacket
+                ppk = get_batch().read_input(str(content_dict[family]['phenopacket']))
+
+                # read in ped
+                ped = get_batch().read_input(str(content_dict[family]['ped']))
+
+                # # this was really satisfying to work out, but isn't needed
+                job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
+
+                job.command(f'python3 config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
+                job.command('ls')
+
+                # now run it
+                job.command(
+                    f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
+                    f'--analysis {job[family]["yaml"]} '
+                    '--spring.config.location=/exomiser-cli-13.3.0/application.properties '
+                    '&',  # run in the background
+                )
+            job.command('wait')
+            job.command('ls')
+
+            # move the results, then copy out
+            # todo - this is a bit of a hack
+            # the output-prefix value can't take a path with a / in it, so we can't use the resource group
+            for family in parallel_chunk:
+                job.command(f'mv results/{family}.json {job[family]["json"]}')
+                get_batch().write_output(
+                    job[family],
+                    str(content_dict[family]['output']).removesuffix('.json'),
+                )
+                # break
     return all_jobs
