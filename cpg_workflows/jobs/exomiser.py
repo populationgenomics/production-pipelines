@@ -395,16 +395,16 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} --ped {ped} '
                     f'--spring.config.location={exomiser_dir}/application.properties '
-                    # '&',  # run in the background
+                    '&',  # run in the background
                 )
                 break
-            # job.command('wait')
-            # job.command('ls')
+            job.command('wait')
+            job.command('ls *')
 
             # move the results, then copy out
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
-                job.command(f'mv results/{family}.json {job[family]["json"]}')
+                job.command(f'mv {family}.json {job[family]["json"]}')
                 get_batch().write_output(
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
