@@ -395,8 +395,9 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'--spring.config.location={exomiser_dir}/application.properties '
                     # '&',  # run in the background
                 )
-            job.command('wait')
-            job.command('ls')
+                break
+            # job.command('wait')
+            # job.command('ls')
 
             # move the results, then copy out
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
@@ -406,5 +407,5 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
                 )
-                # break
+                break
     return all_jobs
