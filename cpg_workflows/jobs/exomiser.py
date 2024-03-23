@@ -221,7 +221,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         phenopacket: dict = {
             'family': family,
             'proband': proband.id,
-            'hpoIds': hpo_terms,
+            'hpoIds': hpo_terms
         }
 
         with out_path[family].open('w') as ppk_file:
@@ -397,17 +397,15 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     f'--spring.config.location={exomiser_dir}/application.properties '
                     '&',  # run in the background
                 )
-                break
             job.command('wait')
             job.command('ls *')
 
             # move the results, then copy out
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
-                job.command(f'mv {family}.json {job[family]["json"]}')
+                job.command(f'mv results/{family}.json {job[family]["json"]}')
                 get_batch().write_output(
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
                 )
-                break
     return all_jobs
