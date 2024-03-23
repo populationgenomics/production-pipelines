@@ -212,9 +212,10 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         proband = affected.pop()
 
         hpo_term_string = proband.meta.get(HPO_KEY, '')
+        # nightmare
+        if not hpo_term_string:
+            hpo_term_string = 'HP:0000520'
         hpo_terms = hpo_term_string.split(',')
-        if not hpo_terms:
-            hpo_terms = ['HP:0000520']
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
         phenopacket: dict = {
