@@ -8,7 +8,7 @@ As a dataset Stage
 - run exomiser, multiple families per setup
 """
 
-from functools import lru_cache
+from functools import cache
 
 from cpg_workflows.jobs.exomiser import (
     extract_mini_ped_files,
@@ -23,7 +23,7 @@ from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, Stage
 HPO_KEY: str = 'HPO Terms (present)'
 
 
-@lru_cache(maxsize=0)
+@cache
 def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     """
     Find all the families in the project
