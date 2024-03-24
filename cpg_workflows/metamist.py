@@ -7,7 +7,7 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Optional
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -53,6 +53,40 @@ GET_SEQUENCING_GROUPS_QUERY = gql(
         }
         """,
 )
+
+GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
+    """
+    query SGByCohortQuery($cohort_id: String!) {
+        cohort(id: {eq: $cohort_id}) {
+            sequencingGroups {
+                id
+                meta
+                platform
+                technology
+                type
+                sample {
+                    project {
+                        name
+                    }
+                    externalId
+                    participant {
+                        id
+                        externalId
+                        reportedSex
+                        meta
+                    }
+                }
+                assays {
+                    id
+                    meta
+                    type
+                }
+            }
+        }
+    }
+    """,
+)
+
 
 GET_ANALYSES_QUERY = gql(
     """
@@ -222,6 +256,24 @@ class Analysis:
         return a
 
 
+def sort_sgs_by_project(response_data) -> dict:
+    """
+    Create dictionary organising sequencing groups by project
+    {project_id: [sequencing_group_1, sequencing_group_2, ...]}
+    """
+    result_dict: dict[str, Any] = {}
+
+    for sequencing_group in response_data:
+        project_id = sequencing_group['sample']['project']['name']
+
+        if project_id not in result_dict:
+            result_dict[project_id] = []
+
+        result_dict[project_id].append(sequencing_group)
+
+    return result_dict
+
+
 class Metamist:
     """
     Communication with metamist.
@@ -231,11 +283,25 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
+    def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
+        """
+        Retrieve sequencing group entries for a cohort.
+        """
+        entries = gql_query_optional_logging(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
+
+        # Create dictionary keying sequencing groups by project
+        # {project_id: [sequencing_group_1, sequencing_group_2, ...]}
+        assert len(entries['cohort']) == 1, 'We only support one cohort at a time currently'
+        sequencing_groups = entries['cohort'][0]['sequencingGroups']
+
+        return sort_sgs_by_project(sequencing_groups)
+
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
         Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
+        # TODO: Take a cohort id as an input OR a dataset name
         metamist_proj = dataset_name
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
