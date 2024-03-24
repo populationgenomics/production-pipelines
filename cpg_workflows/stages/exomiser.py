@@ -201,12 +201,14 @@ class RunExomiser(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
+        # todo filter out families with no affected individuals
+
         output_dict = self.expected_outputs(dataset)
         vcf_inputs = inputs.as_dict(target=dataset, stage=CreateFamilyVCFs)
         ped_inputs = inputs.as_dict(target=dataset, stage=MakePedExtracts)
         ppk_files = inputs.as_dict(target=dataset, stage=MakePhenopackets)
 
-        # expecting all the keys to be the same...
+        # combining all these stage outputs into one object
         single_dict = {
             family: {
                 'output': output_dict[family],
