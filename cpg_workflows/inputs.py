@@ -34,9 +34,7 @@ def create_cohort() -> Cohort:
     # Additional logic to support cohorts + datasets as inputs. In future, cohorts will only be supported.
     dataset_names: list[str] = []
     if custom_cohort_ids and input_datasets:
-        raise ValueError(
-            'Cannot use both custom_cohort_ids and input_datasets in the same workflow'
-        )
+        raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
     if not custom_cohort_ids and not input_datasets:
         dataset_names = [analysis_dataset_name]
 
@@ -45,9 +43,7 @@ def create_cohort() -> Cohort:
 
     if custom_cohort_ids and not input_datasets:
         # TODO: Handle more than one cohort
-        sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(
-            custom_cohort_ids[0]
-        )
+        sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
 
     skip_datasets = get_config()['workflow'].get('skip_datasets', [])
     dataset_names = [d for d in dataset_names if d not in skip_datasets]

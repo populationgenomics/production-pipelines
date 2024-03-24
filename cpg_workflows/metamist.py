@@ -7,7 +7,7 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Any
+from typing import Any, Optional
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -84,7 +84,7 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
             }
         }
     }
-    """
+    """,
 )
 
 
@@ -287,15 +287,11 @@ class Metamist:
         """
         Retrieve sequencing group entries for a cohort.
         """
-        entries = gql_query_optional_logging(
-            GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id}
-        )
+        entries = gql_query_optional_logging(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
         # Create dictionary keying sequencing groups by project
         # {project_id: [sequencing_group_1, sequencing_group_2, ...]}
-        assert (
-            len(entries['cohort']) == 1
-        ), 'We only support one cohort at a time currently'
+        assert len(entries['cohort']) == 1, 'We only support one cohort at a time currently'
         sequencing_groups = entries['cohort'][0]['sequencingGroups']
 
         return sort_sgs_by_project(sequencing_groups)
@@ -557,9 +553,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = gql_query_optional_logging(
-            GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj}
-        )
+        entries = gql_query_optional_logging(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
