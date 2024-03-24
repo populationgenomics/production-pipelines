@@ -1,6 +1,7 @@
 """
 Common methods for all GATK-SV workflows
 """
+
 import re
 from enum import Enum
 from functools import lru_cache
@@ -8,15 +9,15 @@ from os.path import join
 from random import randint
 from typing import Any
 
+from hailtop.batch.job import Job
+
 from analysis_runner.cromwell import (
     CromwellOutputType,
     run_cromwell_workflow_from_repo_and_get_outputs,
 )
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, get_config
-from cpg_utils.hail_batch import Batch, command, image_path, reference_path
-from hailtop.batch.job import Job
-
+from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
 from cpg_workflows.batch import make_job_name
 from cpg_workflows.workflow import Cohort, Dataset
 
@@ -62,9 +63,7 @@ def create_polling_intervals() -> dict:
     # update if these exist in config
     for job_size in CromwellJobSizes:
         if job_size.value in get_config().get('cromwell_polling_intervals', {}):
-            polling_interval_dict[job_size].update(
-                get_config()['cromwell_polling_intervals'][job_size.value]
-            )
+            polling_interval_dict[job_size].update(get_config()['cromwell_polling_intervals'][job_size.value])
     return polling_interval_dict
 
 
@@ -75,15 +74,6 @@ def _sv_batch_meta(
     Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-batch-calls'}
-
-
-def _sv_filtered_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-filtered-calls'}
 
 
 def _sv_individual_meta(
@@ -101,10 +91,7 @@ def get_fasta() -> Path:
     """
     global _FASTA
     if _FASTA is None:
-        _FASTA = to_path(
-            get_config()['workflow'].get('ref_fasta')
-            or reference_path('broad/ref_fasta')
-        )
+        _FASTA = to_path(get_config()['workflow'].get('ref_fasta') or reference_path('broad/ref_fasta'))
     return _FASTA
 
 
@@ -154,7 +141,6 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
 
 
 def add_gatk_sv_jobs(
-    batch: Batch,
     dataset: Dataset,
     wfl_name: str,
     # "dict" is invariant (supports updating), "Mapping" is covariant (read-only)
@@ -174,12 +160,8 @@ def add_gatk_sv_jobs(
     polling_intervals = create_polling_intervals()
 
     # obtain upper and lower polling bounds for this job size
-    polling_minimum = randint(
-        polling_intervals[job_size]['min'], polling_intervals[job_size]['min'] * 2
-    )
-    polling_maximum = randint(
-        polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2
-    )
+    polling_minimum = randint(polling_intervals[job_size]['min'], polling_intervals[job_size]['min'] * 2)
+    polling_maximum = randint(polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2)
 
     # If a config section exists for this workflow, apply overrides
     if override := get_config()['resource_overrides'].get(wfl_name):
@@ -194,13 +176,9 @@ def add_gatk_sv_jobs(
     outputs_to_collect = dict()
     for key, value in expected_out_dict.items():
         if isinstance(value, list):
-            outputs_to_collect[key] = CromwellOutputType.array_path(
-                name=f'{wfl_name}.{key}', length=len(value)
-            )
+            outputs_to_collect[key] = CromwellOutputType.array_path(name=f'{wfl_name}.{key}', length=len(value))
         else:
-            outputs_to_collect[key] = CromwellOutputType.single_path(
-                f'{wfl_name}.{key}'
-            )
+            outputs_to_collect[key] = CromwellOutputType.single_path(f'{wfl_name}.{key}')
 
     driver_image = driver_image or image_path('cpg_workflows')
 
@@ -222,15 +200,13 @@ def add_gatk_sv_jobs(
                 for key, value in sub_section.items():
                     paths_as_strings[f'{sub_wf}.{key}'] = value
 
-    job_prefix = make_job_name(
-        wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name
-    )
+    job_prefix = make_job_name(wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name)
 
     # config toggle decides if outputs are copied out
     copy_outputs = get_config()['workflow'].get('copy_outputs', False)
 
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
-        b=batch,
+        b=get_batch(),
         job_prefix=job_prefix,
         dataset=get_config()['workflow']['dataset'],
         repo='gatk-sv',
@@ -248,7 +224,7 @@ def add_gatk_sv_jobs(
         max_watch_poll_interval=polling_maximum,
     )
 
-    copy_j = batch.new_job(f'{job_prefix}: copy outputs')
+    copy_j = get_batch().new_job(f'{job_prefix}: copy outputs')
     copy_j.image(driver_image)
     cmds = []
     for key, resource in output_dict.items():
@@ -267,12 +243,8 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_panel_bincov_matrix': str(
-                reference_path('broad/ref_panel_bincov_matrix')
-            ),
-            'contig_ploidy_model_tar': str(
-                reference_path('gatk_sv/contig_ploidy_model_tar')
-            ),
+            'ref_panel_bincov_matrix': str(reference_path('broad/ref_panel_bincov_matrix')),
+            'contig_ploidy_model_tar': str(reference_path('gatk_sv/contig_ploidy_model_tar')),
             'gcnv_model_tars': [
                 str(reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
                 for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
@@ -346,7 +318,6 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    batch,
     cohort,
     cohort_prefix: Path,
     input_vcf: Path,
@@ -362,12 +333,8 @@ def queue_annotate_sv_jobs(
         'prefix': cohort.name,
         'ped_file': make_combined_ped(cohort, cohort_prefix),
         'sv_per_shard': 5000,
-        'population': get_config()['references']['gatk_sv'].get(
-            'external_af_population'
-        ),
-        'ref_prefix': get_config()['references']['gatk_sv'].get(
-            'external_af_ref_bed_prefix'
-        ),
+        'population': get_config()['references']['gatk_sv'].get('external_af_population'),
+        'ref_prefix': get_config()['references']['gatk_sv'].get('external_af_ref_bed_prefix'),
         'use_hail': False,
     }
 
@@ -377,7 +344,7 @@ def queue_annotate_sv_jobs(
             'protein_coding_gtf',
             {'ref_bed': 'external_af_ref_bed'},
             {'contig_list': 'primary_contigs_list'},
-        ]
+        ],
     )
 
     # images!
@@ -386,10 +353,9 @@ def queue_annotate_sv_jobs(
             'sv_pipeline_docker',
             'sv_base_mini_docker',
             'gatk_docker',
-        ]
+        ],
     )
     jobs = add_gatk_sv_jobs(
-        batch=batch,
         dataset=cohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,

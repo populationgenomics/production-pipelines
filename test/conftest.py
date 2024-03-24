@@ -1,10 +1,10 @@
 import os
 from unittest import mock
 
-import cpg_utils.config
 import pytest
 from google.auth import environment_vars
 
+import cpg_utils.config
 import cpg_workflows.batch
 import cpg_workflows.inputs
 import cpg_workflows.metamist

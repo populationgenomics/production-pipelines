@@ -70,7 +70,7 @@ For more options available for seqr-loader configuration, check the seqr-loader 
 
 ### Seqr production load invocation
 
-`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted sequencing groups in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset sequencing groups to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time. 
+`configs/seqr-main.toml` provides relevant configuration defaults for a CPG production seqr-loader run. Specifically, in contains the list of datasets to query from Metamist and joint-call together, and a list of blacklisted sequencing groups in those datasets. Another handy configs, `configs/genome.toml` or `configs/exome.toml`, can be passed to subset sequencing groups to WGS or WES specifically. To use along with `configs/seqr-main.toml`, of these two must be provided, as the seqr-loader can work on only one type of data at a time.
 
 For example, to load the genome data:
 
@@ -139,7 +139,7 @@ first_stages = ['MtToEs']
 create_es_index_for_datasets = ['validation']
 ```
 
-The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy. 
+The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy.
 
 ## Large Cohort Workflow
 
@@ -284,7 +284,7 @@ Row fields:
 Key: ['i', 'j']
 ```
 
-`gs://cpg-fewgenomes-test/large-cohort/v0-1/relateds_to_drop.ht` is a sample-level table which contains related samples to drop, with top ranking sample selected from each family. Sets of unrelated individuals are determined using Hail's [`maximal_independent_set`](https://hail.is/docs/0.2/methods/misc.html?highlight=maximal_independent_set#hail.methods.maximal_independent_set). 
+`gs://cpg-fewgenomes-test/large-cohort/v0-1/relateds_to_drop.ht` is a sample-level table which contains related samples to drop, with top ranking sample selected from each family. Sets of unrelated individuals are determined using Hail's [`maximal_independent_set`](https://hail.is/docs/0.2/methods/misc.html?highlight=maximal_independent_set#hail.methods.maximal_independent_set).
 
 ```
 Row fields:
@@ -300,7 +300,7 @@ PCA results are written into `gs://cpg-fewgenomes-test/large-cohort/v0-1/ancestr
   * `gs://cpg-fewgenomes-test/large-cohort/v0-1/ancestry/eigenvalues.ht`
   * `gs://cpg-fewgenomes-test/large-cohort/v0-1/ancestry/loadings.ht`
   * `gs://cpg-fewgenomes-test/large-cohort/v0-1/ancestry/scores.ht`
- 
+
 When there are samples with known continental population available (the metamist participant metadata field with that data can be specified in the [TOML](configs/defaults/large_cohort.toml) as `large_cohort.training_pop`), a random forest method is used to infer population labels from the PCA results. The method is trained using 16 principal components as features on samples with known ancestry (the number of components can be adjusted in the TOML as well as `large_cohort.n_pcs`). Ancestry was assigned to all samples for which the probability of that ancestry was high enough (the threshold is configured as `large_cohort.min_pop_prob` in the TOML). Results are written as sample-level table `gs://cpg-fewgenomes-test/large-cohort/v0-1/ancestry/inferred_pop.ht`.
 
 ```
@@ -312,10 +312,10 @@ Row fields:
     'pca_scores': array<float64>
 ----------------------------------------
 Key: ['s']
-``` 
+```
 
 Plots for PCA and loadings are written to `gs://cpg-fewgenomes-test-web/large-cohort/v0-1/ancestry/*`, a bucket that is exposed as https://test-web.populationgenomics.org.au/fewgenomes/large-cohort/ancestry/*
- 
+
 #### Dense subset
 
 For PCA and PC-relate, a dense subset of the original dataset is used. The markers for the subset are read from the `references.gnomad.predetermined_qc_variants` Hail table specified in the TOML config. The table is suitable for both exomes and genomes, so that a mixture of different sequencing types can be processed together. The resulting subset is written to `gs://cpg-fewgenomes-test/large-cohort/v0-1/dense-subset.mt`.
@@ -327,12 +327,12 @@ Variants from good quality samples are filtered using the [AS-VQSR method](https
 1. Variants are exported into a sites-only VCF,
 
 1. Batch jobs are submitted to create SNP and indel recalibration models using the allele-specific version of GATK Variant Quality Score Recalibration [VQSR](https://gatkforums.broadinstitute.org/gatk/discussion/9622/allele-specific-annotation-and-filtering), with the standard GATK training resources (HapMap, Omni, 1000 Genomes, Mills indels), and the following features:
-   
+
    * SNVs:   `AS_FS`, `AS_SOR`, `AS_ReadPosRankSum`, `AS_MQRankSum`, `AS_QD`, `AS_MQ`,
    * Indels: `AS_FS`, `AS_SOR`, `AS_ReadPosRankSum`, `AS_MQRankSum`, `AS_QD`.
-   
+
 1. The models are applied to the VCFs and combine them back into one VCF.
-   
+
 1. VCF is converted back into a sites-only locus-level Hail table `gs://cpg-fewgenomes-test/large-cohort/v0-1/vqsr.ht`, with split multiallelics.
 
 ```
@@ -352,7 +352,7 @@ Row fields:
 Note that the `info.AS-*` annotations used for AS-VQSR are dropped, and only the resulting filter label is appended into the `filters` field, e.g. `VQSRTrancheINDEL99.50to99.90`, `VQSRTrancheSNP99.00to99.90+`, etc. The AS_VQSLOD thresholds for assigning filters are configurable in the [TOML](configs/defaults/large_cohort.toml) as `vqsr.snp_filter_level` and `vqsr.indel_filter_level`.
 
 This pipeline is largely compiled from the following two WDL workflows:
-   
+
 1. `hail-ukbb-200k-callset/GenotypeAndFilter.AS.wdl`
 
 2. The [Broad VQSR workflow](https://github.com/broadinstitute/warp/blob/develop/pipelines/broad/dna_seq/germline/joint_genotyping/JointGenotyping.wdl) documented [here](https://gatk.broadinstitute.org/hc/en-us/articles/360035531112--How-to-Filter-variants-either-with-VQSR-or-by-hard-filtering), translated from WDL with a help of [Janis](https://github.com/PMCC-BioinformaticsCore/janis).
@@ -439,7 +439,7 @@ The workflow is largely inspired by [the Hail pipeline used for the QC of gnomAD
 
 ## GATK-SV
 
-Broad's [GATK-SV workflow](https://github.com/broadinstitute/gatk-sv) is WIP, but it can be already used to call SV evidence from individual samples. 
+Broad's [GATK-SV workflow](https://github.com/broadinstitute/gatk-sv) is WIP, but it can be already used to call SV evidence from individual samples.
 
 Under the hood, the workflow invokes the GATK-SV WDL workflow using a managed Cromwell instance via the analysis runner helper functions. The WDL workflow repository is [forked](https://github.com/populationgenomics/gatk-sv), and the latest commit to use is specified in `gatk_sv/gatk_sv.py` as a `GATK_SV_COMMIT` constant.
 
@@ -475,7 +475,7 @@ pip install -r requirements-dev.txt
 
 ### Codebase
 
-The entry point of the codebase is `main.py` script. It contains `WORKFLOWS` dictionary, which is listing all available workflows. A workflow is defined by the final stages it needs to trigger, with each stage pulling other required stages recursively following `required_stages` links. Those final stages are passed to the `run_workflow()` function, which would orchestrate stages and required inputs. 
+The entry point of the codebase is `main.py` script. It contains `WORKFLOWS` dictionary, which is listing all available workflows. A workflow is defined by the final stages it needs to trigger, with each stage pulling other required stages recursively following `required_stages` links. Those final stages are passed to the `run_workflow()` function, which would orchestrate stages and required inputs.
 
 In this documentation section, we describe in more detail how exactly it's implemented.
 
@@ -501,7 +501,7 @@ To facilitate re-engineering WARP workflows and creating workflows scratch, we i
 
 ![uml](docs/classes.png)
 
-This library provides an abstraction interface on top of Hail Batch jobs, namely a `Stage` abstract class, parametrised by the `Target` abstract class, representing what target this stage works with. 
+This library provides an abstraction interface on top of Hail Batch jobs, namely a `Stage` abstract class, parametrised by the `Target` abstract class, representing what target this stage works with.
 
 For example, a stage that performs read alignment to produce a CRAM file, would be derived from `SequencingGroupStage`, and be parametrised by `SequencingGroup`, and a stage that performs joint-calling would be derived from `CohortStage`, parametrised by `Cohort`.
 
@@ -523,7 +523,7 @@ class Align(SequencingGroupStage):
         j = get_batch().new_job('BWA', self.get_job_attrs(sequencing_group))
         j.command(f'bwa ... > {j.output}')
         get_batch().write_output(j.output, str(self.expected_outputs(sequencing_group)))
-        # Construct StageOutput object, where we pass a path to the results, 
+        # Construct StageOutput object, where we pass a path to the results,
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), [j])
 ```
 
@@ -593,7 +593,7 @@ only_datasets = ['hgdp', 'thousand-genomes']
 skip_sgs = ['CPGXXXX', 'CPGXXXX']
 skip_stages = ['Align']
 check_inputs = true  # checks e.g. if fastq for align stage exist
-check_intermediates = false  # explitic calls to can_reuse(path) will return False 
+check_intermediates = false  # explitic calls to can_reuse(path) will return False
 check_expected_outputs = true  # if expected_outputs() exist, skip stage
 ```
 
@@ -604,14 +604,14 @@ analysis-runner --dataset seqr --access-level test -o test-workflow \
 --config configs/config.toml main.py
 ```
 
-The script would be able to access config parameters with 
+The script would be able to access config parameters with
 
 ```python
 from cpg_utils.config import get_config
 assert get_config()['workflow']['sequencing_type'] == 'genome'
 ```
 
-Note that the workflow implicitly reads inputs from Metamist, and requires `workflow/only_datasets` and `workflow/sequencing_type` to be defined to pull proper inputs. 
+Note that the workflow implicitly reads inputs from Metamist, and requires `workflow/only_datasets` and `workflow/sequencing_type` to be defined to pull proper inputs.
 
 TOML files in [configs/defaults](configs/defaults) and [cpg_workflows/defaults.toml](cpg_workflows/defaults.toml) list possible configuration parameters for workflows, please refer to those configs for documentation.
 
@@ -650,7 +650,7 @@ web_url = "https://main-web.populationgenomics.org.au/validation"
 ...
 ```
 
-If you are not using the analysis runner, you'd have to set those generated values explicitly. 
+If you are not using the analysis runner, you'd have to set those generated values explicitly.
 
 ### Batch helpers
 
@@ -710,14 +710,14 @@ df -h; du -sh $BATCH_TMPDIR
 
 `workflow/check_expected_outputs = true` controls whether the paths returned by `expected_outputs()` of each job correspond to existing objects, and would skip stages with already existing outputs.
 
-You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly within the code called from `queue_jobs()`. 
+You can also call the method `cpg_workflows.utils.can_reuse(path)` explicitly within the code called from `queue_jobs()`.
 `workflow/check_intermediates = true` controls whether `can_reuse()` checks the object(s), or always returns `False`.
 
 `workflow/check_inputs = true` controls whether inputs to the first stage in the pipeline should be checked for existence, e.g. alignment inputs for an `Align` stage. `skip_sgs_with_missing_input` controls the behaviour if those inputs are missing: where skip such sequencing groups, or stop the workflow.
 
 You can also start the pipeline from a specific stage with `workflow/first_stages` (it would skip all previous stages, but still check immediately required inputs for the first stage). `workflow/last_stages` would stop the workflow after the stages specified. `workflow/only_stages` would execute only stages specified, ignoring dependencies.
 
-You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain sequencing groups with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`: 
+You can also force the pipeline to skip certain sequencing groups with `workflow/skip_sgs`, pick only certain sequencing groups with `workflow/only_sgs`, force re-processing of certain sequencing groups with `workflow/force_sgs`. `workflow/skip_datasets` and `workflow/only_datasets` are available, and more fine-grained combination of `skip_sgs` and `skip_stages`:
 
 ```toml
 [workflow.skip_stages_for_sgs]

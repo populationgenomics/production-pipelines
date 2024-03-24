@@ -7,11 +7,11 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 """
 
 import hailtop.batch as hb
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reference_path
-from hailtop.batch.job import Job
-
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align
@@ -48,12 +48,8 @@ SHIFTED_MITO_REF = {
 }
 
 CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': str(
-        reference_path('gnomad_mito/shifted_control_region_interval')
-    ),
-    'non_control_region': str(
-        reference_path('gnomad_mito/non_control_region_interval')
-    ),
+    'control_region_shifted': str(reference_path('gnomad_mito/shifted_control_region_interval')),
+    'non_control_region': str(reference_path('gnomad_mito/non_control_region_interval')),
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
@@ -116,26 +112,14 @@ class RealignMito(SequencingGroupStage):
         return {
             'non_shifted_cram': main / 'mito' / f'{sequencing_group.id}.mito.cram',
             'shifted_cram': main / 'mito' / f'{sequencing_group.id}.shifted_mito.cram',
-            'base_level_coverage_metrics': main
-            / 'mito'
-            / f'{sequencing_group.id}.base_level_coverage.tsv',
-            'coverage_metrics': analysis
-            / 'mito'
-            / f'{sequencing_group.id}.coverage_metrics.txt',
-            'coverage_mean': analysis
-            / 'mito'
-            / f'{sequencing_group.id}.coverage_mean.txt',
-            'coverage_median': analysis
-            / 'mito'
-            / f'{sequencing_group.id}.coverage_median.txt',
-            'theoretical_sensitivity_metrics': analysis
-            / 'mito'
-            / f'{sequencing_group.id}.theoretical_sensitivity.txt',
+            'base_level_coverage_metrics': main / 'mito' / f'{sequencing_group.id}.base_level_coverage.tsv',
+            'coverage_metrics': analysis / 'mito' / f'{sequencing_group.id}.coverage_metrics.txt',
+            'coverage_mean': analysis / 'mito' / f'{sequencing_group.id}.coverage_mean.txt',
+            'coverage_median': analysis / 'mito' / f'{sequencing_group.id}.coverage_median.txt',
+            'theoretical_sensitivity_metrics': analysis / 'mito' / f'{sequencing_group.id}.theoretical_sensitivity.txt',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # Mitochondrial specific reference files.
         mito_ref = get_batch().read_input_group(**MITO_REF)
         shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
@@ -208,9 +192,7 @@ class RealignMito(SequencingGroupStage):
             cram=realign_mkdup_j.output_cram,
             reference=mito_ref,
             metrics=self.expected_outputs(sequencing_group)['coverage_metrics'],
-            theoretical_sensitivity=self.expected_outputs(sequencing_group)[
-                'theoretical_sensitivity_metrics'
-            ],
+            theoretical_sensitivity=self.expected_outputs(sequencing_group)['theoretical_sensitivity_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(coverage_metrics_J)
@@ -237,9 +219,7 @@ class RealignMito(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(non_control_region_coverage_j)
-        assert isinstance(
-            non_control_region_coverage_j.per_base_coverage, hb.ResourceFile
-        )
+        assert isinstance(non_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
 
         shifted_control_region_coverage_j = mito.coverage_at_every_base(
             b=get_batch(),
@@ -249,25 +229,19 @@ class RealignMito(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(shifted_control_region_coverage_j)
-        assert isinstance(
-            shifted_control_region_coverage_j.per_base_coverage, hb.ResourceFile
-        )
+        assert isinstance(shifted_control_region_coverage_j.per_base_coverage, hb.ResourceFile)
 
         # Merge coverage stats
         merge_coverage_j = mito.merge_coverage(
             b=get_batch(),
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
-            merged_coverage=self.expected_outputs(sequencing_group)[
-                'base_level_coverage_metrics'
-            ],
+            merged_coverage=self.expected_outputs(sequencing_group)['base_level_coverage_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_coverage_j)
 
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
 @stage(required_stages=[RealignMito, CramQC])
@@ -319,14 +293,10 @@ class GenotypeMito(SequencingGroupStage):
         analysis = sequencing_group.dataset.analysis_prefix()
         return {
             'out_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vcf.bgz',
-            'haplocheck_metrics': analysis
-            / 'mito'
-            / f'{sequencing_group.id}.haplocheck.txt',
+            'haplocheck_metrics': analysis / 'mito' / f'{sequencing_group.id}.haplocheck.txt',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # Mitochondrial specific reference files.
         mito_ref = get_batch().read_input_group(**MITO_REF)
         shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
@@ -336,13 +306,11 @@ class GenotypeMito(SequencingGroupStage):
         # Get input resources
         non_shifted_cram = get_batch().read_input_group(
             cram=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'))
-            + '.crai',
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram')) + '.crai',
         )
         shifted_cram = get_batch().read_input_group(
             cram=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')),
-            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram'))
-            + '.crai',
+            crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
         )
         if get_config()['mito_snv']['use_verifybamid']:
             verifybamid_output = get_batch().read_input(
@@ -427,9 +395,7 @@ class GenotypeMito(SequencingGroupStage):
         get_contamination_j = mito.get_contamination(
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=self.expected_outputs(sequencing_group)[
-                'haplocheck_metrics'
-            ],
+            haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(get_contamination_j)
@@ -472,17 +438,13 @@ class GenotypeMito(SequencingGroupStage):
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
-        output_vcf_root = str(
-            self.expected_outputs(sequencing_group)['out_vcf']
-        ).replace('.vcf.bgz', '')
+        output_vcf_root = str(self.expected_outputs(sequencing_group)['out_vcf']).replace('.vcf.bgz', '')
 
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
             output_vcf_root,
         )
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
 @stage(
@@ -509,15 +471,10 @@ class MitoReport(SequencingGroupStage):
         web = sequencing_group.dataset.web_prefix()
         return {
             'vep_vcf': main / 'mito' / f'{sequencing_group.id}.mito.vep.vcf.gz',
-            'mitoreport': web
-            / 'mito'
-            / f'mitoreport-{sequencing_group.id}'
-            / 'index.html',
+            'mitoreport': web / 'mito' / f'mitoreport-{sequencing_group.id}' / 'index.html',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         mito_ref = get_batch().read_input_group(**MITO_REF)
         jobs = []
 
@@ -544,6 +501,4 @@ class MitoReport(SequencingGroupStage):
             mitoreport_j.depends_on(*jobs)
             jobs.append(mitoreport_j)
 
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)

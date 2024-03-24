@@ -1,6 +1,7 @@
 """
 Utility functions and constants.
 """
+
 import logging
 import re
 import string
@@ -9,16 +10,16 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
-
 from itertools import chain, islice
 from os.path import basename, dirname, join
 from random import choices
 from typing import Union, cast
 
 import hail as hl
+from hailtop.batch import ResourceFile
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from hailtop.batch import ResourceFile
 
 
 def chunks(iterable, chunk_size):
@@ -74,10 +75,10 @@ def read_hail(path):
 
 
 def checkpoint_hail(
-        t: hl.Table | hl.MatrixTable,
-        file_name: str,
-        checkpoint_prefix: str | None = None,
-        allow_reuse=False
+    t: hl.Table | hl.MatrixTable,
+    file_name: str,
+    checkpoint_prefix: str | None = None,
+    allow_reuse=False,
 ):
     """
     checkpoint method
@@ -223,9 +224,7 @@ def timestamp(rand_suffix_len: int = 5) -> str:
     """
     result = time.strftime('%Y_%m%d_%H%M')
     if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
-        )
+        rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=rand_suffix_len))
         result += f'_{rand_bit}'
     return result
 

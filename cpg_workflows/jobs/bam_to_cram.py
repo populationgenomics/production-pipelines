@@ -2,12 +2,12 @@
 Convert BAM to CRAM.
 """
 
-from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, image_path, Batch
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
+from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import Batch, command, image_path
 from cpg_workflows.resources import STANDARD
 
 
@@ -49,7 +49,7 @@ def bam_to_cram(
         sorted_cram={
             'cram': '{root}.cram',
             'cram.crai': '{root}.cram.crai',
-        }
+        },
     )
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["cram.crai"]}'
@@ -69,7 +69,7 @@ def cram_to_bam(
     """
     Convert a CRAM file to a BAM file.
     """
-    
+
     assert isinstance(input_cram, ResourceGroup)
 
     job_name = 'cram_to_bam'
@@ -93,7 +93,7 @@ def cram_to_bam(
         sorted_bam={
             'bam': '{root}.bam',
             'bam.bai': '{root}.bam.bai',
-        }
+        },
     )
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -b {input_cram.cram} | tee {j.sorted_bam["bam"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_bam["bam.bai"]}'

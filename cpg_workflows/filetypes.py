@@ -6,9 +6,10 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Union
 
-from hailtop.batch import ResourceGroup, ResourceFile, Batch
+from hailtop.batch import Batch, ResourceFile, ResourceGroup
 
 from cpg_utils import Path, to_path
+
 from .utils import exists
 
 
@@ -41,9 +42,7 @@ class CramOrBamPath(AlignmentInput, ABC):
         if index_path:
             self.index_path = to_path(index_path)
             assert self.index_path.suffix == f'.{self.index_ext}'
-            self.full_index_suffix = str(self.index_path).replace(
-                str(self.path.with_suffix('')), ''
-            )
+            self.full_index_suffix = str(self.index_path).replace(str(self.path.with_suffix('')), '')
         self.reference_assembly = None
         if reference_assembly:
             self.reference_assembly = to_path(reference_assembly)
@@ -51,12 +50,12 @@ class CramOrBamPath(AlignmentInput, ABC):
     @property
     @abstractmethod
     def ext(self) -> str:
-        ...
+        """The canonical extension for the file type, without a '.' at the start."""
 
     @property
     @abstractmethod
     def index_ext(self) -> str:
-        ...
+        """The canonical index file extension, without a '.' at the start."""
 
     def __str__(self) -> str:
         return str(self.path)
@@ -179,7 +178,7 @@ class GvcfPath:
             **{
                 'g.vcf.gz': str(self.path),
                 'g.vcf.gz.tbi': str(self.tbi_path),
-            }
+            },
         )
 
 
@@ -204,12 +203,7 @@ class FastqPair(AlignmentInput):
         Makes a pair of ResourceFile objects for r1 and r2.
         """
         return FastqPair(
-            *[
-                self[i]
-                if isinstance(self[i], ResourceFile)
-                else b.read_input(str(self[i]))
-                for i in [0, 1]
-            ]
+            *[(self[i] if isinstance(self[i], ResourceFile) else b.read_input(str(self[i]))) for i in [0, 1]],
         )
 
     def exists(self) -> bool:

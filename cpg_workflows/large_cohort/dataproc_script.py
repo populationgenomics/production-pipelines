@@ -4,11 +4,13 @@
 Generic script to run a function on dataproc.
 """
 
-import click
 import logging
-from cpg_utils.hail_batch import start_query_context
-from cpg_utils import to_path
 from importlib import import_module
+
+import click
+
+from cpg_utils import to_path
+from cpg_utils.hail_batch import start_query_context
 
 logging.basicConfig()
 logging.getLogger().setLevel(logging.INFO)

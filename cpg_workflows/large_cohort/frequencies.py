@@ -1,15 +1,16 @@
-import hail as hl
 import logging
+
+import hail as hl
 
 from cpg_utils import Path
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (
-    get_adj_expr,
     age_hists_expr,
     bi_allelic_site_inbreeding_expr,
     faf_expr,
+    get_adj_expr,
     pop_max_expr,
     qual_hist_expr,
 )
@@ -65,9 +66,7 @@ def frequency_annotations(
 
     logging.info('Computing adj and sex adjusted genotypes...')
     mt = mt.annotate_entries(
-        GT=adjusted_sex_ploidy_expr(
-            mt.locus, mt.GT, sample_qc_ht[mt.col_key].sex_karyotype
-        ),
+        GT=adjusted_sex_ploidy_expr(mt.locus, mt.GT, sample_qc_ht[mt.col_key].sex_karyotype),
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
 
@@ -98,7 +97,7 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
                 mt.adj,
                 mt.GT,
                 mt.age,
-            )
+            ),
         )
         # Compute callset-wide age histogram global
         mt = mt.annotate_globals(
@@ -108,8 +107,8 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
                     30,
                     80,
                     10,
-                )
-            )
+                ),
+            ),
         )
     return mt
 
@@ -123,15 +122,11 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         faf=faf,
         popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX),
     )
-    mt = mt.annotate_globals(
-        faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta)
-    )
+    mt = mt.annotate_globals(faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta))
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
-            faf95=mt.faf[
-                mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])
-            ].faf95
-        )
+            faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
+        ),
     )
     return mt
 
@@ -143,15 +138,7 @@ def _annotate_quality_metrics_hist(mt: hl.MatrixTable) -> hl.Table:
     mt = mt.annotate_rows(qual_hists=qual_hist_expr(mt.GT, mt.GQ, mt.DP, mt.AD, mt.adj))
     ht = mt.rows()
     ht = ht.annotate(
-        qual_hists=hl.Struct(
-            **{
-                i.replace('_adj', ''): ht.qual_hists[i]
-                for i in ht.qual_hists
-                if '_adj' in i
-            }
-        ),
-        raw_qual_hists=hl.Struct(
-            **{i: ht.qual_hists[i] for i in ht.qual_hists if '_adj' not in i}
-        ),
+        qual_hists=hl.Struct(**{i.replace('_adj', ''): ht.qual_hists[i] for i in ht.qual_hists if '_adj' in i}),
+        raw_qual_hists=hl.Struct(**{i: ht.qual_hists[i] for i in ht.qual_hists if '_adj' not in i}),
     )
     return ht

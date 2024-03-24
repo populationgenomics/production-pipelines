@@ -5,7 +5,7 @@ Mark duplicates in BAM files using sambamba markdup
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
-from cpg_utils.hail_batch import command, image_path, Batch
+from cpg_utils.hail_batch import Batch, command, image_path
 from cpg_workflows.filetypes import BamPath
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import Path
@@ -16,14 +16,12 @@ class Markdup:
     Construct a sambamba markdup command for marking duplicates
     """
 
-    def __init__(
-        self, input_bam: BamPath | Path | str, output_bam: Path | str, nthreads: int = 8
-    ):
+    def __init__(self, input_bam: BamPath | Path | str, output_bam: Path | str, nthreads: int = 8):
         self.command = [
             'sambamba markdup',
             '-t',
             str(nthreads),
-            f'--tmpdir=$BATCH_TMPDIR/markdup',
+            '--tmpdir=$BATCH_TMPDIR/markdup',
             str(input_bam),
             str(output_bam),
         ]
@@ -67,7 +65,7 @@ def markdup(
         output_bam={
             'bam': '{root}.bam',
             'bam.bai': '{root}.bam.bai',
-        }
+        },
     )
     assert isinstance(j.output_bam, ResourceGroup)
 

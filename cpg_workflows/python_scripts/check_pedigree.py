@@ -5,7 +5,7 @@ This script parses "somalier relate" (https://github.com/brentp/somalier) output
 and returns a report whether sex and pedigree matches the provided PED file.
 
 Script can send a report to a Slack channel. To enable that, set SLACK_TOKEN
-and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into 
+and SLACK_CHANNEL environment variables, and add "Seqr Loader" app into
 a channel with:
 
 /invite @Seqr Loader
@@ -129,28 +129,22 @@ def run(
     if bad.any():
         warning(
             f'⚠️ Excluded {len(df[bad])}/{len(df)} samples with zero '
-            f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}'
+            f'mean GT depth from pedigree/sex checks: {", ".join(df[bad].sample_id)}',
         )
         info('')
     bad_ids = list(df[bad].sample_id)  # for checking in pairs_df
     df = df[~bad]
 
-    info(f'*Inferred vs. reported sex:*')
+    info('*Inferred vs. reported sex:*')
     # Rename Ped sex to human-readable tags
     df.sex = df.sex.apply(lambda x: {1: 'male', 2: 'female'}.get(x, 'unknown'))
-    df.original_pedigree_sex = df.original_pedigree_sex.apply(
-        lambda x: {'-9': 'unknown'}.get(x, x)
-    )
+    df.original_pedigree_sex = df.original_pedigree_sex.apply(lambda x: {'-9': 'unknown'}.get(x, x))
     missing_inferred_sex = df.sex == 'unknown'
     missing_provided_sex = df.original_pedigree_sex == 'unknown'
     mismatching_female = (df.sex == 'female') & (df.original_pedigree_sex == 'male')
     mismatching_male = (df.sex == 'male') & (df.original_pedigree_sex == 'female')
     mismatching_sex = mismatching_female | mismatching_male
-    mismatching_other = (
-        (df.sex != df.original_pedigree_sex)
-        & (~mismatching_female)
-        & (~mismatching_male)
-    )
+    mismatching_other = (df.sex != df.original_pedigree_sex) & (~mismatching_female) & (~mismatching_male)
     matching_sex = ~mismatching_sex & ~mismatching_other
 
     def _print_stats(df_filter):
@@ -159,33 +153,27 @@ def run(
                 f' {row_.sample_id} ('
                 f'provided: {row_.original_pedigree_sex}, '
                 f'inferred: {row_.sex}, '
-                f'mean depth: {row_.gt_depth_mean})'
+                f'mean depth: {row_.gt_depth_mean})',
             )
 
     if mismatching_sex.any():
-        info(
-            f'❗ {len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:'
-        )
+        info(f'❗ {len(df[mismatching_sex])}/{len(df)} PED samples with mismatching sex:')
         _print_stats(mismatching_sex)
     if missing_provided_sex.any():
-        info(
-            f'⚠️ {len(df[missing_provided_sex])}/{len(df)} samples with missing provided sex:'
-        )
+        info(f'⚠️ {len(df[missing_provided_sex])}/{len(df)} samples with missing provided sex:')
         _print_stats(missing_provided_sex)
     if missing_inferred_sex.any():
-        info(
-            f'⚠️ {len(df[missing_inferred_sex])}/{len(df)} samples with failed inferred sex:'
-        )
+        info(f'⚠️ {len(df[missing_inferred_sex])}/{len(df)} samples with failed inferred sex:')
         _print_stats(missing_inferred_sex)
     inferred_cnt = len(df[~missing_inferred_sex])
     matching_cnt = len(df[matching_sex])
     info(
         f'✅ Sex inferred for {inferred_cnt}/{len(df)} samples, matching '
-        f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.'
+        f'for {matching_cnt if matching_cnt != inferred_cnt else "all"} samples.',
     )
     info('')
 
-    info(f'*Relatedness:*')
+    info('*Relatedness:*')
     expected_ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
     inferred_ped_sample_by_id = {s.sample_id: s for s in inferred_ped.samples()}
 
@@ -251,19 +239,19 @@ def run(
         info(
             f'⚠️ Found {len(mismatching_unrelated_to_related)} '
             f'sample pair(s) that are provided as unrelated, are inferred as '
-            f'related:'
+            f'related:',
         )
         for i, pair in enumerate(mismatching_unrelated_to_related):
             info(f' {i + 1}. {pair}')
     if mismatching_related_to_unrelated:
         info(
             f'❗ Found {len(mismatching_related_to_unrelated)} sample pair(s) '
-            f'that are provided as related, but inferred as unrelated:'
+            f'that are provided as related, but inferred as unrelated:',
         )
         for i, pair in enumerate(mismatching_related_to_unrelated):
             info(f' {i + 1}. {pair}')
     if not mismatching_unrelated_to_related and not mismatching_related_to_unrelated:
-        info(f'✅ Inferred pedigree matches for all provided related pairs.')
+        info('✅ Inferred pedigree matches for all provided related pairs.')
     info('')
 
     print_contents(
@@ -295,10 +283,7 @@ def print_contents(
     """
     if len(samples_df) < 400:
         samples_str = samples_df.to_string()
-        logging.info(
-            f'Somalier results, samples (based on {somalier_samples_fpath}):\n'
-            f'{samples_str}\n'
-        )
+        logging.info(f'Somalier results, samples (based on {somalier_samples_fpath}):\n{samples_str}\n')
     if len(pairs_df) < 400:
         pairs_str = pairs_df[
             [
@@ -311,10 +296,7 @@ def print_contents(
                 'expected_relatedness',
             ]
         ].to_string()
-        logging.info(
-            f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n'
-            f'{pairs_str}\n'
-        )
+        logging.info(f'Somalier results, sample pairs (based on {somalier_pairs_fpath}):\n{pairs_str}\n')
 
 
 if __name__ == '__main__':

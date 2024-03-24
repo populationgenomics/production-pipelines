@@ -5,15 +5,15 @@ Instructions as-of 07 July 2023 for running GATK-SV via Analysis-Runner.
 ## Intro
 
 [GATK-SV](https://github.com/broadinstitute/gatk-sv) is a collection of workflows for applying a number of structural
-variant callers to genomic data, then refining the initial calls into a high quality joint-callset. Instead of 
-attempting to re-implement these workflows in Production-Pipelines, we have chosen to wrap stages of GATK-SV workflows 
+variant callers to genomic data, then refining the initial calls into a high quality joint-callset. Instead of
+attempting to re-implement these workflows in Production-Pipelines, we have chosen to wrap stages of GATK-SV workflows
 directly.
 
 The [Cohort-Mode section](https://github.com/broadinstitute/gatk-sv#cohort-mode) of the README describes key GATK-SV
-phases, each of which exists as a separate workflow in our implementation. This README will contain instructions for 
+phases, each of which exists as a separate workflow in our implementation. This README will contain instructions for
 running each of these workflows, as well as a description of required inputs.
 
-n.b. this reflects the current state of GATK-SV adoption, but when we migrate to custom cohorts, this will be far less 
+n.b. this reflects the current state of GATK-SV adoption, but when we migrate to custom cohorts, this will be far less
 complex, requiring fewer discrete steps.
 
 ## Runtime Notes
@@ -22,14 +22,14 @@ The GATK-SV workflows are run with Full permissions, as they seem to try and del
 escalated permissions.
 
 The config file `configs/gatk_sv/use_for_all_workflows.toml` contains locations of all docker images to pull from our
-infrastructure, and should be included with all workflows. It also contains instruction to log analysis entries to 
+infrastructure, and should be included with all workflows. It also contains instruction to log analysis entries to
 metamist.
 
 ## Sequencing Group Groups
 
-To run GATK-SV we need to first identify samples which have not been processed previously. This should be done by 
+To run GATK-SV we need to first identify samples which have not been processed previously. This should be done by
 checking Metamist for all SGs without an Analysis entry for AnnotateVcf, the final stage of GATK-SV. All SG IDs
-should be added into a TOML config file as the attribute `workflow.only_sgs`. The SGs used can span multiple projects, 
+should be added into a TOML config file as the attribute `workflow.only_sgs`. The SGs used can span multiple projects,
 so long as the relevant projects are all added to the config file as `workflow.input_datasets`, e.g.
 
 ```toml
@@ -51,11 +51,11 @@ There's a few considerations when building this list of SGs:
   `CreateSampleBatches`, where it is important that all SGs are run at once. If this approach is chosen, create a separate
   config TOML for each sub-batch of SGs, and run these independently.
 - The amount of `tmp` space taken up by this process is wild. After completing the `GatherSampleEvidence` step for all
-  samples, consider asking someone with escalated permissions in the software team to delete the data stored in 
+  samples, consider asking someone with escalated permissions in the software team to delete the data stored in
   `gs://cpg-seqr-main-tmp/cromwell/GatherSampleEvidence`, which may be tens of Terabytes of temporary files. The week-long
   standard retention policy can cost hundreds of dollars!
-- The standard batch sizes for sequencing groups are set in code as 100 < 300. This can be edited in config using the 
-  settings `workflow.min_batch_size` and `workflow.max_batch_size`. A minimum group size of 100 is required for the 
+- The standard batch sizes for sequencing groups are set in code as 100 < 300. This can be edited in config using the
+  settings `workflow.min_batch_size` and `workflow.max_batch_size`. A minimum group size of 100 is required for the
   various steps of batch processing, but The Broad implementation is sets 750 as the maximum batch size, but we have not
   experimented in our infrastructure past a max size of 120.
 - One SG has repeatedly failed to run through the `GatherSampleEvidence` step, due to an elevated resource requirement.
@@ -90,11 +90,11 @@ file, containing a list of all batches identified, each with:
 - Male/Female ratio of this batch
 - List of Median coverage for each sample in this batch
 
-It makes sense to evaluate the contents of this file before continuing - if the M/F ratio is significantly skewed from 
+It makes sense to evaluate the contents of this file before continuing - if the M/F ratio is significantly skewed from
 1, it may make sense to add additional males or females, and repeat the single sample workflow.
 
 If you are satisfied with the content of this file, create a new config TOML file for each of the batches identified,
-following the same structure as the example above. In my proof of concept run I named these `multisam_1.toml` and 
+following the same structure as the example above. In my proof of concept run I named these `multisam_1.toml` and
 `multisam_2.toml`.
 
 ## FilterBatch
@@ -131,7 +131,7 @@ taking the hash of all separate batches and adding them to a new config file:
 batch_names = ['555b2843b7a3cfbdeb28c5cfbf7d2b3b1ca004_119', 'a5407cc508c8f25f960e1b52be1f31e740d289_119']
 ```
 
-These hashes can be found from the output file paths generated in the previous workflow. 
+These hashes can be found from the output file paths generated in the previous workflow.
 
 ```commandline
 analysis-runner \

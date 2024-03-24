@@ -5,25 +5,24 @@ Hail Query stages for the Seqr loader workflow.
 """
 from typing import Any
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import image_path, query_command
-
 from cpg_workflows.jobs.seqr_loader import (
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     Cohort,
     CohortStage,
     Dataset,
     DatasetStage,
     StageInput,
     StageOutput,
+    get_workflow,
+    stage,
 )
 
 from .. import get_batch
@@ -54,15 +53,11 @@ class AnnotateCohort(CohortStage):
         Apply VEP and VQSR annotations to all-sample callset
         """
         vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(
-            target=cohort, stage=Vqsr, key='siteonly'
-        )
+        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, key='siteonly')
         vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
-        j = get_batch().new_job(f'annotate cohort', self.get_job_attrs(cohort))
+        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        j = get_batch().new_job('annotate cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -74,7 +69,7 @@ class AnnotateCohort(CohortStage):
                 str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
                 str(checkpoint_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
         if depends_on := inputs.get_jobs(cohort):
             j.depends_on(*depends_on)
@@ -147,11 +142,7 @@ class AnnotateDataset(DatasetStage):
         """
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (
-                dataset.prefix()
-                / 'mt'
-                / f'{get_workflow().output_version}-{dataset.name}.mt'
-            ),
+            'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -161,12 +152,9 @@ class AnnotateDataset(DatasetStage):
         assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
 
         jobs = annotate_dataset_jobs(
-            b=get_batch(),
             mt_path=mt_path,
             sequencing_group_ids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
@@ -175,9 +163,7 @@ class AnnotateDataset(DatasetStage):
             depends_on=inputs.get_jobs(dataset),
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
 @stage(
@@ -197,16 +183,8 @@ class DatasetVCF(DatasetStage):
         Expected to generate a VCF from the single-dataset MT
         """
         return {
-            'vcf': (
-                dataset.prefix()
-                / 'vcf'
-                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'
-            ),
-            'index': (
-                dataset.prefix()
-                / 'vcf'
-                / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'
-            ),
+            'vcf': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'),
+            'index': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -261,9 +239,7 @@ class MtToEs(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = get_config()['workflow']['sequencing_type']
-        index_name = (
-            f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
-        )
+        index_name = f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
@@ -279,16 +255,14 @@ class MtToEs(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES:
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(
-            target=dataset, stage=AnnotateDataset, key='mt'
-        )
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         # Importing this requires CPG_CONFIG_PATH to be already set, that's why

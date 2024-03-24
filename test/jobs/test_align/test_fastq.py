@@ -3,32 +3,37 @@ Test the `align` function using a SequencingGroup with a FASTQ pair(s)
 alignment input.
 """
 
-from calendar import c
 import re
+from calendar import c
 from pathlib import Path
 from typing import Optional
 
 import pytest
 from pytest_mock import MockFixture
+
 from cpg_utils.config import ConfigError
 from cpg_workflows.filetypes import CramPath
-
-from cpg_workflows.jobs.align import Aligner, MarkDupTool, align
-from cpg_workflows.jobs.align import MissingAlignmentInputException
+from cpg_workflows.jobs.align import (
+    Aligner,
+    MarkDupTool,
+    MissingAlignmentInputException,
+    align,
+)
 
 from ... import set_config
 from ...factories.alignment_input import create_fastq_pairs_input
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig
 from ...factories.sequencing_group import create_sequencing_group
-
 from ..helpers import get_command_str
-
-from .shared import select_jobs, default_config
+from .shared import default_config, select_jobs
 
 
 def setup_test(
-    config: PipelineConfig, tmp_path: Path, num_pairs: Optional[int] = 1, create=False
+    config: PipelineConfig,
+    tmp_path: Path,
+    num_pairs: Optional[int] = 1,
+    create=False,
 ):
     set_config(config, tmp_path / 'config.toml')
     batch = create_local_batch(tmp_path)
@@ -37,7 +42,10 @@ def setup_test(
     alignment_input = None
     if num_pairs:
         alignment_input = create_fastq_pairs_input(
-            prefix='SAMPLE1', location=tmp_path, n=num_pairs, create=create
+            prefix='SAMPLE1',
+            location=tmp_path,
+            n=num_pairs,
+            create=create,
         )
 
     sg = create_sequencing_group(
@@ -71,7 +79,10 @@ class TestPreProcess:
         ],
     )
     def test_error_if_alignment_input_is_missing(
-        self, tmp_path: Path, n_pairs: Optional[int], expected_error: str
+        self,
+        tmp_path: Path,
+        n_pairs: Optional[int],
+        expected_error: str,
     ):
         """
         Test that the `align` function throws an error if the alignment input is
@@ -127,7 +138,9 @@ class TestDragmap:
             assert re.search(pattern, cmd, flags=re.DOTALL)
 
     def test_dragmap_aligner_reads_dragmap_reference_resource(
-        self, mocker: MockFixture, tmp_path: Path
+        self,
+        mocker: MockFixture,
+        tmp_path: Path,
     ):
         config = default_config()
         batch, sg = setup_test(config, tmp_path)
@@ -150,13 +163,14 @@ class TestDragmap:
                 'hash_table_cfg_bin': f'{file_location}hash_table.cfg.bin',
                 'hash_table_cmp': f'{file_location}hash_table.cmp',
                 'reference_bin': f'{file_location}reference.bin',
-            }
+            },
         )
 
 
 class TestBwaAndBwa2:
     @pytest.mark.parametrize(
-        'alinger,expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')]
+        'alinger,expected_tool',
+        [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')],
     )
     @pytest.mark.parametrize(
         'reference,expected_reference',
@@ -191,7 +205,8 @@ class TestBwaAndBwa2:
         assert re.search(fr'\${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
         assert re.search(r'\$BATCH_TMPDIR/R1.fq.gz \$BATCH_TMPDIR/R2.fq.gz', cmd)
         assert re.search(
-            r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd
+            r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam',
+            cmd,
         )
 
 
@@ -236,5 +251,6 @@ class TestPostProcess:
 
         cmd = get_command_str(align_jobs[0])
         assert re.search(
-            r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam', cmd
+            r'\| samtools sort .* -Obam > \${BATCH_TMPDIR}/.*/sorted_bam',
+            cmd,
         )

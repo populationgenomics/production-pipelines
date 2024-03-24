@@ -4,6 +4,7 @@ Hail Query functions for seqr loader; SV edition.
 
 import gzip
 import logging
+
 import requests
 
 import hail as hl
@@ -11,8 +12,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
-from cpg_workflows.utils import read_hail, checkpoint_hail
-
+from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
@@ -51,7 +51,7 @@ PREVIOUS_GENOTYPE_N_ALT_ALLELES = hl.dict(
         # Discordant
         frozenset(['FP', 'TP']): 1,  # 0/1 -> 1/1
         frozenset(['FN', 'TP']): 2,  # 1/1 -> 0/1
-    }
+    },
 )
 
 GENCODE_FILE_HEADER = [
@@ -73,17 +73,15 @@ def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
     """Convert contig name to contig number"""
     return hl.bind(
         lambda contig: (
-            hl.case()
-            .when(contig == 'X', 23)
-            .when(contig == 'Y', 24)
-            .when(contig[0] == 'M', 25)
-            .default(hl.int(contig))
+            hl.case().when(contig == 'X', 23).when(contig == 'Y', 24).when(contig[0] == 'M', 25).default(hl.int(contig))
         ),
         locus.contig.replace('^chr', ''),
     )
 
 
-def get_expr_for_xpos(locus: hl.LocusExpression | hl.StructExpression) -> hl.Int64Expression:
+def get_expr_for_xpos(
+    locus: hl.LocusExpression | hl.StructExpression,
+) -> hl.Int64Expression:
     """Genomic position represented as a single number = contig_number * 10**9 + position.
     This represents chrom:pos more compactly and allows for easier sorting.
     """
@@ -102,9 +100,7 @@ def get_cpx_interval(x):
     type_chr = x.split('_chr')
     chr_pos = type_chr[1].split(':')
     pos = chr_pos[1].split('-')
-    return hl.struct(
-        type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1])
-    )
+    return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
 
 
 def download_gencode_gene_id_mapping(gencode_release: str) -> str:
@@ -167,20 +163,14 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
             if record['feature_type'] != 'gene':
                 continue
             # parse info field
-            info_fields_list = [
-                x.strip().split() for x in record['info'].split(';') if x != ''
-            ]
+            info_fields_list = [x.strip().split() for x in record['info'].split(';') if x != '']
             info_fields = {k: v.strip('"') for k, v in info_fields_list}
-            gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split(
-                '.'
-            )[0]
+            gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split('.')[0]
     logging.info('Completed ingestion of gene-ID mapping')
     return hl.literal(gene_id_mapping)
 
 
-def annotate_cohort_sv(
-    vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None
-):
+def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
     """
     Translate an annotated SV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -245,8 +235,7 @@ def annotate_cohort_sv(
         # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
         filters=hl.or_missing(  # hopefully this plays nicely
-            (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size()
-            > 0,
+            (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size() > 0,
             mt.filters,
         ),
         bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
@@ -262,19 +251,14 @@ def annotate_cohort_sv(
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(
-        get_config().get('gencode_release', '42')
-    )
+    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '42'))
     gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
         gene_col
         for gene_col in mt.info
-        if (
-            gene_col.startswith(CONSEQ_PREDICTED_PREFIX)
-            and gene_col not in NON_GENE_PREDICTIONS
-        )
+        if (gene_col.startswith(CONSEQ_PREDICTED_PREFIX) and gene_col not in NON_GENE_PREDICTIONS)
     ]
 
     # register a chain file
@@ -300,11 +284,9 @@ def annotate_cohort_sv(
                         **{
                             GENE_SYMBOL: gene,
                             GENE_ID: gene_id_mapping.get(gene, hl.missing(hl.tstr)),
-                            MAJOR_CONSEQUENCE: gene_col.replace(  # noqa: B023
-                                CONSEQ_PREDICTED_PREFIX, '', 1
-                            ),
-                        }
-                    )
+                            MAJOR_CONSEQUENCE: gene_col.replace(CONSEQ_PREDICTED_PREFIX, '', 1),  # noqa: B023
+                        },
+                    ),
                 )
                 for gene_col in conseq_predicted_gene_cols
             ],
@@ -317,8 +299,7 @@ def annotate_cohort_sv(
         xstop=get_expr_for_xpos(mt.end_locus),
         rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
         rg37_locus_end=hl.or_missing(
-            mt.end_locus.position
-            <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
+            mt.end_locus.position <= hl.literal(hl.get_reference('GRCh38').lengths)[mt.end_locus.contig],
             hl.liftover(
                 hl.locus(
                     mt.end_locus.contig,
@@ -344,14 +325,12 @@ def annotate_cohort_sv(
     # and some more annotation stuff
     mt = mt.annotate_rows(
         transcriptConsequenceTerms=hl.set(
-            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend(
-                [mt.sv_types[0]]
-            )
+            mt.sortedTranscriptConsequences.map(lambda x: x[MAJOR_CONSEQUENCE]).extend([mt.sv_types[0]]),
         ),
         geneIds=hl.set(
-            mt.sortedTranscriptConsequences.filter(
-                lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS'
-            ).map(lambda x: x[GENE_ID])
+            mt.sortedTranscriptConsequences.filter(lambda x: x[MAJOR_CONSEQUENCE] != 'NEAREST_TSS').map(
+                lambda x: x[GENE_ID],
+            ),
         ),
         rsid=hl.missing('tstr'),
     )
@@ -399,8 +378,8 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
                 # new_call=hl.or_missing(
                 #     is_called, ~was_previously_called | novel_genotype
                 # ),
-            )
-        )
+            ),
+        ),
     )
 
     def _genotype_filter_samples(fn):
@@ -441,19 +420,9 @@ def annotate_dataset_sv(mt_path: str, out_mt_path: str):
         #     lambda g: g.new_call | hl.is_defined(g.prev_num_alt)
         # ),
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
-        samples_num_alt=hl.struct(
-            **{
-                '%i' % i: _genotype_filter_samples(_filter_num_alt(i))
-                for i in range(1, 3, 1)
-            }
-        ),
+        samples_num_alt=hl.struct(**{'%i' % i: _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
         samples_gq_sv=hl.struct(
-            **{
-                ('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(
-                    _filter_samples_gq(i)
-                )
-                for i in range(0, 90, 10)
-            }
+            **{('%i_to_%i' % (i, i + 10)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 90, 10)},
         ),
         # As per `samples` field, I beleive CN stats should only be generated for gCNV only
         # callsets. In particular samples_cn_2 is used to select ALT_ALT variants,

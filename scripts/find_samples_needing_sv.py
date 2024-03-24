@@ -18,14 +18,12 @@ optional arguments:
     -e <path to json list containing sequencing groups to exclude from search>
     -a <path to json list containing sequencing groups to include specifically>
 """
+import json
 import re
 from argparse import ArgumentParser
 from random import sample
 
-import json
-
-from metamist.graphql import query, gql
-
+from metamist.graphql import gql, query
 
 FIND_ANALYSES = gql(
     """
@@ -43,7 +41,7 @@ query MyQuery ($project: String!, $type: String!) {
     }
   }
 }
-"""
+""",
 )
 
 GENOME_SGS = gql(
@@ -55,7 +53,7 @@ query SG_Query($project: String!) {
       type
     }
   }
-}"""
+}""",
 )
 
 # Sequencing groups matching these patterns have consistently failed
@@ -134,7 +132,7 @@ def main(
     max_samples: int,
     output_path: str,
     projects: list[str],
-    exclude: str = None,
+    exclude: str | None = None,
     additional: str | None = None,
 ):
     """
@@ -158,7 +156,6 @@ def main(
 
     # iterate over projects in order
     for project in projects:
-
         # decide if its time to stop
         if len(collected_sgs) >= max_samples:
             break

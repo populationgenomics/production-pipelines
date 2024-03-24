@@ -6,10 +6,11 @@ Convert to site-only table and annotate with AS fields.
 import logging
 
 import hail as hl
+
 from cpg_utils import Path
 from cpg_workflows.utils import can_reuse
-from gnomad.utils.vcf import adjust_vcf_incompatible_types
 from gnomad.utils.sparse_mt import default_compute_info
+from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
 
 def run(
@@ -86,7 +87,5 @@ def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
 def _create_info_ht(mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
     """Create info table from vcf matrix table"""
     info_ht = default_compute_info(mt, site_annotations=True, n_partitions=n_partitions)
-    info_ht = info_ht.annotate(
-        info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp)
-    )
+    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
     return info_ht
