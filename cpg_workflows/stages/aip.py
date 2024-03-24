@@ -120,12 +120,12 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
 
 
 @lru_cache(maxsize=None)
-def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
+def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
     """
     query for the latest MT for a dataset
     Args:
         dataset (str): project to query for
-        type (str): type of analysis entry to query for
+        entry_type (str): type of analysis entry to query for
     Returns:
         str, the path to the latest MT for the given type
     """
@@ -135,7 +135,7 @@ def query_for_latest_mt(dataset: str, type: str = 'custom') -> str:
 
     if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
+    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': entry_type})
     mt_by_date = {}
 
     for analysis in result['project']['analyses']:
