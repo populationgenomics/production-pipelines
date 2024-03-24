@@ -11,25 +11,16 @@ As a dataset Stage
 from functools import lru_cache
 
 from cpg_utils import Path
+
 from cpg_workflows.jobs.exomiser import (
-    create_vds_jobs,
     extract_mini_ped_files,
     extract_vcf_jobs,
     make_phenopackets,
-    mt_from_vds,
     run_exomiser_batches,
 )
 from cpg_workflows.stages.aip import query_for_latest_mt
 from cpg_workflows.utils import exists
-from cpg_workflows.workflow import (
-    Dataset,
-    DatasetStage,
-    SequencingGroup,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
+from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 
 
 @lru_cache(maxsize=0)
@@ -46,39 +37,38 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     return dict_by_family
 
 
-# we need a MT. I didn't think this would happen... but I need to combine some shit
-@stage
-class RDCombiner(DatasetStage):
-    """
-    it's a gVCF combiner, followed by densification
-    """
-
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'vds': self.prefix / 'vds' / f'{get_workflow().output_version}.vds'}
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
-        sgids = dataset.get_sequencing_groups()
-        output = self.expected_outputs(dataset)
-        jobs = create_vds_jobs(sgids=sgids, out_path=str(output['vds']))
-        return self.make_outputs(dataset, output, jobs=jobs)
-
-
-@stage(required_stages=RDCombiner, analysis_keys=['mt'], analysis_type='custom')
-class VDStoMT(DatasetStage):
-    """
-    make a VDS from that MT
-    """
-
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'mt': self.prefix / 'mt' / f'{get_workflow().output_version}.mt'}
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
-        vds = str(inputs.as_dict(target=dataset, stage=RDCombiner)['vds'])
-        output = self.expected_outputs(dataset)
-        jobs = mt_from_vds(vds_path=vds, out_path=str(output['mt']))
-        return self.make_outputs(dataset, output, jobs=jobs)
+# @stage
+# class RDCombiner(DatasetStage):
+#     """
+#     it's a gVCF combiner, to be followed by densification
+#     """
+#
+#     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+#         return {'vds': self.prefix / 'vds' / f'{get_workflow().output_version}.vds'}
+#
+#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+#
+#         sgids = dataset.get_sequencing_groups()
+#         output = self.expected_outputs(dataset)
+#         jobs = create_vds_jobs(sgids=sgids, out_path=str(output['vds']))
+#         return self.make_outputs(dataset, output, jobs=jobs)
+#
+#
+# @stage(required_stages=RDCombiner, analysis_keys=['mt'], analysis_type='custom')
+# class VDStoMT(DatasetStage):
+#     """
+#     make a VDS from that MT
+#     """
+#
+#     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+#         return {'mt': self.prefix / 'mt' / f'{get_workflow().output_version}.mt'}
+#
+#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+#
+#         vds = str(inputs.as_dict(target=dataset, stage=RDCombiner)['vds'])
+#         output = self.expected_outputs(dataset)
+#         jobs = mt_from_vds(vds_path=vds, out_path=str(output['mt']))
+#         return self.make_outputs(dataset, output, jobs=jobs)
 
 
 @stage

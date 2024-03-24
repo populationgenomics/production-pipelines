@@ -5,17 +5,13 @@ jobs required for the exomiser workflow
 import json
 
 import pandas as pd
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import (
-    authenticate_cloud_credentials_in_job,
-    get_batch,
-    image_path,
-    reference_path,
-)
-from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, reference_path
+
+from cpg_workflows.scripts import extract_vcf_from_mt
 from cpg_workflows.scripts import mt_from_vds as vds2mt
+from cpg_workflows.scripts import vds_from_gvcfs
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -288,8 +284,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     run the exomiser batch
     """
 
-    exomiser_image = image_path('exomiser')
-    exomiser_version = exomiser_image.split(':')[-1]
+    exomiser_version = image_path('exomiser').split(':')[-1]
     exomiser_dir = f'/exomiser/exomiser-cli-{exomiser_version}'
 
     # localise the exomiser references
@@ -335,15 +330,15 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     # now chunk the jobs - load resources, then run a bunch of families
     families = sorted(content_dict.keys())
     all_jobs = []
-    for family_chunk in chunks(families, get_config()['workflow'].get('exomiser_chunk_size', 5)):
+    for family_chunk in chunks(families, get_config()['workflow'].get('exomiser_chunk_size', 8)):
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
         all_jobs.append(job)
         job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
-        job.memory('60Gi')
-        job.cpu(4)
-        job.image(exomiser_image)
+        job.memory(get_config()['workflow'].get('exomiser_memory', '60Gi'))
+        job.cpu(get_config()['workflow'].get('exomiser_cpu', 4))
+        job.image(image_path('exomiser'))
         job.command(
             f"""
         mkdir -p {exomiser_dir}/data/2302_phenotype
@@ -361,13 +356,14 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
 
         # run the example data
         # job.command(
-        #     f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
-        #     f'--analysis examples/test-analysis-multisample.yml '
-        #     '&& ls && cat results/Pfeiffer_exomiser.json && cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json &',
-        #     # run in the background
+        #     f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
+        #     f'--analysis examples/test-analysis-multisample.yml && '
+        #     'ls results && '
+        #     'cat results/Pfeiffer_exomiser.json && '
+        #     'cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json'
         # )
 
-        for parallel_chunk in chunks(family_chunk, 4):
+        for parallel_chunk in chunks(family_chunk, chunk_size=get_config()['workflow'].get('exomiser_chunk_size', 8)):
             for family in parallel_chunk:
                 # read in VCF & index
                 vcf = get_batch().read_input_group(
@@ -377,29 +373,26 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
                     },
                 )[f'{family}_vcf']
 
-                # read in phenotype JSON
-                ppk = get_batch().read_input(str(content_dict[family]['pheno']))
-
-                # read in ped
+                # read in ped & phenotype JSON
                 ped = get_batch().read_input(str(content_dict[family]['ped']))
+                ppk = get_batch().read_input(str(content_dict[family]['pheno']))
 
                 # # this was really satisfying syntax to work out
                 job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
 
+                # generate a config file based on the batch tmp locations
                 job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
                 job.command(f'cat {job[family]["yaml"]}')
 
-                # now run it
+                # now run it, as a backgrounded process
                 job.command(
                     f'java -Xmx10g -Xms4g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} --ped {ped} '
-                    f'--spring.config.location={exomiser_dir}/application.properties '
-                    '&',  # run in the background
+                    f'--spring.config.location={exomiser_dir}/application.properties &'
                 )
 
-            # wait for backgrounded processes to finish
-            job.command('wait')
-            job.command('ls *')
+            # wait for backgrounded processes to finish, show current state
+            job.command('wait && ls *')
 
             # move the results, then copy out
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
