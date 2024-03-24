@@ -17,8 +17,10 @@ from cpg_workflows.jobs.exomiser import (
     run_exomiser_batches,
 )
 from cpg_workflows.stages.aip import query_for_latest_mt
-from cpg_workflows.utils import exists
+from cpg_workflows.utils import exists, get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
+
+HPO_KEY: str = 'HPO Terms (present)'
 
 
 @lru_cache(maxsize=0)
@@ -31,6 +33,23 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     for sg in dataset.get_sequencing_groups():
         family_id = str(sg.pedigree.fam_id)
         dict_by_family.setdefault(family_id, []).append(sg)
+
+    # now remove families with no affected individuals
+    for family in list(dict_by_family.keys()):
+
+        # check for at least one retained member
+        affected = [sg for sg in dict_by_family[family] if str(sg.pedigree.phenotype) == '2']
+
+        # remove families with no affected members
+        if not affected:
+            get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
+            del dict_by_family[family]
+
+        # check that the affected members have HPO terms - required for exomiser
+        if any([sg.meta.get(HPO_KEY, '') == '' for sg in affected]):
+            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+            del dict_by_family[family]
+            continue
 
     return dict_by_family
 

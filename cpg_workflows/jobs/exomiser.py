@@ -142,64 +142,14 @@ def extract_vcf_jobs(
     return vcf_jobs
 
 
-def phenopacket_proband(proband: SequencingGroup) -> dict:
-    """
-    generates a phenopacket for a single proband
-    Args:
-        proband (SequencingGroup):
-
-    Returns:
-        ppk format dictionary
-    """
-
-    hpo_term_string = proband.meta.get(HPO_KEY, '')
-    hpo_terms = hpo_term_string.split(',')
-    # todo another greasy hack
-    if not hpo_terms:
-        hpo_terms = ['HP:0000520']
-
-    return {
-        'subject': {'id': proband.id, 'sex': proband.pedigree.sex.name},
-        'phenotypicFeatures': [{'type': {'id': hpo, 'label': hpo}} for hpo in hpo_terms],
-    }
-
-
-def phenopacket_relatives(members: list[SequencingGroup]) -> list[dict]:
-    """
-    generates a phenopacket pedigree for the whole family
-
-    Args:
-        members (list[SequencingGroup]):
-
-    Returns:
-        ppk format dictionary
-    """
-
-    phenopackets: list[dict] = []
-    for sg in members:
-        ped_deets = sg.get_ped_dict()
-        sg_dict = {
-            'individualId': sg.id,
-            'sex': sg.pedigree.sex.name,
-            'affectedStatus': 'AFFECTED' if str(sg.pedigree.phenotype) == '2' else 'UNAFFECTED',
-        }
-        if ped_deets['Father.ID']:
-            sg_dict['paternalId'] = ped_deets['Father.ID']
-        if ped_deets['Mother.ID']:
-            sg_dict['paternalId'] = ped_deets['Mother.ID']
-    return phenopackets
-
-
 def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]):
     """
     find the minimal data to run an exomiser analysis
+    n.b. these are not actually phenopackets - they are a simplified version
 
     Args:
-        family_dict ():
-        out_path ():
-
-    Returns:
-
+        family_dict (dict[str, list[SequencingGroup]]): members per family
+        out_path (dict[str, Path]): corresponding output paths per family
     """
 
     for family, members in family_dict.items():
@@ -223,65 +173,6 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
         phenopacket: dict = {'family': family, 'proband': proband.id, 'hpoIds': hpo_terms}
-
-        with out_path[family].open('w') as ppk_file:
-            json.dump(phenopacket, ppk_file, indent=2)
-
-
-def old_make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]):
-    """
-    make the phenopackets for the families
-    this gets added as --sample
-    also requires the ped with --ped
-
-    Not actually using this, but it's a good example of how to make a phenopacket
-
-    Args:
-        family_dict ():
-        out_path ():
-
-    Returns:
-        the phenopacket as a dictionary
-    """
-
-    for family, members in family_dict.items():
-
-        # get all affected and unaffected
-        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
-
-        if not affected:
-            # todo a grotty hack
-            affected = members
-            print(family, members)
-            print('No affected individuals in family')
-
-        # arbitrarily select a proband for now
-        proband = affected.pop()
-
-        # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
-        phenopacket: dict = {
-            'id': family,
-            'proband': phenopacket_proband(proband),
-            'pedigree': phenopacket_relatives(members),
-            'metaData': {
-                'created': '2024-03-21 21:02:34.209021',
-                'createdBy': 'cpg_workflows',
-                'resources': [
-                    {
-                        "id": "hp",
-                        "name": "Human Phenotype Ontology",
-                        "url": "http://purl.obolibrary.org/obo/hp.owl",
-                        "version": "17-06-2019",
-                        "namespacePrefix": "HP",
-                        "iriPrefix": "http://purl.obolibrary.org/obo/HP_",
-                    },
-                ],
-                'phenopacketSchemaVersion': 1.0,
-            },
-        }
-
-        if affected:
-            phenopacket['relatives'] = [phenopacket_proband(each_aff) for each_aff in affected]
 
         with out_path[family].open('w') as ppk_file:
             json.dump(phenopacket, ppk_file, indent=2)
