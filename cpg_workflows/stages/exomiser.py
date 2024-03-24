@@ -10,8 +10,6 @@ As a dataset Stage
 
 from functools import lru_cache
 
-from cpg_utils import Path
-
 from cpg_workflows.jobs.exomiser import (
     extract_mini_ped_files,
     extract_vcf_jobs,

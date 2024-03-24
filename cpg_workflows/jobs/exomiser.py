@@ -5,13 +5,12 @@ jobs required for the exomiser workflow
 import json
 
 import pandas as pd
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, reference_path
-
-from cpg_workflows.scripts import extract_vcf_from_mt
+from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
 from cpg_workflows.scripts import mt_from_vds as vds2mt
-from cpg_workflows.scripts import vds_from_gvcfs
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -20,7 +19,11 @@ HPO_KEY: str = 'HPO Terms (present)'
 
 def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
     """
-    returns a job or None
+    Create VDS from a number of SG IDs
+    At larger cohort sizes this won't work, as the number of
+    arguments may hit a threshold
+
+    Mitigate by writing a temp file and reading into script container
 
     Args:
         sgids (list[SequencingGroup])
@@ -32,7 +35,12 @@ def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
 
     gvcf_paths = " ".join([str(s.gvcf.path) for s in sgids if s.gvcf])
     sequencing_group_names = " ".join([s.id for s in sgids])
+
+    # need a sexier way of doing this... currently there's a disconnect
+    # between how the cpg_workflows image is built, compared with
+    # how this driver image git checkout is done, meaning a different filepath
     vds_script = str(vds_from_gvcfs.__file__).removeprefix('/production-pipelines')
+
     job = get_batch().new_job('Make VDS from gVCFs')
     authenticate_cloud_credentials_in_job(job)
     job.image(get_config()['workflow']['driver_image'])
@@ -388,7 +396,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
                 job.command(
                     f'java -Xmx10g -Xms4g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} --ped {ped} '
-                    f'--spring.config.location={exomiser_dir}/application.properties &'
+                    f'--spring.config.location={exomiser_dir}/application.properties &',
                 )
 
             # wait for backgrounded processes to finish, show current state
