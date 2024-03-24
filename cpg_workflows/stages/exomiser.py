@@ -10,7 +10,7 @@ As a dataset Stage
 
 from functools import lru_cache
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_workflows.jobs.exomiser import (
     create_vds_jobs,
     extract_mini_ped_files,
@@ -181,9 +181,9 @@ class MakePedExtracts(DatasetStage):
 @stage(required_stages=[CreateFamilyVCFs, MakePedExtracts, MakePhenopackets])
 class RunExomiser(DatasetStage):
     """
-    Run exomiser on the family VCFs, using the mini-vcf and mini-ped
-    HUGELY anti-pattern'y, this is a DatasetStage, but it really just
-    captures SequencingGroups in chunks to optimise the exomiser jobs
+    Run exomiser on the family VCFs
+
+    Only run this for families with at least one affected individual
     """
 
     def expected_outputs(self, dataset: Dataset):
@@ -197,7 +197,7 @@ class RunExomiser(DatasetStage):
         for family in family_dict.keys():
             if not exists(self.prefix / f'{family}_results.json'):
                 families_without_results.append(family)
-        return {family: dataset.prefix() / f'{family}_results.json' for family in families_without_results}
+        return {family: self.prefix / f'{family}_results.json' for family in families_without_results}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -212,11 +212,11 @@ class RunExomiser(DatasetStage):
                 'output': output_dict[family],
                 'vcf': vcf_inputs[family],
                 'ped': ped_inputs[family],
-                'phenopacket': ppk_files[family],
+                'pheno': ppk_files[family],
             }
             for family in output_dict.keys()
         }
 
-        jobs = run_exomiser_batches(single_dict, tempdir=self.tmp_prefix / 'exomiser')
+        jobs = run_exomiser_batches(single_dict)
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

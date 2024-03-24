@@ -177,7 +177,7 @@ def phenopacket_relatives(members: list[SequencingGroup]) -> list[dict]:
         sg_dict = {
             'individualId': sg.id,
             'sex': sg.pedigree.sex.name,
-            'affectedStatus': 'AFFECTED' if str(sg.pedigree.phenotype) == '1' else 'UNAFFECTED',
+            'affectedStatus': 'AFFECTED' if str(sg.pedigree.phenotype) == '2' else 'UNAFFECTED',
         }
         if ped_deets['Father.ID']:
             sg_dict['paternalId'] = ped_deets['Father.ID']
@@ -218,11 +218,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         hpo_terms = hpo_term_string.split(',')
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
-        phenopacket: dict = {
-            'family': family,
-            'proband': proband.id,
-            'hpoIds': hpo_terms
-        }
+        phenopacket: dict = {'family': family, 'proband': proband.id, 'hpoIds': hpo_terms}
 
         with out_path[family].open('w') as ppk_file:
             json.dump(phenopacket, ppk_file, indent=2)
@@ -233,6 +229,8 @@ def old_make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_pat
     make the phenopackets for the families
     this gets added as --sample
     also requires the ped with --ped
+
+    Not actually using this, but it's a good example of how to make a phenopacket
 
     Args:
         family_dict ():
@@ -285,7 +283,7 @@ def old_make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_pat
             json.dump(phenopacket, ppk_file, indent=2)
 
 
-def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path):
+def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
     """
     run the exomiser batch
     """
@@ -357,10 +355,11 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> {exomiser_dir}/application.properties
         cat {exomiser_dir}/application.properties
         set -x
+        tree -l data
         """,
         )
-        # tree -l data
 
+        # run the example data
         # job.command(
         #     f'java -Xmx10g -jar exomiser-cli-13.3.0.jar '
         #     f'--analysis examples/test-analysis-multisample.yml '
@@ -378,22 +377,22 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
                     },
                 )[f'{family}_vcf']
 
-                # read in phenopacket
-                ppk = get_batch().read_input(str(content_dict[family]['phenopacket']))
+                # read in phenotype JSON
+                ppk = get_batch().read_input(str(content_dict[family]['pheno']))
 
                 # read in ped
                 ped = get_batch().read_input(str(content_dict[family]['ped']))
 
-                # # this was really satisfying to work out, but isn't needed
+                # # this was really satisfying syntax to work out
                 job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
 
                 job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
-                job.command(f'cat {job[family]["yaml"]}')
+                job.command(f'cat {job[family]["yaml"]}')  # noqa
 
                 # now run it
                 job.command(
                     f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
-                    f'--analysis {job[family]["yaml"]} --ped {ped} '
+                    f'--analysis {job[family]["yaml"]} --ped {ped} '  # noqa
                     f'--spring.config.location={exomiser_dir}/application.properties '
                     '&',  # run in the background
                 )
@@ -403,7 +402,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]], tempdir: Path
             # move the results, then copy out
             # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
-                job.command(f'mv results/{family}.json {job[family]["json"]}')
+                job.command(f'mv results/{family}.json {job[family]["json"]}')  # noqa
                 get_batch().write_output(
                     job[family],
                     str(content_dict[family]['output']).removesuffix('.json'),
