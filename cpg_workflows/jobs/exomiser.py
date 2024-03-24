@@ -391,11 +391,13 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
 
                 # now run it
                 job.command(
-                    f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
+                    f'java -Xmx10g -Xms4g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
                     f'--analysis {job[family]["yaml"]} --ped {ped} '  # noqa
                     f'--spring.config.location={exomiser_dir}/application.properties '
                     '&',  # run in the background
                 )
+
+            # wait for backgrounded processes to finish
             job.command('wait')
             job.command('ls *')
 
