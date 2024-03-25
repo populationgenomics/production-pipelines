@@ -1,6 +1,7 @@
 """
 Stages that implement GATK-gCNV.
 """
+import json
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
@@ -33,6 +34,23 @@ def _gcnv_annotated_meta(
     Callable, adds custom analysis object meta attribute
     """
     return {'type': 'gCNV-annotated'}
+
+
+@stage
+class SetSGIDOrdering(CohortStage):
+    """
+    Set the order of the sequencing groups in the cohort
+    Push this to a file _now_, and use it later
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {'sgid_order': self.prefix / 'sgid_order.json'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        sorted_sgids = sorted(cohort.get_sequencing_group_ids())
+        with self.expected_outputs(cohort)['sgid_order'].open('w') as f_handler:
+            json.dump(sorted_sgids, f_handler, indent=2)
+        return self.make_outputs(cohort)
 
 
 @stage
@@ -81,7 +99,7 @@ class CollectReadCounts(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[PrepareIntervals, CollectReadCounts])
+@stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts])
 class DeterminePloidy(CohortStage):
     """
     The non-sharded cohort-wide gCNV steps after read counts have been collected:
@@ -101,19 +119,25 @@ class DeterminePloidy(CohortStage):
 
         prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
+        # pull all per-sgid files from previous stage
+        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
+        # order those WRT the set ordering
+        ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
+
         jobs = gcnv.filter_and_determine_ploidy(
-            str(reference_path('gatk_sv/contig_ploidy_priors')),
-            # get_config()['workflow'].get('ploidy_priors'),
-            prep_intervals['preprocessed'],
-            prep_intervals['annotated'],
-            inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
-            self.get_job_attrs(cohort),
-            outputs,
+            ploidy_priors_path=str(reference_path('gatk_sv/contig_ploidy_priors')),
+            preprocessed_intervals_path=prep_intervals['preprocessed'],
+            annotated_intervals_path=prep_intervals['annotated'],
+            counts_paths=ordered_read_counts,
+            job_attrs=self.get_job_attrs(cohort),
+            output_paths=outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[PrepareIntervals, CollectReadCounts, DeterminePloidy])
+@stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
 class GermlineCNV(CohortStage):
     """
     The cohort-wide GermlineCNVCaller step, sharded across genome regions.
@@ -129,18 +153,25 @@ class GermlineCNV(CohortStage):
         determine_ploidy = inputs.as_dict(cohort, DeterminePloidy)
         prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
+        # pull all per-sgid files from previous stage
+        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
+        # order those WRT the set ordering
+        ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
+
         jobs = gcnv.shard_gcnv(
-            prep_intervals['annotated'],
-            determine_ploidy['filtered'],
-            determine_ploidy['calls'],
-            inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
-            self.get_job_attrs(cohort),
-            outputs,
+            annotated_intervals_path=prep_intervals['annotated'],
+            filtered_intervals_path=determine_ploidy['filtered'],
+            ploidy_calls_path=determine_ploidy['calls'],
+            counts_paths=ordered_read_counts,
+            job_attrs=self.get_job_attrs(cohort),
+            output_paths=outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[DeterminePloidy, GermlineCNV])
+@stage(required_stages=[SetSGIDOrdering, DeterminePloidy, GermlineCNV])
 class GermlineCNVCalls(SequencingGroupStage):
     """
     Produces final individual VCF results by running PostprocessGermlineCNVCalls.
@@ -159,18 +190,20 @@ class GermlineCNVCalls(SequencingGroupStage):
         outputs = self.expected_outputs(seqgroup)
         determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
         jobs = gcnv.postprocess_calls(
-            determine_ploidy['calls'],
-            inputs.as_dict(get_cohort(), GermlineCNV),
-            # FIXME get the sample index via sample_name.txt files instead
-            seqgroup.dataset.get_sequencing_group_ids().index(seqgroup.id),
-            self.get_job_attrs(seqgroup),
+            ploidy_calls_path=determine_ploidy['calls'],
+            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            sample_index=sgid_ordering.index(seqgroup.id),
+            job_attrs=self.get_job_attrs(seqgroup),
             output_prefix=str(self.prefix / seqgroup.id),
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[GermlineCNVCalls, PrepareIntervals])
+@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals])
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -192,18 +225,15 @@ class GCNVJointSegmentation(CohortStage):
         Conducts a semi-heirarchical merge of the individual VCFs
         - First merge the segment files in blocks, to produce intermediate merges
         - Then merge those intermediate merges to produce the final result
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
         """
 
         # get the list of individual Segment VCFs
         cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        all_vcfs = [str(cnv_vcfs[sgid]['segments']) for sgid in cohort.get_sequencing_group_ids()]
+
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
+        all_vcfs = [str(cnv_vcfs[sgid]['segments']) for sgid in sgid_ordering]
 
         # get the intervals
         intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
@@ -213,8 +243,8 @@ class GCNVJointSegmentation(CohortStage):
         ped_path = cohort.write_ped_file(expected_out['pedigree'])
 
         jobs = gcnv.run_joint_segmentation(
-            all_vcfs,
-            str(ped_path),
+            segment_vcfs=all_vcfs,
+            pedigree=str(ped_path),
             intervals=str(intervals),
             tmp_prefix=expected_out['tmp_prefix'],
             output_path=expected_out['clustered_vcf'],
@@ -225,10 +255,11 @@ class GCNVJointSegmentation(CohortStage):
 
 @stage(
     required_stages=[
+        SetSGIDOrdering,
         GCNVJointSegmentation,
         GermlineCNV,
         GermlineCNVCalls,
-        DeterminePloidy,
+        DeterminePloidy
     ],
 )
 class RecalculateClusteredQuality(SequencingGroupStage):
@@ -260,12 +291,14 @@ class RecalculateClusteredQuality(SequencingGroupStage):
         determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
         gcnv_call_inputs = inputs.as_dict(sequencing_group, GermlineCNVCalls)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
         jobs = gcnv.postprocess_calls(
-            determine_ploidy['calls'],
-            inputs.as_dict(get_cohort(), GermlineCNV),
-            # FIXME get the sample index via sample_name.txt files instead
-            sequencing_group.dataset.get_sequencing_group_ids().index(sequencing_group.id),
-            self.get_job_attrs(sequencing_group),
+            ploidy_calls_path=determine_ploidy['calls'],
+            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            sample_index=sgid_ordering.index(sequencing_group.id),
+            job_attrs=self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
             intervals_vcf=str(gcnv_call_inputs['intervals']),
@@ -299,7 +332,7 @@ class FastCombineGCNVs(CohortStage):
             sg_vcfs=all_vcfs,
             docker_image=pipeline_image,
             job_attrs=self.get_job_attrs(cohort),
-            output_path=outputs['combined_calls'],
+            output_path=outputs['combined_calls']
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
 

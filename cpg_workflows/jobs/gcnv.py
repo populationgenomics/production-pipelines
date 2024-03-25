@@ -20,6 +20,7 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
 from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse, chunks
+from cpg_workflows.workflow import Cohort
 
 
 def prepare_intervals(
@@ -297,7 +298,7 @@ def postprocess_calls(
         assert all([clustered_vcf, intervals_vcf, qc_file]), [
             clustered_vcf,
             intervals_vcf,
-            qc_file,
+            qc_file
         ]
 
     j = get_batch().new_job(
@@ -322,7 +323,9 @@ def postprocess_calls(
 
     model_shard_args = ''
     calls_shard_args = ''
-    for name, path in shard_paths.items():
+
+    # forced ordering here just in case
+    for name, path in [(shard, shard_paths[shard]) for shard in shard_basenames()]:
         gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
