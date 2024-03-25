@@ -46,7 +46,7 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             del dict_by_family[family]
 
         # check that the affected members have HPO terms - required for exomiser
-        if any([sg.meta.get(HPO_KEY, '') == '' for sg in affected]):
+        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
             get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
             del dict_by_family[family]
             continue

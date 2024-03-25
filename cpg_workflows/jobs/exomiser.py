@@ -158,17 +158,12 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
 
         if not affected:
-            affected = members
-            print(family, members)
-            print('No affected individuals in family')
+            raise ValueError(f'Family {family} has no affected individuals, should not have reached here')
 
         # arbitrarily select a proband for now
         proband = affected.pop()
 
-        hpo_term_string = proband.meta.get(HPO_KEY, '')
-        # nightmare
-        if not hpo_term_string:
-            hpo_term_string = 'HP:0000520'
+        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
         hpo_terms = hpo_term_string.split(',')
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
