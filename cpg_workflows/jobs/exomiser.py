@@ -95,11 +95,7 @@ def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_pa
                 df.to_csv(ped_file, sep='\t', index=False, header=False)
 
 
-def extract_vcf_jobs(
-    family_dict: dict[str, list[SequencingGroup]],
-    mt_path: str,
-    out_path: dict[str, Path],
-):
+def extract_vcf_jobs(family_dict: dict[str, list[SequencingGroup]], mt_path: str, out_path: dict[str, Path]):
     """
     create the jobs to extract the VCFs from the MT
 
@@ -136,7 +132,7 @@ def extract_vcf_jobs(
         # )
 
         authenticate_cloud_credentials_in_job(job)
-        sgid_ids = ','.join([sg.id for sg in family_dict[family_id]])
+        sgid_ids = ' '.join([sg.id for sg in family_dict[family_id]])
         job.command(f'python3 {script_path} {mt_path} {sgid_ids} {vcf_target}')
         vcf_jobs.append(job)
     return vcf_jobs
