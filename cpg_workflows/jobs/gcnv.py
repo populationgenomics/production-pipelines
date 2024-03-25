@@ -295,11 +295,7 @@ def postprocess_calls(
     qc_file: str | None = None,
 ) -> Job:
     if any([clustered_vcf, intervals_vcf, qc_file]):
-        assert all([clustered_vcf, intervals_vcf, qc_file]), [
-            clustered_vcf,
-            intervals_vcf,
-            qc_file
-        ]
+        assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
 
     j = get_batch().new_job(
         'Postprocess gCNV calls',

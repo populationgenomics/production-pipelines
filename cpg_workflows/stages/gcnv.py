@@ -1,6 +1,7 @@
 """
 Stages that implement GATK-gCNV.
 """
+
 import json
 
 from cpg_utils import Path, to_path
@@ -254,13 +255,7 @@ class GCNVJointSegmentation(CohortStage):
 
 
 @stage(
-    required_stages=[
-        SetSGIDOrdering,
-        GCNVJointSegmentation,
-        GermlineCNV,
-        GermlineCNVCalls,
-        DeterminePloidy
-    ],
+    required_stages=[SetSGIDOrdering, GCNVJointSegmentation, GermlineCNV, GermlineCNVCalls, DeterminePloidy],
 )
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
@@ -332,7 +327,7 @@ class FastCombineGCNVs(CohortStage):
             sg_vcfs=all_vcfs,
             docker_image=pipeline_image,
             job_attrs=self.get_job_attrs(cohort),
-            output_path=outputs['combined_calls']
+            output_path=outputs['combined_calls'],
         )
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
 
