@@ -28,7 +28,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
-    sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
+    sqc_ht_path = to_path(tmp_prefix) / 'Xref_Yref_sample_qc.ht'
     if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
@@ -122,11 +122,11 @@ def impute_sex(
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
         vds,
-        tmp_prefix=str(tmp_prefix / 'annotate_sex'),
+        tmp_prefix=str(tmp_prefix / 'Xref_Yref_annotate_sex'),
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
-        variants_only_x_ploidy=True,
+        variants_only_x_ploidy=False,
         variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
