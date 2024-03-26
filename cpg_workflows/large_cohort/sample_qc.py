@@ -85,7 +85,7 @@ def impute_sex(
     """
     Impute sex based on coverage.
     """
-    checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
+    checkpoint_path = tmp_prefix / 'sample_qc' / 'Xref_Yref_sex.ht'
     if can_reuse(str(checkpoint_path), overwrite=True):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
