@@ -132,6 +132,8 @@ if __name__ == '__main__':
 
     vcf_fragments_tmp = output_path(f'fragments_{args.family}.vcf.bgz', category='tmp')
 
+    vds_to_vcf(vds_path=args.vds_out, output=vcf_fragments_tmp)
+
     get_logger(__file__).info('Creating single VCF from fragments')
 
     squash_fragments_to_vcf(vcf_fragment_dir=vcf_fragments_tmp, vcf_out=args.vcf_out)
