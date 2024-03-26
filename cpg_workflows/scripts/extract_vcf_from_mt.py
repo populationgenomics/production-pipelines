@@ -44,7 +44,10 @@ def extract_vcf_from_dataset_vcf(input_mt: str, sg_ids: list[str], out_path: str
     mt = mt.filter_rows(mt.variant_qc.n_non_ref > 0)
 
     # drop gvcf_info - a dict, can't sit in FORMAT
-    mt = mt.drop('variant_qc', 'gvcf_info')
+    # only relevant when doing gVCF -> VDS -> MT
+    if 'gvcf_info' in mt.row:
+        mt = mt.drop('gvcf_info')
+    mt = mt.drop('variant_qc')
 
     hl.export_vcf(mt, out_path, tabix=True)
 
