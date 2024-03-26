@@ -177,7 +177,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     # chrom 20 coverage is computed to infer sex and used here
     ht = add_filter(
         ht,
-        ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
+        ht.autosomal_mean_dp < cutoffs['min_coverage'],
         'low_coverage',
     )
 
