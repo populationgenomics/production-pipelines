@@ -5,13 +5,13 @@ Impute sex. Add soft filters for samples.
 import logging
 
 import hail as hl
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build, reference_path
+from gnomad.sample_qc.pipeline import annotate_sex
+
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
-from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
@@ -33,7 +33,9 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
-        autosome_vds = hl.vds.filter_chromosomes(vds, keep=[f'chr{chrom}' for chrom in range(1, 23)])
+        autosome_vds = hl.vds.filter_chromosomes(
+            vds, keep=[f'chr{chrom}' for chrom in range(1, 23)]
+        )
         sqc_ht = hl.vds.sample_qc(autosome_vds)
         sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
@@ -91,7 +93,9 @@ def impute_sex(
     # Load calling intervals
     seq_type = get_config()['workflow']['sequencing_type']
     calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
-    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
+    calling_intervals_ht = hl.import_locus_intervals(
+        str(calling_intervals_path), reference_genome=genome_build()
+    )
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
@@ -108,7 +112,9 @@ def impute_sex(
                 hl.is_defined(interval_table[vds.variant_data.locus]),
                 keep=False,
             )
-            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+            vds = VariantDataset(
+                reference_data=vds.reference_data, variant_data=tmp_variant_data
+            ).checkpoint(
                 str(tmp_prefix / f'{name}_checkpoint.vds'),
             )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
@@ -149,7 +155,11 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
 
     # Helper function to add filters into the `hard_filters` set
     def add_filter(ht_, expr, name):
-        return ht_.annotate(filters=hl.if_else(expr & hl.is_defined(expr), ht_.filters.add(name), ht_.filters))
+        return ht_.annotate(
+            filters=hl.if_else(
+                expr & hl.is_defined(expr), ht_.filters.add(name), ht_.filters
+            )
+        )
 
     # Remove samples with ambiguous sex assignments
     ht = add_filter(ht, ht.sex_karyotype == 'ambiguous', 'ambiguous_sex')
@@ -159,7 +169,8 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
         'sex_aneuploidy',
     )
 
-    cutoffs = get_config()['large_cohort']['sample_qc_cutoffs']
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    cutoffs = get_config()['large_cohort'][sequencing_type]['sample_qc_cutoffs']
     ht = ht.annotate_globals(hard_filter_cutoffs=hl.struct(**cutoffs))
 
     # Remove low-coverage samples
