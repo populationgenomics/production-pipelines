@@ -6,7 +6,7 @@ from cpg_utils import to_path
 
 def pca_runner(file_path):
 
-    mt = hl.read_matrix_table(file_path)
+    mt = hl.read_matrix_table(str(file_path))
 
     mt = mt.annotate_entries(
         allele_1_rep_length=hl.int(mt.REPCN.split('/')[0]),
@@ -38,10 +38,10 @@ def pca_runner(file_path):
     eigenvalues, scores, loadings = hl.pca(mt.sum_length, k=10, compute_loadings=True)
 
     scores_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt/str_pca/scores.tsv.bgz'
-    scores.export(scores_output_path)
+    scores.export(str(scores_output_path))
 
     loadings_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt/str_pca/loadings.tsv.bgz'
-    loadings.export(loadings_output_path)
+    loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
