@@ -28,7 +28,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
-    sqc_ht_path = to_path(tmp_prefix) / 'Xref_Yref_sample_qc.ht'
+    sqc_ht_path = to_path(tmp_prefix) / 'norm_aneu_changed_sample_qc.ht'
     if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
@@ -85,7 +85,7 @@ def impute_sex(
     """
     Impute sex based on coverage.
     """
-    checkpoint_path = tmp_prefix / 'sample_qc' / 'Xref_Yref_sex.ht'
+    checkpoint_path = tmp_prefix / 'sample_qc' / 'norm_aneu_changed_sex.ht'
     if can_reuse(str(checkpoint_path), overwrite=True):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
@@ -120,7 +120,7 @@ def impute_sex(
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
         vds,
-        tmp_prefix=str(tmp_prefix / 'Xref_Yref_annotate_sex'),
+        tmp_prefix=str(tmp_prefix / 'norm_aneu_changed_annotate_sex'),
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
@@ -175,7 +175,7 @@ def add_soft_filters(ht: hl.Table) -> hl.Table:
     # chrom 20 coverage is computed to infer sex and used here
     ht = add_filter(
         ht,
-        ht.autosomal_mean_dp < cutoffs['min_coverage'],
+        ht.var_data_chr20_mean_dp < cutoffs['min_coverage'],
         'low_coverage',
     )
 
