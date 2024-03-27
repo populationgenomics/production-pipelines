@@ -10,13 +10,13 @@ As a dataset Stage
 
 from functools import cache
 
+from cpg_utils import Path
 from cpg_workflows.jobs.exomiser import (
+    create_gvcf_to_vcf_jobs,
     extract_mini_ped_files,
-    extract_vcf_jobs,
     make_phenopackets,
     run_exomiser_batches,
 )
-from cpg_workflows.stages.aip import query_for_latest_mt
 from cpg_workflows.utils import exists, get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 
@@ -45,83 +45,31 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
             del dict_by_family[family]
 
-        # check that the affected members have HPO terms - required for exomiser
-        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-            del dict_by_family[family]
-            continue
+        # todo reinstate this rule
+        # # check that the affected members have HPO terms - required for exomiser
+        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+        #     del dict_by_family[family]
+        #     continue
 
     return dict_by_family
 
 
 @stage
-class GVCFSToVCF(DatasetStage):
+class CreateFamilyVCFs(DatasetStage):
     """
     it's a gVCF combiner, densification, Mt -> VCF
-    # todo continue
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'vds': self.prefix / 'vds' / f'{get_workflow().output_version}.vds'}
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
-        sgids = dataset.get_sequencing_groups()
-        output = self.expected_outputs(dataset)
-        jobs = create_vds_jobs(sgids=sgids, out_path=str(output['vds']))
-        return self.make_outputs(dataset, output, jobs=jobs)
-
-
-# @stage(required_stages=RDCombiner, analysis_keys=['mt'], analysis_type='custom')
-# class VDStoMT(DatasetStage):
-#     """
-#     make a VDS from that MT
-#     """
-#
-#     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-#         return {'mt': self.prefix / 'mt' / f'{get_workflow().output_version}.mt'}
-#
-#     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-#
-#         vds = str(inputs.as_dict(target=dataset, stage=RDCombiner)['vds'])
-#         output = self.expected_outputs(dataset)
-#         jobs = mt_from_vds(vds_path=vds, out_path=str(output['mt']))
-#         return self.make_outputs(dataset, output, jobs=jobs)
-
-
-@stage
-class CreateFamilyVCFs(DatasetStage):
-    """
-    from the dataset MT, we make a VCF per-family
-    """
-
-    def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
-        families_without_results = []
-
-        # generate the exomiser result paths for each family
-        # skip those families that already have results
-        # uses output_prefix to track consistently
-
-        # the output path of the next step
-        batch_prefix = get_workflow().prefix / 'RunExomiser'
-
-        # get all families without results
-        for family in family_dict.keys():
-            if not exists(batch_prefix / f'{family}_results.json'):
-                families_without_results.append(family)
-
-        return {family: dataset.tmp_prefix() / self.name / f'{family}.vcf.bgz' for family in families_without_results}
+        return {str(family): dataset.prefix() / 'exomiser_vcfs' / f'{family}.vcf.bgz' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """ """
-        dataset_families = find_families(dataset)
-        expected_out = self.expected_outputs(dataset)
-        families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
-
-        mt_path = query_for_latest_mt(dataset.name)
-        vcf_jobs = extract_vcf_jobs(families_to_process, mt_path, expected_out)
-        return self.make_outputs(dataset, data=expected_out, jobs=vcf_jobs)
+        family_dict = find_families(dataset)
+        outputs = self.expected_outputs(dataset)
+        jobs = create_gvcf_to_vcf_jobs(families=family_dict, out_paths=outputs)
+        return self.make_outputs(dataset, outputs, jobs=jobs)
 
 
 @stage

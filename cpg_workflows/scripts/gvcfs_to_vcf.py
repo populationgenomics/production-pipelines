@@ -7,15 +7,14 @@ required gcloud authentication
 
 
 from argparse import ArgumentParser
-from subprocess import run
 from os.path import join
+from subprocess import run
 
 import hail as hl
 
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, init_batch, output_path
 from cpg_workflows.utils import chunks, get_logger
-
 
 MAX_COMPOSE: int = 30
 
@@ -54,6 +53,11 @@ def vds_to_vcf(vds_path: str, output: str):
     vds = hl.vds.read_vds(vds_path)
     vds = hl.vds.split_multi(vds)
     mt = hl.vds.to_dense_mt(vds)
+
+    # gotta drop this (it's a dict)
+    if 'gvcf_info' in mt.row:
+        mt = mt.drop('gvcf_info')
+
     hl.export_vcf(mt, output, parallel='separate_header')
     get_logger().info(f'Exported VCF fragments to {output}')
 
@@ -70,9 +74,7 @@ def squash_fragments_to_vcf(vcf_fragment_dir: str, vcf_out: str):
 
     """
 
-    get_logger().info(
-        'Parsing the manifest file and generating a bash script for concatenating the VCF files'
-    )
+    get_logger().info('Parsing the manifest file and generating a bash script for concatenating the VCF files')
     manifest = hl.hadoop_open(join(vcf_fragment_dir, 'shard-manifest.txt')).readlines()
 
     # prefix these shard names to get full GCP path for each
@@ -108,7 +110,9 @@ def squash_fragments_to_vcf(vcf_fragment_dir: str, vcf_out: str):
     final_job.storage('10Gi')  # make this configurable
     final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]} && tabix {final_job.output["vcf.bgz"]}')
     get_batch().write_output(final_job.output, vcf_out.removesuffix('.vcf.bgz'))
-    get_batch().run(wait=False)
+
+    # this will be a batch-in-batch, and should execute quickly
+    get_batch().run(wait=True)
 
 
 if __name__ == '__main__':
