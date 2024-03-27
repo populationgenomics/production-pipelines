@@ -17,7 +17,7 @@ def main():
                 job_name='STR-PCA',
                 num_workers= 5)
 
-    get_batch().run(wait=False)
+    get_batch(name='STR PCA Data proc job').run(wait=False)
 
 if __name__ == '__main__':
     main()  # pylint: disable=no-value-for-parameter

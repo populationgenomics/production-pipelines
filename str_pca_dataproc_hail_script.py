@@ -20,7 +20,6 @@ from cpg_utils import to_path
 
 def pca_runner(file_path):
 
-    init_batch(worker_memory='highmem')
     mt = hl.read_matrix_table(file_path)
 
     mt = mt.annotate_entries(
