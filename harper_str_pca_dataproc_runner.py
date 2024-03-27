@@ -9,7 +9,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.hail_batch import get_batch
 
-from str_pca_dataproc_hail_script import pca_runner
+from cpg_workflows.large_cohort.str_pca_dataproc_hail_script import pca_runner
 
 
 def main():
