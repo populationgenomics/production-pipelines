@@ -55,7 +55,7 @@ def vds_to_vcf(vds_path: str, output: str):
     mt = hl.vds.to_dense_mt(vds)
 
     # gotta drop this (it's a dict)
-    if 'gvcf_info' in mt.row:
+    if 'gvcf_info' in mt.entry:
         mt = mt.drop('gvcf_info')
 
     hl.export_vcf(mt, output, parallel='separate_header')
