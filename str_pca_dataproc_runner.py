@@ -14,7 +14,8 @@ def main():
     dataproc_job(
                 function = pca_runner,
                 function_path_args=dict(file_path='gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt'),
-                job_name='STR-PCA')
+                job_name='STR-PCA',
+                num_workers= 5)
 
     get_batch().run(wait=False)
 
