@@ -3,12 +3,6 @@
 """
 Hail script to submit to a dataproc cluster
 
- analysis-runner --dataset "bioheart" \
-    --description "str_pca" \
-    --access-level "test" \
-    --output-dir "str/qc/filtered_mt" \
-    str_pca.py --file-path=gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt
-
 """
 
 import hail as hl
