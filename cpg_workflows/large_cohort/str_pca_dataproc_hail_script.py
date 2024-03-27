@@ -1,14 +1,7 @@
-#!/usr/bin/env python3
-# pylint: disable=missing-function-docstring,no-member
-"""
-Hail script to submit to a dataproc cluster
-
-"""
 
 import hail as hl
 
 from cpg_utils import to_path
-
 
 
 def pca_runner(file_path):
