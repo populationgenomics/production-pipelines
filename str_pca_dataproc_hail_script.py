@@ -12,18 +12,12 @@ Hail script to submit to a dataproc cluster
 """
 
 import hail as hl
-import click
 
 from cpg_utils.hail_batch import output_path, init_batch
 from cpg_utils import to_path
 
 
-@click.option(
-    '--file-path',
-    help='GCS file path to Hail STR matrix Table',
-    type=str,
-)
-@click.command()
+
 def pca_runner(file_path):
 
     init_batch(worker_memory='highmem')
@@ -70,7 +64,3 @@ def pca_runner(file_path):
     with to_path(output_path(f'str_pca/eigenvalues.txt')).open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
-
-
-if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
