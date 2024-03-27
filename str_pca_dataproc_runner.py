@@ -13,7 +13,7 @@ def main():
     from str_pca_dataproc_hail_script import pca_runner
     dataproc_job(
                 function = pca_runner,
-                function_path_args=dict(file_path='gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt'),
+                function_path_args={'file_path' :'gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt'},
                 job_name='STR-PCA',
                 num_workers= 5)
 
