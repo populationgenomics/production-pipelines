@@ -13,7 +13,6 @@ Hail script to submit to a dataproc cluster
 
 import hail as hl
 
-from cpg_utils.hail_batch import output_path, init_batch
 from cpg_utils import to_path
 
 
@@ -51,15 +50,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length, k=10, compute_loadings=True)
 
-    scores_output_path = output_path(f'str_pca/scores.tsv.bgz')
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt/str_pca/scores.tsv.bgz'
     scores.export(scores_output_path)
 
-    loadings_output_path = output_path(f'str_pca/loadings.tsv.bgz')
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt/str_pca/loadings.tsv.bgz'
     loadings.export(loadings_output_path)
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path(output_path(f'str_pca/eigenvalues.txt')).open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/filtered_mt/str_pca/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
