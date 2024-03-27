@@ -95,7 +95,7 @@ def squash_fragments_to_vcf(vcf_fragment_dir: str, vcf_out: str):
         condense_temp = join(vcf_fragment_dir, f'temp_chunk_{temp_chunk_prefix_num}')
         temp_chunk_prefix_num += 1
 
-        for i, sub_chunk in chunks(manifest_paths, MAX_COMPOSE):
+        for i, sub_chunk in enumerate(chunks(manifest_paths, MAX_COMPOSE)):
             sub_chunk_out = join(condense_temp, f'chunk_{i}.vcf.bgz')
             run(['gcloud', 'storage', 'objects', 'compose', *sub_chunk, sub_chunk_out])
             chunks_this_round.append(sub_chunk_out)
