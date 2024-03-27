@@ -124,7 +124,7 @@ def impute_sex(
         overwrite=not get_config()['workflow'].get('check_intermediates'),
         included_intervals=calling_intervals_ht,
         gt_expr='LGT',
-        variants_only_x_ploidy=False,
+        variants_only_x_ploidy=True,
         variants_only_y_ploidy=False,
         variants_filter_lcr=False,  # already filtered above
         variants_filter_segdup=False,  # already filtered above
