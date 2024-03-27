@@ -48,7 +48,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
         copy_common_env(family_job)
         family_job.image(get_config()['workflow']['driver_image'])
         family_job.command(
-            f'python3 {script_path} --sgids {" ".join(member_ids)} --gvcfs {" ".join(member_gvcfs)} --out {str(out_paths[family])}'
+            f'python3 {script_path} --sgids {" ".join(member_ids)} --gvcfs {" ".join(member_gvcfs)} --vcf_out {str(out_paths[family])} --family {family}'
         )
         jobs.append(family_job)
     return jobs
