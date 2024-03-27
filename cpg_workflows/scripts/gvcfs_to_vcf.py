@@ -142,4 +142,4 @@ if __name__ == '__main__':
 
     get_logger(__file__).info('Creating single VCF from fragments')
 
-    squash_fragments_to_vcf(vcf_fragment_dir=vcf_fragments_tmp, vcf_out=args.vcf_out)
+    squash_fragments_to_vcf(vcf_fragment_dir=vcf_fragments_tmp, vcf_out=args.out)
