@@ -120,7 +120,7 @@ if __name__ == '__main__':
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('--gvcfs', help='Input gVCFs', nargs='+')
     parser.add_argument('--sgids', help='Family Member IDs', nargs='+')
-    parser.add_argument('--vcf_out', help='Output VCF path')
+    parser.add_argument('--out', help='Output VCF path')
     parser.add_argument('--family', help='Family Name/Number')
     args = parser.parse_args()
 
@@ -128,15 +128,17 @@ if __name__ == '__main__':
 
     init_batch()
 
+    vds_path = output_path(f'{args.family}.vds', category='tmp')
+
     get_logger(__file__).info(f'Creating VDS {args.out} from {len(args.gvcfs)} gVCFs')
 
-    gvcfs_to_vds(gvcfs=args.gvcfs, sgids=args.sgids, vds_out=args.vds_out, family='family')
+    gvcfs_to_vds(gvcfs=args.gvcfs, sgids=args.sgids, vds_out=vds_path, family=args.family)
 
     get_logger(__file__).info('Creating VCF fragments from VDS')
 
     vcf_fragments_tmp = output_path(f'fragments_{args.family}.vcf.bgz', category='tmp')
 
-    vds_to_vcf(vds_path=args.vds_out, output=vcf_fragments_tmp)
+    vds_to_vcf(vds_path=vds_path, output=vcf_fragments_tmp)
 
     get_logger(__file__).info('Creating single VCF from fragments')
 
