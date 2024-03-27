@@ -19,7 +19,7 @@ def main():
                 function_path_args=dict(file_path='gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt'),
                 job_name='STR-PCA')
 
-    get_batch.run(wait=False)
+    get_batch().run(wait=False)
 
-if __ne__ == '__main__':
+if __name__ == '__main__':
     main()  # pylint: disable=no-value-for-parameter
