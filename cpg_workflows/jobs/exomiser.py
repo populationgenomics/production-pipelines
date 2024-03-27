@@ -3,17 +3,25 @@ jobs required for the exomiser workflow
 """
 
 import json
+from typing import TYPE_CHECKING
 
 import pandas as pd
-from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, copy_common_env, get_batch, image_path, reference_path
+from cpg_utils.hail_batch import (
+    authenticate_cloud_credentials_in_job,
+    copy_common_env,
+    get_batch,
+    image_path,
+    reference_path,
+)
 from cpg_workflows.scripts import extract_vcf_from_mt, gvcfs_to_vcf
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
+if TYPE_CHECKING:
+    from hailtop.batch.job import Job
 
 HPO_KEY: str = 'HPO Terms (present)'
 
@@ -48,7 +56,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
         copy_common_env(family_job)
         family_job.image(get_config()['workflow']['driver_image'])
         family_job.command(
-            f'python3 {script_path} --sgids {" ".join(member_ids)} --gvcfs {" ".join(member_gvcfs)} --out {str(out_paths[family])} --family {family}'
+            f'python3 {script_path} --sgids {" ".join(member_ids)} --gvcfs {" ".join(member_gvcfs)} --out {str(out_paths[family])} --family {family}',
         )
         jobs.append(family_job)
     return jobs
