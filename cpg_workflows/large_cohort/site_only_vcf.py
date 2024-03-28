@@ -6,25 +6,25 @@ Convert to site-only table and annotate with AS fields.
 import logging
 
 import hail as hl
-
-from cpg_utils import Path
-from cpg_workflows.utils import can_reuse
+from cpg_utils import Path, to_path
 from gnomad.utils.sparse_mt import default_compute_info
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
+from cpg_workflows.utils import can_reuse
+
 
 def run(
-    vds_path: Path,
-    sample_qc_ht_path: Path,
-    relateds_to_drop_ht_path: Path,
-    out_vcf_path: Path,
-    tmp_prefix: Path,
+    vds_path: str,
+    sample_qc_ht_path: str,
+    relateds_to_drop_ht_path: str,
+    out_vcf_path: str,
+    tmp_prefix: str,
 ):
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    site_only_ht_path = tmp_prefix / 'site_only.ht'
+    site_only_ht_path = to_path(tmp_prefix) / 'site_only.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
@@ -32,7 +32,7 @@ def run(
         out_ht_path=site_only_ht_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
-    assert out_vcf_path.suffix == '.bgz'
+    assert to_path(out_vcf_path).suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
 
 
@@ -87,5 +87,7 @@ def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
 def _create_info_ht(mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
     """Create info table from vcf matrix table"""
     info_ht = default_compute_info(mt, site_annotations=True, n_partitions=n_partitions)
-    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
+    info_ht = info_ht.annotate(
+        info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp)
+    )
     return info_ht
