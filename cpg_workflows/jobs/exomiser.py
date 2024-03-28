@@ -60,7 +60,7 @@ def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: str) -> Job:
     job.command(
         f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf.bgz"]}',
     )
-    job.command(f'tabix {job.output["vcf"]}')
+    job.command(f'tabix {job.output["vcf.bgz"]}')
     get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
     return job
 
