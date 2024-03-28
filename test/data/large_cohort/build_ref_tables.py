@@ -5,10 +5,10 @@ Subset reference data to test intervals.
 """
 
 import hail as hl
-from cpg_utils import to_path
-from cpg_utils.workflows.utils import exists
-from cpg_utils.hail_batch import start_query_context
 
+from cpg_utils import to_path
+from cpg_utils.hail_batch import start_query_context
+from cpg_utils.workflows.utils import exists
 
 start_query_context(
     query_backend='batch',

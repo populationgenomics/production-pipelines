@@ -24,15 +24,13 @@ def default_config() -> PipelineConfig:
             'broad': {
                 'ref_fasta': 'broad_reference.fa',
                 'dragmap_prefix': 'a-cpg-bucket/dragen_reference/',
-            }
+            },
         },
         other={'resource_overrides': {}},
     )
 
 
-def select_jobs(
-    jobs: list[Job], jtype: Literal['align', 'merge', 'markdup']
-) -> list[Job]:
+def select_jobs(jobs: list[Job], jtype: Literal['align', 'merge', 'markdup']) -> list[Job]:
     if jtype == 'align':
         return [j for j in jobs if 'Align' in str(j.name)]
     elif jtype == 'merge':

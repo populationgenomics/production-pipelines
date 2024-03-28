@@ -16,7 +16,7 @@ ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
-# sensitivities. The tool matches them internally to a VQSLOD score cutoff 
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
@@ -33,7 +33,7 @@ num_pcs = 4
 # Kinship threshold to consider two samples as related.
 # the default threshold for second degree relatives in gnomAD is 0.1:
 # https://github.com/broadinstitute/gnomad_methods/blob/382fc2c7976d58cc8983cc4c9f0df5d8d5f9fae3/gnomad/sample_qc/relatedness.py#L195
-max_kin = 0.1  
+max_kin = 0.1
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment
@@ -44,7 +44,7 @@ use_external_id = true
 pca_plot_name = 'hgdp_1kg_sites'
 
 # Section that specifies background samples for PCA analysis.
-# `datasets` must be a list paths to matrix tables or VDS, and 
+# `datasets` must be a list paths to matrix tables or VDS, and
 # `pop_field` if defined would specify the column-level field in th datasets
 # to extract the population tag for RF training for ancestry inference.
 [large_cohort.pca_background]
@@ -60,7 +60,7 @@ inferred_ancestry = false
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
-# https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and 
+# https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and
 # `max_n_singletons` adjusted based on the results we got for the TOB-WGS project.
 [large_cohort.sample_qc_cutoffs]
 min_coverage = 18  # minimum mean coverage for a sample
@@ -74,7 +74,7 @@ max_r_het_hom = 3.3  # maximum rate of heterozygous to homozygous SNPs
 pool_label = 'large-cohort'
 delete_scratch_on_exit = false
 
-# Autoscaling policy must be created in the project that corresponds 
+# Autoscaling policy must be created in the project that corresponds
 # to the analysis dataset.
 #[hail.dataproc]
 #combiner_autoscaling_policy = 'vcf-combiner-50'

@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 
 """
-Hail script to submit on a dataproc cluster. 
+Hail script to submit on a dataproc cluster.
 
 Loads the matrix table into an ElasticSearch index.
 """
 
 import logging
-
 import math
 from pprint import pformat
 
 import click
-import hail as hl
 import coloredlogs
 import elasticsearch
+
+import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import reference_path
-
 from hail_scripts.elasticsearch.hail_elasticsearch_client import HailElasticsearchClient
-
 
 fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
 coloredlogs.install(level='INFO', fmt=fmt)
@@ -83,7 +81,7 @@ class HailElasticsearchClientV8(HailElasticsearchClient):
                     # If using SSL, the instance is likely managed, in which case we
                     # can't discover nodes.
                     'es.nodes.wan.only': 'true',
-                }
+                },
             )
 
         # deprecated in ES=V8:
@@ -125,9 +123,7 @@ def main(
     )
     assert password
 
-    print(
-        f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"'
-    )
+    print(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
     print(f'Reading passport from secret "{secret_name}" in project "{project_id}"')
     es = HailElasticsearchClientV8(
         host=host,

@@ -3,26 +3,27 @@ Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
 """
 
 import logging
+
 from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows import get_batch
-from cpg_workflows.utils import can_reuse
-from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroup,
-    SequencingGroupStage,
-)
 from cpg_workflows.filetypes import (
     BamPath,
     CramPath,
 )
+from cpg_workflows.jobs import bam_to_cram, count
 from cpg_workflows.stages.trim_align import TrimAlignRNA
-from cpg_workflows.jobs import count
-from cpg_workflows.jobs import bam_to_cram
+from cpg_workflows.utils import can_reuse
+from cpg_workflows.workflow import (
+    SequencingGroup,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput,
+    stage,
+)
 
 
 @stage(
@@ -41,7 +42,7 @@ class Count(SequencingGroupStage):
             'count': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count',
             'summary': sequencing_group.dataset.prefix() / 'count' / f'{sequencing_group.id}.count.summary',
         }
-    
+
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to count the reads with featureCounts.

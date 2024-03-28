@@ -5,8 +5,9 @@ Functions to set up Hail Batch resources (cores, memory, storage).
 import math
 from dataclasses import dataclass
 
-from cpg_utils.config import get_config
 from hailtop.batch.job import Job
+
+from cpg_utils.config import get_config
 
 
 def _is_power_of_two(n: int) -> bool:
@@ -115,16 +116,12 @@ class MachineType:
                     self.mem_gb_to_ncpu(mem_gb) if mem_gb else None,
                     self.storage_gb_to_ncpu(storage_gb) if storage_gb else None,
                 ],
-            )
+            ),
         )
         return JobResource(
             machine_type=self,
             ncpu=min_ncpu,
-            attach_disk_storage_gb=(
-                storage_gb
-                if storage_gb and storage_gb > self.calc_instance_disk_gb()
-                else None
-            ),
+            attach_disk_storage_gb=(storage_gb if storage_gb and storage_gb > self.calc_instance_disk_gb() else None),
         )
 
     def fraction_to_ncpu(self, fraction: float) -> int:
@@ -169,10 +166,7 @@ class MachineType:
         the nearest power of 2, not less than the minimal number of cores allowed.
         """
         if ncpu > self.max_ncpu:
-            raise ValueError(
-                f'Requesting more cores than available on {self.name} machine: '
-                f'{ncpu}>{self.max_ncpu}'
-            )
+            raise ValueError(f'Requesting more cores than available on {self.name} machine: {ncpu}>{self.max_ncpu}')
 
         if ncpu < MachineType.min_cpu:
             ncpu = MachineType.min_cpu
@@ -231,7 +225,7 @@ class JobResource:
             if ncpu > self.machine_type.max_ncpu:
                 raise ValueError(
                     f'Max number of CPU on machine {self.machine_type.name} '
-                    f'is {self.machine_type.max_ncpu}, requested {ncpu}'
+                    f'is {self.machine_type.max_ncpu}, requested {ncpu}',
                 )
             self.fraction_of_full = ncpu / self.machine_type.max_ncpu
 
@@ -241,7 +235,7 @@ class JobResource:
                 raise ValueError(
                     f'Storage can be overridden only when the entire machine is used, '
                     f'not a fraction ({self.fraction_of_full}). '
-                    f'override_storage_gb={attach_disk_storage_gb}'
+                    f'override_storage_gb={attach_disk_storage_gb}',
                 )
             self.attach_disk_storage_gb = attach_disk_storage_gb
 
@@ -279,9 +273,7 @@ class JobResource:
         if self.attach_disk_storage_gb:
             storage_gb = self.attach_disk_storage_gb
         else:
-            storage_gb = (
-                self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
-            )
+            storage_gb = self.machine_type.calc_instance_disk_gb() * self.fraction_of_full
 
         # Hail Batch actually requests 5% lower number than the
         # requested one (e.g. "req_storage: 46.25G, actual_storage: 44.0 GiB"),
@@ -337,7 +329,8 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
 
 
 def storage_for_joint_vcf(
-    sequencing_group_count: int | None, site_only: bool = True
+    sequencing_group_count: int | None,
+    site_only: bool = True,
 ) -> float | None:
     """
     Storage enough to fit and process a joint-called VCF
@@ -350,5 +343,5 @@ def storage_for_joint_vcf(
         gb_per_sequencing_group = 1.0
         if not site_only:
             gb_per_sequencing_group = 1.5
-        
+
     return gb_per_sequencing_group * sequencing_group_count
