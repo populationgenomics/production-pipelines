@@ -1,6 +1,7 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, query_command
+
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
@@ -29,10 +30,7 @@ class Combiner(CohortStage):
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-<<<<<<< HEAD
-        j = get_batch().new_job(
-            'Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
-        )
+        j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
         j.image(image_path('cpg_workflows'))
         j.command(
@@ -42,18 +40,7 @@ class Combiner(CohortStage):
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
-            )
-=======
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                out_vds_path=self.expected_outputs(cohort),
-                tmp_prefix=self.tmp_prefix,
             ),
-            autoscaling_policy=(get_config()['hail'].get('dataproc', {}).get('combiner_autoscaling_policy')),
-            depends_on=inputs.get_jobs(cohort),
->>>>>>> origin/main
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
