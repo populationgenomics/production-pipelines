@@ -3,9 +3,10 @@ jobs required for the exomiser workflow
 """
 
 import json
-from typing import TYPE_CHECKING
 
 import pandas as pd
+
+from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
@@ -20,20 +21,17 @@ from cpg_workflows.scripts import extract_vcf_from_mt, gvcfs_to_vcf
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
-if TYPE_CHECKING:
-    from hailtop.batch.job import Job
-
 HPO_KEY: str = 'HPO Terms (present)'
 
 
-def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: Path) -> Job:
+def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: str) -> Job:
     """
     Does a quick blast of gVCF -> VCF
     Strips out ref-only sites, and splits Alt, Non_Ref into just Alt
 
     Args:
-        sg ():
-        out_path ():
+        sg (SequencingGroup): single family member to translate
+        out_path (str): where to write the VCF (and implicitly, the index)
 
     Returns:
         the job, for dependency setting
@@ -52,14 +50,18 @@ def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: Path) -> Job:
         output={
             'vcf': '{root}.vcf.bgz',
             'vcf_index': '{root}.vcf.bgz.tbi',
-        }
+        },
     )
 
+    # view -m 3 to strip out ref-only sites
+    # norm -m -any to split Alt, Non_Ref into just Alt
+    # grep -v NON_REF to remove the NON_REF sites
+    # bgzip -c to write to a compressed file
     job.command(
-        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf"]}'
+        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf"]}',
     )
     job.command(f'tabix {job.output["vcf"]}')
-    get_batch().write_output(job.output, str(out_path).removesuffix('.vcf.bgz'))
+    get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
     return job
 
 
@@ -84,7 +86,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
             continue
 
         if len(members) == 1:
-            jobs.append(single_sample_vcf_from_gvcf(members[0], out_paths[family]))
+            jobs.append(single_sample_vcf_from_gvcf(members[0], str(out_paths[family])))
             continue
 
         # get sorted members

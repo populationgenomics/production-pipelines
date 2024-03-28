@@ -130,16 +130,18 @@ if __name__ == '__main__':
 
     vds_path = output_path(f'{args.family}.vds', category='tmp')
 
-    get_logger(__file__).info(f'Creating VDS {args.out} from {len(args.gvcfs)} gVCFs')
+    get_logger(__file__).info(f'Creating VCF {args.out} from {len(args.gvcfs)} gVCFs')
 
     gvcfs_to_vds(gvcfs=args.gvcfs, sgids=args.sgids, vds_out=vds_path, family=args.family)
 
-    get_logger(__file__).info('Creating VCF fragments from VDS')
+    get_logger(__file__).info('Creating VCF fragments from VDS...')
 
     vcf_fragments_tmp = output_path(f'fragments_{args.family}.vcf.bgz', category='tmp')
 
     vds_to_vcf(vds_path=vds_path, output=vcf_fragments_tmp)
 
-    get_logger(__file__).info('Creating single VCF from fragments')
+    get_logger(__file__).info('Creating single VCF from fragments...')
 
     squash_fragments_to_vcf(vcf_fragment_dir=vcf_fragments_tmp, vcf_out=args.out)
+
+    get_logger(__file__).info(f'All done writing {args.out}...')
