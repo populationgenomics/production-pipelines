@@ -24,7 +24,7 @@ from cpg_utils.config import get_config
 LOGGER: logging.Logger | None = None
 
 
-def get_logger(logger_name: str | None, log_level: int = logging.INFO) -> logging.Logger:
+def get_logger(logger_name: str | None = None, log_level: int = logging.INFO) -> logging.Logger:
     """
     creates a logger instance (so as not to use the root logger)
     Args:
