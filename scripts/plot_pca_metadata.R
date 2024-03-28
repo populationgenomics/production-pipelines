@@ -1,0 +1,52 @@
+#!/usr/bin/env Rscript
+
+# Overlay metadata as coloured points onto PCA
+
+library(tidyverse)
+library(ggplot2)
+library(glue)
+library(googleCloudStorageR)
+library(gargle)
+
+# Google cloud setup/token authorisation (to get files from GCP)
+scope <- c("https://www.googleapis.com/auth/cloud-platform")
+token <- gargle::token_fetch(scopes = scope)
+googleCloudStorageR::gcs_auth(token = token)
+
+# set bucket
+googleCloudStorageR::gcs_global_bucket("gs://cpg-bioheart-test")
+
+scores = read.csv("gs://cpg-bioheart-test-analysis/tenk10k/externalid_scores.csv")
+metadata = read.csv("gs://cpg-bioheart-test-analysis/tenk10k/tenk10k-metadata.csv")
+# match bioheart ID in metadata with scores
+metadata = metadata[match(scores$external_id, metadata$bioheart_id), ]
+
+# plot data
+gcs_image_outdir <- glue("gs://cpg-bioheart-test-web/tenk10k/")
+pcs_to_plot=seq_along(1:10)
+
+plot.pca <- function(scores_df, metadata_df, variable_name){
+    for (i in pcs_to_plot){
+        pca_axis1=paste0("PC",i)
+        pca_axis2=paste0("PC",i+1)
+        df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
+        df |> 
+        p <- ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
+        theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
+        xlab(pca_axis1) + ylab(pca_axis2)
+        # Save plot
+        metadata_plot <- paste0(
+            glue("metadata_pca_",variable_name, ".pdf")
+        )
+        pdf(metadata_plot, width = 14, height = 8)
+        print(p)
+        dev.off()
+        # Copy pdf to system
+        system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
+    }
+}
+
+# Plot PCA
+for (name in colnames(metadata)){
+    plot.pca(scores_df=scores, metadata_df=metadata, variable_name=name)
+}
