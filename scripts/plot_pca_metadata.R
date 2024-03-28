@@ -16,8 +16,19 @@ googleCloudStorageR::gcs_auth(token = token)
 # set bucket
 googleCloudStorageR::gcs_global_bucket("gs://cpg-bioheart-test")
 
-scores = read.csv("gs://cpg-bioheart-test-analysis/tenk10k/externalid_scores.csv")
-metadata = read.csv("gs://cpg-bioheart-test-analysis/tenk10k/tenk10k-metadata.csv")
+scores_file <- "gs://cpg-bioheart-test-analysis/tenk10k/externalid_scores.csv"
+metadata_file <- "gs://cpg-bioheart-test-analysis/tenk10k/tenk10k-metadata.csv"
+# Copy in scores and metadata files
+system(glue(
+    "gsutil cp {scores_file} externalid_scores.csv"
+))
+system(glue(
+    "gsutil cp {metadata_file} tenk10k-metadata.csv"
+))
+# Read in files once copied
+scores <- read.csv("externalid_scores.csv")
+metadata <- read.csv("tenk10k-metadata.csv")
+
 # match bioheart ID in metadata with scores
 metadata = metadata[match(scores$external_id, metadata$bioheart_id), ]
 
