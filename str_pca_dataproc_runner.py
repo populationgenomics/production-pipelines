@@ -13,7 +13,7 @@ def main():
     from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
     dataproc_job(
                 function = pca_runner,
-                function_path_args=dict(file_path ='gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt'),
+                function_path_args=dict(file_path ='gs://cpg-bioheart-test/str/polymorphic_run_n2045/annotated_mt/v2/str_annotated.mt'),
                 job_name='STR-PCA',
                 num_workers= 5)
 
