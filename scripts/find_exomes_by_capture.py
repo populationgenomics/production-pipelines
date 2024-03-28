@@ -7,11 +7,12 @@ to be used in generating capture-specific batch config files
 """
 
 
-from metamist.graphql import gql, query
 import toml
 
+from metamist.graphql import gql, query
 
-meta_query = gql("""
+meta_query = gql(
+    """
 query SampleMetaQuery($name: String!) {
   project(name: $name) {
     sequencingGroups {
@@ -25,7 +26,8 @@ query SampleMetaQuery($name: String!) {
       }
     }
   }
-}""")
+}""",
+)
 
 
 # the structure we want is
@@ -38,7 +40,12 @@ query SampleMetaQuery($name: String!) {
 # nb. SSQXTCREV2 is the Agilent SureSelect Clinical Research Exome V2
 # but V1 was only for GRCh37, so it's implied that unspecified versions
 # are likely also V2 and can be grouped together
-known_captures = ['_SSQXTCREV2_', '_TwistWES1VCGS1_', '_SSXTLICREV2_', '_NEXTERAFLEXWGS_']
+known_captures = [
+    '_SSQXTCREV2_',
+    '_TwistWES1VCGS1_',
+    '_SSXTLICREV2_',
+    '_NEXTERAFLEXWGS_',
+]
 
 capture_dict: dict = dict()
 projects = ['acute-care']

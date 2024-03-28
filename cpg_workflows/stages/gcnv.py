@@ -2,8 +2,8 @@
 Stages that implement GATK-gCNV.
 """
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
@@ -13,16 +13,16 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     queue_annotate_sv_jobs,
 )
-from cpg_workflows.targets import SequencingGroup, Cohort
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     CohortStage,
     Dataset,
     DatasetStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_workflow,
+    stage,
 )
 
 
@@ -62,17 +62,11 @@ class CollectReadCounts(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'counts': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.counts.tsv.gz',
-            'index': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.counts.tsv.gz.tbi',
+            'counts': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz',
+            'index': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz.tbi',
         }
 
-    def queue_jobs(
-        self, seqgroup: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
         if seqgroup.cram is None:
@@ -209,10 +203,7 @@ class GCNVJointSegmentation(CohortStage):
 
         # get the list of individual Segment VCFs
         cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        all_vcfs = [
-            str(cnv_vcfs[sgid]['segments'])
-            for sgid in cohort.get_sequencing_group_ids()
-        ]
+        all_vcfs = [str(cnv_vcfs[sgid]['segments']) for sgid in cohort.get_sequencing_group_ids()]
 
         # get the intervals
         intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
@@ -238,7 +229,7 @@ class GCNVJointSegmentation(CohortStage):
         GermlineCNV,
         GermlineCNVCalls,
         DeterminePloidy,
-    ]
+    ],
 )
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
@@ -252,21 +243,15 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'genotyped_intervals_vcf': self.prefix
-            / f'{sequencing_group.id}.intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.prefix
-            / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
-            'genotyped_segments_vcf': self.prefix
-            / f'{sequencing_group.id}.segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.prefix
-            / f'{sequencing_group.id}.segments.vcf.gz.tbi',
+            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz',
+            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
+            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.segments.vcf.gz',
+            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.segments.vcf.gz.tbi',
             'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.ratios.tsv',
             'qc_status_file': self.prefix / f'{sequencing_group.id}.qc_status.txt',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
 
         # get the clustered VCF from the previous stage
@@ -279,9 +264,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
             determine_ploidy['calls'],
             inputs.as_dict(get_cohort(), GermlineCNV),
             # FIXME get the sample index via sample_name.txt files instead
-            sequencing_group.dataset.get_sequencing_group_ids().index(
-                sequencing_group.id
-            ),
+            sequencing_group.dataset.get_sequencing_group_ids().index(sequencing_group.id),
             self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
@@ -308,10 +291,7 @@ class FastCombineGCNVs(CohortStage):
 
         # do a slapdash bcftools merge on all input files...
         gcnv_vcfs = inputs.as_dict_by_target(RecalculateClusteredQuality)
-        all_vcfs = [
-            str(gcnv_vcfs[sgid]['genotyped_segments_vcf'])
-            for sgid in cohort.get_sequencing_group_ids()
-        ]
+        all_vcfs = [str(gcnv_vcfs[sgid]['genotyped_segments_vcf']) for sgid in cohort.get_sequencing_group_ids()]
 
         pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
 
@@ -397,9 +377,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        strv_job = get_batch().new_job(
-            'StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'}
-        )
+        strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
         strv_job.storage('20Gi')
@@ -421,17 +399,11 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
             output_vcf={
                 'vcf.bgz': '{root}.vcf.bgz',
                 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            }
+            },
         )
 
         # run strvctvre
-        strv_job.command(
-            f'python StrVCTVRE.py '
-            f'-i {input_vcf} '
-            f'-o temp.vcf '
-            f'-f vcf '
-            f'-p {phylop_in_batch}'
-        )
+        strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
         strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
@@ -465,14 +437,10 @@ class AnnotateCohortgCNV(CohortStage):
         Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
         """
 
-        vcf_path = inputs.as_path(
-            target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf'
-        )
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
-        j = get_batch().new_job(f'annotate gCNV cohort', self.get_job_attrs(cohort))
+        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -482,7 +450,7 @@ class AnnotateCohortgCNV(CohortStage):
                 str(self.expected_outputs(cohort)['mt']),
                 str(checkpoint_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
 
         # todo is this necessary?
@@ -496,11 +464,7 @@ class AnnotateCohortgCNV(CohortStage):
         )
 
 
-@stage(
-    required_stages=AnnotateCohortgCNV,
-    analysis_type='cnv',
-    analysis_keys=['mt']
-)
+@stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
 class AnnotateDatasetCNV(DatasetStage):
     """
     Subset the MT to be this Dataset only
@@ -513,11 +477,7 @@ class AnnotateDatasetCNV(DatasetStage):
         """
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (
-                dataset.prefix()
-                / 'mt'
-                / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'
-            ),
+            'mt': (dataset.prefix() / 'mt' / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -530,13 +490,9 @@ class AnnotateDatasetCNV(DatasetStage):
         """
 
         assert dataset.cohort
-        mt_path = inputs.as_path(
-            target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt'
-        )
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
 
         jobs = gcnv.annotate_dataset_jobs_cnv(
             mt_path=mt_path,
@@ -547,9 +503,7 @@ class AnnotateDatasetCNV(DatasetStage):
             depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
 def _gatk_gcnv_index_meta(
@@ -594,16 +548,14 @@ class MtToEsCNV(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(
-            target=dataset, stage=AnnotateDatasetCNV, key='mt'
-        )
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         from analysis_runner import dataproc

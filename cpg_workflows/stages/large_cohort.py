@@ -68,7 +68,7 @@ class SampleQC(CohortStage):
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
@@ -93,7 +93,7 @@ class DenseSubset(CohortStage):
                 str(inputs.as_path(cohort, Combiner)),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
-            )
+            ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 

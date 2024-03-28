@@ -4,7 +4,6 @@ VEP stage.
 
 from cpg_utils import to_path
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.jobs import vep
 from cpg_workflows.workflow import (
     Cohort,
@@ -47,7 +46,7 @@ class Vep(CohortStage):
                     stage=JointGenotyping,
                     target=cohort,
                     key='siteonly_part_pattern',
-                ).format(idx=idx)
+                ).format(idx=idx),
             )
             for idx in range(scatter_count)
         ]

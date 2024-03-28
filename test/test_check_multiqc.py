@@ -2,7 +2,6 @@
 Test Hail Query functions.
 """
 
-
 from cpg_utils import to_path
 
 from . import set_config

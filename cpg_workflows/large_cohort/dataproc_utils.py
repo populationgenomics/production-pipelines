@@ -54,7 +54,7 @@ def dataproc_job(
         raise ValueError(
             f'Cannot find gnomad_methods Git submodule: {gnomad_path}. Make sure '
             f'you cloned the repo recursively with `git clone --recurse-submodules '
-            f'git@github.com:populationgenomics/production-pipelines.git`.'
+            f'git@github.com:populationgenomics/production-pipelines.git`.',
         )
     pyfiles = [
         cpg_workflows.__name__,
