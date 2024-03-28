@@ -26,6 +26,43 @@ if TYPE_CHECKING:
 HPO_KEY: str = 'HPO Terms (present)'
 
 
+def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: Path) -> Job:
+    """
+    Does a quick blast of gVCF -> VCF
+    Strips out ref-only sites, and splits Alt, Non_Ref into just Alt
+
+    Args:
+        sg ():
+        out_path ():
+
+    Returns:
+        the job, for dependency setting
+    """
+
+    job = get_batch().new_job(f'Create VCF for {sg.id}')
+    job.image(image_path('bcftools'))
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        job.storage('10Gi')
+
+    # read input
+    gvcf_input = get_batch().read_input(str(sg.gvcf))
+
+    # declare a resource group
+    job.declare_resource_group(
+        output={
+            'vcf': '{root}.vcf.bgz',
+            'vcf_index': '{root}.vcf.bgz.tbi',
+        }
+    )
+
+    job.command(
+        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf"]}'
+    )
+    job.command(f'tabix {job.output["vcf"]}')
+    get_batch().write_output(job.output, str(out_path).removesuffix('.vcf.bgz'))
+    return job
+
+
 def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):
     """
     Create Joint VCFs for families of SG IDs
@@ -44,6 +81,10 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
 
         # skip if already done
         if exists(out_paths[family]):
+            continue
+
+        if len(members) == 1:
+            jobs.append(single_sample_vcf_from_gvcf(members[0], out_paths[family]))
             continue
 
         # get sorted members
