@@ -48,8 +48,8 @@ def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: str) -> Job:
     # declare a resource group
     job.declare_resource_group(
         output={
-            'vcf': '{root}.vcf.bgz',
-            'vcf_index': '{root}.vcf.bgz.tbi',
+            'vcf.bgz': '{root}.vcf.bgz',
+            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
         },
     )
 
@@ -58,7 +58,7 @@ def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: str) -> Job:
     # grep -v NON_REF to remove the NON_REF sites
     # bgzip -c to write to a compressed file
     job.command(
-        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf"]}',
+        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf.bgz"]}',
     )
     job.command(f'tabix {job.output["vcf"]}')
     get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
