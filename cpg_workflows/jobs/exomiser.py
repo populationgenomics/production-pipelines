@@ -6,72 +6,103 @@ import json
 
 import pandas as pd
 
+from hailtop.batch.job import Job
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, reference_path
-from cpg_workflows.scripts import extract_vcf_from_mt, vds_from_gvcfs
-from cpg_workflows.scripts import mt_from_vds as vds2mt
+from cpg_utils.hail_batch import (
+    authenticate_cloud_credentials_in_job,
+    copy_common_env,
+    get_batch,
+    image_path,
+    reference_path,
+)
+from cpg_workflows.scripts import extract_vcf_from_mt, gvcfs_to_vcf
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
 HPO_KEY: str = 'HPO Terms (present)'
 
 
-def create_vds_jobs(sgids: list[SequencingGroup], out_path: str):
+def single_sample_vcf_from_gvcf(sg: SequencingGroup, out_path: str) -> Job:
     """
-    Create VDS from a number of SG IDs
-    At larger cohort sizes this won't work, as the number of
-    arguments may hit a threshold
-
-    Mitigate by writing a temp file and reading into script container
+    Does a quick blast of gVCF -> VCF
+    Strips out ref-only sites, and splits Alt, Non_Ref into just Alt
 
     Args:
-        sgids (list[SequencingGroup])
-        out_path (str):
+        sg (SequencingGroup): single family member to translate
+        out_path (str): where to write the VCF (and implicitly, the index)
+
+    Returns:
+        the job, for dependency setting
     """
 
-    if exists(out_path):
-        return []
+    job = get_batch().new_job(f'Create VCF for {sg.id}')
+    job.image(image_path('bcftools'))
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        job.storage('10Gi')
 
-    gvcf_paths = " ".join([str(s.gvcf.path) for s in sgids if s.gvcf])
-    sequencing_group_names = " ".join([s.id for s in sgids])
+    # read input
+    gvcf_input = get_batch().read_input(str(sg.gvcf))
 
-    # need a sexier way of doing this... currently there's a disconnect
-    # between how the cpg_workflows image is built, compared with
-    # how this driver image git checkout is done, meaning a different filepath
-    vds_script = str(vds_from_gvcfs.__file__).removeprefix('/production-pipelines')
+    # declare a resource group
+    job.declare_resource_group(
+        output={
+            'vcf.bgz': '{root}.vcf.bgz',
+            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+        },
+    )
 
-    job = get_batch().new_job('Make VDS from gVCFs')
-    authenticate_cloud_credentials_in_job(job)
-    job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {vds_script} --gvcfs {gvcf_paths} --sgids {sequencing_group_names} --out {out_path}')
-    job.storage('10Gi')
-    job.cpu(4)
-    job.memory('standard')
+    # view -m 3 to strip out ref-only sites
+    # norm -m -any to split Alt, Non_Ref into just Alt
+    # grep -v NON_REF to remove the NON_REF sites
+    # bgzip -c to write to a compressed file
+    job.command(
+        f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf.bgz"]}',
+    )
+    job.command(f'tabix {job.output["vcf.bgz"]}')
+    get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
     return job
 
 
-def mt_from_vds(vds_path: str, out_path: str):
+def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):
     """
-    create the MT from the VDS
+    Create Joint VCFs for families of SG IDs
 
     Args:
-        vds_path (str): path to the VDS
-        out_path (str): path to the MT
+        families (): dict of family ID to list of SG IDs
+        out_paths (): dict of family ID to output path
     """
 
-    if exists(out_path):
-        return []
+    jobs: list[Job] = []
 
-    # find the path to the script in _this_ container
-    script_path = str(vds2mt.__file__).removeprefix('/production-pipelines')
-    job = get_batch().new_job('Make MT from VDS')
-    job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {script_path} --vds {vds_path} --mt {out_path}')
-    job.storage('10Gi')
-    job.cpu(4)
-    job.memory('standard')
-    return job
+    script_path = gvcfs_to_vcf.__file__.removeprefix('/production-pipelines')
+
+    # take each family
+    for family, members in families.items():
+
+        # skip if already done
+        if exists(out_paths[family]):
+            continue
+
+        if len(members) == 1:
+            jobs.append(single_sample_vcf_from_gvcf(members[0], str(out_paths[family])))
+            continue
+
+        # get sorted members
+        sorted_members = sorted(members, key=lambda x: x.id)
+        member_ids = [sg.id for sg in sorted_members]
+        member_gvcfs = [str(sg.gvcf) for sg in sorted_members]
+        # get their gVCF paths
+        family_job = get_batch().new_job(f'Create Joint VCF for {family}')
+        authenticate_cloud_credentials_in_job(family_job)
+        copy_common_env(family_job)
+        family_job.image(get_config()['workflow']['driver_image'])
+        family_job.command(
+            f'python3 {script_path} --sgids {" ".join(member_ids)} --gvcfs {" ".join(member_gvcfs)} --out {str(out_paths[family])} --family {family}',
+        )
+        jobs.append(family_job)
+    return jobs
 
 
 def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):

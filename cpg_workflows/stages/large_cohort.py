@@ -1,7 +1,6 @@
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, query_command
-
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
@@ -28,22 +27,19 @@ class Combiner(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
-        from cpg_workflows.large_cohort.combiner import run
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from cpg_workflows.large_cohort import combiner
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                out_vds_path=self.expected_outputs(cohort),
-                tmp_prefix=self.tmp_prefix,
+        j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
+
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                combiner,
+                combiner.run.__name__,
+                str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix),
+                setup_gcp=True,
             ),
-            autoscaling_policy=(
-                get_config()['hail']
-                .get('dataproc', {})
-                .get('combiner_autoscaling_policy')
-            ),
-            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
@@ -57,7 +53,8 @@ class SampleQC(CohortStage):
         from cpg_workflows.large_cohort import sample_qc
 
         j = get_batch().new_job(
-            'Sample QC', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+            'Sample QC',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
         j.image(image_path('cpg_workflows'))
         j.command(
@@ -82,7 +79,8 @@ class DenseSubset(CohortStage):
         from cpg_workflows.large_cohort import dense_subset
 
         j = get_batch().new_job(
-            'Dense Subset', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+            'Dense Subset',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -117,9 +115,7 @@ class Relatedness(CohortStage):
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 out_relatedness_ht_path=self.expected_outputs(cohort)['relatedness'],
-                out_relateds_to_drop_ht_path=self.expected_outputs(cohort)[
-                    'relateds_to_drop'
-                ],
+                out_relateds_to_drop_ht_path=self.expected_outputs(cohort)['relateds_to_drop'],
                 tmp_prefix=self.tmp_prefix,
             ),
             depends_on=inputs.get_jobs(cohort),
@@ -149,7 +145,9 @@ class Ancestry(CohortStage):
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, Relatedness, key='relateds_to_drop'
+                    cohort,
+                    Relatedness,
+                    key='relateds_to_drop',
                 ),
                 tmp_prefix=self.tmp_prefix,
                 out_scores_ht_path=self.expected_outputs(cohort)['scores'],
@@ -180,7 +178,10 @@ class AncestryPlots(CohortStage):
         return {
             str(pc_num): self.out_prefix
             / self.out_fname_pattern.format(
-                scope='dataset', pci=pc_num, pca_suffix=pca_suffix, ext='html'
+                scope='dataset',
+                pci=pc_num,
+                pca_suffix=pca_suffix,
+                ext='html',
             )
             for pc_num in range(1, n_pcs)
         }
@@ -199,7 +200,9 @@ class AncestryPlots(CohortStage):
                 eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
                 loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
                 inferred_pop_ht_path=inputs.as_path(
-                    cohort, Ancestry, key='inferred_pop'
+                    cohort,
+                    Ancestry,
+                    key='inferred_pop',
                 ),
             ),
             depends_on=inputs.get_jobs(cohort),
@@ -219,7 +222,8 @@ class MakeSiteOnlyVcf(CohortStage):
         from cpg_workflows.large_cohort import site_only_vcf
 
         j = get_batch().new_job(
-            'MakeSiteOnlyVcf', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+            'MakeSiteOnlyVcf',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -233,7 +237,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
@@ -301,7 +305,9 @@ class Frequencies(CohortStage):
                 vds_path=inputs.as_path(cohort, stage=Combiner),
                 sample_qc_ht_path=inputs.as_path(cohort, stage=SampleQC),
                 relateds_to_drop_ht_path=inputs.as_path(
-                    cohort, stage=Relatedness, key='relateds_to_drop'
+                    cohort,
+                    stage=Relatedness,
+                    key='relateds_to_drop',
                 ),
                 out_ht_path=self.expected_outputs(cohort),
             ),
