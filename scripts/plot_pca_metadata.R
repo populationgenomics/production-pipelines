@@ -34,7 +34,7 @@ metadata <- read.csv("tenk10k-metadata.csv")
 metadata = metadata[match(scores$external_id, metadata$bioheart_id), ]
 
 # plot data
-gcs_image_outdir <- glue("gs://cpg-bioheart-test-web/tenk10k/")
+gcs_image_outdir <- "gs://cpg-bioheart-test-web/tenk10k/"
 pcs_to_plot=seq_along(1:10)
 
 plot.pca <- function(scores_df, metadata_df, variable_name){
