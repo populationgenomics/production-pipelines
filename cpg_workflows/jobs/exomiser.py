@@ -283,7 +283,10 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         #     'cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json'
         # )
 
-        for parallel_chunk in chunks(family_chunk, chunk_size=get_config()['workflow'].get('exomiser_parallel_chunks', 4)):
+        for parallel_chunk in chunks(
+            family_chunk,
+            chunk_size=get_config()['workflow'].get('exomiser_parallel_chunks', 4),
+        ):
             for family in parallel_chunk:
                 # read in VCF & index
                 vcf = get_batch().read_input_group(
