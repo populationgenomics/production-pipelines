@@ -45,11 +45,11 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
             del dict_by_family[family]
 
-        # # check that the affected members have HPO terms - required for exomiser
-        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-        #     del dict_by_family[family]
-        #     continue
+        # check that the affected members have HPO terms - required for exomiser
+        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+            del dict_by_family[family]
+            continue
 
     return dict_by_family
 
