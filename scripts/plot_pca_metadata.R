@@ -7,6 +7,7 @@ library(ggplot2)
 library(glue)
 library(googleCloudStorageR)
 library(gargle)
+library(magrittr)
 
 # Google cloud setup/token authorisation (to get files from GCP)
 scope <- c("https://www.googleapis.com/auth/cloud-platform")
@@ -41,7 +42,7 @@ plot.pca <- function(scores_df, metadata_df, variable_name){
         pca_axis1=paste0("PC",i)
         pca_axis2=paste0("PC",i+1)
         df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
-        df |> 
+        df %>% 
         p <- ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
         theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
         xlab(pca_axis1) + ylab(pca_axis2)
