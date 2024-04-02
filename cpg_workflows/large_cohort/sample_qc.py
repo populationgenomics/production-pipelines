@@ -14,13 +14,17 @@ from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
 
 
-def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
+def run(
+    vds_path: Path,
+    out_sample_qc_ht_path: Path,
+    tmp_prefix: Path,
+):
     if can_reuse(out_sample_qc_ht_path, overwrite=True):
-        return []
+        return hl.read_table(str(out_sample_qc_ht_path))
 
     ht = initialise_sample_table()
 
-    vds = hl.vds.read_vds(vds_path)
+    vds = hl.vds.read_vds(str(vds_path))
 
     # Remove centromeres and telomeres:
     tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
@@ -28,12 +32,15 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
-    sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
+    sqc_ht_path = tmp_prefix / 'sample_qc.ht'
     if can_reuse(sqc_ht_path, overwrite=True):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
-        autosome_vds = hl.vds.filter_chromosomes(vds, keep=[f'chr{chrom}' for chrom in range(1, 23)])
+        autosome_vds = hl.vds.filter_chromosomes(
+            vds,
+            keep=[f'chr{chrom}' for chrom in range(1, 23)],
+        )
         sqc_ht = hl.vds.sample_qc(autosome_vds)
         sqc_ht = sqc_ht.checkpoint(str(sqc_ht_path), overwrite=True)
     ht = ht.annotate(sample_qc=sqc_ht[ht.s])
@@ -41,12 +48,12 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
     ht.describe()
 
     logging.info('Run sex imputation')
-    sex_ht = impute_sex(vds, ht, to_path(tmp_prefix))
+    sex_ht = impute_sex(vds, ht, tmp_prefix)
     ht = ht.annotate(**sex_ht[ht.s])
 
     logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
-    ht.checkpoint(out_sample_qc_ht_path, overwrite=True)
+    ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
 
 
 def initialise_sample_table() -> hl.Table:
