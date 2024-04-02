@@ -47,9 +47,7 @@ plot.pca <- function(scores_df, metadata_df, variable_name){
         theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
         xlab(pca_axis1) + ylab(pca_axis2)
         # Save plot
-        metadata_plot <- paste0(
-            glue("metadata_pca_",variable_name, ".pdf")
-        )
+        metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".pdf")
         pdf(metadata_plot, width = 14, height = 8)
         print(p)
         dev.off()
