@@ -75,6 +75,7 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
         paths.append(f'{index}.vcf.bgz')
     job.command(f'bcftools merge {" ".join(paths)} -Oz -o {job.output["vcf.bgz"]} --threads 4 -m all -0')
     job.command(f'tabix {job.output["vcf.bgz"]}')
+    get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
     return job
 
 
