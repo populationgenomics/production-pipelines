@@ -134,9 +134,9 @@ def _compute_sample_rankings(ht: hl.Table) -> hl.Table:
     """
     ht = ht.drop(*list(ht.globals.dtype.keys()))
     ht = ht.select(
-        'var_data_chr20_mean_dp',
+        'autosomal_mean_dp',
         filtered=hl.len(ht.filters) > 0,
     )
-    ht = ht.order_by(ht.filtered, hl.desc(ht.var_data_chr20_mean_dp))
+    ht = ht.order_by(ht.filtered, hl.desc(ht.autosomal_mean_dp))
     ht = ht.add_index(name='rank')
     return ht.key_by('s').select('filtered', 'rank')
