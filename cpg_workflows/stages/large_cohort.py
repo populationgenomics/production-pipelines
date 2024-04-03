@@ -47,7 +47,7 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.tmp_prefix / 'out_dp' / 'sample_qc.ht'
+        return self.tmp_prefix / 'out_dp2' / 'sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
@@ -60,7 +60,7 @@ class SampleQC(CohortStage):
                 sample_qc.run.__name__,
                 str(inputs.as_path(cohort, Combiner)),
                 str(self.expected_outputs(cohort)),
-                str(self.tmp_prefix / 'out_dp'),
+                str(self.tmp_prefix / 'out_dp2'),
                 setup_gcp=True,
             ),
         )
