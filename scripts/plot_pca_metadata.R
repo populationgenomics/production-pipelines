@@ -18,17 +18,19 @@ googleCloudStorageR::gcs_auth(token = token)
 googleCloudStorageR::gcs_global_bucket("gs://cpg-bioheart-test")
 
 scores_file <- "gs://cpg-bioheart-test-analysis/tenk10k/externalid_scores.csv"
-metadata_file <- "gs://cpg-bioheart-test-analysis/tenk10k/tenk10k-metadata.csv"
+metadata_file <- "gs://cpg-bioheart-test-analysis/tenk10k/metadata_tenk10k.csv"
 # Copy in scores and metadata files
 system(glue(
     "gsutil cp {scores_file} externalid_scores.csv"
 ))
 system(glue(
-    "gsutil cp {metadata_file} tenk10k-metadata.csv"
+    "gsutil cp {metadata_file} metadata_tenk10k.csv"
 ))
 # Read in files once copied
 scores <- read.csv("externalid_scores.csv")
-metadata <- read.csv("tenk10k-metadata.csv")
+metadata <- read.csv("metadata_tenk10k.csv")
+# tidy data
+metadata[metadata == ""] <- NA
 
 # match bioheart ID in metadata with scores
 metadata = metadata[match(scores$external_id, metadata$bioheart_id), ]
@@ -43,12 +45,12 @@ plot.pca <- function(scores_df, metadata_df, variable_name){
         pca_axis2=paste0("PC",i+1)
         df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
         p <- df %>% 
-        ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
+        ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.9, shape=21, size=3) + 
         theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
         xlab(pca_axis1) + ylab(pca_axis2)
         # Save plot
         metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".pdf")
-        pdf(metadata_plot,  width = 14, height = 8)
+        pdf(metadata_plot,  width = 8, height = 7)
         print(p)
         dev.off()
         # Copy pdf to system
