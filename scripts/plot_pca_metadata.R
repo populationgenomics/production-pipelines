@@ -37,45 +37,26 @@ metadata = metadata[match(scores$external_id, metadata$bioheart_id), ]
 gcs_image_outdir <- "gs://cpg-bioheart-test-web/tenk10k/"
 pcs_to_plot=seq_along(1:10)
 
-# plot.pca <- function(scores_df, metadata_df, variable_name){
-#     for (i in pcs_to_plot){
-#         pca_axis1=paste0("PC",i)
-#         pca_axis2=paste0("PC",i+1)
-#         df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
-#         p <- df %>% 
-#         ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
-#         theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
-#         xlab(pca_axis1) + ylab(pca_axis2)
-#         # Save plot
-#         metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".png")
-#         png(metadata_plot)
-#         print(p)
-#         dev.off()
-#         # Copy pdf to system
-#         system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
-#     }
-# }
+plot.pca <- function(scores_df, metadata_df, variable_name){
+    for (i in pcs_to_plot){
+        pca_axis1=paste0("PC",i)
+        pca_axis2=paste0("PC",i+1)
+        df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
+        p <- df %>% 
+        ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
+        theme_bw() + ggtitle(variable_name) + theme(legend.title=element_blank()) +
+        xlab(pca_axis1) + ylab(pca_axis2)
+        # Save plot
+        metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".png")
+        png(metadata_plot)
+        print(p)
+        dev.off()
+        # Copy pdf to system
+        system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
+    }
+}
 
-# # Plot PCA
-# for (name in colnames(metadata)){
-#     plot.pca(scores_df=scores, metadata_df=metadata, variable_name=name)
-# }
-
-
-# -------
-
-i=1
-pca_axis1=paste0("PC",i)
-pca_axis2=paste0("PC",i+1)
-variable_name="ethcat"
-scores_df=scores
-metadata_df=metadata
-df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
-p <- ggplot(df, aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate))
-# Save plot
-metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".png")
-png(metadata_plot)
-print(p)
-dev.off()
-# Copy pdf to system
-system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
+# Plot PCA
+for (name in colnames(metadata)){
+    plot.pca(scores_df=scores, metadata_df=metadata, variable_name=name)
+}
