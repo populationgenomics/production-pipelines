@@ -71,10 +71,7 @@ variable_name="ethcat"
 scores_df=scores
 metadata_df=metadata
 df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
-p <- df %>% 
-ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
-theme_bw() + theme(legend.title=element_blank()) +
-xlab(pca_axis1) + ylab(pca_axis2)
+p <- ggplot(df, aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate))
 # Save plot
 metadata_plot <- paste0("metadata_",pca_axis1,"_",variable_name, ".png")
 png(metadata_plot)
