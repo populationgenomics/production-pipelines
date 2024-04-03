@@ -69,6 +69,7 @@ pca_axis1=paste0("PC",i)
 pca_axis2=paste0("PC",i+1)
 variable_name="ethcat"
 scores_df=scores
+metadata_df=metadata
 df <- data.frame(PC1 = scores_df[,pca_axis1], PC2 = scores_df[,pca_axis2], covariate = metadata_df[,variable_name])
 p <- df %>% 
 ggplot(aes(x=PC1, y=PC2)) + geom_point(aes(fill=covariate), alpha=0.6, shape=21, size=3) + 
