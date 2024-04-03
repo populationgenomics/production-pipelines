@@ -20,6 +20,8 @@ from cpg_workflows.jobs.exomiser import (
 from cpg_workflows.utils import exists, get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 
+
+BREAKING_PUNCTUATION = '~~'
 HPO_KEY: str = 'HPO Terms (present)'
 
 
@@ -45,11 +47,11 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
             del dict_by_family[family]
 
-        # check that the affected members have HPO terms - required for exomiser
-        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-            del dict_by_family[family]
-            continue
+        # # check that the affected members have HPO terms - required for exomiser
+        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+        #     del dict_by_family[family]
+        #     continue
 
     return dict_by_family
 
@@ -142,23 +144,42 @@ class RunExomiser(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        family_dict = find_families(dataset)
+        """
+        the pipeline logic only accepts a dictionary of paths
+        but we need a dictionary of families, each containing a dictionary of paths
+        I'm fudging this by putting some arbitrary punctuation in to split on later
 
-        # only group samples with no result already
-        # expecting this to fail sometimes
-        families_without_results = []
+        Args:
+            dataset ():
+
+        Returns:
+            dict of outputs for this dataset
+        """
+        family_dict = find_families(dataset)
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_results'
 
         # get all families without results
+        output_files: dict[str, Path] = {}
         for family in family_dict.keys():
-            if not exists(self.prefix / f'{family}_results.json'):
-                families_without_results.append(family)
-        return {family: self.prefix / f'{family}_results.json' for family in families_without_results}
+
+            # arbitrarily test one file
+            if not exists(dataset_prefix / f'{family}_results.json'):
+                output_files[f'{family}{BREAKING_PUNCTUATION}json'] = dataset_prefix / f'{family}_results.json'
+                output_files[f'{family}{BREAKING_PUNCTUATION}gtsv'] = dataset_prefix / f'{family}_results.variants.tsv'
+                output_files[f'{family}{BREAKING_PUNCTUATION}vtsv'] = dataset_prefix / f'{family}_results.genes.tsv'
+
+        return output_files
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        # todo filter out families with no affected individuals
-
         output_dict = self.expected_outputs(dataset)
+
+        # break out that dict again
+        family_outputs: dict[str, dict[str, Path]] = {}
+        for key, value in output_dict.items():
+            family, file_type = key.split(BREAKING_PUNCTUATION)
+            family_outputs.setdefault(family, {})[file_type] = value
+
         vcf_inputs = inputs.as_dict(target=dataset, stage=CreateFamilyVCFs)
         ped_inputs = inputs.as_dict(target=dataset, stage=MakePedExtracts)
         ppk_files = inputs.as_dict(target=dataset, stage=MakePhenopackets)
@@ -166,12 +187,12 @@ class RunExomiser(DatasetStage):
         # combining all these stage outputs into one object
         single_dict = {
             family: {
-                'output': output_dict[family],
+                'output': family_outputs[family],
                 'vcf': vcf_inputs[family],
                 'ped': ped_inputs[family],
                 'pheno': ppk_files[family],
             }
-            for family in output_dict.keys()
+            for family in family_outputs.keys()
         }
 
         jobs = run_exomiser_batches(single_dict)

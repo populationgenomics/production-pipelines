@@ -10,8 +10,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path, reference_path
-from cpg_workflows.scripts import extract_vcf_from_mt
+from cpg_utils.hail_batch import get_batch, image_path, reference_path
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -66,6 +65,7 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
         return job
 
     # if there are multiple members, convert and merge them
+    job.cpu(4)
     paths = []
     for index, gvcf_input in enumerate(family_vcfs):
         job.command(
@@ -73,6 +73,11 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
         )
         job.command(f'tabix {index}.vcf.bgz')
         paths.append(f'{index}.vcf.bgz')
+    # merge the VCFs
+    # -m all to merge all sites
+    # -0 to replace missing with WT (potentially inaccurate, but predictable parsing in exomiser)
+    # --threads 4 to use 4 threads
+    # -Oz to write a compressed VCF
     job.command(f'bcftools merge {" ".join(paths)} -Oz -o {job.output["vcf.bgz"]} --threads 4 -m all -0')
     job.command(f'tabix {job.output["vcf.bgz"]}')
     get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
@@ -125,49 +130,6 @@ def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_pa
                 df.to_csv(ped_file, sep='\t', index=False, header=False)
 
 
-def extract_vcf_jobs(family_dict: dict[str, list[SequencingGroup]], mt_path: str, out_path: dict[str, Path]):
-    """
-    create the jobs to extract the VCFs from the MT
-
-    Args:
-        family_dict (dict[str, list[str]]): family ID to list of SG IDs
-        mt_path (str): path to the MT
-        out_path (dict): path to each family's output file
-
-    Returns:
-        list[hb.Job]: the list of jobs
-    """
-
-    vcf_jobs = []
-
-    # find the path to the script in _this_ container
-    script_path = str(extract_vcf_from_mt.__file__).removeprefix('/production-pipelines')
-    for family_id, sg_ids in family_dict.items():
-
-        vcf_target = out_path[family_id]
-        if vcf_target.exists():
-            continue
-
-        job = get_batch().new_bash_job(f'Extract VCF for {family_id}')
-
-        # set _this_ image as the execution environment
-        job.image(get_config()['workflow']['driver_image'])
-
-        # no need for this - hail will write directly
-        # job.declare_resource_group(
-        #     output={
-        #         'vcf.bgz': '{root}.vcf.bgz',
-        #         'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-        #     }
-        # )
-
-        authenticate_cloud_credentials_in_job(job)
-        sgid_ids = ' '.join([sg.id for sg in family_dict[family_id]])
-        job.command(f'python3 {script_path} {mt_path} {sgid_ids} {vcf_target}')
-        vcf_jobs.append(job)
-    return vcf_jobs
-
-
 def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]):
     """
     find the minimal data to run an exomiser analysis
@@ -199,9 +161,10 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
             json.dump(phenopacket, ppk_file, indent=2)
 
 
-def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
+def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     """
     run the exomiser batch
+    what a wild type hint
     """
 
     exomiser_version = image_path('exomiser').split(':')[-1]
@@ -274,15 +237,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
         """,
         )
 
-        # run the example data
-        # job.command(
-        #     f'java -Xmx10g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
-        #     f'--analysis examples/test-analysis-multisample.yml && '
-        #     'ls results && '
-        #     'cat results/Pfeiffer_exomiser.json && '
-        #     'cat results/Pfeiffer-quartet-hiphive-exome-PASS_ONLY.json'
-        # )
-
         for parallel_chunk in chunks(
             family_chunk,
             chunk_size=get_config()['workflow'].get('exomiser_parallel_chunks', 4),
@@ -301,11 +255,19 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
                 ppk = get_batch().read_input(str(content_dict[family]['pheno']))
 
                 # # this was really satisfying syntax to work out
-                job.declare_resource_group(**{family: {'json': '{root}.json', 'yaml': '{root}.yaml'}})
+                job.declare_resource_group(
+                    **{
+                        family: {
+                            'json': '{root}.json',
+                            'gtsv': '{root}.genes.tsv',
+                            'vtsv': '{root}.variants.tsv',
+                            'yaml': '{root}.yaml',
+                        }
+                    }
+                )
 
                 # generate a config file based on the batch tmp locations
                 job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
-                job.command(f'cat {job[family]["yaml"]}')
 
                 # now run it, as a backgrounded process
                 job.command(
@@ -315,14 +277,15 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path]]):
                 )
 
             # wait for backgrounded processes to finish, show current state
-            job.command('wait && ls *')
+            job.command('wait && ls results')
 
             # move the results, then copy out
-            # the output-prefix value can't take a path with a / in it, so we can't use the resource group
             for family in parallel_chunk:
                 job.command(f'mv results/{family}.json {job[family]["json"]}')
+                job.command(f'mv results/{family}.genes.tsv {job[family]["gtsv"]}')
+                job.command(f'mv results/{family}.variants.tsv {job[family]["vtsv"]}')
                 get_batch().write_output(
                     job[family],
-                    str(content_dict[family]['output']).removesuffix('.json'),
+                    str(content_dict[family]['output']['json']).removesuffix('.json'),
                 )
     return all_jobs
