@@ -47,21 +47,22 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.tmp_prefix / 'in_dp' / 'sample_qc.ht'
+        return self.tmp_prefix / 'out_dp' / 'sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.sample_qc import run
+        from cpg_workflows.large_cohort import sample_qc
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                vds_path=inputs.as_path(cohort, Combiner),
-                out_sample_qc_ht_path=self.expected_outputs(cohort),
-                tmp_prefix=(self.tmp_prefix / 'in_dp'),
+        j = get_batch().new_job('Sample QC', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                sample_qc,
+                sample_qc.run.__name__,
+                str(inputs.as_path(cohort, Combiner)),
+                str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix / 'out_dp'),
+                setup_gcp=True,
             ),
-            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
