@@ -46,7 +46,8 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
 
     logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
-    ht.checkpoint(out_sample_qc_ht_path, overwrite=True)
+    checkpoint_path = to_path(tmp_prefix) / 'out_dp' / 'out_dp_sample_qc.ht'  # necessary for out_dp runs
+    ht.checkpoint(str(checkpoint_path), overwrite=True)
 
 
 def initialise_sample_table() -> hl.Table:
