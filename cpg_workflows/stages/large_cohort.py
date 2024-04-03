@@ -47,7 +47,7 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.tmp_prefix / 'in_dp2' / 'sample_qc.ht'
+        return self.tmp_prefix / 'in_dp2' / 'in_dp_sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
