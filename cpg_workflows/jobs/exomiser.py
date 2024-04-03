@@ -142,6 +142,9 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
 
     for family, members in family_dict.items():
 
+        if out_path[family].exists():
+            continue
+
         # get all affected and unaffected
         affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
 

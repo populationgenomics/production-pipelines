@@ -64,7 +64,10 @@ class CreateFamilyVCFs(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         family_dict = find_families(dataset)
-        return {str(family): dataset.prefix() / 'exomiser_vcfs' / f'{family}.vcf.bgz' for family in family_dict.keys()}
+        return {
+            str(family): dataset.prefix() / 'exomiser_inputs' / f'{family}.vcf.bgz'
+            for family in family_dict.keys()
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         family_dict = find_families(dataset)
@@ -81,17 +84,8 @@ class MakePhenopackets(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
-        families_without_results = []
-
-        # the output path of the next step
-        batch_prefix = get_workflow().prefix / 'RunExomiser'
-
-        # get all families without results
-        for family in family_dict.keys():
-            if not exists(batch_prefix / f'{family}_results.json'):
-                families_without_results.append(family)
-
-        return {family: self.prefix / f'{family}_phenopacket.json' for family in families_without_results}
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
+        return {family: dataset_prefix / f'{family}_phenopacket.json' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -114,14 +108,9 @@ class MakePedExtracts(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
-        families_without_results = []
 
-        # get all families without results
-        for family in family_dict.keys():
-            if not exists(self.prefix / f'{family}_results.json'):
-                families_without_results.append(family)
-
-        return {family: self.prefix / f'{family}.ped' for family in families_without_results}
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
+        return {family: dataset_prefix / f'{family}.ped' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -179,6 +168,8 @@ class RunExomiser(DatasetStage):
         for key, value in output_dict.items():
             family, file_type = key.split(BREAKING_PUNCTUATION)
             family_outputs.setdefault(family, {})[file_type] = value
+
+        print(family_outputs)
 
         vcf_inputs = inputs.as_dict(target=dataset, stage=CreateFamilyVCFs)
         ped_inputs = inputs.as_dict(target=dataset, stage=MakePedExtracts)
