@@ -20,7 +20,6 @@ from cpg_workflows.jobs.exomiser import (
 from cpg_workflows.utils import exists, get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 
-
 BREAKING_PUNCTUATION = '~~'
 HPO_KEY: str = 'HPO Terms (present)'
 
@@ -65,8 +64,7 @@ class CreateFamilyVCFs(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         family_dict = find_families(dataset)
         return {
-            str(family): dataset.prefix() / 'exomiser_inputs' / f'{family}.vcf.bgz'
-            for family in family_dict.keys()
+            str(family): dataset.prefix() / 'exomiser_inputs' / f'{family}.vcf.bgz' for family in family_dict.keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

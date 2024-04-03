@@ -265,8 +265,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
                             'gtsv': '{root}.genes.tsv',
                             'vtsv': '{root}.variants.tsv',
                             'yaml': '{root}.yaml',
-                        }
-                    }
+                        },
+                    },
                 )
 
                 # generate a config file based on the batch tmp locations
