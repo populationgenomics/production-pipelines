@@ -53,7 +53,7 @@ def run(
 
     logging.info('Adding soft filters')
     ht = add_soft_filters(ht)
-    checkpoint_path = to_path(tmp_prefix) / 'in_dp2' / 'sample_qc.ht'
+    checkpoint_path = to_path(tmp_prefix) / 'in_dp' / 'sample_qc.ht'
     ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
 
 
