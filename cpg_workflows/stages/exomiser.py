@@ -18,7 +18,7 @@ from cpg_workflows.jobs.exomiser import (
     run_exomiser_batches,
 )
 from cpg_workflows.utils import exists, get_logger
-from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
+from cpg_workflows.workflow import get_workflow, Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
 
 # this is used to separate family IDs from their individual outputs in RunExomiser
 BREAKING_PUNCTUATION = '~~'
@@ -186,5 +186,35 @@ class RunExomiser(DatasetStage):
         }
 
         jobs = run_exomiser_batches(single_dict)
+
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+
+
+@stage(required_stages=[RunExomiser], analysis_type='custom', analysis_keys=['tsv'])
+class ExomiserSeqrTSV(DatasetStage):
+    """
+    Parse the Exomiser results into a TSV for Seqr
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        return {
+            'tsv': dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.tsv'
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        results = inputs.as_dict(target=dataset, stage=RunExomiser)
+
+        # get all the files
+        results_dict = {k: v for k, v in results.items() if k in self.expected_outputs(dataset)}
+
+        # run the parsing
+        jobs = []
+        for family, files in results_dict.items():
+            jobs.extend(
+                [
+                    f'python scripts/parse_exomiser.py {files["json"]} >> {files["variants"]}',
+                    f'python scripts/parse_exomiser.py {files["json"]} >> {files["genes"]}',
+                ]
+            )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
