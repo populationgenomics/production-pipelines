@@ -11,14 +11,11 @@ As a dataset Stage
 from functools import cache
 
 from cpg_utils import Path
-from cpg_workflows.jobs.exomiser import (
-    create_gvcf_to_vcf_jobs,
-    extract_mini_ped_files,
-    make_phenopackets,
-    run_exomiser_batches,
-)
-from cpg_workflows.utils import exists, get_logger
+from cpg_utils.config import get_config
+from cpg_workflows.jobs.exomiser import create_gvcf_to_vcf_jobs, extract_mini_ped_files, generate_seqr_summary, make_phenopackets, run_exomiser_batches
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import get_workflow, Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
+from metamist.apis import ProjectApi
 
 # this is used to separate family IDs from their individual outputs in RunExomiser
 BREAKING_PUNCTUATION = '~~'
@@ -26,34 +23,60 @@ HPO_KEY: str = 'HPO Terms (present)'
 
 
 @cache
+def find_seqr_projects() -> dict[str, str]:
+    """
+    query for all the seqr projects
+    map datasets to corresponding seqr names
+    """
+
+    project_api = ProjectApi()
+    seq_type = get_config()['workflow']['sequencing_type']
+    seq_type_key = f'seqr-project-{seq_type}'
+    return_dict: dict[str, str] = {}
+
+    for element in project_api.get_seqr_projects():
+        if element['meta'].get('is_seqr', False):
+            if meta_proj := element['meta'].get(seq_type_key, ''):
+                return_dict[element['dataset']] = meta_proj
+
+    return return_dict
+
+
+@cache
 def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     """
     Find all the families in the project
-    group on family ID and return the list of IDs
+    group on family ID and check for affected individuals & HPO terms
+    re-group the selected members by an external ID
+    at some point re-work this so that we have a better definition of proband
     """
+
     dict_by_family: dict[str, list[SequencingGroup]] = {}
     for sg in dataset.get_sequencing_groups():
         family_id = str(sg.pedigree.fam_id)
         dict_by_family.setdefault(family_id, []).append(sg)
 
+    dict_by_ext_id: dict[str, list[SequencingGroup]] = {}
     # now remove families with no affected individuals
-    for family in list(dict_by_family.keys()):
+    for family, members in dict_by_family.items():
 
         # check for at least one retained member
-        affected = [sg for sg in dict_by_family[family] if str(sg.pedigree.phenotype) == '2']
+        affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
 
         # remove families with no affected members
         if not affected:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
-            del dict_by_family[family]
-
-        # check that the affected members have HPO terms - required for exomiser
-        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-            del dict_by_family[family]
             continue
 
-    return dict_by_family
+        # # check that the affected members have HPO terms - required for exomiser
+        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+        #     continue
+
+        # key up those badbois using an affected external ID
+        dict_by_ext_id[affected[0].external_id] = members
+
+    return dict_by_ext_id
 
 
 @stage
@@ -146,29 +169,12 @@ class RunExomiser(DatasetStage):
         family_dict = find_families(dataset)
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_results'
 
-        # get all families without results
-        output_files: dict[str, Path] = {}
-        for family in family_dict.keys():
-
-            # arbitrarily test one file
-            if not exists(dataset_prefix / f'{family}_results.json'):
-                output_files[f'{family}{BREAKING_PUNCTUATION}json'] = dataset_prefix / f'{family}_results.json'
-                output_files[f'{family}{BREAKING_PUNCTUATION}gtsv'] = dataset_prefix / f'{family}_results.variants.tsv'
-                output_files[f'{family}{BREAKING_PUNCTUATION}vtsv'] = dataset_prefix / f'{family}_results.genes.tsv'
-
-        return output_files
+        # only the TSVs are required
+        return {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         output_dict = self.expected_outputs(dataset)
-
-        # break out that dict again
-        family_outputs: dict[str, dict[str, Path]] = {}
-        for key, value in output_dict.items():
-            family, file_type = key.split(BREAKING_PUNCTUATION)
-            family_outputs.setdefault(family, {})[file_type] = value
-
-        print(family_outputs)
 
         vcf_inputs = inputs.as_dict(target=dataset, stage=CreateFamilyVCFs)
         ped_inputs = inputs.as_dict(target=dataset, stage=MakePedExtracts)
@@ -177,17 +183,17 @@ class RunExomiser(DatasetStage):
         # combining all these stage outputs into one object
         single_dict = {
             family: {
-                'output': family_outputs[family],
+                'output': output_dict[family],
                 'vcf': vcf_inputs[family],
                 'ped': ped_inputs[family],
                 'pheno': ppk_files[family],
             }
-            for family in family_outputs.keys()
+            for family in output_dict.keys()
         }
 
         jobs = run_exomiser_batches(single_dict)
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
 
 @stage(required_stages=[RunExomiser], analysis_type='custom', analysis_keys=['tsv'])
@@ -197,24 +203,17 @@ class ExomiserSeqrTSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        return {
-            'tsv': dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.tsv'
-        }
+        return {'tsv': dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.tsv'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        # is there a seqr project?
+        projects = find_seqr_projects()
+        if dataset.name not in projects:
+            get_logger(__file__).info(f'No Seqr project found for {dataset.name}, skipping')
+            return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[], skipped=True)
+
         results = inputs.as_dict(target=dataset, stage=RunExomiser)
 
-        # get all the files
-        results_dict = {k: v for k, v in results.items() if k in self.expected_outputs(dataset)}
+        jobs = generate_seqr_summary(results, projects[dataset.name], self.expected_outputs(dataset))
 
-        # run the parsing
-        jobs = []
-        for family, files in results_dict.items():
-            jobs.extend(
-                [
-                    f'python scripts/parse_exomiser.py {files["json"]} >> {files["variants"]}',
-                    f'python scripts/parse_exomiser.py {files["json"]} >> {files["genes"]}',
-                ]
-            )
-
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=str(self.expected_outputs(dataset)['tsv']), jobs=jobs)

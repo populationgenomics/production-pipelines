@@ -11,6 +11,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, image_path, reference_path
+from cpg_workflows.scripts import collect_dataset_tsvs
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -156,6 +157,9 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
 
         hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
 
+        if not hpo_term_string:
+            hpo_term_string = "HP:0000520"
+
         hpo_terms = hpo_term_string.split(',')
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
@@ -236,8 +240,6 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
         echo exomiser.hg38.cadd-snv-path={cadd_group["cadd_snv"]} >> {exomiser_dir}/application.properties
         echo exomiser.hg38.cadd-in-del-path={cadd_group["cadd_indel"]} >> {exomiser_dir}/application.properties
         cat {exomiser_dir}/application.properties
-        set -x
-        tree -l data
         """,
         )
 
@@ -263,7 +265,7 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
                     **{
                         family: {
                             'json': '{root}.json',
-                            'genes.tsv': '{root}.genes.tsv',
+                            'tsv': '{root}.tsv',
                             'variants.tsv': '{root}.variants.tsv',
                             'yaml': '{root}.yaml',
                         },
@@ -286,10 +288,35 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
             # move the results, then copy out
             for family in parallel_chunk:
                 job.command(f'mv results/{family}.json {job[family]["json"]}')
-                job.command(f'mv results/{family}.genes.tsv {job[family]["gtsv"]}')
-                job.command(f'mv results/{family}.variants.tsv {job[family]["vtsv"]}')
+                job.command(f'mv results/{family}.genes.tsv {job[family]["tsv"]}')
+                job.command(f'mv results/{family}.variants.tsv {job[family]["variants.tsv"]}')
+
                 get_batch().write_output(
                     job[family],
-                    str(content_dict[family]['output']['json']).removesuffix('.json'),
+                    str(content_dict[family]['output']).removesuffix('.tsv'),
                 )
     return all_jobs
+
+
+def generate_seqr_summary(tsv_dict: dict[str, Path], project: str, output: str):
+    """
+    Generate the summary TSV for Seqr by combining all per-family TSVs
+
+    Args:
+        tsv_dict (dict[str, Path]):
+        project ():
+        output ():
+    """
+
+    # path to the python script
+    script_path = collect_dataset_tsvs.__file__.removeprefix('/production-pipelines')
+
+    # read all the input files in
+    files_read_in = [get_batch().read_input(str(tsv)) for tsv in tsv_dict.values()]
+
+    job = get_batch().new_bash_job(f'Aggregate TSVs for {project}')
+    job.storage('10Gi')
+    job.image(get_config()['workflow']['driver_image'])
+    job.command(f'python3 {script_path} --project {project} --input {files_read_in[0]} --output {job.output} ')
+    get_batch().write_output(job.output, output)
+    return [job]
