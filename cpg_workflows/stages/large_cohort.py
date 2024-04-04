@@ -214,8 +214,8 @@ class AncestryPlots(CohortStage):
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'vcf': self.tmp_prefix / 'in_dp_siteonly.vcf.bgz',
-            'tbi': self.tmp_prefix / 'in_dp_siteonly.vcf.bgz.tbi',
+            'vcf': self.tmp_prefix / 'in_dp2' / 'in_dp2_siteonly.vcf.bgz',
+            'tbi': self.tmp_prefix / 'in_dp2' / 'in_dp2_siteonly.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -234,7 +234,7 @@ class MakeSiteOnlyVcf(CohortStage):
                     key='relateds_to_drop',
                 ),
                 out_vcf_path=self.expected_outputs(cohort)['vcf'],
-                tmp_prefix=(self.tmp_prefix / 'in_dp'),
+                tmp_prefix=(self.tmp_prefix / 'in_dp2'),
             ),
             depends_on=inputs.get_jobs(cohort),
             # hl.export_vcf() uses non-preemptible workers' disk to merge VCF files.
