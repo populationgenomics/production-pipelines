@@ -220,6 +220,6 @@ class ExomiserSeqrTSV(DatasetStage):
 
         results = inputs.as_dict(target=dataset, stage=RunExomiser)
 
-        jobs = generate_seqr_summary(results, projects[dataset.name], self.expected_outputs(dataset))
+        jobs = generate_seqr_summary(results, projects[dataset.name], str(self.expected_outputs(dataset)['tsv']))
 
-        return self.make_outputs(dataset, data=str(self.expected_outputs(dataset)['tsv']), jobs=jobs)
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
