@@ -157,9 +157,6 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
 
         hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
 
-        if not hpo_term_string:
-            hpo_term_string = "HP:0000520"
-
         hpo_terms = hpo_term_string.split(',')
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml

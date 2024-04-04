@@ -22,7 +22,7 @@ setup(
         'onnx',
         'onnxruntime',
         'skl2onnx',
-        'metamist>=6.0.4',
+        'metamist>=6.9.0',
         'pandas',
         'peddy',
         'fsspec',

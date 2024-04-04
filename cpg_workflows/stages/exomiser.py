@@ -17,7 +17,7 @@ from cpg_workflows.jobs.exomiser import (
     extract_mini_ped_files,
     generate_seqr_summary,
     make_phenopackets,
-    run_exomiser_batches,
+    run_exomiser_batches
 )
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import get_workflow, Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
@@ -74,10 +74,10 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
             continue
 
-        # # check that the affected members have HPO terms - required for exomiser
-        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-        #     continue
+        # check that the affected members have HPO terms - required for exomiser
+        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+            continue
 
         # key up those badbois using an affected external ID
         dict_by_ext_id[affected[0].external_id] = members
