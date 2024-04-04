@@ -33,7 +33,7 @@ def pca_runner(file_path):
     mt = mt.filter_rows(mt.missing_count == 0)
 
     # mean-centre and normalise sum_length
-    mt = mt.anntotate_rows(sd_sum_length=hl.agg.stats(mt.sum_length).stdev)
+    mt = mt.annotate_rows(sd_sum_length=hl.agg.stats(mt.sum_length).stdev)
     mt = mt.annotate_entries(
         sum_length=(mt.sum_length - mt.mean_sum_length) / mt.sd_sum_length
     )
