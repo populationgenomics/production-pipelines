@@ -19,27 +19,22 @@ def pca_runner(file_path):
 
     # calculate the summed repeat length
     mt = mt.annotate_entries(sum_length=mt.allele_1_rep_length + mt.allele_2_rep_length)
-    mt = mt.annotate_rows(mean_sum_length=hl.agg.mean(hl.float(mt.sum_length)))
 
-    #  replace missing sum_length with the mean for that locus (PCA doesn't accept missing values)
+    mt = mt.annotate_rows(mean_sum_length = hl.agg.filter(hl.is_defined(mt.sum_length), hl.agg.mean(mt.sum_length)),
+                      stdev_sum_length = hl.agg.filter(hl.is_defined(mt.sum_length), hl.agg.stats(mt.sum_length)[1]))
+
+    #  replace missing sum_length with the mean for that locus (PCA doesn't accept missing values) and normalise
     mt = mt.annotate_entries(
-        sum_length=hl.if_else(
-          hl.is_missing(mt.sum_length), mt.mean_sum_length, mt.sum_length
-       )
-    )
+        sum_length_normalised=hl.or_else((mt.sum_length - mt.mean_sum_length) / mt.stdev_sum_length, 0.0))
+
     # drop rows with missing sum_length
     #missing_condition = hl.is_missing(mt.sum_length)
     #mt =mt.annotate_rows(missing_count=hl.agg.count_where(missing_condition))
     #mt = mt.filter_rows(mt.missing_count == 0)
 
-    # mean-centre and normalise sum_length
-    mt = mt.annotate_rows(sd_sum_length=hl.agg.stats(mt.sum_length).stdev)
-    mt = mt.annotate_entries(
-        sum_length=(mt.sum_length - mt.mean_sum_length) / mt.sd_sum_length
-    )
 
     # run PCA
-    eigenvalues, scores, loadings = hl._blanczos_pca(mt.sum_length, k=10, compute_loadings=True)
+    eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
     scores_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt_v2/str_pca/scores.tsv.bgz'
     scores.export(str(scores_output_path))
