@@ -1,0 +1,11 @@
+[workflow]
+sequencing_type = 'genome'
+skip_sgs_with_missing_input = true
+highmem_workers = true
+scatter_count = 20
+output_version = 'v1.1'
+dry_run = false
+# input_cohorts = ['COH211']
+
+[hail]
+dry_run=false
