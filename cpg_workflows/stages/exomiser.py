@@ -20,7 +20,6 @@ from cpg_workflows.jobs.exomiser import (
 from cpg_workflows.utils import exists, get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
 
-
 # this is used to separate family IDs from their individual outputs in RunExomiser
 BREAKING_PUNCTUATION = '~~'
 HPO_KEY: str = 'HPO Terms (present)'
