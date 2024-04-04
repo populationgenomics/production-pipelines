@@ -12,7 +12,13 @@ from functools import cache
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows.jobs.exomiser import create_gvcf_to_vcf_jobs, extract_mini_ped_files, generate_seqr_summary, make_phenopackets, run_exomiser_batches
+from cpg_workflows.jobs.exomiser import (
+    create_gvcf_to_vcf_jobs,
+    extract_mini_ped_files,
+    generate_seqr_summary,
+    make_phenopackets,
+    run_exomiser_batches,
+)
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import get_workflow, Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
 from metamist.apis import ProjectApi
