@@ -17,10 +17,10 @@ from cpg_workflows.jobs.exomiser import (
     extract_mini_ped_files,
     generate_seqr_summary,
     make_phenopackets,
-    run_exomiser_batches
+    run_exomiser_batches,
 )
 from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import get_workflow, Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, stage
+from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
 # this is used to separate family IDs from their individual outputs in RunExomiser

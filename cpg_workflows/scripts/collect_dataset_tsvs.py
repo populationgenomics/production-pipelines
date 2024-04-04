@@ -10,7 +10,6 @@ from csv import DictReader
 
 from cpg_utils import to_path
 
-
 # detect "OMIM:12345" or "ORPHA:12345"
 DISEASE_RE = re.compile(r'((?:OMIM|ORPHA):\d+)')
 
@@ -78,7 +77,7 @@ def main(project: str, input_file: str, p_threshold: float = 0.05):
             'score2',
             'scoreName3',
             'score3',
-        ]
+        ],
     ]
 
     for family_file in input_files:
@@ -112,7 +111,7 @@ def main(project: str, input_file: str, p_threshold: float = 0.05):
                         row['EXOMISER_GENE_PHENO_SCORE'],
                         'variant_score',
                         row['EXOMISER_GENE_VARIANT_SCORE'],
-                    ]
+                    ],
                 )
     return output_lines
 
