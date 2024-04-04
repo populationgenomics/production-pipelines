@@ -39,7 +39,7 @@ def pca_runner(file_path):
     )
 
     # run PCA
-    eigenvalues, scores, loadings = hl.pca(mt.sum_length, k=5, compute_loadings=True)
+    eigenvalues, scores, loadings = hl._blanczos_pca(mt.sum_length, k=10, compute_loadings=True)
 
     scores_output_path = 'gs://cpg-bioheart-test/str/qc/filtered_mt_v2/str_pca/scores.tsv.bgz'
     scores.export(str(scores_output_path))
