@@ -314,6 +314,6 @@ def generate_seqr_summary(tsv_dict: dict[str, Path], project: str, output: str):
     job = get_batch().new_bash_job(f'Aggregate TSVs for {project}')
     job.storage('10Gi')
     job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {script_path} --project {project} --input {files_read_in[0]} --output {job.output} ')
+    job.command(f'python3 {script_path} --project {project} --input {" ".join(files_read_in)} --output {job.output} ')
     get_batch().write_output(job.output, output)
     return [job]
