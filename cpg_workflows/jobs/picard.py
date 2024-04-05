@@ -18,6 +18,48 @@ from cpg_workflows.resources import (
 from cpg_workflows.utils import can_reuse, exists
 
 
+def blacklist_intervals(
+    b: hb.Batch,
+    job_attrs: dict | None = None,
+    source_intervals_path: Path | None = None,
+    blacklist_intervals_path: Path | None = None,
+) -> Job | None:
+    """
+    Add a job that subtracts the blacklisted intervals from the source intervals.
+
+    @param b: Hail Batch object,
+    @param job_attrs: attributes for Hail Batch job,
+    @param source_intervals_path: path to source intervals to use in joint calling.
+        Would check for config if not provided.
+    @param blacklist_intervals_path: path to blacklist intervals to exclude. 
+        Would check for config if not provided.
+
+    The job calls picard IntervalListTools to subtract the blacklist interval list
+    from the source interval list.
+    """
+    sequencing_type = get_config()['workflow']['sequencing_type']
+    source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
+    blacklist_intervals_path = blacklist_intervals_path or reference_path('broad/blacklist_intervals') #TODO add this to config (default?)
+    
+    j = b.new_job(
+        f'Subtract blacklist intervals before scattering intervals for {sequencing_type} calling',
+        attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),
+    )
+    j.image(image_path('picard'))
+    STANDARD.set_resources(j, storage_gb=4, mem_gb=2)
+    
+    cmd = f"""
+    mkdir $BATCH_TMPDIR/out
+
+    picard -Xms1000m -Xmx1500m \
+    IntervalListTools \
+    ACTION=SUBTRACT \
+    INPUT={b.read_input(str(source_intervals_path))} \
+    SECOND_INPUT={b.read_input(str(blacklist_intervals_path))} \
+    OUTPUT=$BATCH_TMPDIR/out/subtracted.interval_list
+    """
+    j.command(command(cmd))
+
 def get_intervals(
     b: hb.Batch,
     scatter_count: int,
