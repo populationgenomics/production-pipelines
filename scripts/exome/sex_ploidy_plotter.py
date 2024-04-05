@@ -15,8 +15,10 @@ Sample QC Table (eg: inferred karyotypic sex, or dataset) from the SampleQC Hail
 """
 
 import click
-import hail as hl
 from bokeh.plotting import output_file, save
+
+import hail as hl
+
 from cpg_utils.hail_batch import get_batch, init_batch, output_path
 
 
@@ -46,11 +48,14 @@ def sex_ploidy_plotter(file_path, gcs_path, label):
     type=str,
 )
 @click.option(
-    '--job-storage', help='Storage of the Hail batch job eg 30G', default='20G'
+    '--job-storage',
+    help='Storage of the Hail batch job eg 30G',
+    default='20G',
 )
 @click.option('--job-memory', help='Memory of the Hail batch job eg 64G', default='8G')
 @click.option(
-    '--label', help='Column field in SampleQC table eg dataset or sex_karyotype'
+    '--label',
+    help='Column field in SampleQC table eg dataset or sex_karyotype',
 )
 @click.option(
     '--out-prefix',
@@ -62,7 +67,7 @@ def main(file_path, job_storage, job_memory, label, out_prefix):
     b = get_batch()
 
     # Initialise job
-    j = b.new_python_job(name=f'Sex ploidy plotter job')
+    j = b.new_python_job(name='Sex ploidy plotter job')
     j.memory(job_memory)
     j.storage(job_storage)
 
