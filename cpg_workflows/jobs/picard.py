@@ -18,52 +18,11 @@ from cpg_workflows.resources import (
 from cpg_workflows.utils import can_reuse, exists
 
 
-def blacklist_intervals(
-    b: hb.Batch,
-    job_attrs: dict | None = None,
-    source_intervals_path: Path | None = None,
-    blacklist_intervals_path: Path | None = None,
-) -> Job | None:
-    """
-    Add a job that subtracts the blacklisted intervals from the source intervals.
-
-    @param b: Hail Batch object,
-    @param job_attrs: attributes for Hail Batch job,
-    @param source_intervals_path: path to source intervals to use in joint calling.
-        Would check for config if not provided.
-    @param blacklist_intervals_path: path to blacklist intervals to exclude. 
-        Would check for config if not provided.
-
-    The job calls picard IntervalListTools to subtract the blacklist interval list
-    from the source interval list.
-    """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
-    blacklist_intervals_path = blacklist_intervals_path or reference_path('broad/blacklist_intervals') #TODO add this to config (default?)
-    
-    j = b.new_job(
-        f'Subtract blacklist intervals before scattering intervals for {sequencing_type} calling',
-        attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),
-    )
-    j.image(image_path('picard'))
-    STANDARD.set_resources(j, storage_gb=4, mem_gb=2)
-    
-    cmd = f"""
-    mkdir $BATCH_TMPDIR/out
-
-    picard -Xms1000m -Xmx1500m \
-    IntervalListTools \
-    ACTION=SUBTRACT \
-    INPUT={b.read_input(str(source_intervals_path))} \
-    SECOND_INPUT={b.read_input(str(blacklist_intervals_path))} \
-    OUTPUT=$BATCH_TMPDIR/out/subtracted.interval_list
-    """
-    j.command(command(cmd))
-
 def get_intervals(
     b: hb.Batch,
     scatter_count: int,
     source_intervals_path: Path | None = None,
+    exclude_intervals_path: Path | None = None,
     job_attrs: dict[str, str] | None = None,
     output_prefix: Path | None = None,
 ) -> tuple[Job | None, list[hb.ResourceFile]]:
@@ -75,6 +34,8 @@ def get_intervals(
     @param scatter_count: number of target sub-intervals,
     @param source_intervals_path: path to source intervals to split. Would check for
         config if not provided.
+    @param exclude_intervals_path: path to file with intervals to exclude. 
+        Would check for config if not provided.
     @param job_attrs: attributes for Hail Batch job,
     @param output_prefix: path optionally to save split subintervals.
 
@@ -91,6 +52,7 @@ def get_intervals(
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
     source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
+    exclude_intervals_path = exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres') or None
 
     if scatter_count == 1:
         # Special case when we don't need to split
@@ -114,22 +76,41 @@ def get_intervals(
         'genome': 100000,
         'exome': 0,
     }.get(sequencing_type, 0)
+    
+    if exclude_intervals_path:  
+        cmd = f"""
+        mkdir $BATCH_TMPDIR/out
 
-    cmd = f"""
-    mkdir $BATCH_TMPDIR/out
+        picard -Xms1000m -Xmx1500m \
+        IntervalListTools \
+        ACTION=SUBTRACT \
+        SCATTER_COUNT={scatter_count} \
+        SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
+        UNIQUE=true \
+        SORT=true \
+        BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
+        INPUT={b.read_input(str(source_intervals_path))} \
+        SECOND_INPUT={b.read_input(str(exclude_intervals_path))} \
+        OUTPUT=$BATCH_TMPDIR/out
+        ls $BATCH_TMPDIR/out
+        ls $BATCH_TMPDIR/out/*
+        """
+    else:
+        cmd = f"""
+        mkdir $BATCH_TMPDIR/out
 
-    picard -Xms1000m -Xmx1500m \
-    IntervalListTools \
-    SCATTER_COUNT={scatter_count} \
-    SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
-    UNIQUE=true \
-    SORT=true \
-    BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-    INPUT={b.read_input(str(source_intervals_path))} \
-    OUTPUT=$BATCH_TMPDIR/out
-    ls $BATCH_TMPDIR/out
-    ls $BATCH_TMPDIR/out/*
-    """
+        picard -Xms1000m -Xmx1500m \
+        IntervalListTools \
+        SCATTER_COUNT={scatter_count} \
+        SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
+        UNIQUE=true \
+        SORT=true \
+        BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
+        INPUT={b.read_input(str(source_intervals_path))} \
+        OUTPUT=$BATCH_TMPDIR/out
+        ls $BATCH_TMPDIR/out
+        ls $BATCH_TMPDIR/out/*
+        """
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
