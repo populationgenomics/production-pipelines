@@ -81,3 +81,5 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
+# Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3 
+hg38_telomeres_and_centromeres = "gs://cpg-common-main/references/hg38/v0/hg38.telomeresAndMergedCentromeres.interval_list"
