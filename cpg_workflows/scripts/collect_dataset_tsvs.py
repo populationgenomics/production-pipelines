@@ -8,8 +8,6 @@ import re
 from argparse import ArgumentParser
 from csv import DictReader
 
-from cpg_utils import to_path
-
 # detect "OMIM:12345" or "ORPHA:12345"
 DISEASE_RE = re.compile(r'((?:OMIM|ORPHA):\d+)')
 
@@ -45,21 +43,16 @@ def _parse_tsv_row(row):
     return [s.strip('#').strip().strip('"') for s in row.rstrip('\n').split('\t')]
 
 
-def main(project: str, input_file: str, p_threshold: float = 0.05):
+def main(project: str, input_files: list[str], p_threshold: float = 0.05):
     """
     Collect all the dataset TSVs and save them in a single file
     Embellish the data with the mapping and project name
 
     Args:
         project ():
-        input_file ():
+        input_files (): all input files to process
         p_threshold (): above this value, ignore the row and break
     """
-
-    # take one example file, find other input files using this
-    file_as_path = to_path(input_file)
-    parent_dir = file_as_path.parent
-    input_files = parent_dir.glob('*.tsv')
 
     # these are the headings for Seqr
     output_lines: list[list[str]] = [
@@ -84,8 +77,8 @@ def main(project: str, input_file: str, p_threshold: float = 0.05):
         print(f'Processing {family_file}')
 
         # crack it open, and take a sip
-        with family_file.open('r') as handle:
-            reader = DictReader(handle, delimiter='\t')
+        with open(family_file, 'r') as input_handle:
+            reader = DictReader(input_handle, delimiter='\t')
             for row in reader:
                 if float(row['P-VALUE']) > p_threshold:
                     break
@@ -96,11 +89,14 @@ def main(project: str, input_file: str, p_threshold: float = 0.05):
                 if result := re.search(DISEASE_RE, row['HUMAN_PHENO_EVIDENCE']):
                     disease_id = result.group(0)
 
+                # get participant_id from the filename
+                participant_id = family_file.split('/')[-1].split('.')[0]
+
                 output_lines.append(
                     [
                         'exomiser',
                         project,
-                        family_file.stem,
+                        participant_id,
                         row['#RANK'],
                         row['GENE_SYMBOL'],
                         disease_id,
@@ -120,7 +116,7 @@ if __name__ == '__main__':
 
     parser = ArgumentParser()
     parser.add_argument('--project', help='Name of Seqr Project')
-    parser.add_argument('--input', help='A single input file')
+    parser.add_argument('--input', help='All input files', nargs='+')
     parser.add_argument('--output', help='Output file to save the combined data')
     parser.add_argument('--p_threshold', type=float, help='P-value threshold for filtering', default=0.05)
     args = parser.parse_args()
