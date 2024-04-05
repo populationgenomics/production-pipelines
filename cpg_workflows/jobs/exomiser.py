@@ -240,6 +240,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
         """,
         )
 
+        job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
+
         # number of chunks should match cpu, accessible in config
         # these will all run simultaneously using backgrounded tasks and a wait
         for parallel_chunk in chunks(
