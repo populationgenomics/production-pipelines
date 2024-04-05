@@ -88,32 +88,6 @@ GET_PEDIGREE_QUERY = gql(
 _metamist: Optional['Metamist'] = None
 
 
-def gql_query_optional_logging(query_to_run, query_params: dict | None = None):
-    """
-    Run a query, but don't log the results to the console
-    This is done by setting the global logger level to WARN
-    for the duration of the query exectution, then returning to
-    whichever state it was previously in
-    Ref: https://github.com/populationgenomics/metamist/issues/540
-    Allow for a config override to log the results to the console
-
-    Args:
-        query_to_run (gql DocumentNode): Query String
-        query_params (dict): Query Parameters or None
-
-    Returns:
-        query result, with or without logging
-    """
-    if get_config()['workflow'].get('log_metamist', False):
-        return query(query_to_run, variables=query_params)
-
-    curr_level = logging.root.level
-    logging.getLogger().setLevel(logging.WARN)
-    result = query(query_to_run, variables=query_params)
-    logging.getLogger().setLevel(curr_level)
-    return result
-
-
 def get_metamist() -> 'Metamist':
     """Return the cohort object"""
     global _metamist
@@ -249,9 +223,9 @@ class Metamist:
         if only_sgs and skip_sgs:
             raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
-        sequencing_group_entries = gql_query_optional_logging(
+        sequencing_group_entries = query(
             GET_SEQUENCING_GROUPS_QUERY,
-            {
+            variables={
                 'metamist_proj': metamist_proj,
                 'only_sgs': only_sgs,
                 'skip_sgs': skip_sgs,
@@ -321,9 +295,9 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        analyses = gql_query_optional_logging(
+        analyses = query(
             GET_ANALYSES_QUERY,
-            {
+            variables={
                 'metamist_proj': metamist_proj,
                 'analysis_type': analysis_type.value,
                 'analysis_status': analysis_status.name,
@@ -488,7 +462,7 @@ class Metamist:
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
 
-        entries = gql_query_optional_logging(GET_PEDIGREE_QUERY, {'metamist_proj': metamist_proj})
+        entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 

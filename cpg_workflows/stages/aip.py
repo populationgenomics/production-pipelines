@@ -59,10 +59,9 @@ from os.path import join
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import copy_common_env, get_batch, image_path
-from cpg_workflows.metamist import gql_query_optional_logging
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
-from metamist.graphql import gql
+from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
 DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
@@ -100,7 +99,7 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
     if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': type})
+    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': type})
     mt_by_date = {}
     for analysis in result['project']['analyses']:
         if (
@@ -135,7 +134,7 @@ def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
 
     if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
-    result = gql_query_optional_logging(MTA_QUERY, query_params={'dataset': query_dataset, 'type': entry_type})
+    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': entry_type})
     mt_by_date = {}
 
     for analysis in result['project']['analyses']:
