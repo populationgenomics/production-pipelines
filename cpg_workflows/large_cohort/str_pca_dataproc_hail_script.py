@@ -23,7 +23,12 @@ def pca_runner(file_path):
     mt = mt.annotate_rows(motif_length = hl.len(mt.info.RU))
 
     #restrict to 2-6 bp motifs
-    mt = mt.filter_rows((mt.motif_length >= 2) & (mt.motif_length <= 6))
+    #mt = mt.filter_rows((mt.motif_length >= 2) & (mt.motif_length <= 6))
+
+    #remove segdup regions
+    segdups = hl.import_bed('gs://cpg-tob-wgs-test/hoptan-str/associatr/input_files/segDupRegions/segDupRegions_hg38_sorted.bed.gz', force_bgz = True)
+    mt = mt.annotate_rows(segdup_region = hl.is_defined(segdups[mt.locus]))
+    mt = mt.filter_rows(mt.segdup_region == False)
 
 
     # calculate the summed repeat length
@@ -46,15 +51,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_2/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_3/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_2/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_3/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_2/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_3/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
