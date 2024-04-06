@@ -24,21 +24,21 @@ def pca_runner(file_path):
     mt = mt.annotate_rows(locus_length = mt.info.REF * mt.motif_length)
 
     #restrict to 2-6 bp motifs
-    #mt = mt.filter_rows((mt.motif_length >= 2) & (mt.motif_length <= 6))
+    mt = mt.filter_rows((mt.motif_length >= 2) & (mt.motif_length <= 6))
 
     #remove segdup regions
-    #segdups = hl.import_bed('gs://cpg-tob-wgs-test/hoptan-str/associatr/input_files/segDupRegions/segDupRegions_hg38_sorted.bed.gz', force_bgz = True)
-    #mt = mt.annotate_rows(segdup_region = hl.is_defined(segdups[mt.locus]))
-    #mt = mt.filter_rows(mt.segdup_region == False)
+    segdups = hl.import_bed('gs://cpg-tob-wgs-test/hoptan-str/associatr/input_files/segDupRegions/segDupRegions_hg38_sorted.bed.gz', force_bgz = True)
+    mt = mt.annotate_rows(segdup_region = hl.is_defined(segdups[mt.locus]))
+    mt = mt.filter_rows(mt.segdup_region == False)
 
     # tighten hwep
-    #annotations = hl.read_matrix_table('gs://cpg-bioheart-test/str/polymorphic_run_n2045/annotated_mt/v2/str_annotated.mt')
-    #annotation_table = annotations.rows()
-    #mt = mt.annotate_rows(binom_hwep = annotation_table[mt.info.VARID].binom_hwep)
-    #mt = mt.filter_rows(mt.binom_hwep >= 0.05)
+    annotations = hl.read_matrix_table('gs://cpg-bioheart-test/str/polymorphic_run_n2045/annotated_mt/v2/str_annotated.mt')
+    annotation_table = annotations.rows()
+    mt = mt.annotate_rows(binom_hwep = annotation_table[mt.info.VARID].binom_hwep)
+    mt = mt.filter_rows(mt.binom_hwep >= 0.05)
 
-    # drop rows with locus length >150 bp
-    mt = mt.filter_rows(mt.locus_length <= 150)
+    # drop rows with locus length >100 bp
+    mt = mt.filter_rows(mt.locus_length <= 100)
 
 
     # calculate the summed repeat length
@@ -61,15 +61,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_5/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_6/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_5/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_6/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_5/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_6/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
