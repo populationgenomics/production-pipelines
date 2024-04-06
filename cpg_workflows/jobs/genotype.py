@@ -322,7 +322,11 @@ def postproc_gvcf(
     # meaning we have more than enough disk (265/8=33.125G).
     # Enough to fit a pre-reblocked GVCF, which can be as big as 10G,
     # the reblocked result (1G), and ref data (5G).
-    storage_gb = get_config()['workflow']['resources']['Genotype'].get('postproc_gvcf_storage', 20)
+    try:
+        # Overwrite the default storage if it is set in the config - for really large GVCFs
+        storage_gb = get_config()['workflow']['resources']['Genotype']['postproc_gvcf_storage']
+    except KeyError:
+        storage_gb = 20
     job_res = STANDARD.set_resources(j, ncpu=2, storage_gb=storage_gb)
 
     j.declare_resource_group(
