@@ -218,10 +218,12 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
     # now chunk the jobs - load resources, then run a bunch of families
     families = sorted(content_dict.keys())
     all_jobs = []
-    for family_chunk in chunks(families, get_config()['workflow'].get('exomiser_chunk_size', 8)):
+    for chunk_number, family_chunk in enumerate(
+        chunks(families, get_config()['workflow'].get('exomiser_chunk_size', 8)),
+    ):
         # create a new job, reference the resources in a config file
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
-        job = get_batch().new_bash_job(f'Run Exomiser for {family_chunk}')
+        job = get_batch().new_bash_job(f'Run Exomiser for chunk {chunk_number}')
         all_jobs.append(job)
         job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
         job.memory(get_config()['workflow'].get('exomiser_memory', '60Gi'))
@@ -240,6 +242,10 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
         """,
         )
 
+        job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
+
+        # number of chunks should match cpu, accessible in config
+        # these will all run simultaneously using backgrounded tasks and a wait
         for parallel_chunk in chunks(
             family_chunk,
             chunk_size=get_config()['workflow'].get('exomiser_parallel_chunks', 4),
