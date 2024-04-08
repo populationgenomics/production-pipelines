@@ -70,7 +70,14 @@ class SampleQC(CohortStage):
 @stage(required_stages=[Combiner])
 class DenseSubset(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return get_workflow().prefix / 'dense_subset.mt'
+        if dense_subset_version := get_config()['large_cohort']['output_versions'].get('dense_subset'):
+            dense_subset_version = slugify(dense_subset_version)
+
+        dense_subset_version = dense_subset_version or get_workflow().output_version
+        dense_subset_path = (
+            cohort.analysis_dataset.prefix() / get_workflow().name / dense_subset_version / 'dense_subset.mt'
+        )
+        return dense_subset_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import dense_subset
