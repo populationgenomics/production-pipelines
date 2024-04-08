@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-analysis-runner --access-level "test" --dataset "bioheart" --description "QC PCA annotator" --output-dir "str/qc/iterative_pca_input" qc_annotator.py \
+analysis-runner --access-level "test" --dataset "bioheart" --description "QC PCA annotator" --output-dir "str/qc/iterative_pca_input" mt_pc_annotator.py \
 --mt-path=gs://cpg-bioheart-test/str/associatr/mt_filtered/v1/str.mt
 
 """
@@ -41,8 +41,10 @@ def main(mt_path):
     )
 
     table_geno_pcs = table_geno_pcs.key_by('sample_id')
-    mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.s].geno_PC1))
-    mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.s].geno_PC6))
+    mt = mt.annotate_cols(sample_id = 'CPG'+hl.str(mt.s))
+    mt = mt.key_cols_by('sample_id')
+    mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.sample_id].geno_PC1))
+    mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.sample_id].geno_PC6))
     # remove ancestry outliers
     mt = mt.filter_cols(
         (mt.geno_pc1 >= -0.05) & (mt.geno_pc6 <= 0.05) & (mt.geno_pc6 >= -0.05)
@@ -94,7 +96,7 @@ def main(mt_path):
     #mt = mt.filter_rows(mt.missing_count == 0)
 
     # write out mt to GCS path
-    mt.write(output_path('str_pc_option7_annotated.mt'))
+    mt.write(output_path('str_pc_option7_annotated.mt'), overwrite=True)
 
     # print mt schema
     mt.describe()
