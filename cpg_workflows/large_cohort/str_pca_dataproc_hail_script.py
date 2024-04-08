@@ -1,5 +1,7 @@
 
 import hail as hl
+from ast import literal_eval
+
 
 from cpg_utils import to_path
 
@@ -16,6 +18,27 @@ def pca_runner(file_path):
             hl.missing('int32'),
         ),
     )
+    table_geno_pcs = hl.import_table(
+        'gs://cpg-bioheart-test/str/anndata/saige-qtl/input_files/covariates/sex_age_geno_pcs_tob_bioheart.csv',
+        delimiter=',',
+        impute=True,
+    )
+
+    table_geno_pcs = table_geno_pcs.key_by('sample_id')
+    mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.s].geno_PC1))
+    mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.s].geno_PC6))
+    # remove ancestry outliers
+    mt = mt.filter_cols(
+        (mt.geno_pc1 >= -0.05) & (mt.geno_pc6 <= 0.05) & (mt.geno_pc6 >= -0.05)
+    )
+    with to_path(
+        'gs://cpg-bioheart-test/str/associatr/input_files/remove-samples.txt'
+    ).open() as f:
+        array_string = f.read().strip()
+        remove_samples = literal_eval(array_string)
+
+    # remove related individuals
+    mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
     # drop chrX
     mt = mt.filter_rows((hl.str(mt.locus.contig).startswith('chrX')), keep=False)
