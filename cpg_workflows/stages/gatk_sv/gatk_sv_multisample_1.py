@@ -556,7 +556,7 @@ class GenotypeBatch(CohortStage):
 
         # if we don't run metrics, don't expect the outputs
         # on by default in the WDL file, so expect this to run unless overridden
-        if override := get_config()['resource_overrides'].get('MakeCohortVcf'):
+        if override := get_config()['resource_overrides'].get('GenotypeBatch'):
             if not override.get('run_module_metrics', True):
                 _metrics_path = str(ending_by_key.pop('metrics_file_genotypebatch'))
 
