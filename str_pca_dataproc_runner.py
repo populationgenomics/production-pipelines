@@ -15,7 +15,7 @@ def main():
                 function = pca_runner,
                 function_path_args=dict(file_path ='gs://cpg-bioheart-test/str/qc/iterative_pca_input/str_pc_option7_annotated.mt'),
                 job_name='STR-PCA',
-                num_workers= 5)
+                num_workers= 20)
 
     get_batch(name='STR PCA Data proc job').run(wait=False)
 
