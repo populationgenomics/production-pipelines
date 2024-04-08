@@ -11,9 +11,9 @@ def pca_runner(file_path):
     mt = hl.read_matrix_table(str(file_path))
 
     # drop rows with missing sum_length
-    missing_condition = hl.is_missing(mt.sum_length)
-    mt =mt.annotate_rows(missing_count=hl.agg.count_where(missing_condition))
-    mt = mt.filter_rows(mt.missing_count == 0)
+    #missing_condition = hl.is_missing(mt.sum_length)
+    #mt =mt.annotate_rows(missing_count=hl.agg.count_where(missing_condition))
+    #mt = mt.filter_rows(mt.missing_count == 0)
 
     #  replace missing sum_length with the mean for that locus (PCA doesn't accept missing values) and normalise
     mt = mt.annotate_entries(
