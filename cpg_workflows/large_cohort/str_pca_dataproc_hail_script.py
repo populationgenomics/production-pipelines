@@ -31,14 +31,6 @@ def pca_runner(file_path):
     mt = mt.filter_cols(
         (mt.geno_pc1 >= -0.05) & (mt.geno_pc6 <= 0.05) & (mt.geno_pc6 >= -0.05)
     )
-    with to_path(
-        'gs://cpg-bioheart-test/str/associatr/input_files/remove-samples.txt'
-    ).open() as f:
-        array_string = f.read().strip()
-        remove_samples = literal_eval(array_string)
-
-    # remove related individuals
-    mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
     # drop chrX
     mt = mt.filter_rows((hl.str(mt.locus.contig).startswith('chrX')), keep=False)
