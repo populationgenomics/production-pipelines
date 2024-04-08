@@ -108,6 +108,9 @@ delete_scratch_on_exit = false
 # Use highmem machine type for alignment step
 # align_use_highmem = true
 
+# Use additional storage in postproc_gvcf job for large gVCFs
+# postproc_gvcf_storage = 50
+
 [mito_snv]
 # Example config for broad wdl found here:
 # https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json
