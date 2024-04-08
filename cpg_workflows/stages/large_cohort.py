@@ -47,7 +47,12 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return get_workflow().prefix / 'sample_qc.ht'
+        if sample_qc_version := get_config()['large_cohort']['output_versions'].get('sample_qc'):
+            sample_qc_version = slugify(sample_qc_version)
+
+        sample_qc_version = sample_qc_version or get_workflow().output_version
+        sample_qc_path = cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version / 'sample_qc.ht'
+        return sample_qc_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
