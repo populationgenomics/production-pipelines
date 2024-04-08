@@ -19,6 +19,10 @@ disk_gb = 200
 
 [resource_overrides.MakeCohortVcf]
 run_module_metrics = false
+
+[resource_overrides.GenotypeBatch]
+run_module_metrics = false
+
 [resource_overrides.MakeCohortVcf.runtime_override_plot_qc_per_family]
 mem_gb = 32
 
