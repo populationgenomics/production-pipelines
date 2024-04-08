@@ -16,8 +16,8 @@ def pca_runner(file_path):
     mt = mt.filter_rows(mt.missing_count == 0)
 
     #  replace missing sum_length with the mean for that locus (PCA doesn't accept missing values) and normalise
-    mt = mt.annotate_entries(
-        sum_length_normalised=hl.or_else((mt.sum_length - mt.mean_sum_length) / mt.stdev_sum_length, 0.0))
+    #mt = mt.annotate_entries(
+    #    sum_length_normalised=hl.or_else((mt.sum_length - mt.mean_sum_length) / mt.stdev_sum_length, 0.0))
 
     # run PCA
     eigenvalues, scores, loadings = hl._blanczos_pca(mt.sum_length_normalised, k=2, compute_loadings=True)
