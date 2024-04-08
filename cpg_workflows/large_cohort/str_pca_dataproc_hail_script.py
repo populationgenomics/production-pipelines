@@ -20,7 +20,7 @@ def pca_runner(file_path):
     #    sum_length_normalised=hl.or_else((mt.sum_length - mt.mean_sum_length) / mt.stdev_sum_length, 0.0))
 
     # run PCA
-    eigenvalues, scores, loadings = hl._blanczos_pca(mt.sum_length, k=2, compute_loadings=True)
+    eigenvalues, scores, loadings = hl.pca(mt.sum_length, k=10, compute_loadings=True)
 
     scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_7/scores.tsv.bgz'
     scores.export(str(scores_output_path))
