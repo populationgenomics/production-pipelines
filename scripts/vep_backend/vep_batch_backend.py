@@ -64,4 +64,4 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter
+    main()

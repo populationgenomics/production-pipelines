@@ -272,4 +272,4 @@ def main(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=no-value-for-parameter  # click will add the arguments
+    main()

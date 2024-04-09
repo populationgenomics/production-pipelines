@@ -343,7 +343,7 @@ class Dataset(Target):
 
     def add_sequencing_group(
         self,
-        id: str,  # pylint: disable=redefined-builtin
+        id: str,
         external_id: str | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
@@ -453,7 +453,7 @@ class SequencingGroup(Target):
 
     def __init__(
         self,
-        id: str,  # pylint: disable=redefined-builtin
+        id: str,
         dataset: 'Dataset',  # type: ignore  # noqa: F821
         external_id: str | None = None,
         participant_id: str | None = None,

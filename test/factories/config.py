@@ -103,7 +103,6 @@ class WorkflowConfig:
     only_stages: list[StageName] | None = None
     skip_stages: list[StageName] | None = None
     force_stages: list[StageName] | None = None
-    # pylint: disable=invalid-name
     allow_missing_outputs_for_stages: list[StageName] | None = None
 
     # ---- Dataset options

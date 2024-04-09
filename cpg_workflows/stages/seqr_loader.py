@@ -81,9 +81,7 @@ class AnnotateCohort(CohortStage):
         )
 
 
-def _update_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _update_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
 
@@ -92,9 +90,7 @@ def _update_meta(
     return {'type': 'annotated-dataset-callset'}
 
 
-def _dataset_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _dataset_vcf_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
 
@@ -103,9 +99,7 @@ def _dataset_vcf_meta(
     return {'type': 'dataset-vcf'}
 
 
-def _sg_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sg_vcf_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
 
@@ -114,9 +108,7 @@ def _sg_vcf_meta(
     return {'type': 'dataset-vcf'}
 
 
-def _snv_es_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _snv_es_index_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to es-index analysis object
     https://github.com/populationgenomics/metamist/issues/539

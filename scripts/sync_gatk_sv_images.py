@@ -59,4 +59,4 @@ def main(dockers_json_url: str, dry_run: bool):
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=E1120
+    main()

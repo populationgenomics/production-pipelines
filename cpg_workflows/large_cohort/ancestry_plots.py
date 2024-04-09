@@ -265,7 +265,7 @@ def manhattan_loadings(
     hover_fields['locus'] = hl.str(locus)
     hover_fields['gene'] = hl.str(loadings.gene_names)
 
-    source_pd = hl.plot.plots._collect_scatter_plot_data(  # pylint: disable=protected-access
+    source_pd = hl.plot.plots._collect_scatter_plot_data(
         ('_global_locus', locus.global_position()),
         ('_pval', pvals),
         fields=hover_fields,
