@@ -585,6 +585,7 @@ class MtToEsCNV(DatasetStage):
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         from analysis_runner import dataproc
+
         # transformation is the same, just use the same methods file?
 
         script = (
