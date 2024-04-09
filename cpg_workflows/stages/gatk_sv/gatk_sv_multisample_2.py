@@ -4,8 +4,8 @@ results of the per-batch workflows into a joint-call across the entire cohort
 """
 
 import logging
-from functools import lru_cache
 from datetime import datetime
+from functools import lru_cache
 from os.path import join
 from typing import Any
 
@@ -63,7 +63,6 @@ def get_exclusion_filename() -> str:
         'combined_exclusion_list.txt',
     )
     return exclusion
-
 
 
 def _exclusion_callable(output_path: str) -> dict[str, set[str]]:

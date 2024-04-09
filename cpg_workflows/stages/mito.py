@@ -6,8 +6,9 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 
 """
 
-import hailtop.batch as hb
 from functools import lru_cache
+
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
@@ -25,8 +26,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-
-# alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
+# alt_allele config from github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
 MAX_ALT_ALLELE_COUNT = 4
 
 
@@ -70,6 +70,7 @@ def get_shifted_mito_ref() -> dict[str, str]:
         'sa': shifted_mito_fa + '.sa',
         'shift_back_chain': str(reference_path('gnomad_mito/shift_back_chain')),
     }
+
 
 @lru_cache(maxsize=1)
 def get_control_region_intervals() -> dict[str, str]:
