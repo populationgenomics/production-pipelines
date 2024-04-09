@@ -4,6 +4,7 @@ results of the per-batch workflows into a joint-call across the entire cohort
 """
 
 import logging
+from functools import lru_cache
 from datetime import datetime
 from os.path import join
 from typing import Any
@@ -45,12 +46,24 @@ from cpg_workflows.workflow import (
 # create the file path outside Stages, so that
 # we can pass this to the metadata update function
 RUN_DATETIME = datetime.now().strftime('%Y-%m-%d')
-EXCLUSION_FILE = join(
-    get_config()['storage']['default']['default'],
-    'gatk_sv',
-    RUN_DATETIME,
-    'combined_exclusion_list.txt',
-)
+
+
+@lru_cache(maxsize=1)
+def get_exclusion_filename() -> str:
+    """
+    generate one exclusion filename for this run
+    Returns:
+        str: the exclusion filename
+    """
+    run_datetime = datetime.now().strftime('%Y-%m-%d')
+    exclusion = join(
+        get_config()['storage']['default']['default'],
+        'gatk_sv',
+        run_datetime,
+        'combined_exclusion_list.txt',
+    )
+    return exclusion
+
 
 
 def _exclusion_callable(output_path: str) -> dict[str, set[str]]:
@@ -89,7 +102,7 @@ class CombineExclusionLists(CohortStage):
         We need this quick stage to run each time
         """
 
-        return {'exclusion_list': to_path(EXCLUSION_FILE)}
+        return {'exclusion_list': to_path(get_exclusion_filename())}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -475,7 +488,7 @@ def _sv_filtered_meta(
     """
     Callable, add meta[type] to custom analysis object
     """
-    return {'type': 'gatk-sv-filtered-calls', 'remove_sgids': EXCLUSION_FILE}
+    return {'type': 'gatk-sv-filtered-calls', 'remove_sgids': get_exclusion_filename()}
 
 
 @stage(
@@ -555,7 +568,7 @@ def _sv_annotated_meta(
     """
     Callable, add meta[type] to custom analysis object
     """
-    return {'type': 'gatk-sv-annotated', 'remove_sgids': EXCLUSION_FILE}
+    return {'type': 'gatk-sv-annotated', 'remove_sgids': get_exclusion_filename()}
 
 
 @stage(
@@ -691,7 +704,7 @@ def _update_sv_dataset_meta(
     """
     Add meta.type to custom analysis object
     """
-    return {'type': 'annotated-sv-dataset-callset', 'remove_sgids': EXCLUSION_FILE}
+    return {'type': 'annotated-sv-dataset-callset', 'remove_sgids': get_exclusion_filename()}
 
 
 @stage(
@@ -751,7 +764,7 @@ def _gatk_sv_index_meta(
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
     """
-    return {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE}
+    return {'seqr-dataset-type': 'SV', 'remove_sgids': get_exclusion_filename()}
 
 
 @stage(
