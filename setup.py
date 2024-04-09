@@ -23,7 +23,7 @@ def read_reqs(filename: str) -> list[str]:
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.22.5',
+    version='1.22.6',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
