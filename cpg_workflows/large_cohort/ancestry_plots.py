@@ -278,10 +278,7 @@ def manhattan_loadings(
     ref = locus.dtype.reference_genome
     observed_contigs = [contig for contig in ref.contigs.copy() if contig in observed_contigs]
 
-    contig_ticks = [
-        ref._contig_global_position(contig) + ref.contig_length(contig) // 2  # pylint: disable=protected-access
-        for contig in observed_contigs
-    ]
+    contig_ticks = [ref._contig_global_position(contig) + ref.contig_length(contig) // 2 for contig in observed_contigs]
     color_mapper = CategoricalColorMapper(factors=ref.contigs, palette=palette[:2] * int((len(ref.contigs) + 1) / 2))
 
     p = figure(title=title, x_axis_label='Chromosome', y_axis_label='Loadings', width=1000)
@@ -292,7 +289,7 @@ def manhattan_loadings(
         _,
         _,
         _,
-    ) = hl.plot.plots._get_scatter_plot_elements(  # pylint: disable=protected-access
+    ) = hl.plot.plots._get_scatter_plot_elements(
         p,
         source_pd,
         x_col='_global_locus',
