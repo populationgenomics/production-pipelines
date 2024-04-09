@@ -2,6 +2,24 @@
 
 from setuptools import find_packages, setup
 
+
+def read_reqs(filename: str) -> list[str]:
+    """
+    Read requirements from a file, return as a list
+    Args:
+        filename (str): the requirements file to parse
+
+    Returns:
+        list[str]: the requirements
+    """
+    with open(filename, encoding='utf-8') as filehandler:
+        return [
+            line.strip()
+            for line in filehandler
+            if line.strip() and not line.startswith('#')
+        ]
+
+
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
@@ -12,36 +30,9 @@ setup(
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
     packages=find_packages(),
-    install_requires=[
-        'cpg-utils>=4.18.3',
-        'cyvcf2==0.30.18',
-        'analysis-runner>=2.43.3',
-        'hail!=0.2.120',  # Temporarily work around hail-is/hail#13337
-        'networkx>=2.8.3',
-        'obonet>=0.3.1',  # for HPO parsing
-        'onnx',
-        'onnxruntime',
-        'skl2onnx',
-        'metamist>=6.9.0',
-        'pandas',
-        'peddy',
-        'fsspec',
-        'slack_sdk',
-        'elasticsearch==8.*',
-        'coloredlogs',
-        'bokeh',
-        'numpy',
-        'click',
-    ],
-    extras_require={
-        'test': [
-            'pytest',
-            'pytest-mock',
-        ],
-    },
-    package_data={
-        'cpg_workflows': ['defaults.toml'],
-    },
+    install_requires=read_reqs('requirements.txt'),
+    extras_require={'dev': read_reqs('requirements-dev.txt')},
+    package_data={'cpg_workflows': ['defaults.toml']},
     keywords='bioinformatics',
     classifiers=[
         'Environment :: Console',
