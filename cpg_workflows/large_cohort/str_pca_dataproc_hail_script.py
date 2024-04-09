@@ -30,9 +30,9 @@ def pca_runner(file_path):
     mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.sample_id].geno_PC1))
     mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.sample_id].geno_PC6))
     # remove ancestry outliers
-    mt = mt.filter_cols(
-        (mt.geno_pc1 >=0.01) & (mt.geno_pc6 <= 0.04) & (mt.geno_pc6 >= -0.03)& (mt.geno_pc6 <= 0.01)
-    )
+    #mt = mt.filter_cols(
+    #    (mt.geno_pc1 >=0.01) & (mt.geno_pc6 <= 0.04) & (mt.geno_pc6 >= -0.03)& (mt.geno_pc6 <= 0.01)
+    #)
 
     with to_path(
         'gs://cpg-bioheart-test/str/associatr/input_files/remove-samples.txt'
