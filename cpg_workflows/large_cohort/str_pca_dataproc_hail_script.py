@@ -44,7 +44,7 @@ def pca_runner(file_path):
     #mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
     # remove putative variants driving the batch effect
-    table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants (1).csv')
+    table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants_opt9.csv')
     table_variants = table_variants.annotate(locus = hl.parse_locus(table_variants['locus']))
     table_variants = table_variants.key_by('locus')
 
