@@ -26,9 +26,6 @@ jobs:
     - name: Install dependencies
       run: pip install .[dev]
 
-    - name: where am i
-      run: ls && pwd
-
     - name: Build
       run: python setup.py sdist
 
