@@ -92,15 +92,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_8/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_9/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_8/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_9/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_8/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_9/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
