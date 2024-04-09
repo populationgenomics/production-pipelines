@@ -13,11 +13,7 @@ def read_reqs(filename: str) -> list[str]:
         list[str]: the requirements
     """
     with open(filename, encoding='utf-8') as filehandler:
-        return [
-            line.strip()
-            for line in filehandler
-            if line.strip() and not line.startswith('#')
-        ]
+        return [line.strip() for line in filehandler if line.strip() and not line.startswith('#')]
 
 
 setup(
