@@ -43,6 +43,15 @@ def pca_runner(file_path):
     # remove related individuals
     #mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
+    # remove putative variants driving the batch effect
+    table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants (1).csv')
+    table_variants = table_variants.annotate(locus = hl.parse_locus(table_variants['locus']))
+    table_variants = table_variants.key_by('locus')
+
+    mt = mt.annotate_rows(not_batch_effect = hl.is_defined(table_variants[mt.locus]))
+    mt = mt.filter_rows(mt.not_batch_effect == True)
+
+
     # drop chrX
     mt = mt.filter_rows((hl.str(mt.locus.contig).startswith('chrX')), keep=False)
 
