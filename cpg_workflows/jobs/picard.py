@@ -7,15 +7,14 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, fasta_res_group, reference_path
-from cpg_utils.hail_batch import command
+from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import (
     HIGHMEM,
     STANDARD,
     storage_for_cram_qc_job,
     storage_for_joint_vcf,
 )
-from cpg_workflows.filetypes import CramPath
 from cpg_workflows.utils import can_reuse, exists
 
 
@@ -49,9 +48,7 @@ def get_intervals(
     """
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
-    source_intervals_path = source_intervals_path or reference_path(
-        f'broad/{sequencing_type}_calling_interval_lists'
-    )
+    source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
 
     if scatter_count == 1:
         # Special case when we don't need to split
@@ -59,14 +56,10 @@ def get_intervals(
 
     if output_prefix:
         interval_lists_exist = all(
-            exists(output_prefix / f'{idx}.interval_list')
-            for idx in range(1, scatter_count + 1)
+            exists(output_prefix / f'{idx}.interval_list') for idx in range(1, scatter_count + 1)
         )
         if interval_lists_exist:
-            return None, [
-                b.read_input(str(output_prefix / f'{idx + 1}.interval_list'))
-                for idx in range(scatter_count)
-            ]
+            return None, [b.read_input(str(output_prefix / f'{idx + 1}.interval_list')) for idx in range(scatter_count)]
 
     j = b.new_job(
         f'Make {scatter_count} intervals for {sequencing_type}',
@@ -138,9 +131,7 @@ def markdup(
     resource = HIGHMEM.request_resources(ncpu=4)
 
     # check for a storage override for unreasonably large sequencing groups
-    if (
-        storage_override := get_config()['resource_overrides'].get('picard_storage_gb')
-    ) is not None:
+    if (storage_override := get_config()['resource_overrides'].get('picard_storage_gb')) is not None:
         assert isinstance(storage_override, int)
         resource.attach_disk_storage_gb = storage_override
     else:
@@ -150,9 +141,7 @@ def markdup(
 
     # check for a memory override for impossible sequencing groups
     # if RAM is overridden, update the memory resource setting
-    if (
-        memory_override := get_config()['resource_overrides'].get('picard_mem_gb')
-    ) is not None:
+    if (memory_override := get_config()['resource_overrides'].get('picard_mem_gb')) is not None:
         assert isinstance(memory_override, int)
         # Hail will select the right number of CPUs based on RAM request
         j.memory(f'{memory_override}G')
@@ -161,7 +150,7 @@ def markdup(
         output_cram={
             'cram': '{root}.cram',
             'cram.crai': '{root}.cram.crai',
-        }
+        },
     )
 
     if fasta_reference is None:
@@ -216,11 +205,7 @@ def vcf_qc(
     job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
     j.image(image_path('picard'))
-    storage_gb = (
-        20
-        if is_gvcf
-        else storage_for_joint_vcf(sequencing_group_count, site_only=False)
-    )
+    storage_gb = 20 if is_gvcf else storage_for_joint_vcf(sequencing_group_count, site_only=False)
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(
@@ -228,9 +213,7 @@ def vcf_qc(
         index=str(reference_path('broad/dbsnp_vcf_index')),
     )
     sequencing_type = get_config()['workflow']['sequencing_type']
-    intervals_file = b.read_input(
-        str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists'))
-    )
+    intervals_file = b.read_input(str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists')))
 
     if is_gvcf:
         input_file = vcf_or_gvcf['g.vcf.gz']
@@ -331,13 +314,9 @@ def picard_collect_metrics(
     """
 
     j.command(command(cmd, define_retry_function=True))
-    b.write_output(
-        j.out_alignment_summary_metrics, str(out_alignment_summary_metrics_path)
-    )
+    b.write_output(j.out_alignment_summary_metrics, str(out_alignment_summary_metrics_path))
     b.write_output(j.out_insert_size_metrics, str(out_insert_size_metrics_path))
-    b.write_output(
-        j.out_quality_by_cycle_metrics, str(out_quality_by_cycle_metrics_path)
-    )
+    b.write_output(j.out_quality_by_cycle_metrics, str(out_quality_by_cycle_metrics_path))
     b.write_output(
         j.out_base_distribution_by_cycle_metrics,
         str(out_base_distribution_by_cycle_metrics_path),
@@ -369,9 +348,7 @@ def picard_hs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(
-        str(reference_path('broad/exome_evaluation_interval_lists'))
-    )
+    interval_file = b.read_input(str(reference_path('broad/exome_evaluation_interval_lists')))
 
     assert cram_path.index_path
     cmd = f"""\
@@ -438,9 +415,7 @@ def picard_wgs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(
-        str(reference_path('broad/genome_coverage_interval_list'))
-    )
+    interval_file = b.read_input(str(reference_path('broad/genome_coverage_interval_list')))
 
     assert cram_path.index_path
     cmd = f"""\

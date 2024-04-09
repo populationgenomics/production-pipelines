@@ -3,16 +3,15 @@ Perform outlier gene expression analysis with Outrider.
 """
 
 from cpg_utils import Path
-
 from cpg_workflows import get_batch
 from cpg_workflows.jobs import outrider
 from cpg_workflows.stages.count import Count
 from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
     Cohort,
     CohortStage,
+    StageInput,
+    StageOutput,
+    stage,
 )
 
 
@@ -27,17 +26,14 @@ class Outrider(CohortStage):
         Generate outrider outputs.
         """
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
-        return {
-            cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'
-        }
-    
+        return {cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'}
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
         Queue a job to run outrider.
         """
         count_inputs = [
-            inputs.as_path(sequencing_group, Count, 'count')
-            for sequencing_group in cohort.get_sequencing_groups()
+            inputs.as_path(sequencing_group, Count, 'count') for sequencing_group in cohort.get_sequencing_groups()
         ]
         j = outrider.outrider(
             b=get_batch(),

@@ -3,9 +3,9 @@ Test building stages DAG.
 """
 
 import pytest
-from cpg_utils.hail_batch import get_batch, reset_batch
 from pytest_mock import MockFixture
 
+from cpg_utils.hail_batch import get_batch, reset_batch
 from cpg_workflows.workflow import WorkflowError, stage
 
 from .. import set_config
@@ -52,7 +52,7 @@ def create_config(tmp_path, allow_missing_outputs_for_stages=None):
 
     allow_missing_outputs_for_stages = {allow_missing_outputs_for_stages or []}
     only_stages = ['B1']
-    
+
     [storage.default]
     default = '{tmp_path}'
     [storage.fewgenomes]
@@ -66,9 +66,7 @@ def create_config(tmp_path, allow_missing_outputs_for_stages=None):
     """
 
 
-def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_stage(
-    mocker: MockFixture, tmp_path
-):
+def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_stage(mocker: MockFixture, tmp_path):
     """
     A -> B1 -> C1
     A -> B2 -> C2
@@ -87,9 +85,7 @@ def test_works_when_using_allow_missing_outputs_for_stages_on_required_parent_st
     assert 'C2' not in get_batch().job_by_stage
 
 
-def test_raises_workflow_error_when_output_from_parent_stage_is_missing(
-    mocker: MockFixture, tmp_path
-):
+def test_raises_workflow_error_when_output_from_parent_stage_is_missing(mocker: MockFixture, tmp_path):
     """
     A -> B1 -> C1
     A -> B2 -> C2

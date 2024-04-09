@@ -1,9 +1,9 @@
 import re
 
 import pytest
-from cpg_utils import Path
 from pytest_mock import MockFixture
 
+from cpg_utils import Path
 from cpg_workflows.jobs.somalier import pedigree
 
 from ... import set_config
@@ -103,7 +103,10 @@ class TestSomalierCheckPedigree:
         ],
     )
     def test_if_job_attrs_supplied_job_attrs_set_or_sets_default_attrs_if_not_supplied(
-        self, tmp_path: Path, job_attrs, expected_attrs
+        self,
+        tmp_path: Path,
+        job_attrs,
+        expected_attrs,
     ):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
@@ -156,9 +159,7 @@ class TestSomalierCheckPedigree:
         script_name = 'check_pedigree.py'
         assert re.search(fr'python3 {script_name}', cmd)
 
-    def test_sed_commands_for_samples_pairs_and_expected_ped_files(
-        self, tmp_path: Path
-    ):
+    def test_sed_commands_for_samples_pairs_and_expected_ped_files(self, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         pedigree_jobs = pedigree(
@@ -213,9 +214,7 @@ class TestSomalierCheckPedigree:
         assert 'sed -iBAK' not in cmd
         assert bool(dataset.rich_id_map()) is False  # empty dictionary
 
-    def test_check_pedigree_uses_output_files_from_relate(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_check_pedigree_uses_output_files_from_relate(self, mocker: MockFixture, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         pedigree_jobs = pedigree(
@@ -230,12 +229,8 @@ class TestSomalierCheckPedigree:
         relate_j, check_pedigree_j = pedigree_jobs
         relate_cmd = get_command_str(relate_j)
         check_pedigree_j_cmd = get_command_str(check_pedigree_j)
-        out_sample_path_match = re.search(
-            fr'\${{BATCH_TMPDIR}}\/.+\/output_samples', relate_cmd
-        )
-        out_pairs_path_match = re.search(
-            fr'\${{BATCH_TMPDIR}}\/.+\/output_pairs', relate_cmd
-        )
+        out_sample_path_match = re.search(r'\${BATCH_TMPDIR}\/.+\/output_samples', relate_cmd)
+        out_pairs_path_match = re.search(r'\${BATCH_TMPDIR}\/.+\/output_pairs', relate_cmd)
         if out_sample_path_match is not None and out_pairs_path_match is not None:
             matched_sample = out_sample_path_match.group(0)
             matched_pairs = out_pairs_path_match.group(0)
@@ -261,11 +256,11 @@ class TestSomalierCheckPedigree:
         expected_ped = 'test_ped.ped'
         somalier_html_url = 'test_html_url'
         assert re.search(
-            fr'--somalier-samples \${{BATCH_TMPDIR}}\/.+\/output_samples',
+            r'--somalier-samples \${BATCH_TMPDIR}\/.+\/output_samples',
             cmd,
         )
         assert re.search(
-            fr'--somalier-pairs \${{BATCH_TMPDIR}}\/.+\/output_pairs',
+            r'--somalier-pairs \${BATCH_TMPDIR}\/.+\/output_pairs',
             cmd,
         )
         assert re.search(
@@ -342,9 +337,7 @@ class TestSomalierCheckPedigree:
             cmd,
         )
 
-    def test_if_output_path_provided_writes_outputs_to_final_destination(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_if_output_path_provided_writes_outputs_to_final_destination(self, mocker: MockFixture, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 
         spy = mocker.spy(batch, 'write_output')
@@ -363,12 +356,12 @@ class TestSomalierCheckPedigree:
 
         out_checks_path = tmp_path / 'out_path'
         assert check_pedigree_j is not None
-        spy.assert_has_calls(
-            calls=[mocker.call(check_pedigree_j.output, str(out_checks_path))]
-        )
+        spy.assert_has_calls(calls=[mocker.call(check_pedigree_j.output, str(out_checks_path))])
 
     def test_if_output_path_not_provided_does_not_write_outputs_to_final_destination(
-        self, mocker: MockFixture, tmp_path: Path
+        self,
+        mocker: MockFixture,
+        tmp_path: Path,
     ):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)
 

@@ -5,12 +5,11 @@ Create Hail Batch jobs to run STRipy
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import image_path, fasta_res_group
-from cpg_utils.hail_batch import command
-from cpg_workflows.resources import STANDARD
+from cpg_utils.hail_batch import command, fasta_res_group, image_path
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
+from cpg_workflows.utils import can_reuse
 
 
 def stripy(
@@ -51,17 +50,12 @@ def stripy(
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
     assert cram_path.index_path  # keep mypy happy as index_path is optional
-    mounted_cram_index_path = bucket_mount_path / '/'.join(
-        cram_path.index_path.parts[2:]
-    )
+    mounted_cram_index_path = bucket_mount_path / '/'.join(cram_path.index_path.parts[2:])
 
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    if (
-        sequencing_group.pedigree.sex
-        and str(sequencing_group.pedigree.sex).lower() != 'unknown'
-    ):
+    if sequencing_group.pedigree.sex and str(sequencing_group.pedigree.sex).lower() != 'unknown':
         sex_argument = f'--sex {str(sequencing_group.pedigree.sex).lower()}'
     else:
         sex_argument = ''

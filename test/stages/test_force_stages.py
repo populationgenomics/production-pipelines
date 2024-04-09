@@ -26,7 +26,7 @@ def test_force_stages(mocker: MockFixture, tmp_path):
     check_intermediates = false
 
     # Skip stages with outputs that already exist
-    check_expected_outputs = true 
+    check_expected_outputs = true
 
     # Except force stage B to re-run
     force_stages = ['B']

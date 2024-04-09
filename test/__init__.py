@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import toml
+
 from cpg_utils import Path as AnyPath
 from cpg_utils.config import set_config_paths
 
@@ -16,8 +17,7 @@ logging.getLogger('py4j').setLevel(logging.ERROR)
 
 @runtime_checkable
 class IDictRepresentable(Protocol):
-    def as_dict(self) -> dict[str, Any]:
-        ...
+    def as_dict(self) -> dict[str, Any]: ...
 
 
 class TomlAnyPathEncoder(toml.TomlEncoder):
@@ -78,10 +78,7 @@ def set_config(
         elif isinstance(config, str):
             f.write(config)
         else:
-            raise TypeError(
-                f'Expected config to be a string, dict, or IDictRepresentable, but'
-                f'got {type(config)}'
-            )
+            raise TypeError(f'Expected config to be a string, dict, or IDictRepresentable, butgot {type(config)}')
 
         f.flush()
 

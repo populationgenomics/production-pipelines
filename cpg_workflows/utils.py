@@ -1,6 +1,7 @@
 """
 Utility functions and constants.
 """
+
 import logging
 import re
 import string
@@ -9,16 +10,49 @@ import time
 import traceback
 import unicodedata
 from functools import lru_cache
-
 from itertools import chain, islice
 from os.path import basename, dirname, join
 from random import choices
 from typing import Union, cast
 
 import hail as hl
+from hailtop.batch import ResourceFile
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from hailtop.batch import ResourceFile
+
+LOGGER: logging.Logger | None = None
+
+
+def get_logger(logger_name: str | None = None, log_level: int = logging.INFO) -> logging.Logger:
+    """
+    creates a logger instance (so as not to use the root logger)
+    Args:
+        logger_name (str):
+        log_level (int): logging level, defaults to INFO
+    Returns:
+        a logger instance, or the global logger if already defined
+    """
+    global LOGGER
+
+    if LOGGER is None:
+        # this very verbose logging is to ensure that the log level requested (INFO)
+        # create a named logger
+        LOGGER = logging.getLogger(logger_name)
+        LOGGER.setLevel(log_level)
+
+        # create a stream handler to write output
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler.setLevel(log_level)
+
+        # create format string for messages
+        formatter = logging.Formatter('%(asctime)s - %(name)s %(lineno)d - %(levelname)s - %(message)s')
+        stream_handler.setFormatter(formatter)
+
+        # set the logger to use this handler
+        LOGGER.addHandler(stream_handler)
+
+    return LOGGER
 
 
 def chunks(iterable, chunk_size):
@@ -74,10 +108,10 @@ def read_hail(path):
 
 
 def checkpoint_hail(
-        t: hl.Table | hl.MatrixTable,
-        file_name: str,
-        checkpoint_prefix: str | None = None,
-        allow_reuse=False
+    t: hl.Table | hl.MatrixTable,
+    file_name: str,
+    checkpoint_prefix: str | None = None,
+    allow_reuse=False,
 ):
     """
     checkpoint method
@@ -223,9 +257,7 @@ def timestamp(rand_suffix_len: int = 5) -> str:
     """
     result = time.strftime('%Y_%m%d_%H%M')
     if rand_suffix_len:
-        rand_bit = ''.join(
-            choices(string.ascii_uppercase + string.digits, k=rand_suffix_len)
-        )
+        rand_bit = ''.join(choices(string.ascii_uppercase + string.digits, k=rand_suffix_len))
         result += f'_{rand_bit}'
     return result
 

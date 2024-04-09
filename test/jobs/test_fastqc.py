@@ -3,8 +3,8 @@ from functools import cached_property
 from pathlib import Path
 
 import pytest
-from cpg_utils.hail_batch import Batch
 
+from cpg_utils.hail_batch import Batch
 from cpg_workflows.filetypes import BamPath, FastqPath
 from cpg_workflows.jobs.fastqc import fastqc
 
@@ -28,7 +28,7 @@ class TestFastqc:
             references={
                 'broad': {
                     'ref_fasta': 'hg38_reference.fa',
-                }
+                },
             },
             other={
                 'resource_overrides': {},

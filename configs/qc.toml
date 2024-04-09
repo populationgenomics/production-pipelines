@@ -3,7 +3,7 @@ name = 'qc'
 description = 'MultiQC'
 
 only_stages = [
-    'CramMultiQC', 
+    'CramMultiQC',
     'GvcfMultiQC',
     'GvcfHappy',
     'JointVcfHappy',
@@ -11,8 +11,8 @@ only_stages = [
 ]
 check_expected_outputs = false
 allow_missing_outputs_for_stages = [
-    'Align', 
-    'Genotype', 
+    'Align',
+    'Genotype',
     'JointGenotyping',
     'SomalierPedigree'
 ]

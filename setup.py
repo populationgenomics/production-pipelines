@@ -5,11 +5,11 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.20.0',
+    version='1.22.6',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
-    url=f'https://github.com/populationgenomics/production-pipelines',
+    url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
     packages=find_packages(),
     install_requires=[
@@ -22,7 +22,7 @@ setup(
         'onnx',
         'onnxruntime',
         'skl2onnx',
-        'metamist>=6.0.4',
+        'metamist>=6.9.0',
         'pandas',
         'peddy',
         'fsspec',
