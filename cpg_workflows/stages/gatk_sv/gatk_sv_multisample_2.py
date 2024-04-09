@@ -9,18 +9,13 @@ from functools import lru_cache
 from os.path import join
 from typing import Any
 
+from google.api_core.exceptions import PermissionDenied
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import (
-    authenticate_cloud_credentials_in_job,
-    get_batch,
-    image_path,
-)
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path
 from cpg_workflows.jobs import ploidy_table_from_ped
-from cpg_workflows.jobs.seqr_loader_sv import (
-    annotate_cohort_jobs_sv,
-    annotate_dataset_jobs_sv,
-)
+from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -32,6 +27,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -792,21 +788,19 @@ class MtToEsSv(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
-            # Skipping dataset that wasn't explicitly requested to upload to ES
+
+        try:
+            es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
-
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}',
-            )
 
         from analysis_runner import dataproc
 
@@ -816,7 +810,7 @@ class MtToEsSv(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}'
+            f'--es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
