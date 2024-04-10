@@ -170,7 +170,8 @@ class MakeCohortVcf(CohortStage):
 
         Replacing this nasty mess with nested/fancy cohorts would be ace
         """
-        cohort_partial_hash = cohort.alignment_inputs_hash()[-10:]
+        genotypebatch_hash = get_config()['workflow'].get('genotypebatch_hash') or cohort.alignment_inputs_hash()
+        cohort_partial_hash = genotypebatch_hash[-10:]
 
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
