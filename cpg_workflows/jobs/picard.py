@@ -34,7 +34,7 @@ def get_intervals(
     @param scatter_count: number of target sub-intervals,
     @param source_intervals_path: path to source intervals to split. Would check for
         config if not provided.
-    @param exclude_intervals_path: path to file with intervals to exclude. 
+    @param exclude_intervals_path: path to file with intervals to exclude.
         Would check for config if not provided.
     @param job_attrs: attributes for Hail Batch job,
     @param output_prefix: path optionally to save split subintervals.
@@ -52,7 +52,9 @@ def get_intervals(
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
     source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
-    exclude_intervals_path = exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres_intervals/interval_list') or None
+    exclude_intervals_path = (
+        exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres_intervals/interval_list') or None
+    )
 
     if scatter_count == 1:
         # Special case when we don't need to split
@@ -76,7 +78,7 @@ def get_intervals(
         'genome': 100000,
         'exome': 0,
     }.get(sequencing_type, 0)
-    
+
     extra_cmd = ''
     if exclude_intervals_path:
         # If there are intervals to exclude, subtract them from the source intervals
@@ -84,7 +86,7 @@ def get_intervals(
         -ACTION SUBTRACT \
         -SI {b.read_input(str(exclude_intervals_path))} \
         """
-    
+
     cmd = f"""
     mkdir $BATCH_TMPDIR/out
 
