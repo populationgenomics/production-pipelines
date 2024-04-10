@@ -52,7 +52,7 @@ def get_intervals(
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
     source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
-    exclude_intervals_path = exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres') or None
+    exclude_intervals_path = exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres_intervals/interval_list') or None
 
     if scatter_count == 1:
         # Special case when we don't need to split
@@ -77,40 +77,30 @@ def get_intervals(
         'exome': 0,
     }.get(sequencing_type, 0)
     
-    if exclude_intervals_path:  
-        cmd = f"""
-        mkdir $BATCH_TMPDIR/out
-
-        picard -Xms1000m -Xmx1500m \
-        IntervalListTools \
-        ACTION=SUBTRACT \
-        SCATTER_COUNT={scatter_count} \
-        SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
-        UNIQUE=true \
-        SORT=true \
-        BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-        INPUT={b.read_input(str(source_intervals_path))} \
-        SECOND_INPUT={b.read_input(str(exclude_intervals_path))} \
-        OUTPUT=$BATCH_TMPDIR/out
-        ls $BATCH_TMPDIR/out
-        ls $BATCH_TMPDIR/out/*
+    extra_cmd = ''
+    if exclude_intervals_path:
+        # If there are intervals to exclude, subtract them from the source intervals
+        extra_cmd = f"""
+        -ACTION SUBTRACT \
+        -SI {b.read_input(str(exclude_intervals_path))} \
         """
-    else:
-        cmd = f"""
-        mkdir $BATCH_TMPDIR/out
+    
+    cmd = f"""
+    mkdir $BATCH_TMPDIR/out
 
-        picard -Xms1000m -Xmx1500m \
-        IntervalListTools \
-        SCATTER_COUNT={scatter_count} \
-        SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
-        UNIQUE=true \
-        SORT=true \
-        BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-        INPUT={b.read_input(str(source_intervals_path))} \
-        OUTPUT=$BATCH_TMPDIR/out
-        ls $BATCH_TMPDIR/out
-        ls $BATCH_TMPDIR/out/*
-        """
+    picard -Xms1000m -Xmx1500m \
+    IntervalListTools \
+    -SCATTER_COUNT {scatter_count} \
+    -SUBDIVISION_MODE INTERVAL_SUBDIVISION \
+    -UNIQUE true \
+    -SORT true \
+    -BREAK_BANDS_AT_MULTIPLES_OF {break_bands_at_multiples_of} \
+    -I {b.read_input(str(source_intervals_path))} \
+    {extra_cmd} \
+    -OUTPUT $BATCH_TMPDIR/out
+    ls $BATCH_TMPDIR/out
+    ls $BATCH_TMPDIR/out/*
+    """
     for idx in range(scatter_count):
         name = f'temp_{str(idx + 1).zfill(4)}_of_{scatter_count}'
         cmd += f"""
