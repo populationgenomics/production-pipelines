@@ -56,7 +56,7 @@ def add_background(
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
-        sample_qc_ht = sample_qc_ht.union(ht)
+        sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
     return dense_mt, sample_qc_ht
 
 
