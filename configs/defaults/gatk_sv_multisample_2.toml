@@ -43,7 +43,7 @@ recalibrate_gq_args = [
 # FilterGenotypes - stringent end of [0.3, 0.5] range
 fmax_beta = 0.3
 
-sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 150 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 100 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
 noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
 
 [elasticsearch]
@@ -54,3 +54,6 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+[resource_overrides.MakeCohortVcf]
+run_module_metrics = false

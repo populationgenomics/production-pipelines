@@ -59,6 +59,9 @@ inferred_ancestry = false
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
+# Set whether to allow column discrepancies when unioning background dataset tables
+#allow_missing_columns = false
+
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and
 # `max_n_singletons` adjusted based on the results we got for the TOB-WGS project.
