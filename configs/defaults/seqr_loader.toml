@@ -82,5 +82,5 @@ vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"
 [references]
 vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
 vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
-# Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3 
+# Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3
 hg38_telomeres_and_centromeres = "gs://cpg-common-main/references/hg38/v0/hg38.telomeresAndMergedCentromeres.interval_list"
