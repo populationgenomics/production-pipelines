@@ -30,6 +30,7 @@ def run(
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
         out_ht_path=site_only_ht_path,
+        tmp_prefix=tmp_prefix,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert out_vcf_path.suffix == '.bgz'
@@ -41,6 +42,7 @@ def vds_to_site_only_ht(
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
     out_ht_path: Path,
+    tmp_prefix: Path,
 ) -> hl.Table:
     """
     Convert VDS into sites-only VCF-ready table.
@@ -52,7 +54,7 @@ def vds_to_site_only_ht(
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
     mt = _filter_rows_and_add_tags(mt)
-    var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
+    var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions(), tmp_prefix=tmp_prefix)
     var_ht = adjust_vcf_incompatible_types(
         var_ht,
         # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
@@ -84,8 +86,9 @@ def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
     return mt.annotate_rows(ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2)
 
 
-def _create_info_ht(mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
+def _create_info_ht(mt: hl.MatrixTable, n_partitions: int, tmp_prefix: Path) -> hl.Table:
     """Create info table from vcf matrix table"""
+    mt.checkpoint(tmp_prefix / 'pre_AS_FS_compute.mt')
     info_ht = default_compute_info(mt, site_annotations=True, n_partitions=n_partitions)
     info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
     return info_ht
