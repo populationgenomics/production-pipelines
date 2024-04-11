@@ -82,8 +82,7 @@ def get_intervals(
     extra_cmd = ''
     if exclude_intervals_path:
         # If there are intervals to exclude, subtract them from the source intervals
-        extra_cmd = f"""
-        -ACTION SUBTRACT \
+        extra_cmd = f"""-ACTION SUBTRACT \
         -SI {b.read_input(str(exclude_intervals_path))} \
         """
 
