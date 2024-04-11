@@ -44,19 +44,24 @@ def pca_runner(file_path):
     mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
     # remove putative variants driving the batch effect
-    table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants_opt13.csv')
-    table_variants = table_variants.annotate(locus = hl.parse_locus(table_variants['locus']))
-    table_variants = table_variants.key_by('locus')
+    #table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants_opt13.csv')
+    #table_variants = table_variants.annotate(locus = hl.parse_locus(table_variants['locus']))
+    #table_variants = table_variants.key_by('locus')
 
-    mt = mt.annotate_rows(not_batch_effect = hl.is_defined(table_variants[mt.locus]))
-    mt = mt.filter_rows(mt.not_batch_effect == True)
+    #mt = mt.annotate_rows(not_batch_effect = hl.is_defined(table_variants[mt.locus]))
+    #mt = mt.filter_rows(mt.not_batch_effect == True)
 
+    # retain variants that pass GC
+    table_gc = hl.import_table('gs://cpg-bioheart-test/str/qc/iterative_pca_input/REPID_passing_GC.csv')
+    table_gc = table_gc.key_by('REPID')
+    mt = mt.annotate_rows(passing_GC = hl.is_defined(table_gc[mt.info.REPID]))
+    mt = mt.filter_rows(mt.passing_GC == True)
 
     # drop chrX
     mt = mt.filter_rows((hl.str(mt.locus.contig).startswith('chrX')), keep=False)
 
-    mt = mt.annotate_rows(motif_length = hl.len(mt.info.RU))
-    mt = mt.annotate_rows(locus_length = mt.info.REF * mt.motif_length)
+    #mt = mt.annotate_rows(motif_length = hl.len(mt.info.RU))
+    #mt = mt.annotate_rows(locus_length = mt.info.REF * mt.motif_length)
 
     #restrict to 2-6 bp motifs
     #mt = mt.filter_rows((mt.motif_length >= 2) & (mt.motif_length <= 6))
@@ -92,15 +97,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_13/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_14/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_13/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_14/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_13/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_14/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
