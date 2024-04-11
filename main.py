@@ -112,8 +112,12 @@ def main(
     fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
 
-    wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
-    assert wfl_conf_path.exists(), wfl_conf_path
+    if workflow:
+        wfl_conf_path = to_path(__file__).parent / f'configs/defaults/{workflow}.toml'
+        assert wfl_conf_path.exists(), wfl_conf_path
+        wfl_conf_path = [str(wfl_conf_path)]
+    else:
+        wfl_conf_path = []
 
     for path in config_paths:
         assert to_path(path).exists(), path
@@ -122,13 +126,13 @@ def main(
     # Assuming the defaults is already loaded in __init__.py:
     assert to_path(config_paths[0]) == defaults_config_path
     # Inserting after the "defaults" config, but before user configs:
-    set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
+    set_config_paths(config_paths[:1] + wfl_conf_path + config_paths[1:])
 
     WORKFLOWS = get_workflows()
 
     if not workflow and not list_workflows:
         click.echo('You must specify WORKFLOW as a first positional command line argument.')
-    if not workflow or list_workflows or workflow == 'list':
+    if not workflow or list_workflows:
         click.echo('Available values for WORKFLOW (and corresponding last stages):')
         for wfl, last_stages in WORKFLOWS.items():
             click.echo(f'\t{wfl} ({", ".join(s.__name__ for s in last_stages)})')
