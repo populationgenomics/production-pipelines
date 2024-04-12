@@ -184,7 +184,7 @@ class TestPicard:
         # ---- Assertions
         assert job
         assert job_attrs.items() <= job.attributes.items()
-        assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
+        assert re.search(rf'-I \S*{source_intervals_path}', cmd)
 
         for i in range(1, scatter_count + 1):
             assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
