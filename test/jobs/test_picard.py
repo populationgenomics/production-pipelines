@@ -43,6 +43,9 @@ class TestPicard:
                     'genome_evaluation_interval_lists': 'intervals.txt',
                     'exome_evaluation_interval_lists': 'exome_intervals.txt',
                 },
+                'hg38_telomeres_and_centromeres_intervals': {
+                    'interval_list': 'hg38_telomeres_and_centromeres.interval_list',
+                },
             },
             other={
                 'resource_overrides': {
