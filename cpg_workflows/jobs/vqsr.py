@@ -399,9 +399,7 @@ def indel_recalibrator_job(
         f"""set -euo pipefail
 
     gatk --java-options \
-      "-Xms{res.get_java_mem_mb()}m \
-      -XX:+UseParallelGC \
-      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
+      "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -480,9 +478,7 @@ def snps_recalibrator_create_model_job(
         f"""set -euo pipefail
 
     gatk --java-options \
-      "-Xms{res.get_java_mem_mb()}m \
-      -XX:+UseParallelGC \
-      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
+      "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -558,9 +554,7 @@ def snps_recalibrator_scattered(
     MODEL_REPORT={model_file}
 
     gatk --java-options \
-      "-Xms{res.get_java_mem_mb()}m \
-      -XX:+UseParallelGC \
-      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
+      "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
       VariantRecalibrator \\
       -V {siteonly_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -625,9 +619,7 @@ def snps_recalibrator_job(
         f"""set -euo pipefail
 
     gatk --java-options \
-      "-Xms{res.get_java_mem_mb()}m \
-      -XX:+UseParallelGC \
-      -XX:ParallelGCThreads={res.get_nthreads() - 2}" \\
+      "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
       VariantRecalibrator \\
       -V {sites_only_variant_filtered_vcf['vcf.gz']} \\
       -O {j.recalibration} \\
@@ -677,7 +669,7 @@ def snps_gather_tranches_job(
     j.command(
         f"""set -euo pipefail
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options "{res.java_mem_options()}" \\
       GatherTranches \\
       --mode SNP \\
       {inputs_cmdl} \\
@@ -725,7 +717,7 @@ def apply_recalibration_snps(
     cp {recalibration} $BATCH_TMPDIR/recalibration
     cp {recalibration_idx} $BATCH_TMPDIR/recalibration.idx
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options "{res.java_mem_options()}" \\
     ApplyVQSR \\
     -O $BATCH_TMPDIR/output.vcf.gz \\
     -V {input_vcf['vcf.gz']} \\
@@ -792,7 +784,7 @@ def apply_recalibration_indels(
     mv {recalibration} $BATCH_TMPDIR/recalibration
     mv {recalibration_idx} $BATCH_TMPDIR/recalibration.idx
 
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options "{res.java_mem_options()}" \\
     ApplyVQSR \\
     --tmp-dir $BATCH_TMPDIR \\
     -O {j.output_vcf['vcf.gz']} \\
