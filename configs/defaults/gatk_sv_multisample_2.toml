@@ -65,7 +65,7 @@ run_module_metrics = false
 #mem_gb = 32
 
 [resource_overrides.FilterGenotypes]
-run_module_metrics = false
+run_qc = false
 
 # if you have to do it, bump the resources
 #[resource_overrides.FilterGenotypes.runtime_override_plot_qc_per_family]
