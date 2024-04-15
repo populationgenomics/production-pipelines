@@ -619,7 +619,8 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
-        strv_job.storage('20Gi')
+        strv_job.storage(get_config()['resource_overrides'].get(self.name, {}).get('storage', '20Gi'))
+        strv_job.memory(get_config()['resource_overrides'].get(self.name, {}).get('memory', '16Gi'))
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
