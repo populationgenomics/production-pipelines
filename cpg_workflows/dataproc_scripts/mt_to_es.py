@@ -189,4 +189,4 @@ def _cleanup(es, es_index, es_shards):
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=E1120

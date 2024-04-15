@@ -15,7 +15,7 @@ from cpg_utils.config import get_config, update_dict
 from cpg_utils.hail_batch import get_batch
 
 
-def main():
+def main():  # pylint: disable=missing-function-docstring
     update_dict(
         get_config()['workflow'],
         {
@@ -53,4 +53,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main()  # pylint: disable=E1120

@@ -518,7 +518,7 @@ class Assay:
         return mm_seq
 
 
-def parse_reads(
+def parse_reads(  # pylint: disable=too-many-return-statements
     sequencing_group_id: str,
     assay_meta: dict,
     check_existence: bool,
