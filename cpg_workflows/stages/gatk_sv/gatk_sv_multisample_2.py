@@ -5,7 +5,7 @@ results of the per-batch workflows into a joint-call across the entire cohort
 
 import logging
 from datetime import datetime
-from functools import lru_cache
+from functools import cache
 from os.path import join
 from typing import Any
 
@@ -44,7 +44,7 @@ from cpg_workflows.workflow import (
 )
 
 
-@lru_cache(maxsize=1)
+@cache
 def get_exclusion_filename() -> str:
     """
     generate one exclusion filename for this run

@@ -7,6 +7,7 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 """
 
 import hailtop.batch as hb
+from functools import cache
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
@@ -24,33 +25,59 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-MITO_REF = {
-    'dict': str(reference_path('gnomad_mito/dict')),
-    'base': str(reference_path('gnomad_mito/fasta')),
-    'amb': str(reference_path('gnomad_mito/fasta')) + '.amb',
-    'ann': str(reference_path('gnomad_mito/fasta')) + '.ann',
-    'bwt': str(reference_path('gnomad_mito/fasta')) + '.bwt',
-    'fai': str(reference_path('gnomad_mito/fasta')) + '.fai',
-    'pac': str(reference_path('gnomad_mito/fasta')) + '.pac',
-    'sa': str(reference_path('gnomad_mito/fasta')) + '.sa',
-}
+@cache
+def get_mito_ref_in_batch() -> hb.ResourceGroup:
+    """
+    get various mito config entries, reads them into the current batch
+    Returns:
+        dict: mito config entries
+    """
+    mito_fa = str(reference_path('gnomad_mito/fasta'))
+    return get_batch().read_input_group(
+        dict=str(reference_path('gnomad_mito/dict')),
+        base=mito_fa,
+        amb=mito_fa + '.amb',
+        ann=mito_fa + '.ann',
+        bwt=mito_fa + '.bwt',
+        fai=mito_fa + '.fai',
+        pac=mito_fa + '.pac',
+        sa=mito_fa + '.sa'
+    )
 
-SHIFTED_MITO_REF = {
-    'dict': str(reference_path('gnomad_mito/shifted_dict')),
-    'base': str(reference_path('gnomad_mito/shifted_fasta')),
-    'amb': str(reference_path('gnomad_mito/shifted_fasta')) + '.amb',
-    'ann': str(reference_path('gnomad_mito/shifted_fasta')) + '.ann',
-    'bwt': str(reference_path('gnomad_mito/shifted_fasta')) + '.bwt',
-    'fai': str(reference_path('gnomad_mito/shifted_fasta')) + '.fai',
-    'pac': str(reference_path('gnomad_mito/shifted_fasta')) + '.pac',
-    'sa': str(reference_path('gnomad_mito/shifted_fasta')) + '.sa',
-    'shift_back_chain': str(reference_path('gnomad_mito/shift_back_chain')),
-}
+@cache
+def get_shifted_mito_ref() -> hb.ResourceGroup:
+    """
+    get shifted mito config entries, reads them into the current batch
+    Returns:
+        dict: mito config entries
+    """
+    shifted_mito_fa = str(reference_path('gnomad_mito/shifted_fasta'))
+    return get_batch().read_input_group(
+        dict=str(reference_path('gnomad_mito/shifted_dict')),
+        base=shifted_mito_fa,
+        amb=shifted_mito_fa + '.amb',
+        ann=shifted_mito_fa + '.ann',
+        bwt=shifted_mito_fa + '.bwt',
+        fai=shifted_mito_fa + '.fai',
+        pac=shifted_mito_fa + '.pac',
+        sa=shifted_mito_fa + '.sa',
+        shift_back_chain=str(reference_path('gnomad_mito/shift_back_chain')),
+    )
 
-CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': str(reference_path('gnomad_mito/shifted_control_region_interval')),
-    'non_control_region': str(reference_path('gnomad_mito/non_control_region_interval')),
-}
+
+@cache
+def get_control_region_intervals() -> hb.ResourceGroup:
+    """
+    get mito control region intervals
+    Returns:
+        dict: mito control region intervals
+    """
+
+    # get_batch().read_input_group(**get_mito_ref())
+    return get_batch().read_input_group(
+        control_region_shifted=str(reference_path('gnomad_mito/shifted_control_region_interval')),
+        non_control_region=str(reference_path('gnomad_mito/non_control_region_interval')),
+    )
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
 MAX_ALT_ALLELE_COUNT = 4
@@ -58,11 +85,10 @@ MAX_ALT_ALLELE_COUNT = 4
 
 @stage(
     required_stages=Align,
-    # TODO: enable once this type can be created
-    # analysis_type='mito-cram',
-    # analysis_keys=[
-    #     'non_shifted_cram',
-    # ],
+    analysis_type='mito-cram',
+    analysis_keys=[
+        'non_shifted_cram',
+    ],
 )
 class RealignMito(SequencingGroupStage):
     """
@@ -121,9 +147,9 @@ class RealignMito(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # Mitochondrial specific reference files.
-        mito_ref = get_batch().read_input_group(**MITO_REF)
-        shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
-        intervals = get_batch().read_input_group(**CONTROL_REGION_INTERVALS)
+        mito_ref = get_mito_ref_in_batch()
+        shifted_mito_ref = get_shifted_mito_ref()
+        intervals = get_control_region_intervals()
 
         jobs = []
 
@@ -298,8 +324,8 @@ class GenotypeMito(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # Mitochondrial specific reference files.
-        mito_ref = get_batch().read_input_group(**MITO_REF)
-        shifted_mito_ref = get_batch().read_input_group(**SHIFTED_MITO_REF)
+        mito_ref = get_mito_ref_in_batch()
+        shifted_mito_ref = get_shifted_mito_ref()
 
         jobs = []
 
@@ -475,7 +501,7 @@ class MitoReport(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        mito_ref = get_batch().read_input_group(**MITO_REF)
+        mito_ref = get_mito_ref_in_batch()
         jobs = []
 
         vep_j = vep.vep_one(
