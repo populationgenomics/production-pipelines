@@ -144,7 +144,6 @@ class MakeCohortVcf(CohortStage):
             'vcf': self.prefix / 'cleaned.vcf.gz',
             'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
             'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz',
-            'metrics_file_makecohortvcf': self.prefix / 'metrics.tsv',
             # if merge_intermediate_vcfs is enabled
             # 'cluster_vcf': '.combine_batches.vcf.gz',
             # 'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
@@ -155,11 +154,9 @@ class MakeCohortVcf(CohortStage):
         }
 
         # if we don't run metrics, don't expect the outputs
-        # on by default in the WDL file, so expect this to run unless overridden
-        if override := get_config()['resource_overrides'].get('MakeCohortVcf'):
-            if not override.get('run_module_metrics', True):
-                metrics_path = str(out_dict.pop('metrics_file_makecohortvcf'))
-                logging.info(f'Will not create metrics file: {metrics_path}')
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                out_dict['metrics_file_makecohortvcf'] = self.prefix / 'metrics.tsv'
 
         return out_dict
 
@@ -495,15 +492,19 @@ class FilterGenotypes(CohortStage):
         create dictionary of names -> output paths
         """
 
-        return {
+        outputs = {
             'filtered_vcf': self.prefix / 'filtered.vcf.gz',
             'filtered_vcf_index': self.prefix / 'filtered.vcf.gz.tbi',
-            'main_vcf_qc_tarball': self.prefix / 'filtered_SV_VCF_QC_output.tar.gz',
             'unfiltered_recalibrated_vcf': self.prefix / 'unfiltered_recalibrated.vcf.gz',
             'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi',
-            # 'vcf_optimization_table': self.prefix / 'vcf_optimization_table.tsv.gz',
-            # 'sl_cutoff_qc_tarball': self.prefix / 'sl_cutoff_SV_VCF_QC_output.tar.gz',
         }
+
+        # if we don't run metrics, don't expect the outputs
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                outputs['main_vcf_qc_tarball'] = self.prefix / 'filtered_SV_VCF_QC_output.tar.gz'
+
+        return outputs
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         input_dict = {
@@ -618,7 +619,8 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
-        strv_job.storage('20Gi')
+        strv_job.storage(get_config()['resource_overrides'].get(self.name, {}).get('storage', '20Gi'))
+        strv_job.memory(get_config()['resource_overrides'].get(self.name, {}).get('memory', '16Gi'))
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
