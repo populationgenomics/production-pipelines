@@ -28,9 +28,7 @@ from cpg_workflows.workflow import (
 )
 
 
-def _gcnv_annotated_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
+def _gcnv_annotated_meta(output_path: str) -> dict[str, str]:
     """
     Callable, adds custom analysis object meta attribute
     """
@@ -382,9 +380,7 @@ class AnnotateCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-def _gcnv_srvctvre_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
+def _gcnv_srvctvre_meta(output_path: str) -> dict[str, str]:
     """
     Callable, adds custom analysis object meta attribute
     """
@@ -534,9 +530,7 @@ class AnnotateDatasetCNV(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-def _gatk_gcnv_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
+def _gatk_gcnv_index_meta(output_path: str) -> dict[str, str]:
     """
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539

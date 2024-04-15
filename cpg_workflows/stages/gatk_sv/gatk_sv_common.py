@@ -67,18 +67,14 @@ def create_polling_intervals() -> dict:
     return polling_interval_dict
 
 
-def _sv_batch_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_batch_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """
     return {'type': 'gatk-sv-batch-calls'}
 
 
-def _sv_individual_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_individual_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """

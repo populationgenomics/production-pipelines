@@ -477,9 +477,7 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
-def _sv_filtered_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_filtered_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """
@@ -557,9 +555,7 @@ class FilterGenotypes(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-def _sv_annotated_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_annotated_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """
@@ -693,9 +689,7 @@ class AnnotateCohortSv(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
 
 
-def _update_sv_dataset_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _update_sv_dataset_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
     """
@@ -752,9 +746,7 @@ class AnnotateDatasetSv(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-def _gatk_sv_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _gatk_sv_index_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539

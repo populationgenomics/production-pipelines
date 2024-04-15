@@ -300,4 +300,4 @@ def print_contents(
 
 
 if __name__ == '__main__':
-    main()  # pylint: disable=E1120
+    main()

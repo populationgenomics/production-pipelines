@@ -46,7 +46,7 @@ def _cohort_config(tmp_path) -> str:
     return conf
 
 
-def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+def mock_get_sgs(*args, **kwargs) -> list[dict]:
     return [
         {
             'id': 'CPGLCL17',
@@ -157,7 +157,7 @@ def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
     return {}
 
 
-def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
+def mock_get_pedigree(*args, **kwargs):
     return [
         {
             'family_id': 123,
@@ -253,7 +253,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     # )
 
 
-def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:
     return [
         {
             'id': 'CPGLCL17',
@@ -409,7 +409,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     assert test_sg2.alignment_input_by_seq_type == {}
 
 
-def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:
     return [
         {
             'id': 'CPGccc',
@@ -603,7 +603,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
     def mock_get_families_empty(*args, **kwargs):
         return []
 
-    def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
+    def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:
         return [
             {
                 'id': 'CPGccc',
