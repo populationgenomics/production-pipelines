@@ -82,7 +82,7 @@ class GatherBatchEvidence(CohortStage):
             'RD_stats': 'RD.QC_matrix.txt',
             'median_cov': 'medianCov.transposed.bed',
             'merged_dels': 'DEL.bed.gz',
-            'merged_dups': 'DUP.bed.gz'
+            'merged_dups': 'DUP.bed.gz',
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
@@ -294,7 +294,6 @@ class GenerateBatchMetrics(CohortStage):
                 outputs['metrics_file_batchmetrics'] = f'GenerateBatchMetrics.{get_workflow().output_version}'
 
         return outputs
-
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)

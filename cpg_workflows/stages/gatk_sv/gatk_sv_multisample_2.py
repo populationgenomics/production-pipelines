@@ -144,7 +144,6 @@ class MakeCohortVcf(CohortStage):
             'vcf': self.prefix / 'cleaned.vcf.gz',
             'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
             'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz',
-
             # if merge_intermediate_vcfs is enabled
             # 'cluster_vcf': '.combine_batches.vcf.gz',
             # 'cluster_vcf_index': '.combine_batches.vcf.gz.tbi',
@@ -497,7 +496,7 @@ class FilterGenotypes(CohortStage):
             'filtered_vcf': self.prefix / 'filtered.vcf.gz',
             'filtered_vcf_index': self.prefix / 'filtered.vcf.gz.tbi',
             'unfiltered_recalibrated_vcf': self.prefix / 'unfiltered_recalibrated.vcf.gz',
-            'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi'
+            'unfiltered_recalibrated_vcf_index': self.prefix / 'unfiltered_recalibrated.vcf.gz.tbi',
         }
 
         # if we don't run metrics, don't expect the outputs
