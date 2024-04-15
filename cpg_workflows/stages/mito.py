@@ -6,8 +6,9 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 
 """
 
-import hailtop.batch as hb
 from functools import cache
+
+import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
@@ -48,7 +49,7 @@ def get_mito_references(ref_path: str = 'gnomad_mito', shifted: bool = False) ->
         bwt=mito_fa + '.bwt',
         fai=mito_fa + '.fai',
         pac=mito_fa + '.pac',
-        sa=mito_fa + '.sa'
+        sa=mito_fa + '.sa',
     )
 
 
@@ -73,9 +74,7 @@ MAX_ALT_ALLELE_COUNT = 4
 @stage(
     required_stages=Align,
     analysis_type='mito-cram',
-    analysis_keys=[
-        'non_shifted_cram',
-    ],
+    analysis_keys=['non_shifted_cram'],
 )
 class RealignMito(SequencingGroupStage):
     """
