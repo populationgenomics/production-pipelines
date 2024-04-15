@@ -221,8 +221,7 @@ def _haplotype_caller_one(
     retry_gs_cp {str(cram_path.index_path)} $CRAI
 
     gatk --java-options \
-    "-Xms{job_res.get_java_mem_mb()}m \
-    -Xmx{job_res.get_java_mem_mb()}m \
+    "{job_res.java_mem_options()} \
     -XX:GCTimeLimit=50 \
     -XX:GCHeapFreeLimit=10" \\
     HaplotypeCaller \\
@@ -360,7 +359,7 @@ def postproc_gvcf(
     | bcftools view -Oz -o $GVCF_NODP
     tabix -p vcf $GVCF_NODP
 
-    gatk --java-options "-Xms{job_res.get_java_mem_mb()}m" \\
+    gatk --java-options "{job_res.java_mem_options()}" \\
     ReblockGVCF \\
     --reference {reference.base} \\
     -V $GVCF_NODP \\
