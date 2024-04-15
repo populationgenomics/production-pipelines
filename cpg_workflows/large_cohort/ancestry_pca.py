@@ -22,6 +22,7 @@ def add_background(
     Add background dataset samples to the dense MT and sample QC HT.
     """
     sites_table = get_config()['references']['ancestry']['sites_table']
+    allow_missing_columns = get_config()['large_cohort']['pca_background'].get('allow_missing_columns', False)
     qc_variants_ht = hl.read_table(sites_table)
     dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
@@ -43,7 +44,7 @@ def add_background(
             for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
-            metadata_tables = hl.Table.union(*metadata_tables)
+            metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
@@ -54,7 +55,7 @@ def add_background(
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
-        sample_qc_ht = sample_qc_ht.union(ht)
+        sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
     return dense_mt, sample_qc_ht
 
 

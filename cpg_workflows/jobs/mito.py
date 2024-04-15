@@ -358,7 +358,6 @@ def mito_mutect2(
     j.image(image_path('gatk'))
 
     res = STANDARD.set_resources(j, ncpu=4)
-    java_mem_mb = res.get_java_mem_mb()
 
     j.declare_resource_group(
         output_vcf={
@@ -369,7 +368,7 @@ def mito_mutect2(
     )
 
     cmd = f"""
-        gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
+        gatk --java-options "{res.java_mem_options()}" Mutect2 \
             -R {reference.base} \
             -I {cram.cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \

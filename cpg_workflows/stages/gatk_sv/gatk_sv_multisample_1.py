@@ -83,8 +83,13 @@ class GatherBatchEvidence(CohortStage):
             'median_cov': 'medianCov.transposed.bed',
             'merged_dels': 'DEL.bed.gz',
             'merged_dups': 'DUP.bed.gz',
-            'Matrix_QC_plot': '00_matrix_FC_QC.png',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_matrix_qc'):
+                ending_by_key['Matrix_QC_plot'] = '00_matrix_FC_QC.png'
+
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
 
@@ -191,9 +196,13 @@ class ClusterBatch(CohortStage):
         * Metrics
         """
 
-        ending_by_key = {
-            'metrics_file_clusterbatch': 'metrics.tsv',
-        }
+        ending_by_key = {}
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_clusterbatch'] = 'metrics.tsv'
+
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
             ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
@@ -274,10 +283,17 @@ class GenerateBatchMetrics(CohortStage):
         Metrics files
         """
 
-        return {
+        outputs = {
             'metrics': self.prefix / 'metrics.tsv',
             'metrics_common': self.prefix / 'metrics_common.tsv',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                outputs['metrics_file_batchmetrics'] = f'GenerateBatchMetrics.{get_workflow().output_version}'
+
+        return outputs
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
@@ -357,7 +373,6 @@ class FilterBatch(CohortStage):
         """
 
         ending_by_key: dict = {
-            'metrics_file_filterbatch': 'metrics.tsv',
             'filtered_pesr_vcf': 'filtered_pesr_merged.vcf.gz',
             'cutoffs': 'cutoffs',
             'scores': 'updated_scores',
@@ -365,6 +380,12 @@ class FilterBatch(CohortStage):
             'outlier_samples_excluded_file': 'outliers.samples.list',
             'batch_samples_postOutlierExclusion_file': 'outliers_excluded.samples.list',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_filterbatch'] = 'metrics.tsv'
+
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
 
@@ -551,8 +572,12 @@ class GenotypeBatch(CohortStage):
             'trained_PE_metrics': 'pe_metric_file.txt',
             'trained_SR_metrics': 'sr_metric_file.txt',
             'regeno_coverage_medians': 'regeno.coverage_medians_merged.bed',
-            'metrics_file_genotypebatch': 'metrics.tsv',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_genotypebatch'] = 'metrics.tsv'
 
         for mode in ['pesr', 'depth']:
             ending_by_key |= {
