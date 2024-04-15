@@ -4,7 +4,7 @@ Stages that implement GATK-gCNV.
 
 import json
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.inputs import get_cohort
@@ -586,7 +586,6 @@ class MtToEsCNV(DatasetStage):
                 f'Elasticsearch index for dataset {dataset}',
             )
 
-        from analysis_runner import dataproc
         from cpg_workflows.stages.seqr_loader import es_password
 
         # transformation is the same, just use the same methods file?

@@ -5,7 +5,7 @@ Hail Query stages for the Seqr loader workflow.
 """
 from typing import Any
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path, dataproc, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config, image_path
 from cpg_utils.hail_batch import query_command
@@ -264,10 +264,6 @@ class MtToEs(DatasetStage):
                 f'"elasticsearch" section is not defined in config, cannot create '
                 f'Elasticsearch index for dataset {dataset}',
             )
-
-        # Importing this requires CPG_CONFIG_PATH to be already set, that's why
-        # we are not importing it on the top level.
-        from analysis_runner import dataproc
 
         script = (
             f'cpg_workflows/dataproc_scripts/mt_to_es.py '

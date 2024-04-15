@@ -8,7 +8,7 @@ from datetime import datetime
 from os.path import join
 from typing import Any
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import (
     authenticate_cloud_credentials_in_job,
@@ -798,8 +798,6 @@ class MtToEsSv(DatasetStage):
                 f'"elasticsearch" section is not defined in config, cannot create '
                 f'Elasticsearch index for dataset {dataset}',
             )
-
-        from analysis_runner import dataproc
 
         # transformation is the same, just use the same methods file?
         script = (
