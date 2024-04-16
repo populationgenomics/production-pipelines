@@ -17,7 +17,6 @@ def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTa
     Output:
         - sites_table: MatrixTable containing high-quality sites
     """
-    init_batch()
     # Pre-filtering
     print('Filtering centromeres and telomeres')
     tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
@@ -78,6 +77,8 @@ def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTa
 @click.command()
 def main(vds_path):
     # Initialise batch
+    init_batch()
+
     b = get_batch()
 
     # Initialise job
