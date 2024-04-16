@@ -128,6 +128,7 @@ def main(vds_path):
         min_callrate=0.95,
         filter_lcr=False,  # Already filtered above
         filter_segdup=False,  # Already filtered above
+        filter_decoy=False,  # gnomad.resources.grch38.reference_data has no attribute 'decoy_intervals'
         checkpoint_path=gcs_output_path,
     )
     print('Done generating sites table')
