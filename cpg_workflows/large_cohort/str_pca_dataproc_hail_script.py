@@ -71,8 +71,8 @@ def pca_runner(file_path):
     #mt = mt.annotate_rows(segdup_region = hl.is_defined(segdups[mt.locus]))
     #mt = mt.filter_rows(mt.segdup_region == False)
 
-    # only keep STRs in the Illumina catalog intervals
-    illumina = hl.import_bed('gs://cpg-bioheart-test/str/batch_debug/Illumina_catalog.bed')
+    # only keep STRs in the EnsembleTR catalog intervals
+    illumina = hl.import_bed('gs://cpg-bioheart-test/str/batch_debug/EnsembleTR.bed')
     mt = mt.annotate_rows(illumina_region = hl.is_defined(illumina[mt.locus]))
     mt = mt.filter_rows(mt.illumina_region == True)
 
@@ -102,15 +102,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_16/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_16/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_16/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
