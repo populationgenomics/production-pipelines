@@ -8,8 +8,7 @@ from cpg_utils.hail_batch import (
     output_path,
     reference_path,
 )
-
-from gnomad_methods.gnomad.sample_qc.pipeline import get_qc_mt
+from gnomad.sample_qc.pipeline import get_qc_mt
 
 
 def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTable:
