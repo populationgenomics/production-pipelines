@@ -55,5 +55,18 @@ username = 'seqr'
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
 
+# switch off metrics workflows
 [resource_overrides.MakeCohortVcf]
+# this is passed to CleanVcf
 run_module_metrics = false
+
+# if you have to do it, bump the resources
+#[resource_overrides.MakeCohortVcf.runtime_override_plot_qc_per_family]
+#mem_gb = 32
+
+[resource_overrides.FilterGenotypes]
+run_qc = false
+
+# if you have to do it, bump the resources
+#[resource_overrides.FilterGenotypes.runtime_override_plot_qc_per_family]
+#mem_gb = 32

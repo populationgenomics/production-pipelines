@@ -62,7 +62,7 @@ interval_list = "stub"
 default = "{directory}"
 web = "{directory}-web"
 analysis = "{directory}-analysis"
-tmp = "{directory}-test-tmp"
+tmp = "://{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-input-dataset]
