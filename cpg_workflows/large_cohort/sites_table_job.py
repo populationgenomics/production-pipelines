@@ -1,3 +1,5 @@
+import os
+
 import click
 
 import hail as hl
@@ -141,7 +143,7 @@ def main(vds_path):
     print('here3 and output_path:', gcs_output_path, type(gcs_output_path))
 
     print(f'Writing sites table to {gcs_output_path}')
-    sites_table.checkpoint(gcs_output_path, overwrite=True)
+    sites_table.checkpoint(os.path.join(gcs_output_path, 'final_sites_table.mt'), overwrite=True)
     print('Done writing sites table')
 
 
