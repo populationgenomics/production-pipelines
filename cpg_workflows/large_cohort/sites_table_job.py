@@ -79,6 +79,7 @@ def main(vds_path):
     # Initialise batch
     init_batch()
 
+    vds = hl.vds.read_vds(str(vds_path))
     b = get_batch()
 
     # Initialise job
@@ -89,7 +90,7 @@ def main(vds_path):
     gcs_output_path = 'gs://cpg-thousand-genomes-test/exome/sites_table/'
     print('here3 and vds_path:', vds_path, type(vds_path))
     print('here3 and output_path:', gcs_output_path, type(gcs_output_path))
-    j.call(sites_table, vds_path, str(gcs_output_path))
+    j.call(sites_table, vds, str(gcs_output_path))
     print('here4')
 
     b.run(wait=False)
