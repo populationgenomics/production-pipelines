@@ -84,11 +84,16 @@ def main(vds_path):
     b = get_batch()
 
     # Initialise job
+    print('here1')
     j = b.new_python_job(name='Sites table job')
+    print('here2')
     gcs_output_path = output_path('sites_table.mt')
+    print('here3 and output_path:', gcs_output_path)
     j.call(sites_table, vds_path, str(gcs_output_path))
+    print('here4')
 
     b.run(wait=False)
+    print('here5')
 
 
 if __name__ == '__main__':
