@@ -63,9 +63,9 @@ def verifybamid(
     --Output OUTPUT \
     --BamFile $CRAM \
     --Reference {reference.base} \
-    --UDPath {b.read_input(str(contam_ud))} \
-    --MeanPath {b.read_input(str(contam_mu))} \
-    --BedPath {b.read_input(str(contam_bed))} \
+    --UDPath {b.read_input(contam_ud)} \
+    --MeanPath {b.read_input(contam_mu)} \
+    --BedPath {b.read_input(contam_bed)} \
     {extra_opts}
     1>/dev/null
 

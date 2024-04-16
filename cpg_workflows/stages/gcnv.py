@@ -128,7 +128,7 @@ class DeterminePloidy(CohortStage):
         ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
 
         jobs = gcnv.filter_and_determine_ploidy(
-            ploidy_priors_path=str(reference_path('gatk_sv/contig_ploidy_priors')),
+            ploidy_priors_path=reference_path('gatk_sv/contig_ploidy_priors'),
             preprocessed_intervals_path=prep_intervals['preprocessed'],
             annotated_intervals_path=prep_intervals['annotated'],
             counts_paths=ordered_read_counts,

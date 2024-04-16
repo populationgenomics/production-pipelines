@@ -261,10 +261,10 @@ def extract(
     STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
 
     ref = fasta_res_group(b)
-    sites = b.read_input(str(reference_path('somalier_sites')))
+    sites = b.read_input(reference_path('somalier_sites'))
 
     cmd = f"""\
-    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites').name}
+    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites')}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}

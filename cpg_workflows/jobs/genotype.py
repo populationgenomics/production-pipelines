@@ -332,7 +332,7 @@ def postproc_gvcf(
     )
 
     reference = fasta_res_group(b)
-    noalt_regions = b.read_input(str(reference_path('broad/noalt_bed')))
+    noalt_regions = b.read_input(reference_path('broad/noalt_bed'))
     gvcf = b.read_input(str(gvcf_path.path))
     gq_bands = get_config()['workflow']['reblock_gq_bands']
 

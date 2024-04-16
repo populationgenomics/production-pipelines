@@ -65,8 +65,8 @@ def annotate_cohort(
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
-    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
-    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
+    ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
+    clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
 
     logging.info('Annotating with seqr-loader fields: round 1')
 

@@ -3,6 +3,7 @@ FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 """
 
 import logging
+import os.path
 from enum import Enum
 from textwrap import dedent
 from typing import cast
@@ -449,7 +450,10 @@ def _align_one(
     elif aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
-            **{k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k) for k in DRAGMAP_INDEX_FILES},
+            **{
+                k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k)
+                for k in DRAGMAP_INDEX_FILES
+            },
         )
         if use_bazam:
             input_params = f'--interleaved=1 -b {r1_param}'

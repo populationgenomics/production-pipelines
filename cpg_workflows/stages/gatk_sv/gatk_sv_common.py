@@ -131,11 +131,11 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
         ref_d_key = ref_d_key.split('.')[-1]
         try:
-            res[key] = str(reference_path(f'gatk_sv/{ref_d_key}'))
+            res[key] = reference_path(f'gatk_sv/{ref_d_key}')
         except KeyError:
-            res[key] = str(reference_path(f'broad/{ref_d_key}'))
+            res[key] = reference_path(f'broad/{ref_d_key}')
         except ConfigError:
-            res[key] = str(reference_path(f'broad/{ref_d_key}'))
+            res[key] = reference_path(f'broad/{ref_d_key}')
 
     return res
 
@@ -235,22 +235,22 @@ def get_ref_panel(keys: list[str] | None = None) -> dict:
         k: v
         for k, v in {
             'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_panel_bincov_matrix': str(reference_path('broad/ref_panel_bincov_matrix')),
-            'contig_ploidy_model_tar': str(reference_path('gatk_sv/contig_ploidy_model_tar')),
+            'ref_panel_bincov_matrix': reference_path('broad/ref_panel_bincov_matrix'),
+            'contig_ploidy_model_tar': reference_path('gatk_sv/contig_ploidy_model_tar'),
             'gcnv_model_tars': [
-                str(reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
+                reference_path('gatk_sv/model_tar_tmpl').format(shard=i)
                 for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
             ],
             'ref_panel_PE_files': [
-                str(reference_path('gatk_sv/ref_panel_PE_file_tmpl')).format(sample=s)
+                reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
             'ref_panel_SR_files': [
-                str(reference_path('gatk_sv/ref_panel_SR_file_tmpl')).format(sample=s)
+                reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
             'ref_panel_SD_files': [
-                str(reference_path('gatk_sv/ref_panel_SD_file_tmpl')).format(sample=s)
+                reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s)
                 for s in get_config()['sv_ref_panel']['ref_panel_samples']
             ],
         }.items()

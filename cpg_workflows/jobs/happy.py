@@ -75,7 +75,7 @@ def happy(
     cmd = f"""\
     {extract_sample_cmd}
 
-    grep -v ^@ {b.read_input(str(eval_intervals_path))} > intervals.bed
+    grep -v ^@ {b.read_input(eval_intervals_path)} > intervals.bed
     head intervals.bed
 
     /opt/hap.py/bin/pre.py \
@@ -89,10 +89,10 @@ def happy(
     # "--false-positives" means confident regions
     /opt/hap.py/bin/hap.py \
     --threads {res.get_nthreads()} \
-    {b.read_input(str(truth_vcf_path))} \
+    {b.read_input(truth_vcf_path)} \
     $BATCH_TMPDIR/pre-processed.vcf.gz \
     {regions_opt} intervals.bed \
-    --false-positives {b.read_input(str(truth_bed_path))} \
+    --false-positives {b.read_input(truth_bed_path)} \
     --report-prefix $BATCH_TMPDIR/prefix \
     --reference {reference["base"]}
 

@@ -174,7 +174,7 @@ def vep_one(
 
     # check that the cache and image for this version exist
     vep_image = image_path(f'vep_{vep_version}')
-    vep_mount_path = reference_path(f'vep_{vep_version}_mount')
+    vep_mount_path = to_path(reference_path(f'vep_{vep_version}_mount'))
     assert all([vep_image, vep_mount_path])
     logging.info(f'Using VEP {vep_version}')
 

@@ -179,30 +179,30 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
     clinvar_file = reference_path('exomiser_core/clinvar_whitelist')
     core_group = get_batch().read_input_group(
         **{
-            'clinvar': str(clinvar_file),
+            'clinvar': clinvar_file,
             'clinvar_index': f'{clinvar_file}.tbi',
-            'genome_h2': str(reference_path('exomiser_core/genome_h2')),
-            'ensembl': str(reference_path('exomiser_core/ensembl_transcripts')),
-            'variants': str(reference_path('exomiser_core/variants')),
+            'genome_h2': reference_path('exomiser_core/genome_h2'),
+            'ensembl': reference_path('exomiser_core/ensembl_transcripts'),
+            'variants': reference_path('exomiser_core/variants'),
         },
     )
 
     # cadd
     cadd_group = get_batch().read_input_group(
         **{
-            'cadd_indel': str(reference_path('exomiser_cadd/indel_tsv')),
-            'cadd_indel_index': str(reference_path('exomiser_cadd/indel_index')),
-            'cadd_snv': str(reference_path('exomiser_cadd/snv_tsv')),
-            'cadd_snv_index': str(reference_path('exomiser_cadd/snv_index')),
+            'cadd_indel': reference_path('exomiser_cadd/indel_tsv'),
+            'cadd_indel_index': reference_path('exomiser_cadd/indel_index'),
+            'cadd_snv': reference_path('exomiser_cadd/snv_tsv'),
+            'cadd_snv_index': reference_path('exomiser_cadd/snv_index'),
         },
     )
 
     # phenotype
     phenotype = get_batch().read_input_group(
         **{
-            'pheno_db': str(reference_path('exomiser_phenotype/pheno_db')),
-            'hpo_obo': str(reference_path('exomiser_phenotype/hpo_obo')),
-            'rw_string': str(reference_path('exomiser_phenotype/rw_string')),
+            'pheno_db': reference_path('exomiser_phenotype/pheno_db'),
+            'hpo_obo': reference_path('exomiser_phenotype/hpo_obo'),
+            'rw_string': reference_path('exomiser_phenotype/rw_string'),
             'phenix_tar': f'{reference_path("exomiser_phenotype/phenix")}.tar.gz',
         },
     )
@@ -210,8 +210,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
     # remm
     remm_group = get_batch().read_input_group(
         **{
-            'remm': str(reference_path('exomiser_remm/remm_tsv')),
-            'remm_index': str(reference_path('exomiser_remm/remm_index')),
+            'remm': reference_path('exomiser_remm/remm_tsv'),
+            'remm_index': reference_path('exomiser_remm/remm_index'),
         },
     )
 

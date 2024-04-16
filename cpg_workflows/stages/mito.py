@@ -25,31 +25,31 @@ from cpg_workflows.workflow import (
 )
 
 MITO_REF = {
-    'dict': str(reference_path('gnomad_mito/dict')),
-    'base': str(reference_path('gnomad_mito/fasta')),
-    'amb': str(reference_path('gnomad_mito/fasta')) + '.amb',
-    'ann': str(reference_path('gnomad_mito/fasta')) + '.ann',
-    'bwt': str(reference_path('gnomad_mito/fasta')) + '.bwt',
-    'fai': str(reference_path('gnomad_mito/fasta')) + '.fai',
-    'pac': str(reference_path('gnomad_mito/fasta')) + '.pac',
-    'sa': str(reference_path('gnomad_mito/fasta')) + '.sa',
+    'dict': reference_path('gnomad_mito/dict'),
+    'base': reference_path('gnomad_mito/fasta'),
+    'amb': reference_path('gnomad_mito/fasta') + '.amb',
+    'ann': reference_path('gnomad_mito/fasta') + '.ann',
+    'bwt': reference_path('gnomad_mito/fasta') + '.bwt',
+    'fai': reference_path('gnomad_mito/fasta') + '.fai',
+    'pac': reference_path('gnomad_mito/fasta') + '.pac',
+    'sa': reference_path('gnomad_mito/fasta') + '.sa',
 }
 
 SHIFTED_MITO_REF = {
-    'dict': str(reference_path('gnomad_mito/shifted_dict')),
-    'base': str(reference_path('gnomad_mito/shifted_fasta')),
-    'amb': str(reference_path('gnomad_mito/shifted_fasta')) + '.amb',
-    'ann': str(reference_path('gnomad_mito/shifted_fasta')) + '.ann',
-    'bwt': str(reference_path('gnomad_mito/shifted_fasta')) + '.bwt',
-    'fai': str(reference_path('gnomad_mito/shifted_fasta')) + '.fai',
-    'pac': str(reference_path('gnomad_mito/shifted_fasta')) + '.pac',
-    'sa': str(reference_path('gnomad_mito/shifted_fasta')) + '.sa',
-    'shift_back_chain': str(reference_path('gnomad_mito/shift_back_chain')),
+    'dict': reference_path('gnomad_mito/shifted_dict'),
+    'base': reference_path('gnomad_mito/shifted_fasta'),
+    'amb': reference_path('gnomad_mito/shifted_fasta') + '.amb',
+    'ann': reference_path('gnomad_mito/shifted_fasta') + '.ann',
+    'bwt': reference_path('gnomad_mito/shifted_fasta') + '.bwt',
+    'fai': reference_path('gnomad_mito/shifted_fasta') + '.fai',
+    'pac': reference_path('gnomad_mito/shifted_fasta') + '.pac',
+    'sa': reference_path('gnomad_mito/shifted_fasta') + '.sa',
+    'shift_back_chain': reference_path('gnomad_mito/shift_back_chain'),
 }
 
 CONTROL_REGION_INTERVALS = {
-    'control_region_shifted': str(reference_path('gnomad_mito/shifted_control_region_interval')),
-    'non_control_region': str(reference_path('gnomad_mito/non_control_region_interval')),
+    'control_region_shifted': reference_path('gnomad_mito/shifted_control_region_interval'),
+    'non_control_region': reference_path('gnomad_mito/non_control_region_interval'),
 }
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167

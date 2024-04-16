@@ -107,8 +107,8 @@ def make_vqsr_jobs(
     """
     resources = {
         key: b.read_input_group(
-            base=str(reference_path(f'broad/{key}_vcf')),
-            index=str(reference_path(f'broad/{key}_vcf_index')),
+            base=reference_path(f'broad/{key}_vcf'),
+            index=reference_path(f'broad/{key}_vcf_index'),
         )
         for key in [
             'dbsnp',

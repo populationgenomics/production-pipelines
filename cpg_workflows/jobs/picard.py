@@ -52,7 +52,7 @@ def get_intervals(
 
     if scatter_count == 1:
         # Special case when we don't need to split
-        return None, [b.read_input(str(source_intervals_path))]
+        return None, [b.read_input(source_intervals_path)]
 
     if output_prefix:
         interval_lists_exist = all(
@@ -83,7 +83,7 @@ def get_intervals(
     UNIQUE=true \
     SORT=true \
     BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-    INPUT={b.read_input(str(source_intervals_path))} \
+    INPUT={b.read_input(source_intervals_path)} \
     OUTPUT=$BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out/*
@@ -209,11 +209,11 @@ def vcf_qc(
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(
-        base=str(reference_path('broad/dbsnp_vcf')),
-        index=str(reference_path('broad/dbsnp_vcf_index')),
+        base=reference_path('broad/dbsnp_vcf'),
+        index=reference_path('broad/dbsnp_vcf_index'),
     )
     sequencing_type = get_config()['workflow']['sequencing_type']
-    intervals_file = b.read_input(str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists')))
+    intervals_file = b.read_input(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists'))
 
     if is_gvcf:
         input_file = vcf_or_gvcf['g.vcf.gz']
@@ -348,7 +348,7 @@ def picard_hs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(str(reference_path('broad/exome_evaluation_interval_lists')))
+    interval_file = b.read_input(reference_path('broad/exome_evaluation_interval_lists'))
 
     assert cram_path.index_path
     cmd = f"""\
@@ -415,7 +415,7 @@ def picard_wgs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(str(reference_path('broad/genome_coverage_interval_list')))
+    interval_file = b.read_input(reference_path('broad/genome_coverage_interval_list'))
 
     assert cram_path.index_path
     cmd = f"""\
