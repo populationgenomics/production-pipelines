@@ -44,14 +44,14 @@ for (i in character_variables){
 }
 
 # match bioheart ID in metadata with scores
-metadata <- metadata[match(scores$external_id, metadata$bioheart_id), ]
+metadata <- metadata[match(scores$sample_id, metadata$sample_id), ]
 
 # plot data --------------------------------------------------
 
 gcs_image_outdir <- "gs://cpg-bioheart-test-web/tenk10k/"
 
 # assign covariates to plot
-sample_ids <- c("Sample.Name", "internal_id", "external_id", "record_id", "bioheart_id")
+sample_ids <- c("sample_id", "Sample.Name", "internal_id", "external_id", "record_id", "bioheart_id")
 descriptive_columns <- colnames(select(metadata,contains("desc")))
 subtract <- c(sample_ids, descriptive_columns)
 
@@ -83,7 +83,7 @@ plot.pca <- function(scores_df, metadata_df, variable_name){
         }
         print(p)
         # Copy pdf to system
-        # system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
+        system(glue("gsutil cp {metadata_plot} {gcs_image_outdir}"))
     }
     dev.off()
 }
