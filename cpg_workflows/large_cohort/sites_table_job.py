@@ -107,15 +107,15 @@ def main(vds_path):
     print('Done filtering low complexity regions and segmental duplications')
 
     print('Splitting multi-allelic sites')
-    print('Variant count before split:', vds.variant_data.count())
+    # print('Variant count before split:', vds.variant_data.count())
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
-    print('Variant count after split:', vds.variant_data.count())
+    # print('Variant count after split:', vds.variant_data.count())
     print('Done splitting multi-allelic sites')
 
     print('Densifying VDS')
-    print('Variant count before densify:', vds.variant_data.count())
+    # print('Variant count before densify:', vds.variant_data.count())
     mt = hl.vds.to_dense_mt(vds)
-    print('Variant count after densify:', mt.count())
+    # print('Variant count after densify:', mt.count())
     # mt.show(n_cols=10)
     print('Done densifying VDS')
 
