@@ -29,7 +29,7 @@ def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTa
     print('Done filtering centromeres and telomeres')
 
     print('Filtering to autosomes')
-    autosome_vds = hl.vds.filter_chromosomes(vds, keep=[f'chr{chrom}' for chrom in range(1, 23)])
+    vds = hl.vds.filter_chromosomes(vds, keep=[f'chr{chrom}' for chrom in range(1, 23)])
     print('Done filtering to autosomes')
 
     print('Filtering low complexity regions and segmental duplications')
