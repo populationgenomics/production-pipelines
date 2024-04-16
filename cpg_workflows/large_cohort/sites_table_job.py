@@ -7,7 +7,7 @@ from cpg_utils.hail_batch import get_batch, init_batch, output_path, reference_p
 from gnomad.sample_qc.pipeline import get_qc_mt
 
 
-def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTable:
+def sites_table(vds_path: str, gcs_output_path: str) -> hl.MatrixTable:
     """
     Select variants within high-quality intervals according to gnomAD v4 criteria.
 
@@ -17,6 +17,8 @@ def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTa
     Output:
         - sites_table: MatrixTable containing high-quality sites
     """
+    vds = hl.vds.read_vds(str(vds_path))
+
     # Pre-filtering
     print('Filtering centromeres and telomeres')
     tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
@@ -79,7 +81,6 @@ def main(vds_path):
     # Initialise batch
     init_batch()
 
-    vds = hl.vds.read_vds(str(vds_path))
     b = get_batch()
 
     # Initialise job
@@ -90,7 +91,7 @@ def main(vds_path):
     gcs_output_path = 'gs://cpg-thousand-genomes-test/exome/sites_table/'
     print('here3 and vds_path:', vds_path, type(vds_path))
     print('here3 and output_path:', gcs_output_path, type(gcs_output_path))
-    j.call(sites_table, vds, str(gcs_output_path))
+    j.call(sites_table, vds_path, str(gcs_output_path))
     print('here4')
 
     b.run(wait=False)
