@@ -3,11 +3,7 @@ import click
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.hail_batch import (
-    get_batch,
-    output_path,
-    reference_path,
-)
+from cpg_utils.hail_batch import get_batch, init_batch, output_path, reference_path
 from gnomad.sample_qc.pipeline import get_qc_mt
 
 
@@ -21,6 +17,7 @@ def sites_table(vds: hl.vds.VariantDataset, gcs_output_path: str) -> hl.MatrixTa
     Output:
         - sites_table: MatrixTable containing high-quality sites
     """
+    init_batch()
     # Pre-filtering
     print('Filtering centromeres and telomeres')
     tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
