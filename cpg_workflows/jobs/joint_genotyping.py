@@ -47,6 +47,7 @@ def make_joint_genotyping_jobs(
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
+    exclude_intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -70,6 +71,7 @@ def make_joint_genotyping_jobs(
     intervals_j, intervals = get_intervals(
         b=b,
         source_intervals_path=intervals_path,
+        exclude_intervals_path=exclude_intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
         output_prefix=tmp_bucket / f'intervals_{scatter_count}',
