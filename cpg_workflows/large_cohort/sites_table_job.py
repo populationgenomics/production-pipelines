@@ -86,7 +86,7 @@ def main(vds_path):
     # Initialise job
     j = b.new_python_job(name='Sites table job')
     gcs_output_path = output_path('sites_table.mt')
-    j.call(sites_table, vds_path, gcs_output_path)
+    j.call(sites_table, vds_path, str(gcs_output_path))
 
     b.run(wait=False)
 
