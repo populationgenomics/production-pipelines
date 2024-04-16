@@ -116,8 +116,10 @@ def main(vds_path):
     print('Variant count before densify:', vds.variant_data.count())
     mt = hl.vds.to_dense_mt(vds)
     print('Variant count after densify:', mt.count())
-    mt.show(n_cols=10)
+    # mt.show(n_cols=10)
     print('Done densifying VDS')
+
+    gcs_output_path = 'gs://cpg-thousand-genomes-test/exome/sites_table/'
 
     print('Generating sites table')
     sites_table = get_qc_mt(
@@ -134,7 +136,6 @@ def main(vds_path):
 
     print('here1 and vds_path:', vds_path, type(vds_path))
     print('here2')
-    gcs_output_path = 'gs://cpg-thousand-genomes-test/exome/sites_table/'
     print('here3 and vds_path:', vds_path, type(vds_path))
     print('here3 and output_path:', gcs_output_path, type(gcs_output_path))
 
