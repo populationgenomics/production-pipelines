@@ -79,6 +79,7 @@ class JointGenotyping(CohortStage):
                 else joint_genotyping.JointGenotyperTool.GenotypeGVCFs
             ),
             intervals_path=get_config()['workflow'].get('intervals_path'),
+            exclude_intervals_path=get_config()['workflow'].get('exclude_intervals_path'),
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,

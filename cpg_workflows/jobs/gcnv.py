@@ -104,10 +104,9 @@ def collect_read_counts(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     cmd = f"""
-    gatk {resource_string} CollectReadCounts \\
+    gatk --java-options "{job_res.java_mem_options()}" CollectReadCounts \\
       --reference {reference.base} --intervals {intervals_path} \\
       --interval-merging-rule OVERLAPPING_ONLY \\
       --input {cram_path.path} --read-index {cram_path.index_path} \\
@@ -156,7 +155,6 @@ def filter_and_determine_ploidy(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(j)
-    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     counts_input_args = _counts_input_args(counts_paths)
     cmd = ''
@@ -169,7 +167,7 @@ def filter_and_determine_ploidy(
         annotated_intervals = get_batch().read_input(str(annotated_intervals_path))
 
         cmd += f"""
-        gatk {resource_string} FilterIntervals \\
+        gatk --java-options "{job_res.java_mem_options()}" FilterIntervals \\
           --interval-merging-rule OVERLAPPING_ONLY \\
           --intervals {preprocessed_intervals} --annotated-intervals {annotated_intervals} \\
           {counts_input_args} \\
@@ -184,7 +182,7 @@ def filter_and_determine_ploidy(
     ploidy_priors = get_batch().read_input(ploidy_priors_path)
 
     cmd += f"""
-    gatk {resource_string} DetermineGermlineContigPloidy \\
+    gatk --java-options "{job_res.java_mem_options()}" DetermineGermlineContigPloidy \\
       --interval-merging-rule OVERLAPPING_ONLY \\
       --intervals {filtered} --contig-ploidy-priors {ploidy_priors} \\
       {counts_input_args} \\
@@ -255,14 +253,13 @@ def shard_gcnv(
         # set highmem resources for this job
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
-        resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
 
         {select_cmd} < {filtered_intervals} > {j.shard_intervals}
 
-        gatk {resource_string} GermlineCNVCaller \\
+        gatk --java-options "{job_res.java_mem_options()}" GermlineCNVCaller \\
           --run-mode COHORT --interval-merging-rule OVERLAPPING_ONLY \\
           --intervals {j.shard_intervals} --annotated-intervals {annotated_intervals} \\
           {counts_input_args} \\
@@ -309,7 +306,6 @@ def postprocess_calls(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=20)
     job_res.set_to_job(j)
-    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     reference = fasta_res_group(get_batch())
 
@@ -356,7 +352,7 @@ def postprocess_calls(
     OUTS=$(dirname {j.output['intervals.vcf.gz']})
     BATCH_OUTS=$(dirname $OUTS)
     mkdir $OUTS
-    gatk {resource_string} PostprocessGermlineCNVCalls \\
+    gatk --java-options "{job_res.java_mem_options()}" PostprocessGermlineCNVCalls \\
       --sequence-dictionary {reference.dict} {allosomal_contigs_args} \\
       --contig-ploidy-calls $BATCH_TMPDIR/inputs/ploidy-calls \\
       {model_shard_args} {calls_shard_args} \\
@@ -430,7 +426,6 @@ def joint_segment_vcfs(
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
     job_res.set_to_job(job)
-    resource_string = f'--java-options "-Xms{job_res.get_java_mem_mb()}m -Xmx{job_res.get_java_mem_mb()}m"'
 
     vcf_string = ''
     for each_vcf in segment_vcfs:
@@ -440,7 +435,7 @@ def joint_segment_vcfs(
     job.command(
         f"""
     set -e
-    gatk {resource_string} JointGermlineCNVSegmentation \\
+    gatk --java-options "{job_res.java_mem_options()}" JointGermlineCNVSegmentation \\
         -R {reference.base} \\
         -O {job.output["vcf.gz"]} \\
         {vcf_string} \\

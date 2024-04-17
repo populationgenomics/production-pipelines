@@ -55,12 +55,14 @@ liftover_38_to_37 = "stub"
 somalier_sites = "stub"
 seqr_combined_reference_data = "stub"
 seqr_clinvar = "stub"
+[references.hg38_telomeres_and_centromeres_intervals]
+interval_list = "stub"
 
 [storage.default]
 default = "{directory}"
 web = "{directory}-web"
 analysis = "{directory}-analysis"
-tmp = "{directory}-test-tmp"
+tmp = "://{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-input-dataset]
