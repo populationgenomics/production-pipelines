@@ -63,7 +63,7 @@ jobs:
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:latest
           docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
           docker push $DOCKER_MAIN/$IMAGE_NAME:latest
-  
+
   docker-dev:
     if: github.ref_name != 'main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
