@@ -51,7 +51,9 @@ def get_intervals(
     """
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
-    source_intervals_path = str(source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists'))
+    source_intervals_path = str(
+        source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists'),
+    )
     exclude_intervals_path = (
         exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres_intervals/interval_list') or None
     )
