@@ -5,7 +5,8 @@ import click
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.hail_batch import get_batch, init_batch, output_path, reference_path
+from cpg_utils.config import output_path
+from cpg_utils.hail_batch import get_batch, init_batch, reference_path
 from gnomad.sample_qc.pipeline import get_qc_mt
 
 
@@ -103,7 +104,7 @@ def main(vds_path):
     # repartition table after pruning
     pruned_variant_table = pruned_variant_table.repartition(100, shuffle=False)
     print('Done repartitioning sites table')
-    pruned_variant_table.checkpoint(output_path('final_sites_table.mt', 'test'), overwrite=True)
+    pruned_variant_table.checkpoint(output_path('final_sites_table.mt', 'default'), overwrite=True)
     print('Done writing sites table')
 
 
