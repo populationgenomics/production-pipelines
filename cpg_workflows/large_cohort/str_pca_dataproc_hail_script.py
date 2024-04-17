@@ -18,17 +18,17 @@ def pca_runner(file_path):
             hl.missing('int32'),
         ),
     )
-    table_geno_pcs = hl.import_table(
-        'gs://cpg-bioheart-test/str/anndata/saige-qtl/input_files/covariates/sex_age_geno_pcs_tob_bioheart.csv',
-        delimiter=',',
-        impute=True,
-    )
+    #table_geno_pcs = hl.import_table(
+    #    'gs://cpg-bioheart-test/str/anndata/saige-qtl/input_files/covariates/sex_age_geno_pcs_tob_bioheart.csv',
+    #    delimiter=',',
+    #    impute=True,
+    #)
 
-    table_geno_pcs = table_geno_pcs.key_by('sample_id')
-    mt = mt.annotate_cols(sample_id = 'CPG'+hl.str(mt.s))
-    mt = mt.key_cols_by('sample_id')
-    mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.sample_id].geno_PC1))
-    mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.sample_id].geno_PC6))
+    #table_geno_pcs = table_geno_pcs.key_by('sample_id')
+    #mt = mt.annotate_cols(sample_id = 'CPG'+hl.str(mt.s))
+    #mt = mt.key_cols_by('sample_id')
+    #mt = mt.annotate_cols(geno_pc1=hl.float(table_geno_pcs[mt.sample_id].geno_PC1))
+    #mt = mt.annotate_cols(geno_pc6=hl.float(table_geno_pcs[mt.sample_id].geno_PC6))
     # remove ancestry outliers
     #mt = mt.filter_cols(
     #    (mt.geno_pc1 >=0.01) & (mt.geno_pc6 <= 0.04) & (mt.geno_pc6 >= -0.03)& (mt.geno_pc6 <= 0.01)
@@ -72,9 +72,9 @@ def pca_runner(file_path):
     #mt = mt.filter_rows(mt.segdup_region == False)
 
     # only keep STRs in the EnsembleTR catalog intervals
-    illumina = hl.import_bed('gs://cpg-bioheart-test/str/batch_debug/EnsembleTR.bed')
-    mt = mt.annotate_rows(illumina_region = hl.is_defined(illumina[mt.locus]))
-    mt = mt.filter_rows(mt.illumina_region == True)
+    #illumina = hl.import_bed('gs://cpg-bioheart-test/str/batch_debug/EnsembleTR.bed')
+    #mt = mt.annotate_rows(illumina_region = hl.is_defined(illumina[mt.locus]))
+    #mt = mt.filter_rows(mt.illumina_region == True)
 
     # tighten hwep
     #annotations = hl.read_matrix_table('gs://cpg-bioheart-test/str/polymorphic_run_n2045/annotated_mt/v2/str_annotated.mt')
@@ -102,15 +102,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/qc/iterative_pca/option_17/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
