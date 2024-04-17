@@ -7,13 +7,11 @@ from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import (
     Batch,
     command,
     fasta_res_group,
-    image_path,
-    reference_path,
 )
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import STANDARD

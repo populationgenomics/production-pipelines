@@ -9,8 +9,8 @@ import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, reference_path
-from cpg_utils.hail_batch import get_batch, image_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.scripts import collect_dataset_tsvs
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
