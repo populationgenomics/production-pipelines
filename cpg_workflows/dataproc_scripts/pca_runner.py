@@ -24,7 +24,7 @@ def pca_runner(vds_path, sample_id_file_path):
     mt = mt.filter_rows(hl.is_defined(qc_variants_ht[mt.locus]))
 
     mt = mt.checkpoint(output_path('checkpoint.mt', 'tmp'))
-    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt.GT, k=2, compute_loadings=True)
+    eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt.GT, k=10, compute_loadings=True)
 
     scores_output_path = output_path('scores.tsv', 'analysis')
     scores.export(scores_output_path)
