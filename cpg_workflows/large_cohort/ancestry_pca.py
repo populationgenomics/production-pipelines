@@ -60,7 +60,7 @@ def add_background(
         sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
 
     if drop_columns:
-        sample_qc_ht = sample_qc_ht.drop(drop_columns)
+        sample_qc_ht = sample_qc_ht.drop(*drop_columns)
     return dense_mt, sample_qc_ht
 
 
