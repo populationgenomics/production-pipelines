@@ -26,7 +26,7 @@ def pca_runner(vds_path, sample_id_file_path):
     eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt.GT, k=10, compute_loadings=True)
 
     scores_output_path = output_path('scores.tsv', 'analysis')
-    scores.export(str(scores_output_path))
+    scores.export(scores_output_path)
 
     loadings_output_path = output_path('loadings.tsv', 'analysis')
     loadings.export(str(loadings_output_path))
