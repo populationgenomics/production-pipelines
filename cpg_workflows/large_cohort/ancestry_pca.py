@@ -24,6 +24,7 @@ def add_background(
     """
     sites_table = get_config()['references']['ancestry']['sites_table']
     allow_missing_columns = get_config()['large_cohort']['pca_background'].get('allow_missing_columns', False)
+    drop_columns = get_config()['large_cohort']['pca_background'].get('drop_columns')
     qc_variants_ht = hl.read_table(sites_table)
     dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
@@ -57,6 +58,9 @@ def add_background(
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
         sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
+
+    if drop_columns:
+        sample_qc_ht = sample_qc_ht.drop(*drop_columns)
     return dense_mt, sample_qc_ht
 
 

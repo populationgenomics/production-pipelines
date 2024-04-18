@@ -61,6 +61,8 @@ inferred_ancestry = false
 
 # Set whether to allow column discrepancies when unioning background dataset tables
 #allow_missing_columns = false
+# Columns to be dropped from the final unioned background table
+#drop_columns = ['autosomal_mean_dp']
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and
