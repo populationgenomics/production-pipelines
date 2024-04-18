@@ -90,8 +90,12 @@ def run(
 
     if subset := get_config()['large_cohort'].get('pca_subset', False):
         sgids_keep = get_config().get('only_sgs', [])
-        dense_mt = dense_mt.filter_cols(hl.literal(sgids_keep).contains(dense_mt.s))
-        sample_qc_ht = sample_qc_ht.filter(hl.literal(sgids_keep).contains(sample_qc_ht.s))
+        if not sgids_keep:
+            logging.info('No specific samples provided for subsetting. Continuing with the full cohort.')
+        else:
+            logging.info(f'Subsetting samples prior to PCA analysis. Subsetting to {sgids_keep}')
+            dense_mt = dense_mt.filter_cols(hl.literal(sgids_keep).contains(dense_mt.s))
+            sample_qc_ht = sample_qc_ht.filter(hl.literal(sgids_keep).contains(sample_qc_ht.s))
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
