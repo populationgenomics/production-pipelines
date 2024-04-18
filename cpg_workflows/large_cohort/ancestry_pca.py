@@ -88,6 +88,11 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
+    if subset := get_config()['large_cohort'].get('pca_subset', False):
+        sgids_keep = get_config().get('only_sgs', [])
+        dense_mt = dense_mt.filter_cols(hl.literal(sgids_keep).contains(dense_mt.s))
+        sample_qc_ht = sample_qc_ht.filter(hl.literal(sgids_keep).contains(sample_qc_ht.s))
+
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
         logging.info(f'Adding background datasets using following config: {pca_background}')
