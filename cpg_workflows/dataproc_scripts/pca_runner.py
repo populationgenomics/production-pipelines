@@ -21,8 +21,7 @@ def pca_runner(vds_path, sample_id_file_path):
     qc_variants_ht = hl.read_table(sites_table)
     qc_variants_ht = qc_variants_ht.key_by('locus')
 
-    mt = mt.annotate_rows(sites_locus=hl.is_defined(qc_variants_ht[mt.locus]))
-    mt = mt.filter_rows(mt.sites_locus == True)
+    mt = mt.filter_rows(hl.is_defined(qc_variants_ht[mt.locus]))
 
     eigenvalues, scores, loadings = hl.hwe_normalized_pca(mt.GT, k=10, compute_loadings=True)
 
