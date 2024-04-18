@@ -6,6 +6,7 @@ Script to submit a dataproc job to run a SNP PCA
 
 """
 import click
+
 from cpg_utils.hail_batch import get_batch
 
 
