@@ -71,17 +71,11 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'Configs are merged left to right, meaning the rightmost file has the'
     'highest priority.',
 )
+@click.option('--list_workflows', is_flag=True, help='List names and final stages for each workflow, then exit.')
 @click.option(
-    '--list-workflows',
-    'list_workflows',
+    '--list_last_stages',
     is_flag=True,
-    help='Only list possible values for WORKFLOW (and available last stages)',
-)
-@click.option(
-    '--list-last-stages',
-    'list_last_stages',
-    is_flag=True,
-    help='Only list possible end stages for a workflow, that can be specified with `workflow/last_stages` in config',
+    help='List end stages for the selected workflow, then exit. Requires "--workflow" to be set.',
 )
 @click.option(
     '--dry-run',
@@ -90,11 +84,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     help='Dry run: do not actually communicate with Metamist or Hail Batch, '
     'instead only print a final config and stages to be run',
 )
-@click.option(
-    '--verbose',
-    'verbose',
-    is_flag=True,
-)
+@click.option('--verbose', 'verbose', is_flag=True)
 def main(
     workflow: str,
     config_paths: list[str],
@@ -109,13 +99,14 @@ def main(
     fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
 
-    if not workflow and not list_workflows:
-        click.echo('You must specify WORKFLOW as a first positional command line argument.')
-    if not workflow or list_workflows or workflow == 'list':
+    if list_workflows:
         click.echo('Available values for WORKFLOW (and corresponding last stages):')
         for wfl, last_stages in WORKFLOWS.items():
             click.echo(f'\t{wfl} ({", ".join(s.__name__ for s in last_stages)})')
         return
+
+    else:
+        assert workflow in WORKFLOWS, f'Invalid workflow: {workflow}'
 
     if list_last_stages:
         click.echo(
