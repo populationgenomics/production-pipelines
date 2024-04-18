@@ -21,7 +21,7 @@ def main(vds_path, sample_id_file_path):
         function=pca_runner,
         function_path_args=dict(vds_path=vds_path, sample_id_file_path=sample_id_file_path),
         job_name='SNP-PCA',
-        num_workers=5,
+        num_workers=20,
     )
 
     get_batch(name='SNP PCA Data proc job').run(wait=False)
