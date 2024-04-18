@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, try_get_ar_guid, config_retrieve
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
@@ -187,7 +187,7 @@ class EvidenceQC(CohortStage):
             input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sgids]
 
         input_dict |= get_images(
-            ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker']
+            ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker'],
         )
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
@@ -247,7 +247,7 @@ class CreateSampleBatches(CohortStage):
         max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
 
         if len(sequencing_groups) < min_batch_size:
-            logging.error(f'Too few sequencing groups to form batches')
+            logging.error('Too few sequencing groups to form batches')
             raise RuntimeError('too few samples to create batches')
 
         py_job = get_batch().new_python_job('create_sample_batches')
