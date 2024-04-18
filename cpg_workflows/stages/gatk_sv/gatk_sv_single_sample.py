@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, try_get_ar_guid, config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
@@ -124,7 +124,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
             'dataset': sequencing_group.dataset.name,  # already lowercase
-            'sequencing-group': sequencing_group.id.lower(),  # cpg123123
+            'sequencing-group': sequencing_group.id.lower(),
             'stage': self.name.lower(),
             AR_GUID_NAME: try_get_ar_guid(),
         }
@@ -187,12 +187,7 @@ class EvidenceQC(CohortStage):
             input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sgids]
 
         input_dict |= get_images(
-            [
-                'sv_base_mini_docker',
-                'sv_base_docker',
-                'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
-            ],
+            ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker']
         )
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
@@ -213,12 +208,7 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(
-    required_stages=EvidenceQC,
-    analysis_type='sv',
-    analysis_keys=['batch_json_negative', 'batch_json_positive'],
-    tolerate_missing_output=True,
-)
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
 class CreateSampleBatches(CohortStage):
     """
     uses the values generated in EvidenceQC
@@ -237,52 +227,38 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            'batch_json_positive': self.prefix / 'pcr_positive_batches.json',
-            'batch_json_negative': self.prefix / 'pcr_negative_batches.json',
-        }
+        return {'batch_json': self.prefix / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        this stage has been clarified - this will only run on Genomes
+        Exomes were never a supported case, they have a separate pipeline
+        """
+
         expected = self.expected_outputs(cohort)
 
-        # PCR +/- logic is only relevant to exomes
-        if get_config()['workflow'].get('sequencing_type') != 'genome':
-            sequencing_group_types = {'exome': [sg.id for sg in cohort.get_sequencing_groups()]}
-        # within exomes, divide into PCR- and all other sequencing groups
-        # this logic is currently invalid, as pcr_status isn't populated
-        # TODO resolve issue #575
-        else:
-            sequencing_group_types = {'positive': [], 'negative': []}
-            for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
-                    sequencing_group_types['negative'].append(sequencing_group.id)
-                else:
-                    sequencing_group_types['positive'].append(sequencing_group.id)
+        if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
+            raise RuntimeError('This workflow is not intended for Exome data')
+
+        sequencing_groups = [sequencing_group.id for sequencing_group in cohort.get_sequencing_groups()]
 
         # get those settings
-        min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
-        max_batch_size = get_config()['workflow'].get('max_batch_size', 300)
+        min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)
+        max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
 
-        all_jobs = []
+        if len(sequencing_groups) < min_batch_size:
+            logging.error(f'Too few sequencing groups to form batches')
+            raise RuntimeError('too few samples to create batches')
 
-        for status, sequencing_groups in sequencing_group_types.items():
-            if not sequencing_groups:
-                logging.info(f'No {status} sequencing groups found')
-                continue
-            elif len(sequencing_groups) < min_batch_size:
-                logging.info(f'Too few {status} sequencing groups to form batches')
-                continue
-            logging.info(f'Creating {status} sequencing group batches')
-            py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
-            py_job.image(get_config()['workflow']['driver_image'])
-            py_job.call(
-                sample_batching.partition_batches,
-                inputs.as_dict(cohort, EvidenceQC)['qc_table'],
-                sequencing_groups,
-                expected[f'batch_json_{status}'],
-                min_batch_size,
-                max_batch_size,
-            )
-            all_jobs.append(py_job)
+        py_job = get_batch().new_python_job('create_sample_batches')
+        py_job.image(config_retrieve(['workflow', 'driver_image']))
+        py_job.call(
+            sample_batching.partition_batches,
+            inputs.as_dict(cohort, EvidenceQC)['qc_table'],
+            sequencing_groups,
+            expected['batch_json'],
+            min_batch_size,
+            max_batch_size,
+        )
 
-        return self.make_outputs(cohort, data=expected, jobs=all_jobs)
+        return self.make_outputs(cohort, data=expected, jobs=py_job)
