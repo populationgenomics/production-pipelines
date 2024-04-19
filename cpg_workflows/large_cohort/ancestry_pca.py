@@ -89,7 +89,7 @@ def run(
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
     if subset := get_config()['large_cohort'].get('pca_subset', False):
-        sgids_keep = get_config().get('only_sgs', [])
+        sgids_keep = get_config()['workflow'].get('only_sgs', [])
         if not sgids_keep:
             logging.info('No specific samples provided for subsetting. Continuing with the full cohort.')
         else:
