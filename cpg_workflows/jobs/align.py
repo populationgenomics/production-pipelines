@@ -2,6 +2,7 @@
 FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 """
 
+import hashlib
 import logging
 from enum import Enum
 from textwrap import dedent
@@ -10,7 +11,7 @@ from typing import cast
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import CloudPath, Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
 from cpg_workflows.filetypes import (
@@ -103,7 +104,54 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     return alignment_input
 
 
+def hack_store_file(
+    self,
+    filename: str | Path,
+) -> Path | hb.ResourceFile:
+    """Store a file"""
+    path = to_path(filename)
+    dry_run = get_config()['hail'].get('dry_run', False)
+    if dry_run or not isinstance(self._backend, hb.ServiceBackend):
+        return path.absolute()
+
+    cksum = hashlib.sha256(str(filename).encode()).hexdigest()
+    cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
+    assert isinstance(cloud_path, CloudPath)
+
+    cloud_path.upload_from(filename)
+    return self.read_input(str(cloud_path))
+
+
 def align(
+    b,
+    sequencing_group: SequencingGroup,
+    job_attrs: dict | None = None,
+    output_path: CramPath | None = None,
+    out_markdup_metrics_path: Path | None = None,
+    aligner: Aligner = Aligner.DRAGMAP,
+    markdup_tool: MarkDupTool = MarkDupTool.PICARD,
+    extra_label: str | None = None,
+    overwrite: bool = False,
+    requested_nthreads: int | None = None,
+) -> list[Job]:
+    j = b.new_job('Test storing', (job_attrs or {}) | dict(tool='fooscript'))
+    j.image(image_path('samtools'))
+
+    foo_script = hack_store_file(b, 'cpg_workflows/jobs/doecho.sh')
+    logging.info(f'foo_script is {type(foo_script)=} {foo_script=}')
+
+    cmd = f"""
+    echo hello
+    sh {foo_script} hello world
+    echo done
+    """
+
+    j.command(command(cmd))
+
+    return [j]
+
+
+def align_orig(
     b,
     sequencing_group: SequencingGroup,
     job_attrs: dict | None = None,

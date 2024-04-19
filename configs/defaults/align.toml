@@ -1,0 +1,4 @@
+[workflow]
+name = 'align'
+check_intermediates = false
+check_expected_outputs = false

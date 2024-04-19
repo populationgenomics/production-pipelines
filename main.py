@@ -3,6 +3,7 @@
 """
 Entry point to run workflows.
 """
+import logging
 import os
 
 import click
@@ -12,6 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
+from cpg_workflows.stages.align import Align
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -58,6 +60,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample_2': [MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
+    'align': [Align],
 }
 
 
@@ -108,6 +111,7 @@ def main(
     """
     fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
+    logging.info(f'At startup, cwd is {os.getcwd()}')
 
     if not workflow and not list_workflows:
         click.echo('You must specify WORKFLOW as a first positional command line argument.')
