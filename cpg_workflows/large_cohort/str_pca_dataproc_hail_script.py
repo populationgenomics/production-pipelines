@@ -44,7 +44,9 @@ def pca_runner(file_path):
     mt = mt.filter_cols(hl.literal(remove_samples).contains(mt.s), keep=False)
 
     # remove outlier
-    mt = mt.filter_cols(mt.s!= 'CPG309245', keep = True)
+    ids_to_filter = ['CPG309245', 'CPG315648','CPG312819','CPG316182','CPG311522','CPG315689','CPG315655','CPG310078']
+    mt = mt.filter_cols(hl.literal(ids_to_filter).contains(mt.s), keep = False)
+
 
     # remove putative variants driving the batch effect
     #table_variants = hl.import_table('gs://cpg-bioheart-test/str/filtered_variants_opt13.csv')
@@ -105,15 +107,15 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.sum_length_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/remove_outlier/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/remove_outlier/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/eigenvalues.txt').open('w') as f:
+    with to_path('gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca/standard_filters/remove_outlier/eigenvalues.txt').open('w') as f:
         for item in eigenvalues_list:
             f.write(f'{item}\n')
