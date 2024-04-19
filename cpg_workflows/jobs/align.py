@@ -118,7 +118,7 @@ def hack_store_file(
     cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
     assert isinstance(cloud_path, CloudPath)
 
-    cloud_path.upload_from(filename)
+    cloud_path.upload_from(filename, force_overwrite_to_cloud=True)
     return self.read_input(str(cloud_path))
 
 
