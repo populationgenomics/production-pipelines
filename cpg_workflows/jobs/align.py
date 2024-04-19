@@ -8,6 +8,8 @@ from enum import Enum
 from textwrap import dedent
 from typing import cast
 
+from cloudpathlib.exceptions import OverwriteNewerCloudError
+
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -118,7 +120,10 @@ def hack_store_file(
     cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
     assert isinstance(cloud_path, CloudPath)
 
-    cloud_path.upload_from(filename, force_overwrite_to_cloud=True)
+    try:
+        cloud_path.upload_from(filename)
+    except OverwriteNewerCloudError:
+        logging.info(f'hack_store_file: already uploaded {cloud_path}')
     return self.read_input(str(cloud_path))
 
 
