@@ -22,31 +22,54 @@ def add_background(
     """
     Add background dataset samples to the dense MT and sample QC HT.
     """
+    logging.info('Getting config parameters')
     sites_table = get_config()['references']['ancestry']['sites_table']
     allow_missing_columns = get_config()['large_cohort']['pca_background'].get('allow_missing_columns', False)
     drop_columns = get_config()['large_cohort']['pca_background'].get('drop_columns')
+    logging.info(
+        f'Config parameters: sites_table: {sites_table}, allow_missing_columns: {allow_missing_columns}, drop_columns: {drop_columns}',
+    )
+    logging.info(f'Reading in sites table from {sites_table}')
     qc_variants_ht = hl.read_table(sites_table)
+    logging.info(f'Selecting GT, GQ, DP, AD from dense_mt {dense_mt}')
     dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+    dataset = get_config()['large_cohort']['pca_background']
+    logging.info(f'Dataset to add will be: {dataset}')
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
+        logging.info(f'Adding background dataset {dataset}')
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
+        logging.info(f'Dataset dict: {dataset_dict}')
         path = dataset_dict['dataset_path']
-        logging.info(f'Adding background dataset {path}')
+        logging.info(f'Adding background dataset at path {path}')
         if to_path(path).suffix == '.mt':
+            logging.info('Shouldn\'t be here, background dataset should be .vds')
             background_mt = hl.read_matrix_table(str(path))
             background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
+            logging.info(f'Adding background dataset {path}')
+            logging.info('Reading in background dataset')
             background_vds = hl.vds.read_vds(str(path))
+            logging.info(f'Splitting multiallelics for background dataset: {path}')
             background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
+            logging.info(f'Filtering variants to predetermined QC variants for background dataset: {path}')
             background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
+            logging.info(f'Densifying background dataset: {path}')
             background_mt = hl.vds.to_dense_mt(background_vds)
+            logging.info('Finished densifying')
             # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
+            logging.info(f'Adding metadata tables: {dataset_dict["metadata_table"]}')
             for path in dataset_dict['metadata_table']:
+                logging.info(f'Adding metadata to Metadata_tables list, table path: {path}')
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
+            logging.info(
+                f'Merging metadata tables, allow_missing_columns: {allow_missing_columns}, metadata_tables: {metadata_tables}',
+            )
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
+            logging.info('Annotating background_mt with metadata tables')
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
@@ -56,9 +79,12 @@ def add_background(
         background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
+        logging.info('Combining dense and background datasets')
         dense_mt = dense_mt.union_cols(background_mt)
+        logging.info('Combining sample_qc_ht with background metadata')
         sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
 
+    logging.info(f'Dropping columns from sample_qc_ht, columns to drop: {drop_columns}')
     if drop_columns:
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
     return dense_mt, sample_qc_ht
