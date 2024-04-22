@@ -1,5 +1,6 @@
 import logging
 import pickle
+from random import sample
 
 import pandas as pd
 
@@ -18,6 +19,7 @@ MIN_N_SAMPLES = 10
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
+    tmp_prefix: Path,
 ) -> tuple[hl.MatrixTable, hl.Table]:
     """
     Add background dataset samples to the dense MT and sample QC HT.
@@ -48,17 +50,25 @@ def add_background(
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            logging.info(f'Adding background dataset {path}')
-            logging.info('Reading in background dataset')
-            background_vds = hl.vds.read_vds(str(path))
-            logging.info(f'Splitting multiallelics for background dataset: {path}')
-            background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
-            logging.info(f'Filtering variants to predetermined QC variants for background dataset: {path}')
-            background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
-            logging.info(f'Densifying background dataset: {path}')
-            background_mt = hl.vds.to_dense_mt(background_vds)
-            logging.info('Finished densifying')
-            # annotate background mt with metadata info derived from SampleQC stage
+            background_mt_checkpoint_path = tmp_prefix / 'densified_background_mt.mt'
+            if can_reuse(background_mt_checkpoint_path):
+                logging.info(f'Reusing densified background mt from {background_mt_checkpoint_path}')
+                background_mt = hl.read_matrix_table(str(background_mt_checkpoint_path))
+            else:
+                logging.info(f'Adding background dataset {path}')
+                logging.info('Reading in background dataset')
+                background_vds = hl.vds.read_vds(str(path))
+                logging.info(f'Splitting multiallelics for background dataset: {path}')
+                background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
+                logging.info(f'Filtering variants to predetermined QC variants for background dataset: {path}')
+                background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
+                logging.info(f'Densifying background dataset: {path}')
+                background_mt = hl.vds.to_dense_mt(background_vds)
+                logging.info('Finished densifying')
+                logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
+                background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
+                logging.info('Finished checkpointing densified_background_mt')
+                # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
             logging.info(f'Adding metadata tables: {dataset_dict["metadata_table"]}')
             for path in dataset_dict['metadata_table']:
@@ -87,6 +97,7 @@ def add_background(
     logging.info(f'Dropping columns from sample_qc_ht, columns to drop: {drop_columns}')
     if drop_columns:
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
+
     return dense_mt, sample_qc_ht
 
 
@@ -121,11 +132,19 @@ def run(
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
         logging.info(f'Adding background datasets using following config: {pca_background}')
-        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
+        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, tmp_prefix)
+        dense_mt_checkpoint_path = tmp_prefix / 'modified_dense_mt.mt'
+        sample_qc_ht_checkpoint_path = tmp_prefix / 'modified_sample_qc.ht'
+        logging.info(f'Checkpointing dense_mt to {dense_mt_checkpoint_path}')
+        dense_mt = dense_mt.checkpoint(str(dense_mt_checkpoint_path), overwrite=True)
 
-    logging.info(
-        f'Running PCA on {dense_mt.count_cols()} samples, {dense_mt.count_rows()} sites, using {n_pcs} PCs',
-    )
+        logging.info(f'Checkpointing sample_qc_ht to {sample_qc_ht_checkpoint_path}')
+        sample_qc_ht = sample_qc_ht.checkpoint(str(sample_qc_ht_checkpoint_path), overwrite=True)
+
+    logging.info('Running PCA on the dense matrix table')
+    # logging.info(
+    #     f'Running PCA on {dense_mt.count_cols()} samples, {dense_mt.count_rows()} sites, using {n_pcs} PCs',
+    # )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
         sample_to_drop_ht=relateds_to_drop_ht,
