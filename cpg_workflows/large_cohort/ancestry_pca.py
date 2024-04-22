@@ -40,7 +40,8 @@ def add_background(
             background_vds = hl.vds.read_vds(str(path))
             background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
             background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
-            background_mt = hl.vds.to_dense_mt(background_vds)
+            # background_mt = hl.vds.to_dense_mt(background_vds)
+            background_mt = background_vds.variant_data
             # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
