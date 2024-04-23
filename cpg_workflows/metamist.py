@@ -57,7 +57,7 @@ GET_SEQUENCING_GROUPS_QUERY = gql(
 GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
     """
     query SGByCohortQuery($cohort_id: String!) {
-        cohort(id: {eq: $cohort_id}) {
+        cohorts(id: {eq: $cohort_id}) {
             sequencingGroups {
                 id
                 meta
@@ -291,8 +291,8 @@ class Metamist:
 
         # Create dictionary keying sequencing groups by project
         # {project_id: [sequencing_group_1, sequencing_group_2, ...]}
-        assert len(entries['cohort']) == 1, 'We only support one cohort at a time currently'
-        sequencing_groups = entries['cohort'][0]['sequencingGroups']
+        assert len(entries['cohorts']) == 1, 'We only support one cohort at a time currently'
+        sequencing_groups = entries['cohorts'][0]['sequencingGroups']
 
         return sort_sgs_by_project(sequencing_groups)
 
