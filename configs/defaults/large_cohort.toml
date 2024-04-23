@@ -59,6 +59,11 @@ inferred_ancestry = false
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
+# Set whether to allow column discrepancies when unioning background dataset tables
+#allow_missing_columns = false
+# Columns to be dropped from the final unioned background table
+#drop_columns = ['autosomal_mean_dp']
+
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and
 # `max_n_singletons` adjusted based on the results we got for the TOB-WGS project.
@@ -81,3 +86,6 @@ delete_scratch_on_exit = false
 
 [references.gnomad]
 tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
+[references.hg38_telomeres_and_centromeres_intervals]
+# Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3
+interval_list = "gs://cpg-common-main/references/hg38/v0/hg38.telomeresAndMergedCentromeres.interval_list"

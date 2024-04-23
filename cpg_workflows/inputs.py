@@ -57,6 +57,8 @@ def create_cohort() -> Cohort:
             for entry in sequencing_group_entries:
                 metadata = entry.get('meta', {})
                 update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+                # phenotypes are managed badly here, need a cleaner way to get them into the SG
+                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
                 sequencing_group = dataset.add_sequencing_group(
                     id=str(entry['id']),
@@ -64,7 +66,6 @@ def create_cohort() -> Cohort:
                     participant_id=entry['sample']['participant'].get('externalId'),
                     meta=metadata,
                 )
-
                 if reported_sex := entry['sample']['participant'].get('reportedSex'):
                     sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
@@ -75,6 +76,8 @@ def create_cohort() -> Cohort:
             for entry in sgs:
                 metadata = entry.get('meta', {})
                 update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+                # phenotypes are managed badly here, need a cleaner way to get them into the SG
+                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
                 sequencing_group = dataset.add_sequencing_group(
                     id=str(entry['id']),

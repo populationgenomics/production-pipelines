@@ -216,7 +216,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     assert test_sg.id == 'CPGLCL17'
     assert test_sg.external_id == 'NA12340'
     assert test_sg.participant_id == '8'
-    assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here'}
+    assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
     assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
@@ -383,7 +383,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     assert test_sg.id == 'CPGLCL17'
     assert test_sg.external_id == 'NA12340'
     assert test_sg.participant_id == '8'
-    assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here'}
+    assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
     assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
