@@ -106,7 +106,7 @@ def run(
 
     # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
     if subset := get_config()['large_cohort'].get('pca_subset', False):
-        sgids_keep = get_config()['workflow'].get('only_sgs', [])
+        sgids_keep = get_config()['large_cohort'].get('pca_subset_sgs', [])
         if not sgids_keep:
             logging.info('No specific samples provided for subsetting. Continuing with the full cohort.')
         else:

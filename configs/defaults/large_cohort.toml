@@ -42,7 +42,10 @@ training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for
 # whether or not to key sequencing groups by their external ID
 use_external_id = true
 pca_plot_name = 'hgdp_1kg_sites'
+# whether to subset the PCA plot to only include specific CPG ids provided by pca_subset_sgs.
+# if pca_subset_sgs is not empty and pca_subset is false, dataset will not be subsetted
 pca_subset = false
+# pca_subset_sgs = []
 
 # Section that specifies background samples for PCA analysis.
 # `datasets` must be a list paths to matrix tables or VDS, and
