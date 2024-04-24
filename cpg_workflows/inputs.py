@@ -26,81 +26,63 @@ def create_cohort() -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
-    analysis_dataset_name = get_config()['workflow']['dataset']
-
-    custom_cohort_ids = get_config()['workflow'].get('input_cohorts', [])
-    input_datasets = get_config()['workflow'].get('input_datasets', [])
+    config = get_config()['workflow']
+    analysis_dataset_name = config['dataset']
+    custom_cohort_ids = config.get('input_cohorts', [])
+    input_datasets = config.get('input_datasets', [])
+    skip_datasets = config.get('skip_datasets', [])
 
     # Additional logic to support cohorts + datasets as inputs. In future, cohorts will only be supported.
-    dataset_names: list[str] = []
     if custom_cohort_ids and input_datasets:
         raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
-    if not custom_cohort_ids and not input_datasets:
-        dataset_names = [analysis_dataset_name]
 
-    if not custom_cohort_ids and input_datasets:
-        dataset_names = input_datasets
-
-    if custom_cohort_ids and not input_datasets:
+    if custom_cohort_ids:
         # TODO: Handle more than one cohort
         sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
+        dataset_names = list(sgs_by_dataset.keys())
+    elif input_datasets:
+        dataset_names = input_datasets
+    else:
+        dataset_names = [analysis_dataset_name]
 
-    skip_datasets = get_config()['workflow'].get('skip_datasets', [])
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
     cohort = Cohort()
 
-    if dataset_names:
-        for dataset_name in dataset_names:
-            dataset = cohort.create_dataset(dataset_name)
-            sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
-            for entry in sequencing_group_entries:
-                metadata = entry.get('meta', {})
-                update_dict(metadata, entry['sample']['participant'].get('meta', {}))
-                # phenotypes are managed badly here, need a cleaner way to get them into the SG
-                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+    for dataset_name in dataset_names:
+        dataset = cohort.create_dataset(dataset_name)
+        if custom_cohort_ids:
+            sgs = sgs_by_dataset[dataset_name]
+        else:
+            sgs = get_metamist().get_sg_entries(dataset_name)
 
-                sequencing_group = dataset.add_sequencing_group(
-                    id=str(entry['id']),
-                    external_id=str(entry['sample']['externalId']),
-                    participant_id=entry['sample']['participant'].get('externalId'),
-                    meta=metadata,
-                )
-                if reported_sex := entry['sample']['participant'].get('reportedSex'):
-                    sequencing_group.pedigree.sex = Sex.parse(reported_sex)
+        for entry in sgs:
+            metadata = entry.get('meta', {})
+            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
-                _populate_alignment_inputs(sequencing_group, entry)
-    else:
-        for dataset_name, sgs in sgs_by_dataset.items():
-            dataset = cohort.create_dataset(dataset_name)
-            for entry in sgs:
-                metadata = entry.get('meta', {})
-                update_dict(metadata, entry['sample']['participant'].get('meta', {}))
-                # phenotypes are managed badly here, need a cleaner way to get them into the SG
-                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+            sequencing_group = dataset.add_sequencing_group(
+                id=str(entry['id']),
+                external_id=str(entry['sample']['externalId']),
+                participant_id=entry['sample']['participant'].get('externalId'),
+                meta=metadata,
+            )
 
-                sequencing_group = dataset.add_sequencing_group(
-                    id=str(entry['id']),
-                    external_id=str(entry['sample']['externalId']),
-                    participant_id=entry['sample']['participant'].get('externalId'),
-                    meta=metadata,
-                )
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
+                sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-                if reported_sex := entry['sample']['participant'].get('reportedSex'):
-                    sequencing_group.pedigree.sex = Sex.parse(reported_sex)
-
-                _populate_alignment_inputs(sequencing_group, entry)
+            _populate_alignment_inputs(sequencing_group, entry)
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
-        if 'skip_sgs' in get_config()['workflow']:
+        if 'skip_sgs' in config:
             msg += ' (after skipping sequencing groups)'
-        if 'only_sgs' in get_config()['workflow']:
+        if 'only_sgs' in config:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
     _populate_analysis(cohort)
-    if get_config()['workflow'].get('read_pedigree', True):
+    if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
     assert cohort.get_sequencing_groups()
     return cohort
