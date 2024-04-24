@@ -276,7 +276,6 @@ class Metamist:
         Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
-        # TODO: Take a cohort id as an input OR a dataset name
         metamist_proj = dataset_name
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
