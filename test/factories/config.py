@@ -54,6 +54,9 @@ class WorkflowConfig:
     # if the input dataset is the dataset being processed.
     input_datasets: list[DatasetId] | None = None
 
+    # List of cohort IDs that will be processed during this analysis.
+    input_cohorts: list[str] | None = None
+
     # Version of this analysis... Not sure versioning is implemented yet.
     output_version: str | None = None
 

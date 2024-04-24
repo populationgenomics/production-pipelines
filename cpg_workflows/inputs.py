@@ -42,8 +42,10 @@ def create_cohort() -> Cohort:
         dataset_names = list(sgs_by_dataset.keys())
     elif input_datasets:
         dataset_names = input_datasets
+        logging.warning('Using input_datasets will soon be deprecated. Use input_cohorts instead.')
     else:
         dataset_names = [analysis_dataset_name]
+        logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
