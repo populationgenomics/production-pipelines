@@ -104,6 +104,7 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
+    # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
     if subset := get_config()['large_cohort'].get('pca_subset', False):
         sgids_keep = get_config()['workflow'].get('only_sgs', [])
         if not sgids_keep:
