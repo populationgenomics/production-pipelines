@@ -2,8 +2,9 @@
 status_reporter = 'metamist'
 
 # attributes to provision the Exomiser VMs
+# Much lower storage req. - CADD & REMM not in use
 exomiser_memory = '60Gi'
-exomiser_storage = '200Gi'
+exomiser_storage = '100Gi'
 exomiser_cpu = 4
 
 # number of exomiser jobs to fit onto each VM

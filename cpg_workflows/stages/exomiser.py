@@ -17,7 +17,7 @@ from cpg_workflows.jobs.exomiser import (
     extract_mini_ped_files,
     generate_seqr_summary,
     make_phenopackets,
-    run_exomiser_batches,
+    run_exomiser_14,
 )
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
@@ -197,7 +197,7 @@ class RunExomiser(DatasetStage):
             for family in output_dict.keys()
         }
 
-        jobs = run_exomiser_batches(single_dict)
+        jobs = run_exomiser_14(single_dict)
 
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
