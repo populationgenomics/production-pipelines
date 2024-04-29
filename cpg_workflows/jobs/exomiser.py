@@ -311,8 +311,10 @@ def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     exomiser_dir = f'/exomiser/exomiser-cli-{exomiser_version}'
 
     # localise the compressed exomiser references
-    core_group = get_batch().read_input(reference_path('exomiser_2402_core'))
-    pheno_group = get_batch().read_input(reference_path('exomiser_2402_pheno'))
+    inputs = get_batch().read_input_group(
+        core=reference_path('exomiser_2402_core'),
+        pheno=reference_path('exomiser_2402_pheno')
+    )
 
     # now chunk the jobs - load resources, then run a bunch of families
     families = sorted(content_dict.keys())
@@ -329,7 +331,7 @@ def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
         job.image(image_path('exomiser_14'))
 
         # unpack references, see linux-install link above
-        job.command(f'unzip "{core_group}" "{pheno_group}" -d "{exomiser_dir}/data"')
+        job.command(f'unzip {inputs}/\* -d "{exomiser_dir}/data"')
 
         job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
 
