@@ -155,7 +155,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         # arbitrarily select a proband for now
         proband = affected.pop()
 
-        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
+        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, 'HP:0000520')
 
         hpo_terms = hpo_term_string.split(',')
 
