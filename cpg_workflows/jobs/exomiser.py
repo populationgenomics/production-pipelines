@@ -329,7 +329,7 @@ def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
         job.image(image_path('exomiser_14'))
 
         # unpack references, see linux-install link above
-        job.command(f'unzip {core_group} {pheno_group} -d {exomiser_dir}/data')
+        job.command(f'unzip "{core_group}" "{pheno_group}" -d "{exomiser_dir}/data"')
 
         job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
 
