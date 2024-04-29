@@ -4,7 +4,7 @@ Metamist wrapper to get input sequencing groups.
 
 import logging
 
-from cpg_utils.config import get_config, update_dict
+from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
@@ -26,11 +26,11 @@ def create_cohort() -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
-    config = get_config()['workflow']
-    analysis_dataset_name = config['dataset']
-    custom_cohort_ids = config.get('input_cohorts', [])
-    input_datasets = config.get('input_datasets', [])
-    skip_datasets = config.get('skip_datasets', [])
+    config = config_retrieve(['workflow'])
+    analysis_dataset_name = config_retrieve(['workflow', 'dataset'])
+    custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
+    input_datasets = config_retrieve(['workflow', 'input_datasets'], [])
+    skip_datasets = config_retrieve(['workflow', 'skip_datasets'], [])
 
     # Additional logic to support cohorts + datasets as inputs. In future, cohorts will only be supported.
     if custom_cohort_ids and input_datasets:
