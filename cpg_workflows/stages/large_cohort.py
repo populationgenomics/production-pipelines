@@ -47,7 +47,7 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if sample_qc_version := get_config()['large_cohort']['output_versions'].get('sample_qc'):
+        if sample_qc_version := get_config()['large_cohort'].get('output_versions').get('sample_qc'):
             sample_qc_version = slugify(sample_qc_version)
 
         sample_qc_version = sample_qc_version or get_workflow().output_version
@@ -75,7 +75,7 @@ class SampleQC(CohortStage):
 @stage(required_stages=[Combiner])
 class DenseSubset(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if dense_subset_version := get_config()['large_cohort']['output_versions'].get('dense_subset'):
+        if dense_subset_version := get_config()['large_cohort'].get('output_versions').get('dense_subset'):
             dense_subset_version = slugify(dense_subset_version)
 
         dense_subset_version = dense_subset_version or get_workflow().output_version
@@ -105,7 +105,7 @@ class DenseSubset(CohortStage):
 @stage(required_stages=[SampleQC, DenseSubset])
 class Relatedness(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if relatedness_version := get_config()['large_cohort']['output_versions'].get('relatedness'):
+        if relatedness_version := get_config()['large_cohort'].get('output_versions').get('relatedness'):
             relatedness_version = slugify(relatedness_version)
 
         relatedness_version = relatedness_version or get_workflow().output_version
