@@ -1,6 +1,4 @@
 [workflow]
-'nothing' = 'here'
-
 status_reporter = 'metamist'
 
 # attributes to provision the Exomiser VMs
