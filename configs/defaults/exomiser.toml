@@ -7,6 +7,9 @@ exomiser_memory = '60Gi'
 exomiser_storage = '100Gi'
 exomiser_cpu = 4
 
+# change this down to 13 to select the previous version of exomiser
+exomiser_version = 14
+
 # number of exomiser jobs to fit onto each VM
 exomiser_chunk_size = 8
 

@@ -42,24 +42,19 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     family_vcfs = [get_batch().read_input(str(sg.gvcf)) for sg in family_members]
 
     # declare a resource group
-    job.declare_resource_group(
-        output={
-            'vcf.bgz': '{root}.vcf.bgz',
-            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-        },
-    )
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
     # view -m 3 to strip out ref-only sites
     # norm -m -any to split Alt, Non_Ref into just Alt
     # grep -v NON_REF to remove the NON_REF sites
     # bgzip -c to write to a compressed file
-
-    # I'm wasting my time working out the most effective logic for single/family here
-    # so I'm just gonna write something, and we can revise later (or not)
     if len(family_vcfs) == 1:
         gvcf_input = family_vcfs[0]
         job.command(
-            f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf.bgz"]}',
+            f'bcftools view -m3 {gvcf_input} | '
+            f'bcftools norm -m -any | '
+            f'grep -v NON_REF | '
+            f'bgzip -c  > {job.output["vcf.bgz"]}',
         )
         job.command(f'tabix {job.output["vcf.bgz"]}')
         get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
@@ -79,6 +74,7 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     # -0 to replace missing with WT (potentially inaccurate, but predictable parsing in exomiser)
     # --threads 4 to use 4 threads
     # -Oz to write a compressed VCF
+    # type: ignore
     job.command(f'bcftools merge {" ".join(paths)} -Oz -o {job.output["vcf.bgz"]} --threads 4 -m all -0')
     job.command(f'tabix {job.output["vcf.bgz"]}')
     get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
@@ -155,7 +151,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
         # arbitrarily select a proband for now
         proband = affected.pop()
 
-        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, 'HP:0000520')
+        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
 
         hpo_terms = hpo_term_string.split(',')
 
@@ -166,10 +162,20 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
             json.dump(phenopacket, ppk_file, indent=2)
 
 
-def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
+def run_exomiser_13(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     """
-    run the exomiser batch
-    what a wild type hint
+    run the families through exomiser 13
+    this is a bit of a monster, but it's a good example of how to chunk jobs
+    that previous line was written by GitHub CoPilot
+    This version implements Exomiser 13, with default references + CADD and REMM
+    This is not recommended by the developers of Exomiser, but if we decide to
+    involve CADD or REMM in the future, we'll have this code as a reference
+
+    This was set up using a de-compressed reference bundle, which was a bit of a pain
+    See the following method (Exomiser 14) for a cleaner implementation:
+    - store compressed resource bundles
+    - copy compressed data into image
+    - inflate at runtime to build reference data folder
     """
 
     exomiser_version = image_path('exomiser').split(':')[-1]
@@ -313,7 +319,7 @@ def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     # localise the compressed exomiser references
     inputs = get_batch().read_input_group(
         core=reference_path('exomiser_2402_core'),
-        pheno=reference_path('exomiser_2402_pheno')
+        pheno=reference_path('exomiser_2402_pheno'),
     )
 
     # now chunk the jobs - load resources, then run a bunch of families

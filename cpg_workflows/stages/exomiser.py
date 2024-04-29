@@ -11,12 +11,13 @@ As a dataset Stage
 from functools import cache
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_workflows.jobs.exomiser import (
     create_gvcf_to_vcf_jobs,
     extract_mini_ped_files,
     generate_seqr_summary,
     make_phenopackets,
+    run_exomiser_13,
     run_exomiser_14,
 )
 from cpg_workflows.utils import get_logger
@@ -36,7 +37,7 @@ def find_seqr_projects() -> dict[str, str]:
     """
 
     project_api = ProjectApi()
-    seq_type = get_config()['workflow']['sequencing_type']
+    seq_type = config_retrieve(['workflow', 'sequencing_type'])
     seq_type_key = f'seqr-project-{seq_type}'
     return_dict: dict[str, str] = {}
 
@@ -74,10 +75,10 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has no affected individuals, skipping')
             continue
 
-        # # check that the affected members have HPO terms - required for exomiser
-        # if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
-        #     get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
-        #     continue
+        # check that the affected members have HPO terms - required for exomiser
+        if any([sg.meta['phenotypes'].get(HPO_KEY, '') == '' for sg in affected]):
+            get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
+            continue
 
         # key up those badbois using an affected external ID
         dict_by_ext_id[affected[0].external_id] = members
@@ -93,8 +94,10 @@ class CreateFamilyVCFs(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         family_dict = find_families(dataset)
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
         return {
-            str(family): dataset.prefix() / 'exomiser_inputs' / f'{family}.vcf.bgz' for family in family_dict.keys()
+            str(family): dataset.prefix() / f'exomiser_{exomiser_version}_inputs' / f'{family}.vcf.bgz'
+            for family in family_dict.keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -112,7 +115,9 @@ class MakePhenopackets(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
-        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
+
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
         return {family: dataset_prefix / f'{family}_phenopacket.json' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -136,8 +141,9 @@ class MakePedExtracts(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         family_dict = find_families(dataset)
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
-        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
+        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
         return {family: dataset_prefix / f'{family}.ped' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -172,13 +178,17 @@ class RunExomiser(DatasetStage):
         Returns:
             dict of outputs for this dataset
         """
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+
         family_dict = find_families(dataset)
-        dataset_prefix = dataset.analysis_prefix() / 'exomiser_results'
+        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
 
         # only the TSVs are required
         return {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         output_dict = self.expected_outputs(dataset)
 
@@ -197,7 +207,12 @@ class RunExomiser(DatasetStage):
             for family in output_dict.keys()
         }
 
-        jobs = run_exomiser_14(single_dict)
+        if exomiser_version == 14:
+            jobs = run_exomiser_14(single_dict)
+        elif exomiser_version == 13:
+            jobs = run_exomiser_13(single_dict)
+        else:
+            raise ValueError(f'Exomiser version {exomiser_version} not supported')
 
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
@@ -209,7 +224,13 @@ class ExomiserSeqrTSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        return {'tsv': dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.tsv'}
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+
+        return {
+            'tsv': dataset.analysis_prefix()
+            / get_workflow().output_version
+            / f'exomiser_{exomiser_version}_results.tsv',
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # is there a seqr project?
