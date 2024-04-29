@@ -38,6 +38,8 @@ def create_cohort() -> Cohort:
 
     if custom_cohort_ids:
         # TODO: Handle more than one cohort
+        if len(custom_cohort_ids) > 1:
+            raise ValueError('Only one cohort is supported')
         sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
         dataset_names = list(sgs_by_dataset.keys())
     elif input_datasets:
