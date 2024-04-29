@@ -73,6 +73,7 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
                     participant {
                         id
                         externalId
+                        phenotypes
                         reportedSex
                         meta
                     }
