@@ -231,7 +231,8 @@ def run_exomiser_13(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for chunk {chunk_number}')
         all_jobs.append(job)
-        job.storage(get_config()['workflow'].get('exomiser_storage', '100Gi'))
+        # higher requirement for exomiser 13 resources
+        job.storage('200Gi')
         job.memory(get_config()['workflow'].get('exomiser_memory', '60Gi'))
         job.cpu(get_config()['workflow'].get('exomiser_cpu', 4))
         job.image(image_path('exomiser'))
