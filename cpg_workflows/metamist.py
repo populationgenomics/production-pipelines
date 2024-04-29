@@ -267,7 +267,7 @@ class Metamist:
         # Create dictionary keying sequencing groups by project
         # {project_id: [sequencing_group_1, sequencing_group_2, ...]}
 
-        if len(entries[['cohorts']]) != 1:
+        if len(entries['cohorts']) != 1:
             raise MetamistError('We only support one cohort at a time currently')
         sequencing_groups = entries['cohorts'][0]['sequencingGroups']
 
