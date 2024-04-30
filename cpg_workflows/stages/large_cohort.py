@@ -280,7 +280,8 @@ class LoadVqsr(CohortStage):
         from cpg_workflows.large_cohort import load_vqsr
 
         j = get_batch().new_job(
-            'LoadVqsr', (self.get_job_attrs() or {}) | {'tool': 'hail query'}
+            'LoadVqsr',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -291,7 +292,7 @@ class LoadVqsr(CohortStage):
                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
-            )
+            ),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
