@@ -74,7 +74,6 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     # -0 to replace missing with WT (potentially inaccurate, but predictable parsing in exomiser)
     # --threads 4 to use 4 threads
     # -Oz to write a compressed VCF
-    # type: ignore
     job.command(f'bcftools merge {" ".join(paths)} -Oz -o {job.output["vcf.bgz"]} --threads 4 -m all -0')
     job.command(f'tabix {job.output["vcf.bgz"]}')
     get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
