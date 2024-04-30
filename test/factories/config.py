@@ -303,9 +303,7 @@ class PipelineConfig:
     def get(self, key: str, default: Any = None) -> Any:
         return self.as_dict().get(key, default)
 
-    def set_storage(
-        self, dataset: DatasetId, storage: StorageConfig
-    ) -> 'PipelineConfig':
+    def set_storage(self, dataset: DatasetId, storage: StorageConfig) -> 'PipelineConfig':
         self.storage[dataset] = storage
         return self
 
@@ -313,9 +311,7 @@ class PipelineConfig:
         self.images[name] = path
         return self
 
-    def set_references(
-        self, name: str, value: str | dict[str, Any]
-    ) -> 'PipelineConfig':
+    def set_references(self, name: str, value: str | dict[str, Any]) -> 'PipelineConfig':
         self.references[name] = value
         return self
 

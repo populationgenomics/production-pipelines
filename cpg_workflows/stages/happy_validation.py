@@ -5,21 +5,23 @@ Content relating to the hap.py validation process
 """
 
 import logging
+
 from cpg_utils.config import get_config
+from cpg_workflows.jobs.validation import (
+    parse_and_post_results,
+    run_happy_on_vcf,
+    validation_mt_to_vcf_job,
+)
+from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
 from cpg_workflows.workflow import (
-    stage,
-    SequencingGroupStage,
     SequencingGroup,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
     get_workflow,
+    stage,
 )
-from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
-from cpg_workflows.jobs.validation import (
-    validation_mt_to_vcf_job,
-    run_happy_on_vcf,
-    parse_and_post_results,
-)
+
 from .. import get_batch
 
 
@@ -45,20 +47,14 @@ class ValidationMtToVcf(SequencingGroupStage):
             ),
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             return None
 
         # generate the MT path from config
         input_hash = get_config()['inputs']['sample_hash']
-        mt_path = (
-            sequencing_group.dataset.prefix()
-            / 'mt'
-            / f'{input_hash}-{sequencing_group.dataset.name}.mt'
-        )
+        mt_path = sequencing_group.dataset.prefix() / 'mt' / f'{input_hash}-{sequencing_group.dataset.name}.mt'
 
         exp_outputs = self.expected_outputs(sequencing_group)
 
@@ -81,10 +77,7 @@ class ValidationMtToVcf(SequencingGroupStage):
 class ValidationHappyOnVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         output_prefix = (
-            sequencing_group.dataset.prefix()
-            / 'validation'
-            / get_workflow().output_version
-            / sequencing_group.id
+            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
         )
         return {
             'vcf': f'{output_prefix}.happy.vcf.bgz',
@@ -96,25 +89,18 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             'happy_summary': f'{output_prefix}.summary.csv',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
             return None
 
         # get the input vcf for this sequence group
-        input_vcf = inputs.as_path(
-            target=sequencing_group, stage=ValidationMtToVcf, key='vcf'
-        )
+        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf, key='vcf')
 
         # set the prefix to write outputs to
         output_prefix = (
-            sequencing_group.dataset.prefix()
-            / 'validation'
-            / get_workflow().output_version
-            / sequencing_group.id
+            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
@@ -139,23 +125,15 @@ class ValidationParseHappy(SequencingGroupStage):
             / f'{sequencing_group.id}.happy_summary.json',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
         if sequencing_group.external_id not in get_config()['references']:
             logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
             return None
 
         # get the input vcf for this sequence group
-        input_vcf = inputs.as_path(
-            target=sequencing_group, stage=ValidationMtToVcf, key='vcf'
-        )
-        happy_csv = str(
-            inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[sequencing_group.id][
-                'happy_csv'
-            ]
-        )
+        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf, key='vcf')
+        happy_csv = str(inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[sequencing_group.id]['happy_csv'])
 
         exp_outputs = self.expected_outputs(sequencing_group)
 

@@ -3,6 +3,7 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
 
 [references.gatk_sv]
 # This model is trained on the All Of Us dataset. If this is used in any published work,
@@ -43,7 +44,7 @@ recalibrate_gq_args = [
 # FilterGenotypes - stringent end of [0.3, 0.5] range
 fmax_beta = 0.3
 
-sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 150 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 100 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
 noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
 
 [elasticsearch]
@@ -54,3 +55,19 @@ username = 'seqr'
 # Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
 password_secret_id = 'seqr-es-password'
 password_project_id = 'seqr-308602'
+
+# switch off metrics workflows
+[resource_overrides.MakeCohortVcf]
+# this is passed to CleanVcf
+run_module_metrics = false
+
+# if you have to do it, bump the resources
+#[resource_overrides.MakeCohortVcf.runtime_override_plot_qc_per_family]
+#mem_gb = 32
+
+[resource_overrides.FilterGenotypes]
+run_qc = false
+
+# if you have to do it, bump the resources
+#[resource_overrides.FilterGenotypes.runtime_override_plot_qc_per_family]
+#mem_gb = 32

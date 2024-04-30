@@ -1,4 +1,4 @@
-""" 
+"""
 Sync the Broad reference resources into the corresponding CPG bucket.
 """
 

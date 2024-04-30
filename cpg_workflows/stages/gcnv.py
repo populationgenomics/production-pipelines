@@ -2,8 +2,10 @@
 Stages that implement GATK-gCNV.
 """
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import get_config, try_get_ar_guid, AR_GUID_NAME
+import json
+
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
@@ -13,16 +15,16 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     queue_annotate_sv_jobs,
 )
-from cpg_workflows.targets import SequencingGroup, Cohort
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import (
-    get_workflow,
-    stage,
     CohortStage,
     Dataset,
     DatasetStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_workflow,
+    stage,
 )
 
 
@@ -33,6 +35,23 @@ def _gcnv_annotated_meta(
     Callable, adds custom analysis object meta attribute
     """
     return {'type': 'gCNV-annotated'}
+
+
+@stage
+class SetSGIDOrdering(CohortStage):
+    """
+    Set the order of the sequencing groups in the cohort
+    Push this to a file _now_, and use it later
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {'sgid_order': self.prefix / 'sgid_order.json'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        sorted_sgids = sorted(cohort.get_sequencing_group_ids())
+        with self.expected_outputs(cohort)['sgid_order'].open('w') as f_handler:
+            json.dump(sorted_sgids, f_handler, indent=2)
+        return self.make_outputs(cohort)
 
 
 @stage
@@ -62,32 +81,26 @@ class CollectReadCounts(SequencingGroupStage):
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
         return {
-            'counts': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.counts.tsv.gz',
-            'index': seqgroup.dataset.prefix()
-            / 'gcnv'
-            / f'{seqgroup.id}.counts.tsv.gz.tbi',
+            'counts': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz',
+            'index': seqgroup.dataset.prefix() / 'gcnv' / f'{seqgroup.id}.counts.tsv.gz.tbi',
         }
 
-    def queue_jobs(
-        self, seqgroup: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
         if seqgroup.cram is None:
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
         jobs = gcnv.collect_read_counts(
-            inputs.as_path(get_cohort(), PrepareIntervals, 'preprocessed'),
-            seqgroup.cram,
-            self.get_job_attrs(seqgroup),
-            seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
+            intervals_path=inputs.as_path(get_cohort(), PrepareIntervals, 'preprocessed'),
+            cram_path=seqgroup.cram,
+            job_attrs=self.get_job_attrs(seqgroup),
+            output_base_path=seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[PrepareIntervals, CollectReadCounts])
+@stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts])
 class DeterminePloidy(CohortStage):
     """
     The non-sharded cohort-wide gCNV steps after read counts have been collected:
@@ -107,19 +120,25 @@ class DeterminePloidy(CohortStage):
 
         prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
+        # pull all per-sgid files from previous stage
+        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
+        # order those WRT the set ordering
+        ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
+
         jobs = gcnv.filter_and_determine_ploidy(
-            str(reference_path('gatk_sv/contig_ploidy_priors')),
-            # get_config()['workflow'].get('ploidy_priors'),
-            prep_intervals['preprocessed'],
-            prep_intervals['annotated'],
-            inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
-            self.get_job_attrs(cohort),
-            outputs,
+            ploidy_priors_path=str(reference_path('gatk_sv/contig_ploidy_priors')),
+            preprocessed_intervals_path=prep_intervals['preprocessed'],
+            annotated_intervals_path=prep_intervals['annotated'],
+            counts_paths=ordered_read_counts,
+            job_attrs=self.get_job_attrs(cohort),
+            output_paths=outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[PrepareIntervals, CollectReadCounts, DeterminePloidy])
+@stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
 class GermlineCNV(CohortStage):
     """
     The cohort-wide GermlineCNVCaller step, sharded across genome regions.
@@ -135,18 +154,25 @@ class GermlineCNV(CohortStage):
         determine_ploidy = inputs.as_dict(cohort, DeterminePloidy)
         prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
+        # pull all per-sgid files from previous stage
+        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
+        # order those WRT the set ordering
+        ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
+
         jobs = gcnv.shard_gcnv(
-            prep_intervals['annotated'],
-            determine_ploidy['filtered'],
-            determine_ploidy['calls'],
-            inputs.as_path_by_target(CollectReadCounts, 'counts').values(),
-            self.get_job_attrs(cohort),
-            outputs,
+            annotated_intervals_path=prep_intervals['annotated'],
+            filtered_intervals_path=determine_ploidy['filtered'],
+            ploidy_calls_path=determine_ploidy['calls'],
+            counts_paths=ordered_read_counts,
+            job_attrs=self.get_job_attrs(cohort),
+            output_paths=outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[DeterminePloidy, GermlineCNV])
+@stage(required_stages=[SetSGIDOrdering, DeterminePloidy, GermlineCNV])
 class GermlineCNVCalls(SequencingGroupStage):
     """
     Produces final individual VCF results by running PostprocessGermlineCNVCalls.
@@ -165,18 +191,20 @@ class GermlineCNVCalls(SequencingGroupStage):
         outputs = self.expected_outputs(seqgroup)
         determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
         jobs = gcnv.postprocess_calls(
-            determine_ploidy['calls'],
-            inputs.as_dict(get_cohort(), GermlineCNV),
-            # FIXME get the sample index via sample_name.txt files instead
-            seqgroup.dataset.get_sequencing_group_ids().index(seqgroup.id),
-            self.get_job_attrs(seqgroup),
+            ploidy_calls_path=determine_ploidy['calls'],
+            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            sample_index=sgid_ordering.index(seqgroup.id),
+            job_attrs=self.get_job_attrs(seqgroup),
             output_prefix=str(self.prefix / seqgroup.id),
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[GermlineCNVCalls, PrepareIntervals])
+@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals])
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -198,21 +226,15 @@ class GCNVJointSegmentation(CohortStage):
         Conducts a semi-heirarchical merge of the individual VCFs
         - First merge the segment files in blocks, to produce intermediate merges
         - Then merge those intermediate merges to produce the final result
-
-        Args:
-            cohort ():
-            inputs ():
-
-        Returns:
-
         """
 
         # get the list of individual Segment VCFs
         cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        all_vcfs = [
-            str(cnv_vcfs[sgid]['segments'])
-            for sgid in cohort.get_sequencing_group_ids()
-        ]
+
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
+        all_vcfs = [str(cnv_vcfs[sgid]['segments']) for sgid in sgid_ordering]
 
         # get the intervals
         intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
@@ -222,8 +244,8 @@ class GCNVJointSegmentation(CohortStage):
         ped_path = cohort.write_ped_file(expected_out['pedigree'])
 
         jobs = gcnv.run_joint_segmentation(
-            all_vcfs,
-            str(ped_path),
+            segment_vcfs=all_vcfs,
+            pedigree=str(ped_path),
             intervals=str(intervals),
             tmp_prefix=expected_out['tmp_prefix'],
             output_path=expected_out['clustered_vcf'],
@@ -233,12 +255,7 @@ class GCNVJointSegmentation(CohortStage):
 
 
 @stage(
-    required_stages=[
-        GCNVJointSegmentation,
-        GermlineCNV,
-        GermlineCNVCalls,
-        DeterminePloidy,
-    ]
+    required_stages=[SetSGIDOrdering, GCNVJointSegmentation, GermlineCNV, GermlineCNVCalls, DeterminePloidy],
 )
 class RecalculateClusteredQuality(SequencingGroupStage):
     """
@@ -252,21 +269,15 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'genotyped_intervals_vcf': self.prefix
-            / f'{sequencing_group.id}.intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.prefix
-            / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
-            'genotyped_segments_vcf': self.prefix
-            / f'{sequencing_group.id}.segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.prefix
-            / f'{sequencing_group.id}.segments.vcf.gz.tbi',
+            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz',
+            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
+            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.segments.vcf.gz',
+            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.segments.vcf.gz.tbi',
             'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.ratios.tsv',
             'qc_status_file': self.prefix / f'{sequencing_group.id}.qc_status.txt',
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
 
         # get the clustered VCF from the previous stage
@@ -275,14 +286,14 @@ class RecalculateClusteredQuality(SequencingGroupStage):
         determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
         gcnv_call_inputs = inputs.as_dict(sequencing_group, GermlineCNVCalls)
 
+        # pull the json file with the sgid ordering
+        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+
         jobs = gcnv.postprocess_calls(
-            determine_ploidy['calls'],
-            inputs.as_dict(get_cohort(), GermlineCNV),
-            # FIXME get the sample index via sample_name.txt files instead
-            sequencing_group.dataset.get_sequencing_group_ids().index(
-                sequencing_group.id
-            ),
-            self.get_job_attrs(sequencing_group),
+            ploidy_calls_path=determine_ploidy['calls'],
+            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            sample_index=sgid_ordering.index(sequencing_group.id),
+            job_attrs=self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
             intervals_vcf=str(gcnv_call_inputs['intervals']),
@@ -308,10 +319,7 @@ class FastCombineGCNVs(CohortStage):
 
         # do a slapdash bcftools merge on all input files...
         gcnv_vcfs = inputs.as_dict_by_target(RecalculateClusteredQuality)
-        all_vcfs = [
-            str(gcnv_vcfs[sgid]['genotyped_segments_vcf'])
-            for sgid in cohort.get_sequencing_group_ids()
-        ]
+        all_vcfs = [str(gcnv_vcfs[sgid]['genotyped_segments_vcf']) for sgid in cohort.get_sequencing_group_ids()]
 
         pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
 
@@ -397,9 +405,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        strv_job = get_batch().new_job(
-            'StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'}
-        )
+        strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
         strv_job.storage('20Gi')
@@ -421,17 +427,11 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
             output_vcf={
                 'vcf.bgz': '{root}.vcf.bgz',
                 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            }
+            },
         )
 
         # run strvctvre
-        strv_job.command(
-            f'python StrVCTVRE.py '
-            f'-i {input_vcf} '
-            f'-o temp.vcf '
-            f'-f vcf '
-            f'-p {phylop_in_batch}'
-        )
+        strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
         strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
 
@@ -465,14 +465,10 @@ class AnnotateCohortgCNV(CohortStage):
         Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
         """
 
-        vcf_path = inputs.as_path(
-            target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf'
-        )
+        vcf_path = inputs.as_path(target=cohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        )
-        j = get_batch().new_job(f'annotate gCNV cohort', self.get_job_attrs(cohort))
+        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
+        j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(cohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -482,7 +478,7 @@ class AnnotateCohortgCNV(CohortStage):
                 str(self.expected_outputs(cohort)['mt']),
                 str(checkpoint_prefix),
                 setup_gcp=True,
-            )
+            ),
         )
 
         # todo is this necessary?
@@ -496,11 +492,7 @@ class AnnotateCohortgCNV(CohortStage):
         )
 
 
-@stage(
-    required_stages=AnnotateCohortgCNV,
-    analysis_type='cnv',
-    analysis_keys=['mt']
-)
+@stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
 class AnnotateDatasetCNV(DatasetStage):
     """
     Subset the MT to be this Dataset only
@@ -513,11 +505,7 @@ class AnnotateDatasetCNV(DatasetStage):
         """
         return {
             'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (
-                dataset.prefix()
-                / 'mt'
-                / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'
-            ),
+            'mt': (dataset.prefix() / 'mt' / f'gCNV-{get_workflow().output_version}-{dataset.name}.mt'),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -530,13 +518,9 @@ class AnnotateDatasetCNV(DatasetStage):
         """
 
         assert dataset.cohort
-        mt_path = inputs.as_path(
-            target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt'
-        )
+        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohortgCNV, key='mt')
 
-        checkpoint_prefix = (
-            to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-        )
+        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
 
         jobs = gcnv.annotate_dataset_jobs_cnv(
             mt_path=mt_path,
@@ -547,9 +531,7 @@ class AnnotateDatasetCNV(DatasetStage):
             depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
         )
 
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
 def _gatk_gcnv_index_meta(
@@ -594,16 +576,14 @@ class MtToEsCNV(DatasetStage):
             # Skipping dataset that wasn't explicitly requested to upload to ES
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(
-            target=dataset, stage=AnnotateDatasetCNV, key='mt'
-        )
+        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
         if 'elasticsearch' not in get_config():
             raise ValueError(
                 f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}'
+                f'Elasticsearch index for dataset {dataset}',
             )
 
         from analysis_runner import dataproc

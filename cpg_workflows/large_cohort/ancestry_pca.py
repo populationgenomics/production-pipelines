@@ -1,15 +1,16 @@
 import logging
 import pickle
+from random import sample
+
+import pandas as pd
 
 import hail as hl
-import pandas as pd
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from gnomad.sample_qc.ancestry import run_pca_with_relateds, assign_population_pcs
-
 from cpg_utils.hail_batch import reference_path
 from cpg_workflows.utils import can_reuse
-
+from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
@@ -18,15 +19,17 @@ MIN_N_SAMPLES = 10
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
+    tmp_prefix: Path,
 ) -> tuple[hl.MatrixTable, hl.Table]:
     """
     Add background dataset samples to the dense MT and sample QC HT.
     """
     sites_table = get_config()['references']['ancestry']['sites_table']
+    allow_missing_columns = get_config()['large_cohort']['pca_background'].get('allow_missing_columns', False)
+    drop_columns = get_config()['large_cohort']['pca_background'].get('drop_columns')
     qc_variants_ht = hl.read_table(sites_table)
-    dense_mt = (
-        dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
-    )
+    dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+    dataset = get_config()['large_cohort']['pca_background']
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
         path = dataset_dict['dataset_path']
@@ -37,35 +40,39 @@ def add_background(
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            background_vds = hl.vds.read_vds(str(path))
-            background_vds = hl.vds.split_multi(
-                background_vds, filter_changed_loci=True
-            )
-            background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
-            background_mt = hl.vds.to_dense_mt(background_vds)
-            # annotate background mt with metadata info derived from SampleQC stage
+            background_mt_checkpoint_path = tmp_prefix / 'densified_background_mt.mt'
+            if can_reuse(background_mt_checkpoint_path):
+                logging.info(f'Reusing densified background mt from {background_mt_checkpoint_path}')
+                background_mt = hl.read_matrix_table(str(background_mt_checkpoint_path))
+            else:
+                background_vds = hl.vds.read_vds(str(path))
+                background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
+                background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
+                background_mt = hl.vds.to_dense_mt(background_vds)
+                logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
+                background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
+                logging.info('Finished checkpointing densified_background_mt')
+                # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
-            metadata_tables = hl.Table.union(*metadata_tables)
-            background_mt = background_mt.annotate_cols(
-                **metadata_tables[background_mt.col_key]
-            )
+            metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
+            background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
         # save metadata info before merging dense and background datasets
         ht = background_mt.cols()
-        background_mt = (
-            background_mt.select_cols()
-            .select_rows()
-            .select_entries('GT', 'GQ', 'DP', 'AD')
-        )
+        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
         background_mt = background_mt.naive_coalesce(5000)
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
-        sample_qc_ht = sample_qc_ht.union(ht)
+        sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
+
+    if drop_columns:
+        sample_qc_ht = sample_qc_ht.drop(*drop_columns)
+
     return dense_mt, sample_qc_ht
 
 
@@ -99,15 +106,21 @@ def run(
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
-        logging.info(
-            f'Adding background datasets using following config: {pca_background}'
-        )
-        dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht)
+        dense_mt_checkpoint_path = tmp_prefix / 'modified_dense_mt.mt'
+        sample_qc_ht_checkpoint_path = tmp_prefix / 'modified_sample_qc.ht'
+        if can_reuse(dense_mt_checkpoint_path) and can_reuse(sample_qc_ht_checkpoint_path):
+            dense_mt = hl.read_matrix_table(str(dense_mt_checkpoint_path))
+            sample_qc_ht = hl.read_table(str(sample_qc_ht_checkpoint_path))
+        else:
+            logging.info(f'Adding background datasets using following config: {pca_background}')
+            dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, tmp_prefix)
+            logging.info(f'Checkpointing dense_mt to {dense_mt_checkpoint_path}')
+            dense_mt = dense_mt.checkpoint(str(dense_mt_checkpoint_path), overwrite=True)
+            logging.info(f'Checkpointing sample_qc_ht to {sample_qc_ht_checkpoint_path}')
+            sample_qc_ht = sample_qc_ht.checkpoint(str(sample_qc_ht_checkpoint_path), overwrite=True)
 
     logging.info(
-        f'Running PCA on {dense_mt.count_cols()} samples, '
-        f'{dense_mt.count_rows()} sites, '
-        f'using {n_pcs} PCs'
+        f'Running PCA on {dense_mt.count_cols()} samples, {dense_mt.count_rows()} sites, using {n_pcs} PCs',
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
@@ -182,25 +195,20 @@ def _run_pca_ancestry_analysis(
         samples_to_use -= samples_to_drop
         logging.info(
             f'Removing the {samples_to_drop} relateds from the list of samples used '
-            f'for PCA, got remaining {samples_to_use} samples'
+            f'for PCA, got remaining {samples_to_use} samples',
         )
 
     if samples_to_use < MIN_N_SAMPLES:
         raise ValueError(
             f'The number of samples after removing relateds if too low for the PCA '
-            f'analysis. Got {samples_to_use}, but need at least {MIN_N_SAMPLES}'
+            f'analysis. Got {samples_to_use}, but need at least {MIN_N_SAMPLES}',
         )
 
     if n_pcs > samples_to_use:
-        logging.info(
-            'Adjusting the number of PCs not to exceed the number of samples:'
-            f'{n_pcs} -> {samples_to_use}'
-        )
+        logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
 
-    eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(
-        mt, sample_to_drop_ht, n_pcs=n_pcs
-    )
+    eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)
     logging.info(f'scores_ht.s: {list(scores_ht.s.collect())}')
     logging.info(f'eigenvalues: {eigenvalues}')
     eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(eigenvalues, columns=['f0']))
@@ -250,7 +258,7 @@ def _infer_pop_labels(
     if training_pop_ht.count() < 2:
         logging.warning(
             'Need at least 2 samples with known `population` label to run PCA '
-            'and assign population labels to remaining samples'
+            'and assign population labels to remaining samples',
         )
         pop_ht = scores_ht.annotate(
             training_pop=hl.missing(hl.tstr),
@@ -262,16 +270,12 @@ def _infer_pop_labels(
 
     logging.info(
         'Using calculated PCA scores as well as training samples with known '
-        '`population` label to assign population labels to remaining samples'
+        '`population` label to assign population labels to remaining samples',
     )
-    scores_ht = scores_ht.annotate(
-        training_pop=training_pop_ht[scores_ht.key].training_pop
-    )
+    scores_ht = scores_ht.annotate(training_pop=training_pop_ht[scores_ht.key].training_pop)
 
     def _run_assign_population_pcs(pop_pca_scores_ht_, min_prob_):
-        examples_num = pop_pca_scores_ht_.aggregate(
-            hl.agg.count_where(hl.is_defined(pop_pca_scores_ht_.training_pop))
-        )
+        examples_num = pop_pca_scores_ht_.aggregate(hl.agg.count_where(hl.is_defined(pop_pca_scores_ht_.training_pop)))
         logging.info(f'Running RF using {examples_num} training examples')
         pop_ht_, pops_rf_model_ = assign_population_pcs(
             pop_pca_scores_ht_,
@@ -279,39 +283,29 @@ def _infer_pop_labels(
             known_col='training_pop',
             min_prob=min_prob_,
         )
-        n_mislabeled_samples_ = pop_ht_.aggregate(
-            hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop)
-        )
+        n_mislabeled_samples_ = pop_ht_.aggregate(hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop))
         return pop_ht_, pops_rf_model_, n_mislabeled_samples_
 
-    pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(
-        scores_ht, min_prob
-    )
+    pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(scores_ht, min_prob)
     while n_mislabeled_samples > max_mislabeled_training_samples:
         logging.info(
             f'Found {n_mislabeled_samples} samples '
             f'labeled differently from their known pop. '
-            f'Re-running without them.'
+            f'Re-running without them.',
         )
 
         pop_ht = pop_ht[scores_ht.key]
         pop_pca_scores_ht = scores_ht.annotate(
-            training_pop=hl.or_missing(
-                (pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop
-            )
+            training_pop=hl.or_missing((pop_ht.training_pop == pop_ht.pop), scores_ht.training_pop),
         ).persist()
 
-        pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(
-            pop_pca_scores_ht, min_prob
-        )
+        pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(pop_pca_scores_ht, min_prob)
 
     # Writing a tab delimited file indicating inferred sample populations
     pop_tsv_file = tmp_prefix / 'RF_pop_assignments.txt.gz'
     if not can_reuse(pop_tsv_file, overwrite=True):
         pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
-        pop_ht.transmute(
-            **{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}
-        ).export(str(pop_tsv_file))
+        pop_ht.transmute(**{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}).export(str(pop_tsv_file))
 
     # Writing the RF model used for inferring sample populations
     pop_rf_file = tmp_prefix / 'pop.RF_fit.pickle'

@@ -4,8 +4,8 @@ from functools import cached_property
 from pathlib import Path
 
 import pytest
-from cpg_utils.hail_batch import Batch, fasta_res_group
 
+from cpg_utils.hail_batch import Batch, fasta_res_group
 from cpg_workflows.filetypes import BamPath, CramPath, GvcfPath
 from cpg_workflows.jobs.picard import (
     get_intervals,
@@ -42,7 +42,10 @@ class TestPicard:
                     'dbsnp_vcf_index': 'dbsnp.vcf.gz.tbi',
                     'genome_evaluation_interval_lists': 'intervals.txt',
                     'exome_evaluation_interval_lists': 'exome_intervals.txt',
-                }
+                },
+                'hg38_telomeres_and_centromeres_intervals': {
+                    'interval_list': 'hg38_telomeres_and_centromeres.interval_list',
+                },
             },
             other={
                 'resource_overrides': {
@@ -62,9 +65,7 @@ class TestPicard:
         return batch
 
     @pytest.mark.parametrize('scatter_count', [-645, -1, 0])
-    def test_get_intervals_scatter_less_than_zero(
-        self, tmp_path: Path, scatter_count: int
-    ):
+    def test_get_intervals_scatter_less_than_zero(self, tmp_path: Path, scatter_count: int):
         # ---- Test setup
         batch = self._setup(self.default_config, tmp_path)
 
@@ -158,9 +159,7 @@ class TestPicard:
             assert re.search(rf'/{i}.interval_list', cmd)
 
     @pytest.mark.parametrize('scatter_count', [10, 15, 20])
-    @pytest.mark.parametrize(
-        'source_intervals_path', ['source_intervals.txt', 'src_intrvls.txt']
-    )
+    @pytest.mark.parametrize('source_intervals_path', ['source_intervals.txt', 'src_intrvls.txt'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
     def test_get_intervals_valid_inputs(
         self,
@@ -185,7 +184,7 @@ class TestPicard:
         # ---- Assertions
         assert job
         assert job_attrs.items() <= job.attributes.items()
-        assert re.search(rf'INPUT=\S*{source_intervals_path}', cmd)
+        assert re.search(rf'-I \S*{source_intervals_path}', cmd)
 
         for i in range(1, scatter_count + 1):
             assert re.search(rf'temp_{i:04d}_of_{scatter_count}', cmd)
@@ -200,9 +199,7 @@ class TestPicard:
         batch = self._setup(self.default_config, tmp_path, ref=ref)
 
         # ---- The job we want to test
-        sorted_bam = BamPath(
-            path=tmp_path / 'in.bam', index_path=tmp_path / 'in.bam.bai'
-        )
+        sorted_bam = BamPath(path=tmp_path / 'in.bam', index_path=tmp_path / 'in.bam.bai')
         job = markdup(
             b=batch,
             sorted_bam=sorted_bam,
@@ -241,9 +238,7 @@ class TestPicard:
     @pytest.mark.parametrize('dbsnp', ['dbsnp.vcf.gz', 'DBSNP.vcf.gz'])
     @pytest.mark.parametrize('intervals', ['intervals.txt', 'intrvls.txt'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_vcf_qc(
-        self, tmp_path: Path, gvcf: str, dbsnp: str, intervals: str, job_attrs: dict
-    ):
+    def test_vcf_qc(self, tmp_path: Path, gvcf: str, dbsnp: str, intervals: str, job_attrs: dict):
         # ---- Test setup
         config = self.default_config
         config.references['broad'] = {
@@ -279,18 +274,14 @@ class TestPicard:
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
     @pytest.mark.parametrize('assume_sorted', [True, False])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_picard_collect_metrics(
-        self, tmp_path: Path, cram: str, assume_sorted: bool, job_attrs: dict
-    ):
+    def test_picard_collect_metrics(self, tmp_path: Path, cram: str, assume_sorted: bool, job_attrs: dict):
         # ---- Test setup
         config = self.default_config
         config.other['cramqc']['assume_sorted'] = assume_sorted
         batch = self._setup(config, tmp_path)
 
         # ---- The job we want to test
-        cram_path = CramPath(
-            path=tmp_path / cram, index_path=tmp_path / (cram + '.crai')
-        )
+        cram_path = CramPath(path=tmp_path / cram, index_path=tmp_path / (cram + '.crai'))
         job = picard_collect_metrics(
             b=batch,
             cram_path=cram_path,
@@ -312,13 +303,9 @@ class TestPicard:
         assert re.search(rf'ASSUME_SORTED={assume_sorted}', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
-    @pytest.mark.parametrize(
-        'exome_intervals', ['exome_intervals.txt', 'ex_intrvls.txt']
-    )
+    @pytest.mark.parametrize('exome_intervals', ['exome_intervals.txt', 'ex_intrvls.txt'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_picard_hs_metrics(
-        self, tmp_path: Path, cram: str, exome_intervals: str, job_attrs: dict
-    ):
+    def test_picard_hs_metrics(self, tmp_path: Path, cram: str, exome_intervals: str, job_attrs: dict):
         # ---- Test setup
         config = self.default_config
         config.workflow = WorkflowConfig(
@@ -334,9 +321,7 @@ class TestPicard:
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
-        cram_path = CramPath(
-            path=tmp_path / cram, index_path=tmp_path / (cram + '.crai')
-        )
+        cram_path = CramPath(path=tmp_path / cram, index_path=tmp_path / (cram + '.crai'))
         job = picard_hs_metrics(
             b=batch,
             cram_path=cram_path,
@@ -354,13 +339,9 @@ class TestPicard:
         assert re.search(rf'I=\S+{exome_intervals}', cmd)
 
     @pytest.mark.parametrize('cram', ['file.cram', 'file2.cram'])
-    @pytest.mark.parametrize(
-        'genome_intervals', ['genome_intervals.txt', 'gnm_intrvls.txt']
-    )
+    @pytest.mark.parametrize('genome_intervals', ['genome_intervals.txt', 'gnm_intrvls.txt'])
     @pytest.mark.parametrize('job_attrs', [{'blah': 'abc'}, {'test': '123'}])
-    def test_picard_wgs_metrics(
-        self, tmp_path: Path, cram: str, genome_intervals: str, job_attrs: dict
-    ):
+    def test_picard_wgs_metrics(self, tmp_path: Path, cram: str, genome_intervals: str, job_attrs: dict):
         # ---- Test setup
         config = self.default_config
         config.references['broad'] = {
@@ -370,9 +351,7 @@ class TestPicard:
         batch = self._setup(self.default_config, tmp_path)
 
         # ---- The job we want to test
-        cram_path = CramPath(
-            path=tmp_path / cram, index_path=tmp_path / (cram + '.crai')
-        )
+        cram_path = CramPath(path=tmp_path / cram, index_path=tmp_path / (cram + '.crai'))
         job = picard_wgs_metrics(
             b=batch,
             cram_path=cram_path,

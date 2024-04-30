@@ -102,9 +102,7 @@ def create_sequencing_group(
         sex=sex,
         pedigree=pedigree,
         forced=forced,
-        alignment_input_by_seq_type=(
-            {sequencing_type: alignment_input} if alignment_input else None
-        ),
+        alignment_input_by_seq_type=({sequencing_type: alignment_input} if alignment_input else None),
     )
 
     if gvcf == 'auto':
