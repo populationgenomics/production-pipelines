@@ -3,3 +3,30 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
+
+# switches to deactivate all Metrics workflows. We ran into some resourcing issues when our total
+# cohort size approached ~1600. Response when raised with GATK team:
+#
+# "GatherBatchEvidenceMetrics and the other metrics routines at the end of the main workflows are
+# primarily for development and testing purposes, so you don’t need to run them as a user"
+
+# these metrics workflows are typically running svtest (https://github.com/broadinstitute/gatk-sv/blob/d37e453038e425acba9683da503218fe3d4b1033/src/svtest/setup.py)
+# on each output of the stage, producing output files containing a count/distribution of different variants
+# and sizes. The workflow files we are using as Stages do not always capture these results as top-level outputs,
+# so we have no reliable method to extract these files into permanent storage.
+[resource_overrides.GatherBatchEvidence]
+run_matrix_qc = false
+run_module_metrics = false
+
+[resource_overrides.ClusterBatch]
+run_module_metrics = false
+
+[resource_overrides.GenerateBatchMetrics]
+run_module_metrics = false
+
+[resource_overrides.FilterBatch]
+run_module_metrics = false
+
+[resource_overrides.GenotypeBatch]
+run_module_metrics = false

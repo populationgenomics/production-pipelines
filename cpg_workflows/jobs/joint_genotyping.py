@@ -47,6 +47,7 @@ def make_joint_genotyping_jobs(
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
+    exclude_intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -70,6 +71,7 @@ def make_joint_genotyping_jobs(
     intervals_j, intervals = get_intervals(
         b=b,
         source_intervals_path=intervals_path,
+        exclude_intervals_path=exclude_intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
         output_prefix=tmp_bucket / f'intervals_{scatter_count}',
@@ -350,7 +352,7 @@ def _add_joint_genotyper_job(
     cmd = f"""\
     {input_cmd}
 
-    gatk --java-options "-Xmx{res.get_java_mem_mb()}m" \\
+    gatk --java-options "{res.java_mem_options()}" \\
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
@@ -423,7 +425,7 @@ def _add_excess_het_filter(
     # Capturing stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options "{res.java_mem_options()}" \\
     VariantFiltration \\
     --filter-expression 'ExcessHet > {excess_het_threshold}' \\
     --filter-name ExcessHet \\
@@ -477,7 +479,7 @@ def add_make_sitesonly_job(
     j.command(
         command(
             f"""
-    gatk --java-options -Xms{res.get_java_mem_mb()}m \\
+    gatk --java-options "{res.java_mem_options()}" \\
     MakeSitesOnlyVcf \\
     -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']}

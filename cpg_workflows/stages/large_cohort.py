@@ -47,7 +47,12 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return get_workflow().prefix / 'sample_qc.ht'
+        if sample_qc_version := get_config()['large_cohort'].get('output_versions').get('sample_qc'):
+            sample_qc_version = slugify(sample_qc_version)
+
+        sample_qc_version = sample_qc_version or get_workflow().output_version
+        sample_qc_path = cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version / 'sample_qc.ht'
+        return sample_qc_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
@@ -73,7 +78,14 @@ class SampleQC(CohortStage):
 @stage(required_stages=[Combiner])
 class DenseSubset(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return get_workflow().prefix / 'dense_subset.mt'
+        if dense_subset_version := get_config()['large_cohort'].get('output_versions').get('dense_subset'):
+            dense_subset_version = slugify(dense_subset_version)
+
+        dense_subset_version = dense_subset_version or get_workflow().output_version
+        dense_subset_path = (
+            cohort.analysis_dataset.prefix() / get_workflow().name / dense_subset_version / 'dense_subset.mt'
+        )
+        return dense_subset_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import dense_subset
@@ -99,9 +111,20 @@ class DenseSubset(CohortStage):
 @stage(required_stages=[SampleQC, DenseSubset])
 class Relatedness(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if relatedness_version := get_config()['large_cohort'].get('output_versions').get('relatedness'):
+            relatedness_version = slugify(relatedness_version)
+
+        relatedness_version = relatedness_version or get_workflow().output_version
+        relatedness_path = (
+            cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version / 'relatedness.ht'
+        )
+        relatedness_to_drop_path = (
+            cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version / 'relateds_to_drop.ht'
+        )
+
         return dict(
-            relatedness=get_workflow().prefix / 'relatedness.ht',
-            relateds_to_drop=get_workflow().prefix / 'relateds_to_drop.ht',
+            relatedness=relatedness_path,
+            relateds_to_drop=relatedness_to_drop_path,
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -274,18 +297,24 @@ class LoadVqsr(CohortStage):
         return get_workflow().prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.load_vqsr import run
+        from cpg_workflows.large_cohort import load_vqsr
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                site_only_vcf_path=inputs.as_path(cohort, Vqsr, key='vcf'),
-                vqsr_ht_path=self.expected_outputs(cohort),
-            ),
-            depends_on=inputs.get_jobs(cohort),
+        j = get_batch().new_job(
+            'LoadVqsr',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                load_vqsr,
+                load_vqsr.run.__name__,
+                str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
