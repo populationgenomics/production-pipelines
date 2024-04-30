@@ -12,31 +12,31 @@ Examples of workflows can be found in the `production-workflows` repository.
 """
 
 import functools
-import networkx as nx
 import logging
 import pathlib
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
-from typing import cast, Callable, Union, TypeVar, Generic, Optional, Type, Sequence
+from typing import Callable, Generic, Optional, Sequence, Type, TypeVar, Union, cast
 
+import networkx as nx
 from cloudpathlib import CloudPath
+
 from hailtop.batch.job import Job
-from cpg_utils.config import get_config
+
 from cpg_utils import Path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch, reset_batch
 
-from .batch import get_batch
-from .status import MetamistStatusReporter
-from .targets import Target, Dataset, SequencingGroup, Cohort
-from .utils import (
-    exists,
-    missing_from_pre_collected,
-    timestamp,
-    slugify,
-    ExpectedResultT,
-)
 from .inputs import get_cohort
-
+from .status import MetamistStatusReporter
+from .targets import Cohort, Dataset, SequencingGroup, Target
+from .utils import (
+    ExpectedResultT,
+    exists,
+    slugify,
+    timestamp,
+)
 
 StageDecorator = Callable[..., 'Stage']
 
@@ -45,33 +45,6 @@ StageDecorator = Callable[..., 'Stage']
 # it would violate the Liskov substitution principle (i.e. any Stage subclass would
 # have to be able to work on any Target subclass).
 TargetT = TypeVar('TargetT', bound=Target)
-
-
-def list_all_parent_dirs(all_outputs: set[Path]) -> set[Path]:
-    """
-    take all possible outputs, find unique parent directories
-
-    Args:
-        all_outputs (set[Path]): all possible outputs across multiple stages
-
-    Returns:
-        a set of all unique parent directories
-    """
-    return {output.parent for output in all_outputs}
-
-
-def list_of_all_dir_contents(locations: set[Path]) -> set[Path]:
-    """
-    take a collection of parent directories and identify their contents
-
-    Args:
-        locations (set[Path]): all places to look
-
-    Returns:
-        set of all files across all locations
-    """
-
-    return {file for location in locations for file in location.iterdir()}
 
 
 def path_walk(expected, collected: set | None = None) -> set[Path]:
@@ -164,11 +137,11 @@ class StageOutput:
             f'StageOutput({self.data}'
             f' target={self.target}'
             f' stage={self.stage}'
-            + (f' [reusable]' if self.reusable else '')
-            + (f' [skipped]' if self.skipped else '')
+            + (' [reusable]' if self.reusable else '')
+            + (' [skipped]' if self.skipped else '')
             + (f' [error: {self.error_msg}]' if self.error_msg else '')
             + f' meta={self.meta}'
-            + f')'
+            + ')'
         )
         return res
 
@@ -178,9 +151,7 @@ class StageOutput:
 
         if key is not None:
             if not isinstance(self.data, dict):
-                raise ValueError(
-                    f'{self.stage}: {self.data} is not a dictionary, can\'t get "{key}"'
-                )
+                raise ValueError(f'{self.stage}: {self.data} is not a dictionary, can\'t get "{key}"')
             res = cast(dict, self.data)[key]
         else:
             res = self.data
@@ -258,7 +229,7 @@ class StageInput:
                 f'{self.stage.name}: getting inputs from stage {stage.__name__}, '
                 f'but {stage.__name__} is not listed in required_stages. '
                 f'Consider adding it into the decorator: '
-                f'@stage(required_stages=[{stage.__name__}])'
+                f'@stage(required_stages=[{stage.__name__}])',
             )
 
         if stage.__name__ not in self._outputs_by_target_by_stage:
@@ -270,15 +241,10 @@ class StageInput:
                     'stages, and consider changing `workflow/first_stage`'
                     if get_config()['workflow'].get('skip_sgs_with_missing_input')
                     else ''
-                )
+                ),
             )
 
-        return {
-            trg: fun(result)
-            for trg, result in self._outputs_by_target_by_stage.get(
-                stage.__name__, {}
-            ).items()
-        }
+        return {trg: fun(result) for trg, result in self._outputs_by_target_by_stage.get(stage.__name__, {}).items()}
 
     def as_path_by_target(
         self,
@@ -314,12 +280,11 @@ class StageInput:
             raise StageInputNotFoundError(
                 f'Not found output from stage {stage.__name__}, required for stage '
                 f'{self.stage.name}. Is {stage.__name__} in the `required_stages`'
-                f'decorator? Available: {self._outputs_by_target_by_stage}'
+                f'decorator? Available: {self._outputs_by_target_by_stage}',
             )
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFoundError(
-                f'Not found output for {target} from stage {stage.__name__}, required '
-                f'for stage {self.stage.name}'
+                f'Not found output for {target} from stage {stage.__name__}, required for stage {self.stage.name}',
             )
         return self._outputs_by_target_by_stage[stage.__name__][target.target_id]
 
@@ -366,14 +331,10 @@ class StageInput:
             for target_, output in outputs_by_target.items():
                 if output:
                     output_sequencing_groups = output.target.get_sequencing_group_ids()
-                    sequencing_groups_intersect = set(target_sequencing_groups) & set(
-                        output_sequencing_groups
-                    )
+                    sequencing_groups_intersect = set(target_sequencing_groups) & set(output_sequencing_groups)
                     if sequencing_groups_intersect:
                         for j in output.jobs:
-                            assert (
-                                j
-                            ), f'Stage: {stage_}, target: {target_}, output: {output}'
+                            assert j, f'Stage: {stage_}, target: {target_}, output: {output}'
                         all_jobs.extend(output.jobs)
         return all_jobs
 
@@ -401,6 +362,7 @@ class Stage(Generic[TargetT], ABC):
         analysis_type: str | None = None,
         analysis_keys: list[str] | None = None,
         update_analysis_meta: Callable[[str], dict] | None = None,
+        tolerate_missing_output: bool = False,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
         forced: bool = False,
@@ -427,13 +389,13 @@ class Stage(Generic[TargetT], ABC):
         # field, and result is merged into the `Analysis.meta` dictionary.
         self.update_analysis_meta = update_analysis_meta
 
+        self.tolerate_missing_output = tolerate_missing_output
+
         # Populated with the return value of `add_to_the_workflow()`
         self.output_by_target: dict[str, StageOutput | None] = dict()
 
         self.skipped = skipped
-        self.forced = forced or self.name in get_config()['workflow'].get(
-            'force_stages', []
-        )
+        self.forced = forced or self.name in get_config()['workflow'].get('force_stages', [])
         self.assume_outputs_exist = assume_outputs_exist
 
     @property
@@ -447,6 +409,10 @@ class Stage(Generic[TargetT], ABC):
     @property
     def prefix(self) -> Path:
         return get_workflow().prefix / self.name
+
+    @property
+    def analysis_prefix(self) -> Path:
+        return get_workflow().analysis_prefix / self.name
 
     def __str__(self):
         res = f'{self._name}'
@@ -563,34 +529,27 @@ class Stage(Generic[TargetT], ABC):
         for output_job in outputs.jobs:
             if output_job:
                 for input_job in inputs.get_jobs(target):
-                    assert (
-                        input_job
-                    ), f'Input dependency job for stage: {self}, target: {target}'
+                    assert input_job, f'Input dependency job for stage: {self}, target: {target}'
                     output_job.depends_on(input_job)
 
         if outputs.error_msg:
             return outputs
 
         # Adding status reporter jobs
-        if (
-            self.analysis_type
-            and self.status_reporter
-            and action == Action.QUEUE
-            and outputs.data
-        ):
+        if self.analysis_type and self.status_reporter and action == Action.QUEUE and outputs.data:
             analysis_outputs: list[str | Path] = []
             if isinstance(outputs.data, dict):
                 if not self.analysis_keys:
                     raise WorkflowError(
                         f'Cannot create Analysis: `analysis_keys` '
                         f'must be set with the @stage decorator to select value from '
-                        f'the expected_outputs dict: {outputs.data}'
+                        f'the expected_outputs dict: {outputs.data}',
                     )
                 if not all(key in outputs.data for key in self.analysis_keys):
                     raise WorkflowError(
                         f'Cannot create Analysis for stage {self.name}: `analysis_keys` '
                         f'"{self.analysis_keys}" is not a subset of the expected_outputs '
-                        f'keys {outputs.data.keys()}'
+                        f'keys {outputs.data.keys()}',
                     )
 
                 for analysis_key in self.analysis_keys:
@@ -607,56 +566,56 @@ class Stage(Generic[TargetT], ABC):
             elif isinstance(target, Cohort):
                 project_name = target.analysis_dataset.name
 
+            assert isinstance(project_name, str)
+
+            # bump name to include `-test`
+            if get_config()['workflow']['access_level'] == 'test' and 'test' not in project_name:
+                project_name = f'{project_name}-test'
+
             for analysis_output in analysis_outputs:
-                assert isinstance(
-                    analysis_output, (str, Path)
-                ), f'{analysis_output} should be a str or Path object'
-                self.status_reporter.add_updaters_jobs(
+                if not outputs.jobs:
+                    continue
+
+                assert isinstance(analysis_output, (str, Path)), f'{analysis_output} should be a str or Path object'
+                if outputs.meta is None:
+                    outputs.meta = {}
+
+                self.status_reporter.create_analysis(
                     b=get_batch(),
-                    output=analysis_output,
+                    output=str(analysis_output),
                     analysis_type=self.analysis_type,
                     target=target,
                     jobs=outputs.jobs,
-                    prev_jobs=inputs.get_jobs(target),
+                    job_attr=self.get_job_attrs(target) | {'stage': self.name, 'tool': 'metamist'},
                     meta=outputs.meta,
-                    job_attrs=self.get_job_attrs(target),
                     update_analysis_meta=self.update_analysis_meta,
+                    tolerate_missing_output=self.tolerate_missing_output,
                     project_name=project_name,
                 )
 
         return outputs
 
-    def _get_action(
-        self, target: TargetT, existing_files: set[Path] | None = None
-    ) -> Action:
+    def _get_action(self, target: TargetT) -> Action:
         """
         Based on stage parameters and expected outputs existence, determines what
-        to do with the target: queue, skip or reuse, etc..
+        to do with the target: queue, skip or reuse, etc...
         """
         if target.forced and not self.skipped:
             logging.info(f'{self.name}: {target} [QUEUE] (target is forced)')
             return Action.QUEUE
 
-        if (
-            d := get_config()['workflow'].get('skip_stages_for_sgs')
-        ) and self.name in d:
+        if (d := get_config()['workflow'].get('skip_stages_for_sgs')) and self.name in d:
             skip_targets = d[self.name]
             if target.target_id in skip_targets:
-                logging.info(
-                    f'{self.name}: {target} [SKIP] (is in workflow/skip_stages_for_sgs)'
-                )
+                logging.info(f'{self.name}: {target} [SKIP] (is in workflow/skip_stages_for_sgs)')
                 return Action.SKIP
 
         expected_out = self.expected_outputs(target)
-        reusable, first_missing_path = self._is_reusable(
-            expected_out, existing_outputs=existing_files
-        )
+        reusable, first_missing_path = self._is_reusable(expected_out)
 
         if self.skipped:
             if reusable and not first_missing_path:
-                logging.info(
-                    f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)'
-                )
+                logging.info(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
                 return Action.REUSE
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.warning(
@@ -664,7 +623,7 @@ class Stage(Generic[TargetT], ABC):
                     f'but is marked as "skipped", '
                     f'workflow/skip_sgs_with_missing_input=true '
                     f'and some expected outputs for the target do not exist: '
-                    f'{first_missing_path}'
+                    f'{first_missing_path}',
                 )
                 # `workflow/skip_sgs_with_missing_input` means that we can ignore
                 # sgs/datasets that have missing results from skipped stages.
@@ -672,53 +631,41 @@ class Stage(Generic[TargetT], ABC):
                 # be ignored:
                 target.active = False
                 return Action.SKIP
-            if self.name in get_config()['workflow'].get(
-                'allow_missing_outputs_for_stages', []
-            ):
+            if self.name in get_config()['workflow'].get('allow_missing_outputs_for_stages', []):
                 logging.info(
                     f'{self.name}: {target} [REUSE] (stage is skipped, some outputs are'
                     f'missing, but stage is listed in '
-                    f'workflow/allow_missing_outputs_for_stages)'
+                    f'workflow/allow_missing_outputs_for_stages)',
                 )
                 return Action.REUSE
             else:
                 raise WorkflowError(
                     f'{self.name}: stage is required, but is skipped, and '
                     f'the following expected outputs for target {target} do not exist: '
-                    f'{first_missing_path}'
+                    f'{first_missing_path}',
                 )
 
         if reusable and not first_missing_path:
             if target.forced:
                 logging.info(
-                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target '
-                    f'to rerun this stage)'
+                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the target to rerun this stage)',
                 )
                 return Action.QUEUE
             elif self.forced:
-                logging.info(
-                    f'{self.name}: {target} [QUEUE] (can reuse, but forcing the stage '
-                    f'to rerun)'
-                )
+                logging.info(f'{self.name}: {target} [QUEUE] (can reuse, but forcing the stage to rerun)')
                 return Action.QUEUE
             else:
-                logging.info(
-                    f'{self.name}: {target} [REUSE] (expected outputs exist: '
-                    f'{expected_out})'
-                )
+                logging.info(f'{self.name}: {target} [REUSE] (expected outputs exist: {expected_out})')
                 return Action.REUSE
 
         logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
-    def _is_reusable(
-        self, expected_out: ExpectedResultT, existing_outputs: set[Path] | None = None
-    ) -> tuple[bool, Path | None]:
+    def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
         """
         Checks if the outputs of prior stages already exist, and can be reused
         Args:
             expected_out (ExpectedResultT): expected outputs of a stage
-            existing_outputs (optional[set[Path]]): pre-scanned directory contents
 
         Returns:
             tuple[bool, Path | None]:
@@ -726,28 +673,26 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
+            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
+            logging.info('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out)
+            logging.info(f'Checking if {paths} from expected output {expected_out} exist')
             if not paths:
+                logging.info(f'{expected_out} is not reusable. No paths found.')
                 return False, None
 
-            # check against the pre-scanned files if possible
-            if existing_outputs:
-                first_missing_path = missing_from_pre_collected(paths, existing_outputs)
-
-            # fall back to individual .exists() tests
-            else:
-                first_missing_path = next((p for p in paths if not exists(p)), None)
-
-            if first_missing_path:
+            if first_missing_path := next((p for p in paths if not exists(p)), None):
+                logging.info(f'{expected_out} is not reusable, {first_missing_path} is missing')
                 return False, first_missing_path
+
             return True, None
         else:
             if self.skipped:
@@ -775,6 +720,7 @@ def stage(
     analysis_type: str | None = None,
     analysis_keys: list[str | Path] | None = None,
     update_analysis_meta: Callable[[str], dict] | None = None,
+    tolerate_missing_output: bool = False,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
     assume_outputs_exist: bool = False,
@@ -798,6 +744,8 @@ def stage(
         if the Stage.expected_outputs() returns a dict.
     @update_analysis_meta: if defined, this function is called on the `Analysis.output`
         field, and returns a dictionary to be merged into the `Analysis.meta`
+    @tolerate_missing_output: if True, when registering the output of this stage,
+        allow for the output file to be missing (only relevant for metamist entry)
     @required_stages: list of other stage classes that are required prerequisites
         for this stage. Outputs of those stages will be passed to
         `Stage.queue_jobs(... , inputs)` as `inputs`, and all required
@@ -822,6 +770,7 @@ def stage(
                 skipped=skipped,
                 assume_outputs_exist=assume_outputs_exist,
                 forced=forced,
+                tolerate_missing_output=tolerate_missing_output,
             )
 
         return wrapper_stage
@@ -906,13 +855,11 @@ class Workflow:
         dry_run: bool | None = None,
     ):
         if _workflow is not None:
-            raise ValueError(
-                'Workflow already initialised. Use get_workflow() to get the instance'
-            )
+            raise ValueError('Workflow already initialised. Use get_workflow() to get the instance')
 
-        self.dry_run = dry_run or get_config()['workflow'].get('dry_run')
+        self.dry_run = dry_run or get_config(True)['workflow'].get('dry_run')
 
-        analysis_dataset = get_config()['workflow']['dataset']
+        analysis_dataset = get_config(True)['workflow']['dataset']
         name = get_config()['workflow'].get('name', analysis_dataset)
         description = get_config()['workflow'].get('description', name)
         self.name = slugify(name)
@@ -921,9 +868,7 @@ class Workflow:
         if output_version := get_config()['workflow'].get('output_version'):
             self._output_version = slugify(output_version)
 
-        self.run_timestamp: str = (
-            get_config()['workflow'].get('run_timestamp') or timestamp()
-        )
+        self.run_timestamp: str = get_config()['workflow'].get('run_timestamp') or timestamp()
 
         # Description
         if self._output_version:
@@ -934,6 +879,7 @@ class Workflow:
         if not self.dry_run:
             if ds_set := set(d.name for d in get_cohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
+            reset_batch()
             get_batch().name = description
 
         self.status_reporter = None
@@ -945,6 +891,10 @@ class Workflow:
     @property
     def output_version(self) -> str:
         return self._output_version or get_cohort().alignment_inputs_hash()
+
+    @property
+    def analysis_prefix(self) -> Path:
+        return self._prefix(category='analysis')
 
     @property
     def tmp_prefix(self) -> Path:
@@ -962,11 +912,7 @@ class Workflow:
         """
         Prepare a unique path for the workflow with this name and this input data.
         """
-        return (
-            get_cohort().analysis_dataset.prefix(category=category)
-            / self.name
-            / self.output_version
-        )
+        return get_cohort().analysis_dataset.prefix(category=category) / self.name / self.output_version
 
     def run(
         self,
@@ -1011,7 +957,7 @@ class Workflow:
                     raise WorkflowError(
                         f'Value in workflow/{param} "{_s_name}" must be a stage name '
                         f'or a subset of stages from the available list: '
-                        f'{", ".join(stage_names)}'
+                        f'{", ".join(stage_names)}',
                     )
 
         if not (last_stages or first_stages):
@@ -1027,16 +973,13 @@ class Workflow:
         for fs in first_stages:
             for descendant in nx.descendants(graph, fs):
                 if not stages_d[descendant].skipped:
-                    logging.info(
-                        f'Skipping stage {descendant} (precedes {fs} listed in '
-                        f'first_stages)'
-                    )
+                    logging.info(f'Skipping stage {descendant} (precedes {fs} listed in first_stages)')
                     stages_d[descendant].skipped = True
                 for grand_descendant in nx.descendants(graph, descendant):
                     if not stages_d[grand_descendant].assume_outputs_exist:
                         logging.info(
                             f'Not checking expected outputs of not immediately '
-                            f'required stage {grand_descendant} (< {descendant} < {fs})'
+                            f'required stage {grand_descendant} (< {descendant} < {fs})',
                         )
                         stages_d[grand_descendant].assume_outputs_exist = True
 
@@ -1066,9 +1009,7 @@ class Workflow:
                 _stage.assume_outputs_exist = True
 
     @staticmethod
-    def _process_only_stages(
-        stages: list[Stage], graph: nx.DiGraph, only_stages: list[str]
-    ):
+    def _process_only_stages(stages: list[Stage], graph: nx.DiGraph, only_stages: list[str]):
         if not only_stages:
             return
 
@@ -1081,7 +1022,7 @@ class Workflow:
                 raise WorkflowError(
                     f'Value in workflow/only_stages "{s_name}" must be a stage '
                     f'name or a subset of stages from the available list: '
-                    f'{", ".join(stage_names)}'
+                    f'{", ".join(stage_names)}',
                 )
 
         # We want to run stages only appearing in only_stages, and check outputs of
@@ -1120,13 +1061,10 @@ class Workflow:
         if only_stages and (first_stages or last_stages or skip_stages):
             raise WorkflowError(
                 "Workflow config parameter 'only_stages' is incompatible with "
-                + "'first_stages', 'last_stages' and/or 'skip_stages'"
+                + "'first_stages', 'last_stages' and/or 'skip_stages'",
             )
 
-        logging.info(
-            f'End stages for the workflow "{self.name}": '
-            f'{[cls.__name__ for cls in requested_stages]}'
-        )
+        logging.info(f'End stages for the workflow "{self.name}": {[cls.__name__ for cls in requested_stages]}')
         logging.info('Stages additional configuration:')
         logging.info(f'  workflow/skip_stages: {skip_stages}')
         logging.info(f'  workflow/only_stages: {only_stages}')
@@ -1162,10 +1100,7 @@ class Workflow:
                     newly_implicitly_added_d[reqstg.name] = reqstg
 
             if newly_implicitly_added_d:
-                logging.info(
-                    f'Additional implicit stages: '
-                    f'{list(newly_implicitly_added_d.keys())}'
-                )
+                logging.info(f'Additional implicit stages: {list(newly_implicitly_added_d.keys())}')
                 _stages_d |= newly_implicitly_added_d
             else:
                 # No new implicit stages added, so can stop the depth-search here
@@ -1174,9 +1109,7 @@ class Workflow:
         # Round 3: set "stage.required_stages" fields to each stage.
         for stg in _stages_d.values():
             stg.required_stages = [
-                _stages_d[cls.__name__]
-                for cls in stg.required_stages_classes
-                if cls.__name__ in _stages_d
+                _stages_d[cls.__name__] for cls in stg.required_stages_classes if cls.__name__ in _stages_d
             ]
 
         # Round 4: determining order of execution.
@@ -1204,47 +1137,34 @@ class Workflow:
         if not (final_set_of_stages := [s.name for s in stages if not s.skipped]):
             raise WorkflowError('No stages to run')
 
-        logging.info(
-            f'Final list of stages after applying stage configuration options:\n'
-            f'{final_set_of_stages}'
-        )
+        logging.info(f'Final list of stages after applying stage configuration options:\n{final_set_of_stages}')
 
         required_skipped_stages = [s for s in stages if s.skipped]
         if required_skipped_stages:
-            logging.info(
-                f'Skipped stages: {", ".join(s.name for s in required_skipped_stages)}'
-            )
+            logging.info(f'Skipped stages: {", ".join(s.name for s in required_skipped_stages)}')
 
         # Round 6: actually adding jobs from the stages.
         if not self.dry_run:
             cohort = get_cohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
-                logging.info(f'*' * 60)
+                logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')
                 stg.output_by_target = stg.queue_for_cohort(cohort)
                 if errors := self._process_stage_errors(stg.output_by_target):
-                    raise WorkflowError(
-                        f'Stage {stg} failed to queue jobs with errors: '
-                        + '\n'.join(errors)
-                    )
+                    raise WorkflowError(f'Stage {stg} failed to queue jobs with errors: ' + '\n'.join(errors))
 
-                logging.info(f'')
+                logging.info('')
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
             logging.info(f'Queued stages: {self.queued_stages}')
 
     @staticmethod
-    def _process_stage_errors(
-        output_by_target: dict[str, StageOutput | None]
-    ) -> list[str]:
+    def _process_stage_errors(output_by_target: dict[str, StageOutput | None]) -> list[str]:
         targets_by_error = defaultdict(list)
         for target, output in output_by_target.items():
             if output and output.error_msg:
                 targets_by_error[output.error_msg].append(target)
-        return [
-            f'{error}: {", ".join(target_ids)}'
-            for error, target_ids in targets_by_error.items()
-        ]
+        return [f'{error}: {", ".join(target_ids)}' for error, target_ids in targets_by_error.items()]
 
 
 class SequencingGroupStage(Stage[SequencingGroup], ABC):
@@ -1259,9 +1179,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
         """
 
     @abstractmethod
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Override to add Hail Batch jobs.
         """
@@ -1279,7 +1197,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
                 f'`workflow.input_datasets` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`'
+                f'via workflow.skip_datasets`',
             )
             return output_by_target
         if not cohort.get_sequencing_groups():
@@ -1289,7 +1207,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'usable (active=True) sequencing groups found. Check logs above for '
                 f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                 f'via `workflow.skip_sgs` in config, or they all missing stage '
-                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
+                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
             )
             return output_by_target
 
@@ -1302,7 +1220,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                     f'usable (active=True) sequencing groups found. Check logs above for '
                     f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
                     f'via `workflow.skip_sgs` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)'
+                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
                 )
                 continue
 
@@ -1312,20 +1230,12 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
             # list outputs in advance
             all_outputs: set[Path] = set()
             for sequencing_group in dataset.get_sequencing_groups():
-                all_outputs = path_walk(
-                    self.expected_outputs(sequencing_group), all_outputs
-                )
-            all_parents = list_all_parent_dirs(all_outputs)
-            existing_files = list_of_all_dir_contents(all_parents)
+                all_outputs = path_walk(self.expected_outputs(sequencing_group), all_outputs)
 
             # evaluate_stuff en masse
             for sequencing_group in dataset.get_sequencing_groups():
-                action = self._get_action(
-                    sequencing_group, existing_files=existing_files
-                )
-                output_by_target[
-                    sequencing_group.target_id
-                ] = self._queue_jobs_with_checks(sequencing_group, action)
+                action = self._get_action(sequencing_group)
+                output_by_target[sequencing_group.target_id] = self._queue_jobs_with_checks(sequencing_group, action)
 
         return output_by_target
 
@@ -1359,15 +1269,13 @@ class DatasetStage(Stage, ABC):
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
                 f'`workflow.input_datasets` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`'
+                f'via workflow.skip_datasets`',
             )
             return output_by_target
         for dataset_i, dataset in enumerate(datasets):
             action = self._get_action(dataset)
             logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
-            output_by_target[dataset.target_id] = self._queue_jobs_with_checks(
-                dataset, action
-            )
+            output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
         return output_by_target
 
 

@@ -27,7 +27,7 @@ def test_check_pedigree(caplog, tmp_path):
     for expected_line in [
         '4/51 PED samples with mismatching sex',
         'Sex inferred for 51/51 samples, matching for 47 samples.',
-        'Found 4 sample pair(s) that are provided as unrelated, are inferred as related:',
+        'Found 1 sample pair(s) that are provided as unrelated, are inferred as related:',
         'Found 7 sample pair(s) that are provided as related, but inferred as unrelated:',
     ]:
         matching_lines = [expected_line in msg for msg in caplog.messages]

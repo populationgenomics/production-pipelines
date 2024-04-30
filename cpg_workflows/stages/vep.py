@@ -3,19 +3,19 @@ VEP stage.
 """
 
 from cpg_utils import to_path
+from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs import vep
 from cpg_workflows.workflow import (
-    stage,
+    Cohort,
+    CohortStage,
     StageInput,
     StageOutput,
-    CohortStage,
-    Cohort,
+    stage,
 )
 
-from cpg_workflows.jobs import vep
+from ..resources import joint_calling_scatter_count
 from .joint_genotyping import JointGenotyping
 from .vqsr import Vqsr
-from .. import get_batch
-from ..resources import joint_calling_scatter_count
 
 
 @stage(required_stages=[Vqsr, JointGenotyping])
@@ -45,8 +45,8 @@ class Vep(CohortStage):
                 inputs.as_str(
                     stage=JointGenotyping,
                     target=cohort,
-                    key=f'siteonly_part_pattern',
-                ).format(idx=idx)
+                    key='siteonly_part_pattern',
+                ).format(idx=idx),
             )
             for idx in range(scatter_count)
         ]

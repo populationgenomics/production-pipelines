@@ -1,6 +1,7 @@
 """
 Test building stages DAG.
 """
+
 import pytest
 from pytest_mock import MockFixture
 

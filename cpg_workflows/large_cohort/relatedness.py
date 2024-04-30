@@ -1,5 +1,7 @@
 import logging
+
 import hail as hl
+
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.utils import can_reuse
@@ -56,9 +58,7 @@ def pcrelate(
         scores_ht = hl.read_table(str(scores_ht_path))
     else:
         sample_num = mt.cols().count()
-        _, scores_ht, _ = hl.hwe_normalized_pca(
-            mt.GT, k=max(1, min(sample_num // 3, 10)), compute_loadings=False
-        )
+        _, scores_ht, _ = hl.hwe_normalized_pca(mt.GT, k=max(1, min(sample_num // 3, 10)), compute_loadings=False)
         scores_ht.checkpoint(str(scores_ht_path), overwrite=True)
 
     relatedness_ht = hl.pc_relate(
@@ -83,15 +83,22 @@ def flag_related(
 ) -> hl.Table:
     """
     Rank samples and flag samples to drop so there is only one sample per family
-    left, with the highest rank in the family.
+    left, with the highest rank in the family. The ranking is based on either
+    'var_data_chr20_mean_dp' or 'autosomal_mean_dp' depending on which is present
+    in the `sample_qc_ht` table.
 
-    `sample_qc_ht` has to have a `filters` and `var_data_chr20_mean_dp` columns.
+    @param relatedness_ht: table with relatedness information.
+    @param sample_qc_ht: table with either `var_data_chr20_mean_dp` or `autosomal_mean_dp`
+                         and `filters` fields.
+    @param out_relateds_to_drop_ht_path: path to write the output table of samples to drop.
+    @param tmp_prefix: path for temporary files.
+    @return: table of samples to drop, ordered by rank.
     """
-    logging.info(f'Flagging related samples to drop')
+    logging.info('Flagging related samples to drop')
     if can_reuse(out_relateds_to_drop_ht_path):
         return hl.read_table(str(out_relateds_to_drop_ht_path))
 
-    rankings_ht_path = tmp_prefix / 'relatedness' / f'samples_rankings.ht'
+    rankings_ht_path = tmp_prefix / 'relatedness' / 'samples_rankings.ht'
     if can_reuse(rankings_ht_path):
         rank_ht = hl.read_table(str(rankings_ht_path))
     else:
@@ -100,11 +107,7 @@ def flag_related(
         ).checkpoint(str(rankings_ht_path), overwrite=True)
 
     try:
-        filtered_samples = hl.literal(
-            rank_ht.aggregate(
-                hl.agg.filter(rank_ht.filtered, hl.agg.collect(rank_ht.s))
-            )
-        )
+        filtered_samples = hl.literal(rank_ht.aggregate(hl.agg.filter(rank_ht.filtered, hl.agg.collect(rank_ht.s))))
     except hl.ExpressionException:
         # Hail doesn't handle it with `aggregate` when none of
         # the samples is 'filtered'
@@ -116,9 +119,7 @@ def flag_related(
         kin_threshold=get_config()['large_cohort']['max_kin'],
         filtered_samples=filtered_samples,
     )
-    to_drop_ht = to_drop_ht.checkpoint(
-        str(out_relateds_to_drop_ht_path), overwrite=True
-    )
+    to_drop_ht = to_drop_ht.checkpoint(str(out_relateds_to_drop_ht_path), overwrite=True)
     return to_drop_ht
 
 

@@ -1,33 +1,34 @@
 """
 Stages that generates and summarises CRAM QC.
 """
-import logging
+
 import dataclasses
-from typing import Callable, Optional, Any
+import logging
+from typing import Any, Callable, Optional
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import (
-    picard_wgs_metrics,
     picard_collect_metrics,
     picard_hs_metrics,
+    picard_wgs_metrics,
 )
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import SequencingGroup, Dataset
+from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
-    stage,
-    StageInput,
-    StageOutput,
-    SequencingGroupStage,
     DatasetStage,
+    SequencingGroupStage,
+    StageInput,
     StageInputNotFoundError,
+    StageOutput,
+    stage,
 )
 
 
@@ -68,22 +69,14 @@ def qc_functions() -> list[Qc]:
         Qc(
             func=picard_collect_metrics,
             outs={
-                'alignment_summary_metrics': QcOut(
-                    '.alignment_summary_metrics', 'picard/alignment_metrics'
-                ),
+                'alignment_summary_metrics': QcOut('.alignment_summary_metrics', 'picard/alignment_metrics'),
                 'base_distribution_by_cycle_metrics': QcOut(
                     '.base_distribution_by_cycle_metrics',
                     'picard/basedistributionbycycle',
                 ),
-                'insert_size_metrics': QcOut(
-                    '.insert_size_metrics', 'picard/insertsize'
-                ),
-                'quality_by_cycle_metrics': QcOut(
-                    '.quality_by_cycle_metrics', 'picard/quality_by_cycle'
-                ),
-                'quality_yield_metrics': QcOut(
-                    '.quality_yield_metrics', 'picard/quality_yield_metrics'
-                ),
+                'insert_size_metrics': QcOut('.insert_size_metrics', 'picard/insertsize'),
+                'quality_by_cycle_metrics': QcOut('.quality_by_cycle_metrics', 'picard/quality_by_cycle'),
+                'quality_yield_metrics': QcOut('.quality_yield_metrics', 'picard/quality_yield_metrics'),
             },
         ),
     ]
@@ -93,21 +86,15 @@ def qc_functions() -> list[Qc]:
         qcs.append(
             Qc(
                 func=picard_wgs_metrics,
-                outs={
-                    'picard_wgs_metrics': QcOut(
-                        '.picard-wgs-metrics', 'picard/wgs_metrics'
-                    )
-                },
-            )
+                outs={'picard_wgs_metrics': QcOut('.picard-wgs-metrics', 'picard/wgs_metrics')},
+            ),
         )
     if sequencing_type == 'exome':
         qcs.append(
             Qc(
                 func=picard_hs_metrics,
-                outs={
-                    'picard_hs_metrics': QcOut('.picard-hs-metrics', 'picard/hsmetrics')
-                },
-            )
+                outs={'picard_hs_metrics': QcOut('.picard-hs-metrics', 'picard/hsmetrics')},
+            ),
         )
     return qcs
 
@@ -123,19 +110,13 @@ class CramQC(SequencingGroupStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
+                    # Somalier outputs will be written to self.dataset.prefix() / 'cram' / f'{self.id}.cram.somalier' regardless of input cram path.
                     outs[key] = sequencing_group.make_cram_path().somalier_path
                 elif out:
-                    outs[key] = (
-                        sequencing_group.dataset.prefix()
-                        / 'qc'
-                        / key
-                        / f'{sequencing_group.id}{out.suf}'
-                    )
+                    outs[key] = sequencing_group.dataset.prefix() / 'qc' / key / f'{sequencing_group.id}{out.suf}'
         return outs
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_path = inputs.as_path(sequencing_group, Align, 'cram')
         crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
@@ -144,8 +125,7 @@ class CramQC(SequencingGroupStage):
         forced = self.forced or sequencing_group.forced
         for qc in qc_functions():
             out_path_kwargs = {
-                f'out_{key}_path': self.expected_outputs(sequencing_group)[key]
-                for key in qc.outs.keys()
+                f'out_{key}_path': self.expected_outputs(sequencing_group)[key] for key in qc.outs.keys()
             }
             if qc.func:
                 j = qc.func(  # type: ignore
@@ -158,9 +138,7 @@ class CramQC(SequencingGroupStage):
                 if j:
                     jobs.append(j)
 
-        return self.make_outputs(
-            sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
 @stage(required_stages=[CramQC])
@@ -180,8 +158,7 @@ class SomalierPedigree(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
-        prefix = dataset.prefix() / 'somalier' / 'cram' / h
+        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
@@ -198,19 +175,15 @@ class SomalierPedigree(DatasetStage):
         somalier_path_by_sgid = {}
         for sequencing_group in dataset.get_sequencing_groups():
             if get_config().get('somalier', {}).get('exclude_high_contamination'):
-                verify_bamid_path = inputs.as_path(
-                    stage=CramQC, target=sequencing_group, key='verify_bamid'
-                )
+                verify_bamid_path = inputs.as_path(stage=CramQC, target=sequencing_group, key='verify_bamid')
                 if not exists(verify_bamid_path):
                     logging.warning(
                         f'VerifyBAMID results {verify_bamid_path} do not exist for '
-                        f'{sequencing_group}, somalier pedigree estimations might be affected'
+                        f'{sequencing_group}, somalier pedigree estimations might be affected',
                     )
                 else:
                     verifybamid_by_sgid[sequencing_group.id] = verify_bamid_path
-            somalier_path = inputs.as_path(
-                stage=CramQC, target=sequencing_group, key='somalier'
-            )
+            somalier_path = inputs.as_path(stage=CramQC, target=sequencing_group, key='somalier')
             somalier_path_by_sgid[sequencing_group.id] = somalier_path
 
         html_path = self.expected_outputs(dataset)['html']
@@ -219,12 +192,8 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(
-            sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()
-        ):
-            expected_ped_path = dataset.write_ped_file(
-                self.expected_outputs(dataset)['expected_ped']
-            )
+        if any(sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()):
+            expected_ped_path = dataset.write_ped_file(self.expected_outputs(dataset)['expected_ped'])
             jobs = somalier.pedigree(
                 b=get_batch(),
                 dataset=dataset,
@@ -239,16 +208,15 @@ class SomalierPedigree(DatasetStage):
                 job_attrs=self.get_job_attrs(dataset),
                 send_to_slack=True,
             )
-            return self.make_outputs(
-                dataset, data=self.expected_outputs(dataset), jobs=jobs
-            )
+            return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
         else:
             return self.make_outputs(dataset, skipped=True)
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
-    from cloudpathlib import CloudPath
     import json
+
+    from cloudpathlib import CloudPath
 
     with CloudPath(output_path).open() as f:
         d = json.load(f)
@@ -275,11 +243,13 @@ class CramMultiQC(DatasetStage):
         """
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
+
+        # get the unique hash for these Sequencing Groups
+        sg_hash = dataset.alignment_inputs_hash()
         return {
-            'html': dataset.web_prefix() / 'qc' / 'cram' / 'multiqc.html',
-            'json': dataset.prefix() / 'qc' / 'cram' / h / 'multiqc_data.json',
-            'checks': dataset.prefix() / 'qc' / 'cram' / h / '.checks',
+            'html': dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
+            'json': dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
+            'checks': dataset.prefix() / 'qc' / 'cram' / sg_hash / '.checks',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
@@ -323,7 +293,7 @@ class CramMultiQC(DatasetStage):
                     except StageInputNotFoundError:  # allow missing inputs
                         logging.warning(
                             f'Output CramQc/"{key}" not found for {sequencing_group}, '
-                            f'it will be silently excluded from MultiQC'
+                            f'it will be silently excluded from MultiQC',
                         )
                         continue
                     modules_to_trim_endings.add(out.multiqc_key)
@@ -350,6 +320,4 @@ class CramMultiQC(DatasetStage):
             label='CRAM',
             extra_config={'table_columns_visible': {'FastQC': False}},
         )
-        return self.make_outputs(
-            dataset, data=self.expected_outputs(dataset), jobs=jobs
-        )
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

@@ -1,0 +1,9 @@
+[workflow]
+sequencing_type = 'genome'
+vep_version = '105'
+
+[vep]
+scatter_count = 1
+
+[images]
+vep_105 = "australia-southeast1-docker.pkg.dev/cpg-common/images/vep:105.0"

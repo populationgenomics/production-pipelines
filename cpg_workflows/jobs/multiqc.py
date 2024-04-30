@@ -5,17 +5,16 @@ Batch jobs to run MultiQC.
 """
 from typing import cast
 
-from cpg_utils.config import get_config
-from hailtop.batch.job import Job
 from hailtop.batch import Batch, ResourceFile
+from hailtop.batch.job import Job
 
-from cpg_utils import to_path
-from cpg_utils.hail_batch import image_path, copy_common_env, command
-from cpg_utils import Path
+from cpg_utils import Path, to_path
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import command, copy_common_env, image_path
+from cpg_workflows.python_scripts import check_multiqc
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import rich_sequencing_group_id_seds
-from cpg_workflows.python_scripts import check_multiqc
 
 
 def multiqc(
@@ -61,19 +60,17 @@ def multiqc(
     mqc_j.image(image_path('multiqc'))
     STANDARD.set_resources(mqc_j, ncpu=16)
 
-    file_list_path = tmp_prefix / 'multiqc-file-list.txt'
+    file_list_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_multiqc-file-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with file_list_path.open('w') as f:
             f.writelines([f'{p}\n' for p in paths])
     file_list = b.read_input(str(file_list_path))
 
     endings_conf = ', '.join(list(ending_to_trim)) if ending_to_trim else ''
-    modules_conf = (
-        ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
-    )
+    modules_conf = ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
 
     if sequencing_group_id_map:
-        sample_map_path = tmp_prefix / 'rename-sample-map.tsv'
+        sample_map_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_rename-sample-map.tsv'
         if not get_config()['workflow'].get('dry_run', False):
             _write_sg_id_map(sequencing_group_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))
@@ -174,7 +171,7 @@ def check_report_job(
             cmd,
             python_script_path=script_path,
             setup_gcp=True,
-        )
+        ),
     )
     if out_checks_path:
         b.write_output(check_j.output, str(out_checks_path))

@@ -1,16 +1,22 @@
 """
 Hail Batch jobs needed to call mitochondrial SNVs
 """
+
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
-from cpg_utils.config import get_config
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import command, image_path, fasta_res_group, reference_path
-from cpg_workflows.resources import STANDARD
-from cpg_workflows.batch import Batch
+from cpg_utils.config import get_config
+from cpg_utils.hail_batch import (
+    Batch,
+    command,
+    fasta_res_group,
+    image_path,
+    reference_path,
+)
 from cpg_workflows.filetypes import CramPath
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
 
 
@@ -48,7 +54,7 @@ def subset_cram_to_chrM(
         output_bam={
             'bam': '{root}.bam',
             'bam.bai': '{root}.bai',
-        }
+        },
     )
 
     # We are only accessing a tiny fraction of the genome. Mounting is the best option.
@@ -352,18 +358,17 @@ def mito_mutect2(
     j.image(image_path('gatk'))
 
     res = STANDARD.set_resources(j, ncpu=4)
-    java_mem_mb = res.get_java_mem_mb()
 
     j.declare_resource_group(
         output_vcf={
             'vcf.gz': '{root}.vcf.gz',
             'vcf.gz.tbi': '{root}.vcf.gz.tbi',
             'vcf.gz.stats': '{root}.vcf.gz.stats',
-        }
+        },
     )
 
     cmd = f"""
-        gatk --java-options "-Xmx{java_mem_mb}m" Mutect2 \
+        gatk --java-options "{res.java_mem_options()}" Mutect2 \
             -R {reference.base} \
             -I {cram.cram} \
             --read-filter MateOnSameContigOrNoMappedMateReadFilter \
@@ -410,12 +415,8 @@ def liftover_and_combine_vcfs(
 
     STANDARD.set_resources(j, ncpu=4)
 
-    j.declare_resource_group(
-        lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(lifted_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     cmd = f"""
         picard LiftoverVcf \
@@ -522,17 +523,11 @@ def filter_variants(
         idx=str(reference_path('gnomad_mito/blacklist_sites')) + '.idx',
     )
 
-    j.declare_resource_group(
-        filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
-    j.declare_resource_group(
-        output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
     if contamination_estimate:
-        contamination_estimate_string = (
-            f'--contamination-estimate  $(cat {contamination_estimate})'
-        )
+        contamination_estimate_string = f'--contamination-estimate  $(cat {contamination_estimate})'
     else:
         contamination_estimate_string = ''
 
@@ -584,13 +579,9 @@ def split_multi_allelics(
 
     STANDARD.set_resources(j, ncpu=4)
 
-    j.declare_resource_group(
-        split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'}
-    )
+    j.declare_resource_group(split_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     # Downstream hail steps prefer explicit .bgz suffix
-    j.declare_resource_group(
-        output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}
-    )
+    j.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
     cmd = f"""
         gatk LeftAlignAndTrimVariants \
@@ -685,9 +676,7 @@ def parse_contamination_results(
 
     STANDARD.set_resources(j, ncpu=4)
 
-    def parse_contamination_worker(
-        haplocheck_report: str, verifybamid_report: str | None
-    ) -> float:
+    def parse_contamination_worker(haplocheck_report: str, verifybamid_report: str | None) -> float:
         """
         Process haplocheckCLI and verifyBamID outputs to get contamination level as a
         single float.
@@ -727,9 +716,7 @@ def parse_contamination_results(
 
     # Call parse_contamination_worker as pythonJob which returns contamination_level
     # as a hail PythonResult.
-    contamination_level = j.call(
-        parse_contamination_worker, haplocheck_output, verifybamid_output
-    )
+    contamination_level = j.call(parse_contamination_worker, haplocheck_output, verifybamid_output)
 
     return j, contamination_level
 
@@ -758,7 +745,7 @@ def mitoreport(
         **{
             'cram': str(cram_path),
             'cram.crai': str(cram_path.with_suffix('.cram.crai')),
-        }
+        },
     )
 
     cmd = f"""
@@ -779,7 +766,7 @@ def mitoreport(
         command(
             cmd,
             setup_gcp=True,
-        )
+        ),
     )
 
     return j

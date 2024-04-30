@@ -5,14 +5,12 @@ Utils for submitting the workflow to a Dataproc cluster.
 import math
 from typing import Sequence
 
-from analysis_runner import dataproc
 from hailtop.batch.job import Job
 
+from analysis_runner import dataproc
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-
-from cpg_workflows.batch import get_batch
-
+from cpg_utils.hail_batch import get_batch
 
 DATAPROC_PACKAGES = [
     'cpg-utils',
@@ -56,7 +54,7 @@ def dataproc_job(
         raise ValueError(
             f'Cannot find gnomad_methods Git submodule: {gnomad_path}. Make sure '
             f'you cloned the repo recursively with `git clone --recurse-submodules '
-            f'git@github.com:populationgenomics/production-pipelines.git`.'
+            f'git@github.com:populationgenomics/production-pipelines.git`.',
         )
     pyfiles = [
         cpg_workflows.__name__,
@@ -124,5 +122,4 @@ def dataproc_job(
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=pyfiles,
-        init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
     )

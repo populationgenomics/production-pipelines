@@ -1,3 +1,0 @@
-[workflow]
-input_datasets = ['acute-care']
-create_es_index_for_datasets = ['acute-care']

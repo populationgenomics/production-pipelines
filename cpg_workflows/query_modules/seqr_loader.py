@@ -7,17 +7,16 @@ import logging
 import hail as hl
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import reference_path, genome_build
-from hail_scripts.computed_fields import vep, variant_id
-
+from cpg_utils.hail_batch import genome_build, reference_path
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
+from hail_scripts.computed_fields import variant_id, vep
 
 
 def annotate_cohort(
-    vcf_path,
-    out_mt_path,
-    vep_ht_path,
+    vcf_path: str,
+    out_mt_path: str,
+    vep_ht_path: str,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
 ):
@@ -26,26 +25,31 @@ def annotate_cohort(
     annotations.
     """
 
+    # tune the logger correctly
+    logging.getLogger().setLevel(logging.INFO)
+
+    # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
     mt = hl.import_vcf(
-        str(vcf_path),
+        vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
+        array_elements_required=False,
+        block_size=10,
     )
-    logging.info(f'Importing VCF {vcf_path}')
+    logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
-    logging.info(f'Loading VEP Table from {vep_ht_path}')
-    # Annotate VEP. Do ti before splitting multi, because we run VEP on unsplit VCF,
+    # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
     vep_ht = hl.read_table(str(vep_ht_path))
-    logging.info(f'Adding VEP annotations into the Matrix Table from {vep_ht_path}')
+    logging.info(
+        f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions',
+    )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
-    mt = hl.split_multi_hts(
-        mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles)
-    )
+    mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
@@ -57,9 +61,7 @@ def annotate_cohort(
         mt = mt.annotate_rows(
             # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
-            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(
-                lambda val: val != 'PASS'
-            ),
+            filters=mt.filters.union(vqsr_ht[mt.row_key].filters).filter(lambda val: val != 'PASS'),
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
@@ -69,22 +71,25 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # don't fail if the AC/AF attributes are an inappropriate type
+    # don't fail if completely absent either
     for attr in ['AC', 'AF']:
-        if not isinstance(mt.info[attr], hl.ArrayExpression):
+        if attr not in mt.info:
+            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
+        elif not isinstance(mt.info[attr], hl.ArrayExpression):
             mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
 
+    if 'AN' not in mt.info:
+        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+
+    logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],
         AF=mt.info.AF[mt.a_index - 1],
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
-        originalAltAlleles=variant_id.get_expr_for_variant_ids(
-            mt.locus_old, mt.alleles_old
-        ),
-        sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(
-            mt.vep
-        ),
+        originalAltAlleles=variant_id.get_expr_for_variant_ids(mt.locus_old, mt.alleles_old),
+        sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(mt.vep),
         variantId=variant_id.get_expr_for_variant_id(mt),
         contig=variant_id.get_expr_for_contig(mt.locus),
         pos=mt.locus.position,
@@ -99,41 +104,31 @@ def annotate_cohort(
         ref_data=ref_ht[mt.row_key],
     )
 
-    # this was previously executed in the MtToEs job, as it was not
-    # previously possible on QoB
+    # this was previously executed in the MtToEs job, as it wasn't possible on QoB
     logging.info('Adding GRCh37 coords')
     liftover_path = reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
     rg38.add_liftover(str(liftover_path), rg37)
-    mt = mt.annotate_rows(
-        rg37_locus=hl.liftover(mt.locus, 'GRCh37'),
-        info=mt.info.drop('InbreedingCoeff')
-    )
+    mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
-    mt = checkpoint_hail(mt, 'mt-vep-split-vqsr-round1.mt', checkpoint_prefix)
+    # only remove InbreedingCoeff if present (post-VQSR)
+    if 'InbreedingCoeff' in mt.info:
+        mt = mt.annotate_rows(info=mt.info.drop('InbreedingCoeff'))
 
     logging.info(
         'Annotating with seqr-loader fields: round 2 '
-        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)'
+        '(expanding sortedTranscriptConsequences, ref_data, clinvar_data)',
     )
     mt = mt.annotate_rows(
-        domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(
-            mt.sortedTranscriptConsequences
-        ),
-        transcriptConsequenceTerms=vep.get_expr_for_vep_consequence_terms_set(
-            mt.sortedTranscriptConsequences
-        ),
-        transcriptIds=vep.get_expr_for_vep_transcript_ids_set(
-            mt.sortedTranscriptConsequences
-        ),
+        domains=vep.get_expr_for_vep_protein_domains_set_from_sorted(mt.sortedTranscriptConsequences),
+        transcriptConsequenceTerms=vep.get_expr_for_vep_consequence_terms_set(mt.sortedTranscriptConsequences),
+        transcriptIds=vep.get_expr_for_vep_transcript_ids_set(mt.sortedTranscriptConsequences),
         mainTranscript=vep.get_expr_for_worst_transcript_consequence_annotations_struct(
-            mt.sortedTranscriptConsequences
+            mt.sortedTranscriptConsequences,
         ),
         geneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences),
-        codingGeneIds=vep.get_expr_for_vep_gene_ids_set(
-            mt.sortedTranscriptConsequences, only_coding_genes=True
-        ),
+        codingGeneIds=vep.get_expr_for_vep_gene_ids_set(mt.sortedTranscriptConsequences, only_coding_genes=True),
         cadd=mt.ref_data.cadd,
         dbnsfp=mt.ref_data.dbnsfp,
         geno2mp=mt.ref_data.geno2mp,
@@ -153,7 +148,7 @@ def annotate_cohort(
                 'allele_id': mt.clinvar_data.info.ALLELEID,
                 'clinical_significance': hl.delimit(mt.clinvar_data.info.CLNSIG),
                 'gold_stars': mt.clinvar_data.gold_stars,
-            }
+            },
         ),
     )
     mt = mt.annotate_globals(
@@ -178,17 +173,29 @@ def annotate_cohort(
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
-def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
+def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str | None = None):
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
     @param mt_path: cohort-level matrix table from VCF.
     @param sample_ids: samples to take from the matrix table.
     @param out_mt_path: path to write the result.
+    @param exclusion_file: path to a file containing samples to remove from the
+            subset prior to attempting removal
     """
+
     mt = hl.read_matrix_table(str(mt_path))
 
     sample_ids = set(sample_ids)
+
+    # if an exclusion file was passed, remove the samples from the subset
+    # this executes in a query command, by execution time the file should exist
+    if exclusion_file:
+        with hl.hadoop_open(exclusion_file) as f:
+            exclusion_ids = set(f.read().splitlines())
+        logging.info(f'Excluding {len(exclusion_ids)} samples from the subset')
+        sample_ids -= exclusion_ids
+
     mt_sample_ids = set(mt.s.collect())
 
     sample_ids_not_in_mt = sample_ids - mt_sample_ids
@@ -200,10 +207,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    logging.info(
-        f'Found {len(mt_sample_ids)} samples in mt, '
-        f'subsetting to {len(sample_ids)} samples.'
-    )
+    logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(sample_ids)} samples.')
 
     n_rows_before = mt.count_rows()
 
@@ -213,7 +217,7 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path):
     logging.info(
         f'Finished subsetting to {len(sample_ids)} samples. '
         f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
-        f'{mt.count_rows()}/{n_rows_before} rows'
+        f'{mt.count_rows()}/{n_rows_before} rows',
     )
     mt.write(str(out_mt_path), overwrite=True)
     logging.info(f'Written {out_mt_path}')
@@ -236,7 +240,7 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
     logging.info(f'Written {out_vcf_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
+def annotate_dataset_mt(mt_path, out_mt_path):
     """
     Add dataset-level annotations.
     """
@@ -255,17 +259,13 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
             ),
             hl.sum(mt.AD),
         ),
-        'dp': hl.if_else(
-            is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)
-        ),
+        'dp': hl.if_else(is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)),
         'sample_id': mt.s,
     }
     logging.info('Annotating genotypes')
     mt = mt.annotate_rows(
         genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
     )
-
-    mt = checkpoint_hail(mt, 'dataset-genotypes.mt', checkpoint_prefix)
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
@@ -303,25 +303,12 @@ def annotate_dataset_mt(mt_path, out_mt_path, checkpoint_prefix):
 
     mt = mt.annotate_rows(
         samples_no_call=_genotype_filter_samples(lambda g: g.num_alt == -1),
-        samples_num_alt=hl.struct(
-            **{
-                ('%i' % i): _genotype_filter_samples(_filter_num_alt(i))
-                for i in range(1, 3, 1)
-            }
-        ),
+        samples_num_alt=hl.struct(**{('%i' % i): _genotype_filter_samples(_filter_num_alt(i)) for i in range(1, 3, 1)}),
         samples_gq=hl.struct(
-            **{
-                ('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(
-                    _filter_samples_gq(i)
-                )
-                for i in range(0, 95, 5)
-            }
+            **{('%i_to_%i' % (i, i + 5)): _genotype_filter_samples(_filter_samples_gq(i)) for i in range(0, 95, 5)},
         ),
         samples_ab=hl.struct(
-            **{
-                '%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i))
-                for i in range(0, 45, 5)
-            }
+            **{'%i_to_%i' % (i, i + 5): _genotype_filter_samples(_filter_samples_ab(i)) for i in range(0, 45, 5)},
         ),
     )
     mt.describe()

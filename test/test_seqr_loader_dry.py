@@ -1,11 +1,13 @@
 """
 Test seqr-loader workflow.
 """
+
 from pathlib import Path
 from unittest.mock import mock_open
 
-from cpg_utils import to_path
 from pytest_mock import MockFixture
+
+from cpg_utils import to_path
 
 from . import set_config
 
@@ -42,7 +44,8 @@ peer = "stub"
 picard = "stub"
 samtools = "stub"
 somalier = "stub"
-vep = "stub"
+vep_110 = "stub"
+vep_105 = "stub"
 verifybamid = "stub"
 
 [references]
@@ -52,12 +55,14 @@ liftover_38_to_37 = "stub"
 somalier_sites = "stub"
 seqr_combined_reference_data = "stub"
 seqr_clinvar = "stub"
+[references.hg38_telomeres_and_centromeres_intervals]
+interval_list = "stub"
 
 [storage.default]
 default = "{directory}"
 web = "{directory}-web"
 analysis = "{directory}-analysis"
-tmp = "{directory}-test-tmp"
+tmp = "://{directory}-test-tmp"
 web_url = "https://test-web.populationgenomics.org.au/fewgenomes"
 
 [storage.test-input-dataset]
@@ -114,12 +119,8 @@ kgp_hc_ht = "stub"
 mills_ht = "stub"
 """
 
-DEFAULT_CONFIG = Path(
-    to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml'
-)
-SEQR_LOADER_CONFIG = Path(
-    to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml'
-)
+DEFAULT_CONFIG = Path(to_path(__file__).parent.parent / 'cpg_workflows' / 'defaults.toml')
+SEQR_LOADER_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'defaults' / 'seqr_loader.toml')
 
 
 def _mock_cohort():
@@ -131,9 +132,7 @@ def _mock_cohort():
     ds.add_sequencing_group(
         'CPG01',
         'SAMPLE1',
-        alignment_input_by_seq_type={
-            'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')
-        },
+        alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
     )
     ds.add_sequencing_group(
         'CPG02',
@@ -149,8 +148,8 @@ def _mock_cohort():
                         'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
                         'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
                     ),
-                ]
-            )
+                ],
+            ),
         },
     )
     return cohort
@@ -184,25 +183,19 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         return 1
 
     mocker.patch('pathlib.Path.open', selective_mock_open)
-    # functions like get_intervals checks file existence
-    mocker.patch('cpg_workflows.workflow.list_all_parent_dirs', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.list_of_all_dir_contents', lambda *args: {})
-    mocker.patch('cpg_workflows.workflow.missing_from_pre_collected', lambda *args: None)
     # cloudfuse (used in Vep) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.cloudfuse', do_nothing)
     # always_run (used in MtToEs -> hail_dataproc_job) doesn't work with LocalBackend
     mocker.patch('hailtop.batch.job.Job.always_run', do_nothing)
     # can't access secrets from CI environment
-    mocker.patch(
-        'cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password'
-    )
+    mocker.patch('cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password')
     mocker.patch(
         'metamist.apis.AnalysisApi.create_analysis',
         mock_create_analysis,
     )
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
-    from cpg_workflows.batch import get_batch
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
@@ -212,16 +205,9 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
-    assert (
-        get_batch().job_by_tool['gatk HaplotypeCaller']['job_n']
-        == len(get_cohort().get_sequencing_groups()) * 50
-    )
-    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(
-        get_cohort().get_sequencing_groups()
-    )
-    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(
-        get_cohort().get_sequencing_groups()
-    )
+    assert get_batch().job_by_tool['gatk HaplotypeCaller']['job_n'] == len(get_cohort().get_sequencing_groups()) * 50
+    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(get_cohort().get_sequencing_groups())
+    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(get_cohort().get_sequencing_groups())
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
         == len(get_cohort().get_sequencing_groups()) + 1

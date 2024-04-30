@@ -1,9 +1,9 @@
 import re
 
 import pytest
-from cpg_utils import Path
 from pytest_mock import MockFixture
 
+from cpg_utils import Path
 from cpg_workflows.jobs.somalier import extract
 
 from ... import set_config
@@ -62,9 +62,7 @@ class TestSomalierExtract:
             len(batch.select_jobs('Somalier extract')) == 1
         ), "Unexpected number of 'Somalier' jobs in batch list, should be just 1 job"
 
-    def test_will_return_none_if_output_file_exists_and_overwrite_is_false(
-        self, tmp_path: Path
-    ):
+    def test_will_return_none_if_output_file_exists_and_overwrite_is_false(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         output = tmp_path / 'output_somalier_file'
@@ -79,9 +77,7 @@ class TestSomalierExtract:
 
         assert j is None, 'Job was created when output file should have been reused'
 
-    def test_will_create_one_job_if_output_file_exists_and_overwrite_is_true(
-        self, tmp_path: Path
-    ):
+    def test_will_create_one_job_if_output_file_exists_and_overwrite_is_true(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         output = tmp_path / 'output_somalier_file'
@@ -108,7 +104,10 @@ class TestSomalierExtract:
         ],
     )
     def test_sets_supplied_job_attrs_or_sets_default_attrs_if_attrs_not_supplied(
-        self, tmp_path: Path, job_attrs, expected_attrs
+        self,
+        tmp_path: Path,
+        job_attrs,
+        expected_attrs,
     ):
         _, cram_pth, batch = setup_test(tmp_path)
 
@@ -134,9 +133,7 @@ class TestSomalierExtract:
         assert j is not None
         assert j._image == config.images['somalier']
 
-    def test_sets_sites_location_with_name_of_sites_file_in_config(
-        self, tmp_path: Path
-    ):
+    def test_sets_sites_location_with_name_of_sites_file_in_config(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
 
         j = extract(
@@ -151,9 +148,7 @@ class TestSomalierExtract:
         assert re.search(fr'SITES=\$BATCH_TMPDIR/sites/{sites}', cmd)
         assert re.search(fr'--sites \${{BATCH_TMPDIR}}/inputs/\w+/{sites}', cmd)
 
-    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(
-        self, tmp_path: Path
-    ):
+    def test_uses_fail_safe_copy_on_cram_path_and_index_in_bash_command(self, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         j = extract(
@@ -183,9 +178,7 @@ class TestSomalierExtract:
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'-f \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(
-        self, tmp_path: Path
-    ):
+    def test_uses_broad_reference_as_default_if_reference_not_set_in_workflow_config_section(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
 
         j = extract(
@@ -198,9 +191,7 @@ class TestSomalierExtract:
         ref_file = config.other['references']['broad']['ref_fasta']
         assert re.search(fr'-f \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
 
-    def test_batch_writes_output_file_to_output_path(
-        self, mocker: MockFixture, tmp_path: Path
-    ):
+    def test_batch_writes_output_file_to_output_path(self, mocker: MockFixture, tmp_path: Path):
         _, cram_pth, batch = setup_test(tmp_path)
 
         spy = mocker.spy(batch, 'write_output')
@@ -218,9 +209,7 @@ class TestSomalierExtract:
     def test_raises_error_if_no_cram_index_path_given(self, tmp_path: Path):
         _, cram_pth_no_index, batch = setup_test(tmp_path, index=False)
 
-        with pytest.raises(
-            ValueError, match='CRAM for somalier is required to have CRAI index'
-        ):
+        with pytest.raises(ValueError, match='CRAM for somalier is required to have CRAI index'):
             _ = extract(
                 b=batch,
                 cram_path=cram_pth_no_index,

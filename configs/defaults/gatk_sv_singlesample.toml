@@ -3,3 +3,11 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
+
+# these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
+# from the same caller, and runs a VCFMetrics comparison of the two
+# we don't have like-for-like baselines for any of our samples (AFAIK), and the workflows don't allow
+# us to recover these results
+[resource_overrides.GatherSampleEvidence]
+run_module_metrics = false

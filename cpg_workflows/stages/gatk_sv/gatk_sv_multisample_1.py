@@ -6,25 +6,29 @@ Though, there is a separate process required to merge files
 across batches between FilterBatch and GenotypeBatch
 """
 
-
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_workflows.batch import get_batch
-from cpg_workflows.workflow import stage, StageOutput, StageInput, Cohort, CohortStage
-
+from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+    SV_CALLERS,
+    CromwellJobSizes,
+    _sv_batch_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
-    get_references,
     get_ref_panel,
+    get_references,
     make_combined_ped,
-    SV_CALLERS,
-    _sv_batch_meta,
 )
-from cpg_workflows.workflow import get_workflow
+from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
 
 @stage
@@ -72,15 +76,24 @@ class GatherBatchEvidence(CohortStage):
             'merged_BAF_index': f'{self.name}.baf.txt.gz.tbi',
             'merged_bincov': f'{self.name}.RD.txt.gz',
             'merged_bincov_index': f'{self.name}.RD.txt.gz.tbi',
-            'SR_stats': 'SR.QC_matrix.txt',
-            'PE_stats': 'PE.QC_matrix.txt',
-            'BAF_stats': 'BAF.QC_matrix.txt',
-            'RD_stats': 'RD.QC_matrix.txt',
             'median_cov': 'medianCov.transposed.bed',
             'merged_dels': 'DEL.bed.gz',
             'merged_dups': 'DUP.bed.gz',
-            'Matrix_QC_plot': '00_matrix_FC_QC.png',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_matrix_qc'):
+                ending_by_key.update(
+                    {
+                        'Matrix_QC_plot': '00_matrix_FC_QC.png',
+                        'SR_stats': 'SR.QC_matrix.txt',
+                        'PE_stats': 'PE.QC_matrix.txt',
+                        'BAF_stats': 'BAF.QC_matrix.txt',
+                        'RD_stats': 'RD.QC_matrix.txt',
+                    },
+                )
+
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
 
@@ -95,31 +108,19 @@ class GatherBatchEvidence(CohortStage):
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(make_combined_ped(cohort, self.prefix)),
             'counts': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.coverage_counts.tsv.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.coverage_counts.tsv.gz')
                 for sequencing_group in sequencing_groups
             ],
             'SR_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.sr.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sr.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'PE_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.pe.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.pe.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'SD_files': [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.sd.txt.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.sd.txt.gz')
                 for sequencing_group in sequencing_groups
             ],
             'ref_copy_number_autosomal_contigs': 2,
@@ -133,10 +134,7 @@ class GatherBatchEvidence(CohortStage):
 
         for caller in SV_CALLERS:
             input_dict[f'{caller}_vcfs'] = [
-                str(
-                    sequencing_group.make_sv_evidence_path
-                    / f'{sequencing_group.id}.{caller}.vcf.gz'
-                )
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz')
                 for sequencing_group in sequencing_groups
             ]
 
@@ -150,7 +148,7 @@ class GatherBatchEvidence(CohortStage):
                 {'cnmops_allo_file': 'allosome_file'},
                 'cytoband',
                 'mei_bed',
-            ]
+            ],
         )
 
         # reference panel gCNV models
@@ -167,16 +165,24 @@ class GatherBatchEvidence(CohortStage):
                 'condense_counts_docker',
                 'gatk_docker',
                 'cnmops_docker',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # this step runs for approximately 15 hours
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            job_size=CromwellJobSizes.LARGE,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -194,14 +200,16 @@ class ClusterBatch(CohortStage):
         * Metrics
         """
 
-        ending_by_key = {
-            'metrics_file_clusterbatch': 'metrics.tsv',
-        }
+        ending_by_key = {}
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_clusterbatch'] = 'metrics.tsv'
+
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
-            ending_by_key[
-                f'clustered_{caller}_vcf_index'
-            ] = f'clustered-{caller}.vcf.gz.tbi'
+            ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
         return {key: self.prefix / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -229,9 +237,7 @@ class ClusterBatch(CohortStage):
         }
 
         for caller in SV_CALLERS:
-            input_dict[f'{caller}_vcf_tar'] = str(
-                batch_evidence_d[f'std_{caller}_vcf_tar']
-            )
+            input_dict[f'{caller}_vcf_tar'] = str(batch_evidence_d[f'std_{caller}_vcf_tar'])
 
         input_dict |= get_images(
             [
@@ -240,7 +246,7 @@ class ClusterBatch(CohortStage):
                 'gatk_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -248,16 +254,24 @@ class ClusterBatch(CohortStage):
                 {'contig_list': 'primary_contigs_list'},
                 {'depth_exclude_intervals': 'depth_exclude_list'},
                 {'pesr_exclude_intervals': 'pesr_exclude_list'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for approx 1 hour
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -273,10 +287,17 @@ class GenerateBatchMetrics(CohortStage):
         Metrics files
         """
 
-        return {
+        outputs = {
             'metrics': self.prefix / 'metrics.tsv',
             'metrics_common': self.prefix / 'metrics_common.tsv',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                outputs['metrics_file_batchmetrics'] = f'GenerateBatchMetrics.{get_workflow().output_version}'
+
+        return outputs
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
@@ -309,7 +330,7 @@ class GenerateBatchMetrics(CohortStage):
                 'sv_base_docker',
                 'sv_pipeline_base_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
@@ -319,16 +340,24 @@ class GenerateBatchMetrics(CohortStage):
                 'segdups',
                 {'autosome_contigs': 'autosome_file'},
                 {'allosome_contigs': 'allosome_file'},
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for approx 4-5 hours
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -348,7 +377,6 @@ class FilterBatch(CohortStage):
         """
 
         ending_by_key: dict = {
-            'metrics_file_filterbatch': 'metrics.tsv',
             'filtered_pesr_vcf': 'filtered_pesr_merged.vcf.gz',
             'cutoffs': 'cutoffs',
             'scores': 'updated_scores',
@@ -356,21 +384,22 @@ class FilterBatch(CohortStage):
             'outlier_samples_excluded_file': 'outliers.samples.list',
             'batch_samples_postOutlierExclusion_file': 'outliers_excluded.samples.list',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_filterbatch'] = 'metrics.tsv'
+
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
 
             # unsure why, scramble doesn't export this file
             if caller != 'scramble':
-                ending_by_key[
-                    f'sites_filtered_{caller}_vcf'
-                ] = f'sites-filtered-{caller}.vcf.gz'
+                ending_by_key[f'sites_filtered_{caller}_vcf'] = f'sites-filtered-{caller}.vcf.gz'
 
-        ending_by_key['sv_counts'] = [
-            f'{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']
-        ]
+        ending_by_key['sv_counts'] = [f'{caller}.with_evidence.svcounts.txt' for caller in SV_CALLERS + ['depth']]
         ending_by_key['sv_count_plots'] = [
-            f'{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png'
-            for caller in SV_CALLERS + ['depth']
+            f'{caller}.with_evidence.all_SVTYPEs.counts_per_sample.png' for caller in SV_CALLERS + ['depth']
         ]
         d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
@@ -401,22 +430,30 @@ class FilterBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
-            ]
+            ],
         )
 
         input_dict |= get_references(
             [
                 'primary_contigs_list',
-            ]
+            ],
         )
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
+        # runs for over an hour
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
+            job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -461,13 +498,9 @@ class MergeBatchSites(CohortStage):
         batch_names = get_config()['workflow']['batch_names']
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz'
-            for batch_name in batch_names
+            batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz' for batch_name in batch_names
         ]
-        depth_vcfs = [
-            batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz'
-            for batch_name in batch_names
-        ]
+        depth_vcfs = [batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz' for batch_name in batch_names]
 
         input_dict: dict[str, Any] = {
             'cohort': cohort.name,
@@ -476,12 +509,18 @@ class MergeBatchSites(CohortStage):
         }
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -517,14 +556,32 @@ class GenotypeBatch(CohortStage):
         List of SR pass variants
         List of SR fail variants
         """
+
+        # this workflow requires re-genotyping previous batches with each new
+        # expansion of the cohort.
+        # we want to keep all versions of these outputs generated from separate
+        # inputs, so we incorporate the hash from the MergeBatchSites file into
+        # the files generated by this step to differentiate the outputs
+        if mbs_file := get_config()['workflow'].get('cohort_depth_vcf'):
+            cohort_hash = mbs_file.split('/')[4][-10:]
+        else:
+            # this method is still run, even if the Stage is skipped
+            # adding a failure here prevents the need for a dummy config variable
+            print('cohort_depth_vcf not found in config, wont run GenotypeBatch')
+            return {}
+
         ending_by_key = {
             'sr_bothside_pass': 'genotype_SR_part2_bothside_pass.txt',
             'sr_background_fail': 'genotype_SR_part2_background_fail.txt',
             'trained_PE_metrics': 'pe_metric_file.txt',
             'trained_SR_metrics': 'sr_metric_file.txt',
             'regeno_coverage_medians': 'regeno.coverage_medians_merged.bed',
-            'metrics_file_genotypebatch': 'metrics.tsv',
         }
+
+        # we don't run metrics as standard, only expect the output if we choose to run
+        if override := get_config()['resource_overrides'].get(self.name):
+            if override.get('run_module_metrics'):
+                ending_by_key['metrics_file_genotypebatch'] = 'metrics.tsv'
 
         for mode in ['pesr', 'depth']:
             ending_by_key |= {
@@ -534,7 +591,7 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.prefix / fname for key, fname in ending_by_key.items()}
+        return {key: self.prefix / f'{cohort_hash}_{fname}' for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
@@ -559,9 +616,7 @@ class GenotypeBatch(CohortStage):
         # pull out the merged VCF from MergeBatchSites
         for mode in ['pesr', 'depth']:
             input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][
-                f'cohort_{mode}_vcf'
-            ]
+            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][f'cohort_{mode}_vcf']
 
         input_dict |= get_images(
             [
@@ -570,21 +625,25 @@ class GenotypeBatch(CohortStage):
                 'sv_pipeline_docker',
                 'sv_pipeline_rdtest_docker',
                 'linux_docker',
-            ]
+            ],
         )
-        input_dict |= get_references(
-            ['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list']
-        )
+        input_dict |= get_references(['primary_contigs_list', 'bin_exclude', 'seed_cutoffs', 'pesr_exclude_list'])
         # 2 additional (optional) references CPG doesn't have:
         # - sr_hom_cutoff_multiplier
         # - sr_median_hom_ins
 
         expected_d = self.expected_outputs(cohort)
+
+        billing_labels = {
+            'stage': self.name.lower(),
+            AR_GUID_NAME: try_get_ar_guid(),
+        }
+
         jobs = add_gatk_sv_jobs(
-            batch=get_batch(),
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
+            labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)

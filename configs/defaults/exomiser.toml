@@ -1,0 +1,19 @@
+[workflow]
+status_reporter = 'metamist'
+
+# attributes to provision the Exomiser VMs
+# Much lower storage req. - CADD & REMM not in use
+exomiser_memory = '60Gi'
+exomiser_storage = '100Gi'
+exomiser_cpu = 4
+
+# change this down to 13 to select the previous version of exomiser
+exomiser_version = 14
+
+# number of exomiser jobs to fit onto each VM
+exomiser_chunk_size = 8
+
+# number of jobs to run in parallel through backgrounded processes
+exomiser_parallel_chunks = 4
+
+# should probably add some exome/genome defaults here to alter behaviour/regions

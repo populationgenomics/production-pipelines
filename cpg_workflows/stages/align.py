@@ -1,20 +1,20 @@
 """
 Stage that generates a CRAM file.
 """
+
 import logging
-from cloudpathlib import CloudPath
 
 from cpg_utils import Path
 from cpg_utils.config import get_config
-from cpg_workflows import get_batch
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
 from cpg_workflows.workflow import (
     SequencingGroup,
-    stage,
+    SequencingGroupStage,
     StageInput,
     StageOutput,
-    SequencingGroupStage,
+    stage,
 )
 
 
@@ -28,14 +28,17 @@ class Align(SequencingGroupStage):
         """
         Stage is expected to generate a CRAM file and a corresponding index.
         """
+        if sequencing_group.cram:
+            cram_path = sequencing_group.cram
+        else:
+            cram_path = sequencing_group.make_cram_path()
+
         return {
-            'cram': sequencing_group.make_cram_path().path,
-            'crai': sequencing_group.make_cram_path().index_path,
+            'cram': cram_path.path,
+            'crai': cram_path.index_path,
         }
 
-    def queue_jobs(
-        self, sequencing_group: SequencingGroup, inputs: StageInput
-    ) -> StageOutput | None:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
         Checks the `realign_from_cram_version` pipeline config argument, and
@@ -69,14 +72,8 @@ class Align(SequencingGroupStage):
             )
         except MissingAlignmentInputException:
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
-                logging.error(
-                    f'No alignment inputs, skipping sequencing group {sequencing_group}'
-                )
+                logging.error(f'No alignment inputs, skipping sequencing group {sequencing_group}')
                 sequencing_group.active = False
-                return self.make_outputs(
-                    sequencing_group, skipped=True
-                )  # return empty output
+                return self.make_outputs(sequencing_group, skipped=True)  # return empty output
             else:
-                return self.make_outputs(
-                    target=sequencing_group, error_msg=f'No alignment input found'
-                )
+                return self.make_outputs(target=sequencing_group, error_msg='No alignment input found')

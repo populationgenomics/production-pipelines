@@ -1,6 +1,7 @@
 """
 Test building stages DAG.
 """
+
 from pytest_mock import MockFixture
 
 from .. import set_config
@@ -27,7 +28,7 @@ def test_skip_stages(mocker: MockFixture, tmp_path):
 
     # Skip stages with outputs that already exist
     check_expected_outputs = false
-    
+
     skip_stages = ['A2']
 
     [storage.default]
@@ -42,10 +43,10 @@ def test_skip_stages(mocker: MockFixture, tmp_path):
     dry_run = true
     """
     set_config(conf, tmp_path / 'config.toml')
+
+    from cpg_utils.hail_batch import get_batch
+
     run_workflow(mocker)
-
-    from cpg_workflows.workflow import get_batch
-
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage['A']['job_n'] == 1
     assert get_batch().job_by_stage['B']['job_n'] == 1

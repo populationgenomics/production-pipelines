@@ -1,21 +1,21 @@
-import hail as hl
 import logging
 
-from cpg_utils import Path
+import hail as hl
+
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse
 
 
 def run(
-    site_only_vcf_path: Path,
-    out_ht_path: Path,
+    site_only_vcf_path: str,
+    out_ht_path: str,
 ):
     load_vqsr(site_only_vcf_path, out_ht_path)
 
 
 def load_vqsr(
-    site_only_vcf_path: Path,
-    out_ht_path: Path | None = None,
+    site_only_vcf_path: str,
+    out_ht_path: str | None = None,
 ) -> hl.Table:
     """
     Convert VQSR VCF to HT
@@ -23,9 +23,7 @@ def load_vqsr(
     if can_reuse(out_ht_path):
         return hl.read_table(str(out_ht_path))
 
-    logging.info(
-        f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}'
-    )
+    logging.info(f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}')
     ht = hl.import_vcf(
         str(site_only_vcf_path),
         reference_genome=genome_build(),
@@ -61,7 +59,5 @@ def load_vqsr(
         ht = hl.read_table(str(out_ht_path))
         logging.info(f'Wrote split HT to {out_ht_path}')
     split_count = ht.count()
-    logging.info(
-        f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations'
-    )
+    logging.info(f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations')
     return ht
