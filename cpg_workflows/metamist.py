@@ -237,7 +237,7 @@ def sort_sgs_by_project(response_data) -> dict:
     Create dictionary organising sequencing groups by project
     {project_id: [sequencing_group_1, sequencing_group_2, ...]}
     """
-    result_dict: dict[str, Any] = {}
+    result_dict: dict[str, list[str]] = {}
 
     for sequencing_group in response_data:
         project_id = sequencing_group['sample']['project']['name']
