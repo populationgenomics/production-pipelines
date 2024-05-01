@@ -1,6 +1,6 @@
 [workflow]
 # Cohorts to use as inputs.
-# input_cohorts = []
+#input_cohorts = []
 
 # Datasets to load inputs. If not provided, datasets will be determined
 # automatically based on the input provider implementation:
