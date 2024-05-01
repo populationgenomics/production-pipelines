@@ -307,7 +307,8 @@ class RunHailSVFiltering(DatasetStage):
             copy_common_env(job)
 
             panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
-            pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
+            pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+
             # peddy can't read cloud paths
             local_ped = get_batch().read_input(str(pedigree))
 
