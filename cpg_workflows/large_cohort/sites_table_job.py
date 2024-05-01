@@ -19,6 +19,8 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
 )
 @click.command()
 def main(vds_path):
+    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
+    print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
     # Initialise batch
     init_batch()
 
@@ -93,7 +95,7 @@ def main(vds_path):
     pruned_variant_table = pruned_variant_table.repartition(100, shuffle=False)
     print('Number of variants in pruned_variant_table:', pruned_variant_table.count())
     print('Done repartitioning sites table')
-    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
+    # pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
     print(f'Writing sites table to {pruned_variant_table_path}')
     pruned_variant_table.write(pruned_variant_table_path)
     print('Done writing sites table')
