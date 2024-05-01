@@ -92,7 +92,8 @@ def main(vds_path):
     # repartition table after pruning
     pruned_variant_table = pruned_variant_table.repartition(100, shuffle=False)
     print('Done repartitioning sites table')
-    pruned_variant_table_path = output_path('pruned_variants_exome.ht')
+    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
+    print(f'Writing sites table to {pruned_variant_table_path}')
     pruned_variant_table.write(pruned_variant_table_path)
     print('Done writing sites table')
 
