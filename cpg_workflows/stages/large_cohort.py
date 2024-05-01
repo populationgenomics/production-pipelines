@@ -324,22 +324,24 @@ class Frequencies(CohortStage):
         return get_workflow().prefix / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.frequencies import run
+        from cpg_workflows.large_cohort import frequencies
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                vds_path=inputs.as_path(cohort, stage=Combiner),
-                sample_qc_ht_path=inputs.as_path(cohort, stage=SampleQC),
-                relateds_to_drop_ht_path=inputs.as_path(
-                    cohort,
-                    stage=Relatedness,
-                    key='relateds_to_drop',
-                ),
-                out_ht_path=self.expected_outputs(cohort),
-            ),
-            depends_on=inputs.get_jobs(cohort),
+        j = get_batch().new_job(
+            'Frequencies',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
         )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                frequencies,
+                frequencies.run.__name__,
+                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, SampleQC)),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
