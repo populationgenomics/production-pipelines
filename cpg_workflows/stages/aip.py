@@ -235,7 +235,7 @@ class RunHailFiltering(DatasetStage):
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
-        input_mt = config_retrieve(['workflow', 'matrix_table'], default=query_for_latest_mt(dataset.name))
+        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
@@ -336,7 +336,7 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary: {dataset.name}')
-        job.cpu(1.0).memory('standard')
+        job.cpu(2.0).memory('highmem')
 
         # auth and copy env
         job.image(image_path('aip'))
@@ -457,13 +457,14 @@ class GenerateSeqrFile(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
+
         # if it doesn't exist for this sequencing type, fail gracefully
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
         try:
             seqr_lookup = config_retrieve(['cohorts', dataset.name, seq_type, 'seqr_lookup'])
         except ConfigError:
             logging.warning(f'No Seqr lookup file for {dataset.name} {seq_type}')
-            return self.make_outputs(dataset, data={}, jobs=[], skipped=True)
+            return self.make_outputs(dataset, skipped=True)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
         input_localised = get_batch().read_input(str(moi_inputs))

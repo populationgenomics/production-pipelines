@@ -9,7 +9,7 @@ import pandas as pd
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.scripts import collect_dataset_tsvs
 from cpg_workflows.targets import SequencingGroup
@@ -42,24 +42,19 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     family_vcfs = [get_batch().read_input(str(sg.gvcf)) for sg in family_members]
 
     # declare a resource group
-    job.declare_resource_group(
-        output={
-            'vcf.bgz': '{root}.vcf.bgz',
-            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-        },
-    )
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
     # view -m 3 to strip out ref-only sites
     # norm -m -any to split Alt, Non_Ref into just Alt
     # grep -v NON_REF to remove the NON_REF sites
     # bgzip -c to write to a compressed file
-
-    # I'm wasting my time working out the most effective logic for single/family here
-    # so I'm just gonna write something, and we can revise later (or not)
     if len(family_vcfs) == 1:
         gvcf_input = family_vcfs[0]
         job.command(
-            f'bcftools view -m3 {gvcf_input} | bcftools norm -m -any | grep -v NON_REF | bgzip -c  > {job.output["vcf.bgz"]}',
+            f'bcftools view -m3 {gvcf_input} | '
+            f'bcftools norm -m -any | '
+            f'grep -v NON_REF | '
+            f'bgzip -c  > {job.output["vcf.bgz"]}',
         )
         job.command(f'tabix {job.output["vcf.bgz"]}')
         get_batch().write_output(job.output, out_path.removesuffix('.vcf.bgz'))
@@ -166,10 +161,20 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
             json.dump(phenopacket, ppk_file, indent=2)
 
 
-def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
+def run_exomiser_13(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     """
-    run the exomiser batch
-    what a wild type hint
+    run the families through exomiser 13
+    this is a bit of a monster, but it's a good example of how to chunk jobs
+    that previous line was written by GitHub CoPilot
+    This version implements Exomiser 13, with default references + CADD and REMM
+    This is not recommended by the developers of Exomiser, but if we decide to
+    involve CADD or REMM in the future, we'll have this code as a reference
+
+    This was set up using a de-compressed reference bundle, which was a bit of a pain
+    See the following method (Exomiser 14) for a cleaner implementation:
+    - store compressed resource bundles
+    - copy compressed data into image
+    - inflate at runtime to build reference data folder
     """
 
     exomiser_version = image_path('exomiser').split(':')[-1]
@@ -225,7 +230,8 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for chunk {chunk_number}')
         all_jobs.append(job)
-        job.storage(get_config()['workflow'].get('exomiser_storage', '200Gi'))
+        # higher requirement for exomiser 13 resources
+        job.storage('200Gi')
         job.memory(get_config()['workflow'].get('exomiser_memory', '60Gi'))
         job.cpu(get_config()['workflow'].get('exomiser_cpu', 4))
         job.image(image_path('exomiser'))
@@ -249,6 +255,97 @@ def run_exomiser_batches(content_dict: dict[str, dict[str, Path | dict[str, Path
         for parallel_chunk in chunks(
             family_chunk,
             chunk_size=get_config()['workflow'].get('exomiser_parallel_chunks', 4),
+        ):
+            for family in parallel_chunk:
+                # read in VCF & index
+                vcf = get_batch().read_input_group(
+                    **{
+                        f'{family}_vcf': str(content_dict[family]['vcf']),
+                        f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
+                    },
+                )[f'{family}_vcf']
+
+                # read in ped & phenotype JSON
+                ped = get_batch().read_input(str(content_dict[family]['ped']))
+                ppk = get_batch().read_input(str(content_dict[family]['pheno']))
+
+                # # this was really satisfying syntax to work out
+                job.declare_resource_group(
+                    **{
+                        family: {
+                            'json': '{root}.json',
+                            'tsv': '{root}.tsv',
+                            'variants.tsv': '{root}.variants.tsv',
+                            'yaml': '{root}.yaml',
+                        },
+                    },
+                )
+
+                # generate a config file based on the batch tmp locations
+                job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
+
+                # now run it, as a backgrounded process
+                job.command(
+                    f'java -Xmx10g -Xms4g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
+                    f'--analysis {job[family]["yaml"]} --ped {ped} '
+                    f'--spring.config.location={exomiser_dir}/application.properties &',
+                )
+
+            # wait for backgrounded processes to finish, show current state
+            job.command('wait && ls results')
+
+            # move the results, then copy out
+            for family in parallel_chunk:
+                job.command(f'mv results/{family}.json {job[family]["json"]}')
+                job.command(f'mv results/{family}.genes.tsv {job[family]["tsv"]}')
+                job.command(f'mv results/{family}.variants.tsv {job[family]["variants.tsv"]}')
+
+                get_batch().write_output(
+                    job[family],
+                    str(content_dict[family]['output']).removesuffix('.tsv'),
+                )
+    return all_jobs
+
+
+def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
+    """
+    run jobs through Exomiser 14
+    type hint is still wild
+    """
+
+    exomiser_version = image_path('exomiser_14').split(':')[-1]
+    exomiser_dir = f'/exomiser/exomiser-cli-{exomiser_version}'
+
+    # localise the compressed exomiser references
+    inputs = get_batch().read_input_group(
+        core=reference_path('exomiser_2402_core'),
+        pheno=reference_path('exomiser_2402_pheno'),
+    )
+
+    # now chunk the jobs - load resources, then run a bunch of families
+    families = sorted(content_dict.keys())
+    all_jobs = []
+    for chunk_number, family_chunk in enumerate(
+        chunks(families, config_retrieve(['workflow', 'exomiser_chunk_size'], 8)),
+    ):
+        # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
+        job = get_batch().new_bash_job(f'Run Exomiser for chunk {chunk_number}')
+        all_jobs.append(job)
+        job.storage(config_retrieve(['workflow', 'exomiser_storage'], '100Gi'))
+        job.memory(config_retrieve(['workflow', 'exomiser_memory'], '60Gi'))
+        job.cpu(config_retrieve(['workflow', 'exomiser_cpu'], 4))
+        job.image(image_path('exomiser_14'))
+
+        # unpack references, see linux-install link above
+        job.command(f'unzip {inputs}/\* -d "{exomiser_dir}/data"')
+
+        job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
+
+        # number of chunks should match cpu, accessible in config
+        # these will all run simultaneously using backgrounded tasks and a wait
+        for parallel_chunk in chunks(
+            family_chunk,
+            chunk_size=config_retrieve(['workflow', 'exomiser_parallel_chunks'], 4),
         ):
             for family in parallel_chunk:
                 # read in VCF & index
