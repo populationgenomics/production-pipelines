@@ -323,9 +323,7 @@ class RunHailSVFiltering(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
 
 
-def _aip_summary_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
+def _aip_summary_meta(output_path: str) -> dict[str, str]:
     """
     Add meta.type to custom analysis object
     """
@@ -399,9 +397,7 @@ class ValidateMOI(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-def _aip_html_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
+def _aip_html_meta(output_path: str) -> dict[str, str]:
     """
     Add meta.type to custom analysis object
     This isn't quite conformant with what AIP alone produces
