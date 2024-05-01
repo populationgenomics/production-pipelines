@@ -57,7 +57,7 @@ from functools import lru_cache
 from os.path import join
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import copy_common_env, get_batch
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
@@ -96,7 +96,7 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
     result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': type})
@@ -105,7 +105,7 @@ def query_for_sv_mt(dataset: str, type: str = 'sv') -> str | None:
         if (
             analysis['output']
             and analysis['output'].endswith('.mt')
-            and (analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type'))
+            and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -132,7 +132,7 @@ def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
     # hot swapping to a string we can freely modify
     query_dataset = dataset
 
-    if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+    if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
     result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': entry_type})
     mt_by_date = {}
@@ -141,7 +141,7 @@ def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
         if (
             analysis['output']
             and analysis['output'].endswith('.mt')
-            and (analysis['meta']['sequencing_type'] == get_config()['workflow'].get('sequencing_type'))
+            and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -176,9 +176,9 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         query_dataset = dataset.name
-        if get_config()['workflow'].get('access_level') == 'test' and 'test' not in query_dataset:
+        if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
-        hpo_file = get_batch().read_input(get_config()['workflow']['obo_file'])
+        hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
 
         job.command(
             f'python3 reanalysis/hpo_panel_match.py '
@@ -235,7 +235,7 @@ class RunHailFiltering(DatasetStage):
         # either do as you're told, or find the latest
         # this could potentially follow on from the AnnotateDataset stage
         # if this becomes integrated in the main pipeline
-        input_mt = get_config()['workflow'].get('matrix_table', query_for_latest_mt(dataset.name))
+        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('aip'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
@@ -275,8 +275,8 @@ class RunHailSVFiltering(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
-        sv_mt = get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type))
+        sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
+        sv_mt = config_retrieve(['workflow', 'sv_matrix_table'], query_for_sv_mt(dataset.name, type=sv_type))
 
         # this might work? May require some config entries
         if sv_mt is None:
@@ -336,7 +336,7 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary: {dataset.name}')
-        job.cpu(1.0).memory('standard')
+        job.cpu(2.0).memory('highmem')
 
         # auth and copy env
         job.image(image_path('aip'))
@@ -344,12 +344,12 @@ class ValidateMOI(DatasetStage):
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
-        input_path = get_config()['workflow'].get('matrix_table', query_for_latest_mt(dataset.name))
+        input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
 
         # the SV vcf is accepted, but is not always generated
         sv_vcf_arg = ''
-        sv_type = 'cnv' if get_config()['workflow'].get('sequencing_type') == 'exome' else 'sv'
-        if sv_path := get_config()['workflow'].get('sv_matrix_table', query_for_sv_mt(dataset.name, type=sv_type)):
+        sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
+        if sv_path := config_retrieve(['workflow', 'sv_matrix_table'], query_for_sv_mt(dataset.name, type=sv_type)):
             # bump input_path to contain both source files if appropriate
             input_path = f'{input_path}, {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
@@ -457,13 +457,12 @@ class GenerateSeqrFile(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
-        cohort_seq_type_section = get_config()['cohorts'][dataset.name].get(
-            get_config()['workflow'].get('sequencing_type', {}),
-        )
+        seq_type = config_retrieve(['workflow', 'sequencing_type'])
+        seqr_lookup = config_retrieve(['cohorts', dataset.name, seq_type, 'seqr_lookup'], False)
 
         # if there's no lookup file, do nothing
-        if not (seqr_lookup := cohort_seq_type_section.get('seqr_lookup')):
-            return self.make_outputs(dataset, data={}, jobs=[], skipped=True)
+        if not seqr_lookup:
+            return self.make_outputs(dataset, skipped=True)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
         input_localised = get_batch().read_input(str(moi_inputs))
