@@ -84,7 +84,8 @@ def get_fasta() -> Path:
     """
     global _FASTA
     if _FASTA is None:
-        _FASTA = to_path(config_retrieve(['workflow', 'ref_fasta'], reference_path('broad/ref_fasta')))
+        fasta_path = config_retrieve(['workflow', 'ref_fasta'], False) or reference_path('broad/ref_fasta')
+        _FASTA = to_path(fasta_path)
     return _FASTA
 
 
