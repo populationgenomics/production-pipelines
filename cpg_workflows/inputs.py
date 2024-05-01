@@ -63,6 +63,7 @@ def create_cohort() -> Cohort:
         for entry in sgs:
             metadata = entry.get('meta', {})
             update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+            # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
             sequencing_group = dataset.add_sequencing_group(
