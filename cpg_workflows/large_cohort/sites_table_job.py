@@ -74,10 +74,10 @@ def main(vds_path):
 
     nrows = hgdp_1kg_exome.count_rows()
     print(f'hgdp_1kg_exome.count_rows() = {nrows}')
-    hgdp_1kg_exome = hgdp_1kg_exome.sample_rows(
-        NUM_ROWS_BEFORE_LD_PRUNE / nrows,
-        seed=12345,
-    )
+    # hgdp_1kg_exome = hgdp_1kg_exome.sample_rows(
+    #     NUM_ROWS_BEFORE_LD_PRUNE / nrows,
+    #     seed=12345,
+    # )
 
     # as per gnomAD, LD-prune variants with a cutoff of r2 = 0.1
     print('Pruning sites table')
@@ -91,6 +91,7 @@ def main(vds_path):
     print('Repartitioning sites table')
     # repartition table after pruning
     pruned_variant_table = pruned_variant_table.repartition(100, shuffle=False)
+    print('Number of variants in pruned_variant_table:', pruned_variant_table.count())
     print('Done repartitioning sites table')
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
     print(f'Writing sites table to {pruned_variant_table_path}')
