@@ -46,6 +46,30 @@ def _cohort_config(tmp_path) -> str:
     return conf
 
 
+def _custom_cohort_config(tmp_path) -> str:
+    conf = f"""
+    [workflow]
+    dataset = 'projecta'
+    input_cohorts = ['COH1']
+
+    path_scheme = 'local'
+
+    [storage.default]
+    default = '{tmp_path}'
+
+    [storage.projecta]
+    default = '{tmp_path}'
+
+    [storage.projectb]
+    default = '{tmp_path}'
+
+    [references.broad]
+    ref_fasta = 'stub'
+    """
+
+    return conf
+
+
 def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
     return [
         {
@@ -145,6 +169,79 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
                         'sequencing_type': 'genome',
                         'sequencing_technology': 'short-read',
                         'sequencing_platform': 'illumina',
+                    },
+                    'type': 'sequencing',
+                },
+            ],
+        },
+    ]
+
+
+def mock_get_sgs_by_cohort(*args, **kwargs) -> list[dict]:
+    return [
+        {
+            'id': 'CPGXXXX',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'technology': 'short-read',
+            'type': 'genome',
+            'sample': {
+                'project': {
+                    'name': 'projecta',
+                },
+                'externalId': 'NA12340',
+                'participant': {
+                    'id': 1,
+                    'externalId': '8',
+                    'reportedSex': 'Male',
+                    'meta': {'participant_meta': 'is_here'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 1,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS28',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                    },
+                    'type': 'sequencing',
+                },
+            ],
+        },
+        {
+            'id': 'CPGAAAA',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'technology': 'short-read',
+            'type': 'genome',
+            'sample': {
+                'project': {
+                    'name': 'projectb',
+                },
+                'externalId': 'NA12489',
+                'participant': {
+                    'id': 2,
+                    'externalId': '14',
+                    'reportedSex': None,
+                    'meta': {'participant_metadata': 'number_fourteen'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 2,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS29',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
                     },
                     'type': 'sequencing',
                 },
@@ -713,3 +810,36 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
 
     assert test_female.pedigree.sex == Sex.FEMALE
     assert test_unknown.pedigree.sex == Sex.UNKNOWN
+
+
+def test_custom_cohort(mocker: MockFixture, tmp_path, monkeypatch):
+    """
+    Testing creating a Cohort object from metamist mocks.
+    """
+    set_config(_custom_cohort_config(tmp_path), tmp_path / 'config.toml')
+
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: False)
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
+
+    def mock_query(query, variables):
+        # Mocking the return value of the query function
+        return {'cohorts': [{'sequencingGroups': mock_get_sgs_by_cohort()}]}
+
+    # Patching the query function to mock the GraphQL query
+    monkeypatch.setattr('cpg_workflows.metamist.query', mock_query)
+
+    from cpg_workflows.inputs import get_cohort
+
+    cohort = get_cohort()
+
+    assert cohort
+
+    # Testing Cohort Information
+    assert len(cohort.get_sequencing_groups()) == 2
+    assert cohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA']
+
+    # Test the projects they belong to
+    assert cohort.get_sequencing_groups()[0].dataset.name == 'projecta'
+    assert cohort.get_sequencing_groups()[1].dataset.name == 'projectb'

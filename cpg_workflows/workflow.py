@@ -1196,7 +1196,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
                 f'{len(cohort.get_datasets())}/'
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
-                f'`workflow.input_datasets` is provided, and not all datasets are skipped '
+                f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and not all datasets are skipped '
                 f'via workflow.skip_datasets`',
             )
             return output_by_target
@@ -1268,7 +1268,7 @@ class DatasetStage(Stage, ABC):
                 f'{len(cohort.get_datasets())}/'
                 f'{len(cohort.get_datasets(only_active=False))} '
                 f'usable (active=True) datasets found in the cohort. Check that '
-                f'`workflow.input_datasets` is provided, and not all datasets are skipped '
+                f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and not all datasets are skipped '
                 f'via workflow.skip_datasets`',
             )
             return output_by_target
