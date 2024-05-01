@@ -82,17 +82,16 @@ class GatherBatchEvidence(CohortStage):
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_matrix_qc'):
-                ending_by_key.update(
-                    {
-                        'Matrix_QC_plot': '00_matrix_FC_QC.png',
-                        'SR_stats': 'SR.QC_matrix.txt',
-                        'PE_stats': 'PE.QC_matrix.txt',
-                        'BAF_stats': 'BAF.QC_matrix.txt',
-                        'RD_stats': 'RD.QC_matrix.txt',
-                    },
-                )
+        if config_retrieve(['resource_overrides', self.name, 'run_matrix_qc'], False):
+            ending_by_key.update(
+                {
+                    'Matrix_QC_plot': '00_matrix_FC_QC.png',
+                    'SR_stats': 'SR.QC_matrix.txt',
+                    'PE_stats': 'PE.QC_matrix.txt',
+                    'BAF_stats': 'BAF.QC_matrix.txt',
+                    'RD_stats': 'RD.QC_matrix.txt',
+                },
+            )
 
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
