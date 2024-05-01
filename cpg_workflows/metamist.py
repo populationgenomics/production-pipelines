@@ -266,7 +266,7 @@ class Metamist:
         entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
         # Create dictionary keying sequencing groups by project
-        # {project_id: [sequencing_group_1, sequencing_group_2, ...]}
+        # {project_id: [sequencing_group_1, sequencing_group_2, ...], ...}
 
         if len(entries['cohorts']) != 1:
             raise MetamistError('We only support one cohort at a time currently')
