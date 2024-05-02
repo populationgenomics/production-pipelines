@@ -360,11 +360,12 @@ class ValidateMOI(DatasetStage):
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
 
         # If there are SV VCFs, read each one in and add to the arguments
+        hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
         sv_vcf_arg = ''
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             # bump input_path to contain both source files if appropriate
             input_path += f', {sv_path}'
-            hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+
             labelled_sv_vcf = get_batch().read_input_group(
                 **{
                     'vcf.bgz': str(hail_sv_inputs[sv_file]),
