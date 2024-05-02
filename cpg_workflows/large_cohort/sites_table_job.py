@@ -19,6 +19,7 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
 )
 @click.command()
 def main(vds_path):
+    print(f'Input vds_path: {vds_path}')
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
     # Initialise batch
