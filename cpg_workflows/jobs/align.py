@@ -8,8 +8,6 @@ from enum import Enum
 from textwrap import dedent
 from typing import cast
 
-from cloudpathlib.exceptions import OverwriteNewerCloudError
-
 import hailtop.batch as hb
 from hailtop.batch.job import Job
 
@@ -106,6 +104,9 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     return alignment_input
 
 
+_uploaded = set()
+
+
 def hack_store_file(
     self,
     filename: str | Path,
@@ -120,10 +121,10 @@ def hack_store_file(
     cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
     assert isinstance(cloud_path, CloudPath)
 
-    try:
+    if cksum not in _uploaded:
         cloud_path.upload_from(filename)
-    except OverwriteNewerCloudError:
-        logging.info(f'hack_store_file: already uploaded {cloud_path}')
+        _uploaded.add(cksum)
+
     return self.read_input(str(cloud_path))
 
 
