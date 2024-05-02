@@ -20,7 +20,7 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
 @click.command()
 def main(vds_path):
     print(f'Input vds_path: {vds_path}')
-    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
+    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
     # Initialise batch
     init_batch()
@@ -71,7 +71,7 @@ def main(vds_path):
     # otherwise, persisting the pruned_variant_table will cause
     # script to fail. See https://github.com/populationgenomics/ancestry/pull/79
     print('Writing sites table pre-LD pruning')
-    checkpoint_path = output_path('hgdp1_1kg_exome_pre_pruning.mt', 'tmp')
+    checkpoint_path = output_path('hgdp1_1kg_exome_pre_pruning.mt', 'default')
     hgdp_1kg_exome = hgdp_1kg_exome.checkpoint(checkpoint_path, overwrite=True)
     print('Done writing sites table pre-LD pruning')
 
