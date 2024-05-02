@@ -7,7 +7,7 @@ import logging
 from typing import Callable, Optional
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, config_retrieve
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
