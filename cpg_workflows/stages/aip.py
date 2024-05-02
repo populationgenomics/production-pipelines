@@ -361,14 +361,14 @@ class ValidateMOI(DatasetStage):
 
         # If there are SV VCFs, read each one in and add to the arguments
         sv_vcf_arg = ''
-        for sv_path, _ in query_for_sv_mt(dataset.name):
+        for sv_path, sv_file in query_for_sv_mt(dataset.name):
             # bump input_path to contain both source files if appropriate
             input_path += f', {sv_path}'
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
             labelled_sv_vcf = get_batch().read_input_group(
                 **{
-                    'vcf.bgz': str(hail_sv_inputs[sv_path]),
-                    'vcf.bgz.tbi': f'{hail_sv_inputs[sv_path]}.tbi',
+                    'vcf.bgz': str(hail_sv_inputs[sv_file]),
+                    'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
                 },
             )['vcf.bgz']
             sv_vcf_arg += f' {labelled_sv_vcf}" '
