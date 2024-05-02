@@ -104,7 +104,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     return alignment_input
 
 
-_uploaded = set()
+_uploaded = {}
 
 
 def hack_store_file(
@@ -118,14 +118,14 @@ def hack_store_file(
         return path.absolute()
 
     cksum = hashlib.sha256(str(filename).encode()).hexdigest()
-    cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
-    assert isinstance(cloud_path, CloudPath)
-
     if cksum not in _uploaded:
-        cloud_path.upload_from(filename)
-        _uploaded.add(cksum)
+        cloud_path = to_path(self._backend.remote_tmpdir) / 'stored' / cksum / path.name
+        assert isinstance(cloud_path, CloudPath)
 
-    return self.read_input(str(cloud_path))
+        cloud_path.upload_from(filename)
+        _uploaded[cksum] = self.read_input(str(cloud_path))
+
+    return _uploaded[cksum]
 
 
 def align(
