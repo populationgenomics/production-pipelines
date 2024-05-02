@@ -297,6 +297,12 @@ class RunHailSVFiltering(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
 
+        panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
+        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+
+        # peddy can't read cloud paths
+        local_ped = get_batch().read_input(str(pedigree))
+
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
@@ -305,12 +311,6 @@ class RunHailSVFiltering(DatasetStage):
 
             # auth and copy env
             copy_common_env(job)
-
-            panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
-            pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-
-            # peddy can't read cloud paths
-            local_ped = get_batch().read_input(str(pedigree))
 
             job.command(
                 f'python3 reanalysis/hail_filter_sv.py '
@@ -332,7 +332,7 @@ def _aip_summary_meta(output_path: str) -> dict[str, str]:
 
 
 @stage(
-    required_stages=[GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
+    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
     update_analysis_meta=_aip_summary_meta,
@@ -353,6 +353,11 @@ class ValidateMOI(DatasetStage):
         job.image(image_path('aip'))
         copy_common_env(job)
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
+
+        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+        # peddy can't read cloud paths
+        local_ped = get_batch().read_input(str(pedigree))
+
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
@@ -375,8 +380,6 @@ class ValidateMOI(DatasetStage):
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
 
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
-        # peddy can't read cloud paths
-        local_ped = get_batch().read_input(str(hail_inputs['pedigree']))
         labelled_vcf = get_batch().read_input_group(
             **{
                 'vcf.bgz': str(hail_inputs['labelled_vcf']),
@@ -408,7 +411,7 @@ def _aip_html_meta(output_path: str) -> dict[str, str]:
 
 
 @stage(
-    required_stages=[ValidateMOI, QueryPanelapp, RunHailFiltering],
+    required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     update_analysis_meta=_aip_html_meta,
@@ -431,7 +434,9 @@ class CreateAIPHTML(DatasetStage):
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
         panel_input = inputs.as_dict(dataset, QueryPanelapp)['panel_data']
-        pedigree = inputs.as_dict(dataset, RunHailFiltering)['pedigree']
+
+        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+        # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
         expected_out = self.expected_outputs(dataset)
