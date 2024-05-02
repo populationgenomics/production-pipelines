@@ -100,7 +100,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     # create batches
     batches = []
     for cov in range(cov_bins):
-        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])
+        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])  # type: ignore
         batches.append(
             {
                 'sequencing_groups': sample_ids.ID.tolist(),
@@ -140,7 +140,7 @@ def partition_batches(
 
     # load in the metadata file
     md = pd.read_csv(metadata_file, sep='\t', low_memory=False)
-    md.columns = [x.replace('#', '') for x in md.columns]
+    md.columns = [x.replace('#', '') for x in md.columns]  # type: ignore
 
     # filter to the PCR-state SGs we're interested in
     md = md.query('ID in @sample_ids')

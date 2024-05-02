@@ -56,7 +56,7 @@ from functools import lru_cache
 from os.path import join
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, image_path
+from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import copy_common_env, get_batch
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import get_logger
@@ -191,10 +191,9 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
-        job.cpu(0.25).memory('lowmem')
+        job.cpu(0.25)
+        job.memory('lowmem')
         job.image(image_path('aip'))
-
-        # auth and copy env
         copy_common_env(job)
 
         expected_out = self.expected_outputs(dataset)
@@ -225,10 +224,9 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
-        job.cpu(0.25).memory('lowmem')
+        job.cpu(0.25)
+        job.memory('lowmem')
         job.image(image_path('aip'))
-
-        # auth and copy env
         copy_common_env(job)
 
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
@@ -347,9 +345,8 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary: {dataset.name}')
-        job.cpu(2.0).memory('highmem')
-
-        # auth and copy env
+        job.cpu(2.0)
+        job.memory('highmem')
         job.image(image_path('aip'))
         copy_common_env(job)
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
@@ -426,7 +423,8 @@ class CreateAIPHTML(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP HTML: {dataset.name}')
-        job.cpu(1.0).memory('lowmem')
+        job.cpu(1.0)
+        job.memory('lowmem')
         job.image(image_path('aip'))
 
         # auth and copy env
@@ -473,11 +471,13 @@ class GenerateSeqrFile(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
-        seq_type = config_retrieve(['workflow', 'sequencing_type'])
-        seqr_lookup = config_retrieve(['cohorts', dataset.name, seq_type, 'seqr_lookup'], False)
 
-        # if there's no lookup file, do nothing
-        if not seqr_lookup:
+        # if it doesn't exist for this sequencing type, fail gracefully
+        seq_type = config_retrieve(['workflow', 'sequencing_type'])
+        try:
+            seqr_lookup = config_retrieve(['cohorts', dataset.name, seq_type, 'seqr_lookup'])
+        except ConfigError:
+            get_logger().warning(f'No Seqr lookup file for {dataset.name} {seq_type}')
             return self.make_outputs(dataset, skipped=True)
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
@@ -485,7 +485,8 @@ class GenerateSeqrFile(DatasetStage):
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'AIP Prep for Seqr: {dataset.name}')
-        job.cpu(1.0).memory('lowmem')
+        job.cpu(1.0)
+        job.memory('lowmem')
         job.image(image_path('aip'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(

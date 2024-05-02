@@ -7,8 +7,8 @@ import logging
 import hail as hl
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
@@ -23,7 +23,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
     vds = hl.vds.read_vds(vds_path)
 
     # Remove centromeres and telomeres:
-    tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
+    tel_cent_ht = hl.read_table(reference_path('gnomad/tel_and_cent_ht'))
     if tel_cent_ht.count() > 0:
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
@@ -101,7 +101,7 @@ def impute_sex(
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
-        interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
+        interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
             # remove all rows where the locus falls within a defined interval
             tmp_variant_data = vds.variant_data.filter_rows(
