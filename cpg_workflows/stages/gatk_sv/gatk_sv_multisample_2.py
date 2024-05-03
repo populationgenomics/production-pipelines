@@ -562,18 +562,11 @@ class SpiceUpSVIDs(CohortStage):
         return self.make_outputs(cohort, data=expected_output, jobs=[pyjob, bcftools_job])
 
 
-def _sv_annotated_meta(output_path: str) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-annotated', 'remove_sgids': EXCLUSION_FILE}
-
-
 @stage(
     required_stages=SpiceUpSVIDs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=_sv_annotated_meta,
+    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
 )
 class AnnotateVcf(CohortStage):
     """
@@ -673,10 +666,7 @@ class AnnotateCohortSv(CohortStage):
         """
         Expected to write a matrix table.
         """
-        return {
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'cohort_sv.mt',
-        }
+        return {'tmp_prefix': str(self.tmp_prefix), 'mt': self.prefix / 'cohort_sv.mt'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -697,18 +687,11 @@ class AnnotateCohortSv(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
 
 
-def _update_sv_dataset_meta(output_path: str) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-    """
-    return {'type': 'annotated-sv-dataset-callset', 'remove_sgids': EXCLUSION_FILE}
-
-
 @stage(
     required_stages=[CombineExclusionLists, AnnotateCohortSv],
     analysis_type='sv',
     analysis_keys=['mt'],
-    update_analysis_meta=_update_sv_dataset_meta,
+    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
 )
 class AnnotateDatasetSv(DatasetStage):
     """
@@ -754,23 +737,16 @@ class AnnotateDatasetSv(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-def _gatk_sv_index_meta(output_path: str) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-    https://github.com/populationgenomics/metamist/issues/539
-    """
-    return {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE}
-
-
 @stage(
     required_stages=[AnnotateDatasetSv],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=_gatk_sv_index_meta,
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE},
 )
 class MtToEsSv(DatasetStage):
     """
     Create a Seqr index
+    https://github.com/populationgenomics/metamist/issues/539
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
@@ -805,10 +781,8 @@ class MtToEsSv(DatasetStage):
         # transformation is the same, just use the same methods file?
         script = (
             f'cpg_workflows/dataproc_scripts/mt_to_es.py '
-            f'--mt-path {dataset_mt_path} '
-            f'--es-index {index_name} '
-            f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password_string}'
+            f'--mt-path {dataset_mt_path} --es-index {index_name} '
+            f'--done-flag-path {done_flag_path} --es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
@@ -830,13 +804,7 @@ class MtToEsSv(DatasetStage):
                 get_batch(),
                 script,
                 max_age='48h',
-                packages=[
-                    'cpg_workflows',
-                    'elasticsearch==8.*',
-                    'google',
-                    'fsspec',
-                    'gcloud',
-                ],
+                packages=['cpg_workflows', 'elasticsearch==8.*', 'google', 'fsspec', 'gcloud'],
                 num_workers=2,
                 num_secondary_workers=0,
                 job_name=job_name,
