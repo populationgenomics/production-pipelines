@@ -6,8 +6,8 @@ import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
@@ -65,8 +65,8 @@ def annotate_cohort(
         )
         mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
 
-    ref_ht = hl.read_table(str(reference_path('seqr_combined_reference_data')))
-    clinvar_ht = hl.read_table(str(reference_path('seqr_clinvar')))
+    ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
+    clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
 
     logging.info('Annotating with seqr-loader fields: round 1')
 

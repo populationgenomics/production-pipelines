@@ -3,23 +3,17 @@ The second multi-sample workflow, containing all stages which combine the
 results of the per-batch workflows into a joint-call across the entire cohort
 """
 
-import logging
 from datetime import datetime
 from os.path import join
 from typing import Any
 
-from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import (
-    authenticate_cloud_credentials_in_job,
-    get_batch,
-    image_path,
-)
+from google.api_core.exceptions import PermissionDenied
+
+from cpg_utils import Path, dataproc, to_path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, try_get_ar_guid
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
-from cpg_workflows.jobs.seqr_loader_sv import (
-    annotate_cohort_jobs_sv,
-    annotate_dataset_jobs_sv,
-)
+from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -31,6 +25,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -68,11 +63,7 @@ def _exclusion_callable(output_path: str) -> dict[str, set[str]]:
     return {'filtered_sgids': excluded_ids}
 
 
-@stage(
-    analysis_type='sv',
-    analysis_keys=['exclusion_list'],
-    update_analysis_meta=_exclusion_callable,
-)
+@stage(analysis_type='sv', analysis_keys=['exclusion_list'], update_analysis_meta=_exclusion_callable)
 class CombineExclusionLists(CohortStage):
     """
     Takes the per-batch lists of excluded sample IDs and combines
@@ -96,7 +87,7 @@ class CombineExclusionLists(CohortStage):
         queue job to combine exclusion lists
         """
 
-        batch_names = get_config()['workflow']['batch_names']
+        batch_names = config_retrieve(key=['workflow', 'batch_names'])
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
 
         all_filter_lists = [
@@ -106,7 +97,7 @@ class CombineExclusionLists(CohortStage):
         # check for the existence of each file? Should all exist, even if empty
 
         job = get_batch().new_job('Concatenate all sample exclusion files')
-        job.image(get_config()['workflow']['driver_image'])
+        job.image(config_retrieve(key=['workflow', 'driver_image']))
         authenticate_cloud_credentials_in_job(job)
         job.command(
             'gcloud storage objects compose '
@@ -154,9 +145,8 @@ class MakeCohortVcf(CohortStage):
         }
 
         # if we don't run metrics, don't expect the outputs
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                out_dict['metrics_file_makecohortvcf'] = self.prefix / 'metrics.tsv'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], default=False):
+            out_dict['metrics_file_makecohortvcf'] = self.prefix / 'metrics.tsv'
 
         return out_dict
 
@@ -167,10 +157,10 @@ class MakeCohortVcf(CohortStage):
 
         Replacing this nasty mess with nested/fancy cohorts would be ace
         """
-        genotypebatch_hash = get_config()['workflow'].get('genotypebatch_hash') or cohort.alignment_inputs_hash()
+        genotypebatch_hash = config_retrieve(['workflow', 'genotypebatch_hash'], default=cohort.alignment_inputs_hash())
         cohort_partial_hash = genotypebatch_hash[-10:]
 
-        batch_names = get_config()['workflow']['batch_names']
+        batch_names = config_retrieve(['workflow', 'batch_names'])
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
             batch_prefix / batch_name / 'GenotypeBatch' / f'{cohort_partial_hash}_pesr.vcf.gz'
@@ -358,7 +348,7 @@ class JoinRawCalls(CohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         # add all clustered _caller_ files, plus indices
-        batch_names = get_config()['workflow']['batch_names']
+        batch_names = config_retrieve(['workflow', 'batch_names'])
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         for caller in SV_CALLERS + ['depth']:
             input_dict[f'clustered_{caller}_vcfs'] = [
@@ -451,7 +441,7 @@ class GeneratePloidyTable(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         py_job = get_batch().new_python_job('create_ploidy_table')
-        py_job.image(get_config()['workflow']['driver_image'])
+        py_job.image(config_retrieve(['workflow', 'driver_image']))
 
         ped_path = make_combined_ped(cohort, self.prefix)
         contig_path = get_references(['primary_contigs_list'])['primary_contigs_list']
@@ -467,9 +457,7 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
-def _sv_filtered_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_filtered_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """
@@ -500,9 +488,8 @@ class FilterGenotypes(CohortStage):
         }
 
         # if we don't run metrics, don't expect the outputs
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                outputs['main_vcf_qc_tarball'] = self.prefix / 'filtered_SV_VCF_QC_output.tar.gz'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], default=False):
+            outputs['main_vcf_qc_tarball'] = self.prefix / 'filtered_SV_VCF_QC_output.tar.gz'
 
         return outputs
 
@@ -512,34 +499,27 @@ class FilterGenotypes(CohortStage):
             'vcf': inputs.as_dict(cohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(cohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': make_combined_ped(cohort, self.prefix),
-            'fmax_beta': get_config()['references']['gatk_sv'].get('fmax_beta', 0.3),
-            'recalibrate_gq_args': get_config()['references']['gatk_sv'].get('recalibrate_gq_args'),
-            'sl_filter_args': get_config()['references']['gatk_sv'].get('sl_filter_args'),
+            'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.3),
+            'recalibrate_gq_args': config_retrieve(['references', 'gatk_sv', 'recalibrate_gq_args']),
+            'sl_filter_args': config_retrieve(['references', 'gatk_sv', 'sl_filter_args']),
         }
-        assert input_dict['recalibrate_gq_args']
-        assert input_dict['sl_filter_args']
+        assert input_dict['recalibrate_gq_args'] and input_dict['sl_filter_args'], input_dict
 
         input_dict |= get_images(['linux_docker', 'sv_base_mini_docker', 'sv_pipeline_docker'])
         # use a non-standard GATK image containing required filtering tool
         input_dict['gatk_docker'] = get_images(['gq_recalibrator_docker'])['gq_recalibrator_docker']
         input_dict |= get_references(
-            [
-                {'gq_recalibrator_model_file': 'aou_filtering_model'},
-                'primary_contigs_fai',
-            ],
+            [{'gq_recalibrator_model_file': 'aou_filtering_model'}, 'primary_contigs_fai'],
         )
 
         # something a little trickier - we need to get various genome tracks
         input_dict['genome_tracks'] = list(
-            get_references(get_config()['references']['gatk_sv'].get('genome_tracks', [])).values(),
+            get_references(config_retrieve(['references', 'gatk_sv', 'genome_tracks'], [])).values(),
         )
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
@@ -551,9 +531,7 @@ class FilterGenotypes(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-def _sv_annotated_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _sv_annotated_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
     """
@@ -619,10 +597,13 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
-        strv_job.storage(get_config()['resource_overrides'].get(self.name, {}).get('storage', '20Gi'))
-        strv_job.memory(get_config()['resource_overrides'].get(self.name, {}).get('memory', '16Gi'))
+        config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi')
+        strv_job.storage(config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi'))
+        strv_job.memory(config_retrieve(['resource_overrides', self.name, 'memory'], '16Gi'))
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        assert isinstance(strvctvre_phylop, str)
+
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(cohort, AnnotateVcf)
@@ -640,7 +621,7 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         strv_job.command(
             f'python StrVCTVRE.py '
             f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '  # ignore: type
             f'-f vcf '
             f'-p {phylop_in_batch}',
         )
@@ -688,9 +669,7 @@ class AnnotateCohortSv(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
 
 
-def _update_sv_dataset_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _update_sv_dataset_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
     """
@@ -747,9 +726,7 @@ class AnnotateDatasetSv(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-def _gatk_sv_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
+def _gatk_sv_index_meta(output_path: str) -> dict[str, Any]:
     """
     Add meta.type to custom analysis object
     https://github.com/populationgenomics/metamist/issues/539
@@ -772,7 +749,7 @@ class MtToEsSv(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        sequencing_type = get_config()['workflow']['sequencing_type']
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
         index_name = f'{dataset.name}-{sequencing_type}-SV-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
@@ -783,23 +760,19 @@ class MtToEsSv(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
-            # Skipping dataset that wasn't explicitly requested to upload to ES
+
+        try:
+            es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
-
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}',
-            )
-
-        from analysis_runner import dataproc
 
         # transformation is the same, just use the same methods file?
         script = (
@@ -807,12 +780,12 @@ class MtToEsSv(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}'
+            f'--es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
 
-        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
+        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id']):
             # noinspection PyProtectedMember
 
             j = dataproc._add_submit_job(

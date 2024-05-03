@@ -1,6 +1,6 @@
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, image_path, query_command
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
