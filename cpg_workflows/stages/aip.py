@@ -69,7 +69,7 @@ MTA_QUERY = gql(
     """
     query MyQuery($dataset: String!, $type: String!) {
         project(name: $dataset) {
-            analyses(type: {eq: $type}, status: {eq: COMPLETED}) {
+            analyses(active: {eq: true}, type: {eq: $type}, status: {eq: COMPLETED}) {
                 output
                 timestampCompleted
                 meta
@@ -102,6 +102,9 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
     if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
+    # we only want the final stage MT, subset to the specific dataset
+    final_stage_lookup = {'cnv': 'AnnotateDatasetCNV', 'sv': 'AnnotateDatasetSv'}
+
     result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': sv_type})
     mt_by_date: dict[str, str] = {}
     for analysis in result['project']['analyses']:
@@ -109,6 +112,7 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
             analysis['output']
             and analysis['output'].endswith('.mt')
             and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
+            and (analysis['meta']['stage'] == final_stage_lookup[sv_type])
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
@@ -364,6 +368,7 @@ class ValidateMOI(DatasetStage):
         sv_vcf_arg = ''
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             # bump input_path to contain both source files if appropriate
+            # this is a string written into the metadata
             input_path += f', {sv_path}'
 
             labelled_sv_vcf = get_batch().read_input_group(
@@ -372,7 +377,7 @@ class ValidateMOI(DatasetStage):
                     'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
                 },
             )['vcf.bgz']
-            sv_vcf_arg += f' {labelled_sv_vcf}" '
+            sv_vcf_arg += f' {labelled_sv_vcf} '
 
         if sv_vcf_arg:
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
