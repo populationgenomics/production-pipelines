@@ -13,6 +13,7 @@ from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
+from cpg_workflows.jobs.gatk_sv import rename_sv_ids
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
@@ -457,19 +458,7 @@ class GeneratePloidyTable(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=py_job)
 
 
-def _sv_filtered_meta(output_path: str) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-filtered-calls', 'remove_sgids': EXCLUSION_FILE}
-
-
-@stage(
-    required_stages=[GeneratePloidyTable, SVConcordance],
-    analysis_type='sv',
-    analysis_keys=['filtered_vcf'],
-    update_analysis_meta=_sv_filtered_meta,
-)
+@stage(required_stages=[GeneratePloidyTable, SVConcordance])
 class FilterGenotypes(CohortStage):
     """
     Steps required to post-filter called genotypes
@@ -531,6 +520,48 @@ class FilterGenotypes(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
+@stage(
+    required_stages=FilterGenotypes,
+    analysis_type='sv',
+    analysis_keys=['fresh_id_vcf'],
+    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+)
+class SpiceUpSVIDs(CohortStage):
+    """
+    Overwrites the GATK-SV assigned IDs with a meaningful ID
+    This new ID is based on the call attributes itself
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
+            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        # read the filtered VCF into the batch
+        input_vcf = inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']
+        expected_output = self.expected_outputs(cohort)
+        new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
+
+        # update the IDs using a PythonJob
+        pyjob = get_batch().new_python_job('rename_sv_ids')
+        pyjob.storage('10Gi')
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output)
+
+        # then compress & run tabix on that plain text result
+        bcftools_job = get_batch().new_job('bgzip and tabix')
+        bcftools_job.image(image_path('bcftools'))
+        bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        bcftools_job.command(f'bgzip -c {pyjob.output} > {bcftools_job.output["vcf.bgz"]}')  # type: ignore
+        bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
+
+        # get the output root to write to
+        get_batch().write_output(bcftools_job.output, new_vcf)
+
+        return self.make_outputs(cohort, data=expected_output, jobs=[pyjob, bcftools_job])
+
+
 def _sv_annotated_meta(output_path: str) -> dict[str, Any]:
     """
     Callable, add meta[type] to custom analysis object
@@ -539,7 +570,7 @@ def _sv_annotated_meta(output_path: str) -> dict[str, Any]:
 
 
 @stage(
-    required_stages=FilterGenotypes,
+    required_stages=SpiceUpSVIDs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
     update_analysis_meta=_sv_annotated_meta,
@@ -571,14 +602,11 @@ class AnnotateVcf(CohortStage):
         passing the VCF Index has become implicit, which may be a problem for us
         """
         expected_out = self.expected_outputs(cohort)
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
         job_or_none = queue_annotate_sv_jobs(
             cohort=cohort,
             cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
+            input_vcf=inputs.as_dict(cohort, SpiceUpSVIDs)['fresh_id_vcf'],
             outputs=expected_out,
             labels=billing_labels,
         )
@@ -619,13 +647,13 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE.py '
+            f'python StrVCTVRE.py '  # ignore: type
             f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '  # ignore: type
+            f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
             f'-p {phylop_in_batch}',
         )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # ignore: type
 
         get_batch().write_output(strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', ''))
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
