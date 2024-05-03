@@ -31,7 +31,7 @@ class Combiner(CohortStage):
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
-        init_batch_args = {'worker_memory': 'highmem'} if get_config()['workflow'].get('highmem_works') else None
+        init_batch_args = {'worker_memory': 'highmem'} if get_config()['workflow'].get('highmem_workers') else None
 
         j.image(image_path('cpg_workflows'))
         j.command(
