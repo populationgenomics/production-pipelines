@@ -31,6 +31,8 @@ class Combiner(CohortStage):
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
+        init_batch_args = {'worker_memory': 'highmem'} if get_config()['workflow'].get('highmem_works') else None
+
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -39,6 +41,7 @@ class Combiner(CohortStage):
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
+                init_batch_args=init_batch_args,
             ),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
