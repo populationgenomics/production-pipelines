@@ -23,7 +23,7 @@ def main(vds_path):
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
     # Initialise batch
-    init_batch()
+    init_batch(worker_memory='highmem')
 
     vds = hl.vds.read_vds(str(vds_path))
 
