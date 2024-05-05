@@ -540,7 +540,7 @@ class SpiceUpSVIDs(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # read the filtered VCF into the batch
-        input_vcf = inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']
+        input_vcf = get_batch().read_input(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'])
         expected_output = self.expected_outputs(cohort)
         new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
 
@@ -553,7 +553,7 @@ class SpiceUpSVIDs(CohortStage):
         bcftools_job = get_batch().new_job('bgzip and tabix')
         bcftools_job.image(image_path('bcftools'))
         bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-        bcftools_job.command(f'bgzip -c {pyjob.output} > {bcftools_job.output["vcf.bgz"]}')  # type: ignore
+        bcftools_job.command(f'bcftools view {pyjob.output} | bgzip -c > {bcftools_job.output["vcf.bgz"]}')  # type: ignore
         bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
 
         # get the output root to write to
