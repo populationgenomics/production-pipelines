@@ -640,13 +640,13 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE.py '  # ignore: type
+            f'python StrVCTVRE.py '  # type: ignore
             f'-i {input_vcf} '
             f'-o {strv_job.output_vcf["vcf.gz"]} '
             f'-f vcf '
             f'-p {phylop_in_batch}',
         )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # ignore: type
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
 
         get_batch().write_output(strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', ''))
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
