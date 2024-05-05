@@ -523,7 +523,7 @@ class FilterGenotypes(CohortStage):
 @stage(
     required_stages=FilterGenotypes,
     analysis_type='sv',
-    analysis_keys=['fresh_id_vcf'],
+    analysis_keys=['new_id_vcf'],
     update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
 )
 class SpiceUpSVIDs(CohortStage):
@@ -599,7 +599,7 @@ class AnnotateVcf(CohortStage):
         job_or_none = queue_annotate_sv_jobs(
             cohort=cohort,
             cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, SpiceUpSVIDs)['fresh_id_vcf'],
+            input_vcf=inputs.as_dict(cohort, SpiceUpSVIDs)['new_id_vcf'],
             outputs=expected_out,
             labels=billing_labels,
         )
