@@ -36,7 +36,7 @@ def test_rename_sv_ids_1(tmp_path):
     newpath = tmp_path / 'output.vcf'
     rename_sv_ids(str(zipfile), str(newpath))
 
-    with open(newpath, 'r') as f:
+    with gzip.open(newpath, 'rt') as f:
         header = next(f)
         assert header == '##fileformat=VCFv4.2\n'
 
@@ -54,7 +54,7 @@ def test_rename_sv_ids_2(tmp_path):
     newpath = tmp_path / 'output.vcf'
     rename_sv_ids(str(zipfile), str(newpath))
 
-    with open(newpath, 'r') as f:
+    with gzip.open(newpath, 'rt') as f:
         header = next(f)
         assert header == '##fileformat=VCFv4.2\n'
 
@@ -72,7 +72,7 @@ def test_rename_sv_ids_3(tmp_path):
     newpath = tmp_path / 'output.vcf'
     rename_sv_ids(str(zipfile), str(newpath))
 
-    with open(newpath, 'r') as f:
+    with gzip.open(newpath, 'rt') as f:
         header = next(f)
         assert header == '##fileformat=VCFv4.2\n'
 
@@ -81,6 +81,24 @@ def test_rename_sv_ids_3(tmp_path):
 
 
 def test_rename_sv_ids_4(tmp_path):
+
+    lines = [
+        'chr1\t12345\tID\tA\t<INS.ALU.ME>\t.\t.\tSVLEN=999\tother\tsections\n',
+    ]
+
+    zipfile = write_zippy_bits(tmp_path, lines)
+    newpath = tmp_path / 'output.vcf'
+    rename_sv_ids(str(zipfile), str(newpath))
+
+    with gzip.open(newpath, 'rt') as f:
+        header = next(f)
+        assert header == '##fileformat=VCFv4.2\n'
+
+        content = next(f)
+        assert content.split('\t')[2] == 'INS.ALU.ME_1-12345_ins999'
+
+
+def test_rename_sv_ids_5(tmp_path):
     """
     raises an error - no END2 in the INFO field
     and END is missing from the INFO field
