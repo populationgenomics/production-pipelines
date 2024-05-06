@@ -36,7 +36,7 @@ class Combiner(CohortStage):
 
         if config.get('highmem_workers'):
             init_batch_args['worker_memory'] = 'highmem'
-        if config.get('highmem_driver'):
+        if config.get('highmem_drivers'):
             init_batch_args['driver_memory'] = 'highmem'
         if 'driver_cores' in config:
             init_batch_args['driver_cores'] = config['driver_cores']
