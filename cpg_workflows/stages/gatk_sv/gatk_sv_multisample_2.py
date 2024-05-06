@@ -540,7 +540,7 @@ class SpiceUpSVIDs(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # read the filtered VCF into the batch
-        input_vcf = get_batch().read_input(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'])
+        input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
         expected_output = self.expected_outputs(cohort)
         new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
 
