@@ -1,5 +1,7 @@
+import logging
+
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
@@ -32,7 +34,7 @@ class Combiner(CohortStage):
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
         init_batch_args = {}
-        config = get_config()['workflow']
+        config = config_retrieve()['workflow']
 
         if config.get('highmem_workers'):
             init_batch_args['worker_memory'] = 'highmem'
@@ -40,6 +42,10 @@ class Combiner(CohortStage):
             init_batch_args['driver_memory'] = 'highmem'
         if 'driver_cores' in config:
             init_batch_args['driver_cores'] = config['driver_cores']
+        if not init_batch_args:
+            logging.warning(
+                "None of 'highmem_workers', 'highmem_drivers', or 'driver_cores' were specified in the config. If you're getting OOM errors, ensure these are included in the config.",
+            )
 
         j.image(image_path('cpg_workflows'))
         j.command(
