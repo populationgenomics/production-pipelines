@@ -26,7 +26,7 @@ def main(vds_path):
     # Initialise batch
     init_batch(
         worker_memory='highmem',
-        driver_memory='highmen',
+        driver_memory='highmem',
         driver_cores=4,
     )
 
