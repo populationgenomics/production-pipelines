@@ -1,4 +1,5 @@
 import os
+from lib2to3.pgen2 import driver
 
 import click
 
@@ -23,7 +24,11 @@ def main(vds_path):
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
     # Initialise batch
-    init_batch(worker_memory='highmem')
+    init_batch(
+        worker_memory='highmem',
+        driver_memory='highmen',
+        driver_cores=4,
+    )
 
     vds = hl.vds.read_vds(str(vds_path))
 
