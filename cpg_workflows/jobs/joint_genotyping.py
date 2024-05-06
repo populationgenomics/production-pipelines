@@ -249,7 +249,7 @@ def genomicsdb(
         #   using the --merge-input-intervals arg. There's no data in between since we
         #   didn't run HaplotypeCaller over those loci, so we're not wasting any
         #   compute.
-        '--merge-input-intervals',
+        # '--merge-input-intervals', # Removed because of issues when excluding intervals - EddieLF 2024-04-06
         '--consolidate',
         # The Broad:
         # > The batch_size value was carefully chosen here as it is the optimal value
@@ -367,8 +367,8 @@ def _add_joint_genotyper_job(
     --create-output-variant-index
     """
     else:
+        # --merge-input-intervals \\  # Removed from cmd because of issues when excluding intervals - EddieLF 2024-04-06
         cmd += f"""\
-    --merge-input-intervals \\
     -G AS_StandardAnnotation
 
     if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then
