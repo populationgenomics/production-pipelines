@@ -33,7 +33,7 @@ class Combiner(CohortStage):
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
-        init_batch_args = {}
+        init_batch_args: dict[str, str | int] = {}
         config = config_retrieve('workflow')
 
         if config.get('highmem_workers'):
