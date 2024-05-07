@@ -59,7 +59,7 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if val := config_retrieve(['cromwell_polling_intervals', job_size.value]):
+        if val := config_retrieve(['cromwell_polling_intervals', job_size.value], False):
             polling_interval_dict[job_size].update(val)
     return polling_interval_dict
 
