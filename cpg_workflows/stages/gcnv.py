@@ -4,6 +4,8 @@ Stages that implement GATK-gCNV.
 
 import json
 
+from google.api_core.exceptions import PermissionDenied
+
 from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
@@ -15,7 +17,9 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     queue_annotate_sv_jobs,
 )
+from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     Dataset,
@@ -241,14 +245,14 @@ class GCNVJointSegmentation(CohortStage):
 
         expected_out = self.expected_outputs(cohort)
 
-        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        ped_path = cohort.write_ped_file(expected_out['pedigree'])  # type: ignore
 
         jobs = gcnv.run_joint_segmentation(
             segment_vcfs=all_vcfs,
             pedigree=str(ped_path),
             intervals=str(intervals),
-            tmp_prefix=expected_out['tmp_prefix'],
-            output_path=expected_out['clustered_vcf'],
+            tmp_prefix=expected_out['tmp_prefix'],  # type: ignore
+            output_path=expected_out['clustered_vcf'],  # type: ignore
             job_attrs=self.get_job_attrs(cohort),
         )
         return self.make_outputs(cohort, data=expected_out, jobs=jobs)
@@ -412,6 +416,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         strv_job.memory('8Gi')
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        assert isinstance(strvctvre_phylop, str)
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(cohort, AnnotateCNV)
@@ -432,8 +437,8 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
-        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
+        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
 
         get_batch().write_output(
             strv_job.output_vcf,
@@ -570,23 +575,18 @@ class MtToEsCNV(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
-            # Skipping dataset that wasn't explicitly requested to upload to ES
+        try:
+            es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
-
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}',
-            )
-
-        from cpg_workflows.stages.seqr_loader import es_password
 
         # transformation is the same, just use the same methods file?
         script = (
@@ -594,7 +594,7 @@ class MtToEsCNV(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}'
+            f'--es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
@@ -608,6 +608,7 @@ class MtToEsCNV(DatasetStage):
                 pyfiles=pyfiles,
                 job_name=job_name,
                 region='australia-southeast1',
+                hail_version=dataproc.DEFAULT_HAIL_VERSION,
             )
         else:
             j = dataproc.hail_dataproc_job(

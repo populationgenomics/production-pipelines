@@ -3,8 +3,8 @@ from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import toml
+from cloudpathlib import CloudPath
 
-from cpg_utils import Path as AnyPath
 from cpg_utils.config import set_config_paths
 
 logging.basicConfig()
@@ -27,7 +27,7 @@ class TomlAnyPathEncoder(toml.TomlEncoder):
     """
 
     def dump_value(self, v):
-        if isinstance(v, AnyPath):
+        if isinstance(v, (Path, CloudPath)):
             v = str(v)
         return super().dump_value(v)
 
@@ -47,7 +47,7 @@ def update_dict(d1: dict, d2: dict) -> None:
 
 def set_config(
     config: str | dict[str, Any] | IDictRepresentable,
-    path: Path,
+    path: Path | CloudPath,
     merge_with: list[Path] | None = None,
 ) -> None:
     """

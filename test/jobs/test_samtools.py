@@ -137,6 +137,8 @@ class TestSamtoolsStatsRun:
             job_attrs=None,
         )
 
+        assert j is not None
+
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -150,6 +152,8 @@ class TestSamtoolsStatsRun:
             out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
+        assert j is not None
 
         cmd = get_command_str(j)
         ref_file = config.references['broad']['ref_fasta']
@@ -180,6 +184,8 @@ class TestSamtoolsStatsRun:
             out_samtools_stats_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
+        assert j is not None
 
         cmd = get_command_str(j)
         assert re.search(r'\$CRAM > \${BATCH_TMPDIR}/.*/output_stats', cmd)

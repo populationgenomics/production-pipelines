@@ -46,7 +46,6 @@ To run the Seqr Loader workflow on the dataset called `validation`, create a con
 [workflow]
 input_datasets = ['validation']
 sequencing_type = 'genome'
-create_es_index_for_datasets = ['validation']
 skip_sgs = [
     'CPGXXXX',  # eg: low coverage (8x)
 ]
@@ -131,12 +130,11 @@ The genome GVCF QC report will be exposed as https://main-web.populationgenomics
 
 ### Stage selection example: upload Elasticsearch indices
 
-If you want the workflow to create Elasticsearch indices in the end, make sure you include the stage `MtToEs` into the workflow (if every prerequisite stage is already finished, you can specify it under `first_stages`), and set the `workflow/create_es_index_for_datasets` section with the list of datasets for which you want the indices to be created:
+If you want the workflow to create Elasticsearch indices in the end, make sure you include the stage `MtToEs` into the workflow (if every prerequisite stage is already finished, you can specify it under `first_stages`):
 
 ```toml
 [workflow]
 first_stages = ['MtToEs']
-create_es_index_for_datasets = ['validation']
 ```
 
 The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy.

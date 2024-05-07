@@ -1,7 +1,7 @@
-from pathlib import Path
-
+# from pathlib import Path
 from hailtop.batch import LocalBackend
 
+from cpg_utils import Path
 from cpg_utils.hail_batch import Batch
 
 

@@ -21,10 +21,6 @@ vep_version = '110'
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
-# Create Seqr ElasticSearch indices for these datasets. If not specified, will
-# create indices for all input datasets.
-#create_es_index_for_datasets = []
-
 write_vcf = ["udn-aus"]
 
 [resource_overrides]

@@ -31,7 +31,9 @@ class Combiner(CohortStage):
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
-        init_batch_args = {'worker_memory': 'highmem'} if get_config()['workflow'].get('highmem_workers') else None
+        init_batch_args: dict[str, str | int] = (
+            {'worker_memory': 'highmem'} if get_config()['workflow'].get('highmem_workers') else {}
+        )
 
         j.image(image_path('cpg_workflows'))
         j.command(
@@ -296,7 +298,7 @@ class Vqsr(CohortStage):
 
 @stage(required_stages=Vqsr)
 class LoadVqsr(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         return get_workflow().prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -323,7 +325,7 @@ class LoadVqsr(CohortStage):
 
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
 class Frequencies(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         return get_workflow().prefix / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

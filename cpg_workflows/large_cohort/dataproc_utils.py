@@ -76,6 +76,7 @@ def dataproc_job(
             pyfiles=pyfiles,
             job_name=job_name,
             region='australia-southeast1',
+            hail_version=dataproc.DEFAULT_HAIL_VERSION,
         )
 
     if num_workers is None:

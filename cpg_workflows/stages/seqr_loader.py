@@ -5,6 +5,8 @@ Hail Query stages for the Seqr loader workflow.
 """
 from typing import Any
 
+from google.api_core.exceptions import PermissionDenied
+
 from cpg_utils import Path, dataproc, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config, image_path
@@ -14,6 +16,7 @@ from cpg_workflows.jobs.seqr_loader import (
     cohort_to_vcf_job,
 )
 from cpg_workflows.query_modules import seqr_loader
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -211,7 +214,7 @@ class DatasetVCF(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=job)
 
 
-def es_password() -> str:
+def es_password() -> str | None:
     """
     Get Elasticsearch password. Moved into a separate method to simplify
     mocking in tests.
@@ -249,28 +252,25 @@ class MtToEs(DatasetStage):
         """
         Transforms the MT into a Seqr index, requires Dataproc
         """
-        if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
-            # Skipping dataset that wasn't explicitly requested to upload to ES:
+        try:
+            es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
 
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}',
-            )
-
         script = (
             f'cpg_workflows/dataproc_scripts/mt_to_es.py '
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}'
+            f'--es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
@@ -284,6 +284,7 @@ class MtToEs(DatasetStage):
                 pyfiles=pyfiles,
                 job_name=job_name,
                 region='australia-southeast1',
+                hail_version=dataproc.DEFAULT_HAIL_VERSION,
             )
         else:
             j = dataproc.hail_dataproc_job(

@@ -2,12 +2,15 @@
 Common methods for all GATK-SV workflows
 """
 
+import pathlib
 import re
 from enum import Enum
 from functools import lru_cache
 from os.path import join
 from random import randint
 from typing import Any
+
+from cloudpathlib import CloudPath
 
 from hailtop.batch.job import Job
 
@@ -179,7 +182,7 @@ def add_gatk_sv_jobs(
     # pre-process input_dict
     paths_as_strings: dict = {}
     for key, value in input_dict.items():
-        if isinstance(value, Path):
+        if isinstance(value, (pathlib.Path, CloudPath)):
             paths_as_strings[f'{wfl_name}.{key}'] = str(value)
         elif isinstance(value, (list, set)):
             paths_as_strings[f'{wfl_name}.{key}'] = [str(v) for v in value]

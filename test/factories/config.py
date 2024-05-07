@@ -131,7 +131,6 @@ class WorkflowConfig:
     cram_version_reference: dict[str, str | Path] | None = None
     intervals_path: str | Path | None = None
     reblock_gq_bands: list[int] | None = None
-    create_es_index_for_datasets: list[str] | None = None
     scatter_count: int | None = None
     scatter_count_genotype: int | None = None
     vds_version: str | None = None

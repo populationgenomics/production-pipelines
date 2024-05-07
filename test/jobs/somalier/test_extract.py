@@ -47,7 +47,7 @@ def setup_test(
     set_config(config, tmp_path / 'config.toml')
 
     cram_pth = create_cram_input(location=tmp_path, index=index)
-    batch = create_local_batch(tmp_path)
+    batch = create_local_batch(str(tmp_path))
 
     return config, cram_pth, batch
 
@@ -142,6 +142,8 @@ class TestSomalierExtract:
             out_somalier_path=(tmp_path / 'output_file'),
         )
 
+        assert j is not None
+
         cmd = get_command_str(j)
         sites = config.other['references']['somalier_sites']
         assert j is not None
@@ -156,6 +158,8 @@ class TestSomalierExtract:
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
+
+        assert j is not None
 
         cmd = get_command_str(j)
         # This test ensures the script uses a fail-safe copy operation when working with CRAM files and their indices.
@@ -173,6 +177,7 @@ class TestSomalierExtract:
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
+        assert j is not None
 
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
@@ -186,6 +191,7 @@ class TestSomalierExtract:
             cram_path=cram_pth,
             out_somalier_path=(tmp_path / 'output_file'),
         )
+        assert j is not None
 
         cmd = get_command_str(j)
         ref_file = config.other['references']['broad']['ref_fasta']

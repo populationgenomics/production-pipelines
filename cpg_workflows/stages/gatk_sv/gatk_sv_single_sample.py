@@ -138,7 +138,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             dataset=sequencing_group.dataset,
             wfl_name=self.name,
             input_dict=input_dict,
-            expected_out_dict=expected_d,
+            expected_out_dict=expected_d,  # type: ignore
             sequencing_group_id=sequencing_group.id,
             labels=billing_labels,
             job_size=CromwellJobSizes.LARGE,
@@ -201,7 +201,7 @@ class EvidenceQC(CohortStage):
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
-            expected_out_dict=expected_d,
+            expected_out_dict=expected_d,  # type: ignore
             labels=billing_labels,
             job_size=CromwellJobSizes.MEDIUM,
         )

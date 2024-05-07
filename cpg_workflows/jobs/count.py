@@ -7,20 +7,14 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, image_path
-from cpg_utils.hail_batch import command
-from cpg_workflows.filetypes import (
-    BamPath,
-    CramPath,
-)
+from cpg_utils.hail_batch import Batch, command
+from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs.bam_to_cram import cram_to_bam
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
-from cpg_workflows.workflow import (
-    SequencingGroup,
-)
 
 
-def count_res_group(b: hb.Batch) -> hb.ResourceGroup:
+def count_res_group(b: Batch) -> hb.ResourceGroup:
     """
     Define resource group for counting.
     """
@@ -114,7 +108,7 @@ class FeatureCounts:
 
 
 def count(
-    b: hb.Batch,
+    b: Batch,
     input_cram_or_bam: BamPath | CramPath,
     output_path: str | Path,
     summary_path: str | Path,

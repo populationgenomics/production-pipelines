@@ -573,8 +573,8 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')
-    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')
+    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')  # type: ignore
+    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')  # type: ignore
 
     # dependency setting between jobs should be implicit due to temp file passing
 

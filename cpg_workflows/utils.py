@@ -302,4 +302,4 @@ def rich_sequencing_group_id_seds(
     return cmd
 
 
-ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
+ExpectedResultT = Union[Path, dict[str, str | Path], dict[str, Path], dict[str, str], str, None]

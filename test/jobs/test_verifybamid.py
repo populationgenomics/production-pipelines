@@ -141,6 +141,8 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
+        assert j is not None
+
         num_pcs = config.other['cramqc']['num_pcs']
         cmd = get_command_str(j)
         assert re.search(fr'--NumPC {num_pcs}', cmd)
@@ -157,6 +159,8 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
+        assert j is not None
+
         cmd = get_command_str(j)
         ref_file = config.workflow.ref_fasta
         assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -171,6 +175,8 @@ class TestVerifyBAMID:
             job_attrs=None,
         )
 
+        assert j is not None
+
         cmd = get_command_str(j)
         ref_file = config.references['broad']['ref_fasta']
         assert re.search(fr'--Reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref_file}', cmd)
@@ -184,6 +190,8 @@ class TestVerifyBAMID:
             out_verify_bamid_path=(tmp_path / 'output_file'),
             job_attrs=None,
         )
+
+        assert j is not None
 
         cmd = get_command_str(j)
         sequencing_type = config.workflow.sequencing_type
