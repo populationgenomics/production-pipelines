@@ -147,10 +147,8 @@ class TestPicard:
             source_intervals_path=tmp_path / 'source_intervals.txt',
             output_prefix=output_prefix,
         )
-        cmd = get_command_str(job)
-
-        # ---- Assertions
         assert job is not None
+        cmd = get_command_str(job)
         assert len(intervals) == scatter_count
 
         for i in range(1, scatter_count + 1):
@@ -178,10 +176,10 @@ class TestPicard:
             output_prefix=tmp_path / 'intervals',
             job_attrs=job_attrs,
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'-I \S*{source_intervals_path}', cmd)
 
@@ -204,6 +202,7 @@ class TestPicard:
             sorted_bam=sorted_bam,
             fasta_reference=fasta_res_group(batch),
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
@@ -226,6 +225,7 @@ class TestPicard:
             sorted_bam=sorted_bam,
             job_attrs=job_attrs,
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
@@ -261,9 +261,9 @@ class TestPicard:
             job_attrs=job_attrs,
         )
         cmd = get_command_str(job)
+        assert job is not None
 
         # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'INPUT=\S*{gvcf}', cmd)
         assert re.search(rf'DBSNP=\S*{dbsnp}', cmd)
@@ -327,10 +327,10 @@ class TestPicard:
             out_picard_hs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
             job_attrs=job_attrs,
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
@@ -357,10 +357,10 @@ class TestPicard:
             out_picard_wgs_metrics_path=tmp_path / 'picard_hs_metrics.txt',
             job_attrs=job_attrs,
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)
