@@ -123,7 +123,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 @stage(
     required_stages=[
         JointVcfQC,
-        JointVcfHappy,
+        JointVcfHappy
     ],
     analysis_type='qc',
     analysis_keys=['json'],

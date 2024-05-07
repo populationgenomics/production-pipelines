@@ -216,7 +216,7 @@ def add_gatk_sv_jobs(
     for key, resource in output_dict.items():
         out_path = expected_out_dict[key]
         if isinstance(resource, list):
-            for source, dest in zip(resource, out_path):
+            for source, dest in zip(resource, out_path):  # type: ignore
                 cmds.append(f'gsutil cp "$(cat {source})" "{dest}"')
         else:
             cmds.append(f'gsutil cp "$(cat {resource})" "{out_path}"')
