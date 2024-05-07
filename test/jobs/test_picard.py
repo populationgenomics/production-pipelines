@@ -2,6 +2,10 @@ import random
 import re
 from functools import cached_property
 from pathlib import Path
+from test import set_config
+from test.factories.batch import create_local_batch
+from test.factories.config import PipelineConfig, WorkflowConfig
+from test.jobs.helpers import get_command_str, get_path_from_resource_file
 
 import pytest
 
@@ -15,11 +19,6 @@ from cpg_workflows.jobs.picard import (
     picard_wgs_metrics,
     vcf_qc,
 )
-
-from .. import set_config
-from ..factories.batch import create_local_batch
-from ..factories.config import PipelineConfig, WorkflowConfig
-from .helpers import get_command_str, get_path_from_resource_file
 
 
 class TestPicard:
@@ -292,10 +291,10 @@ class TestPicard:
             out_quality_yield_metrics_path=tmp_path / 'qual_yield_by_cycle.txt',
             job_attrs=job_attrs,
         )
+        assert job is not None
         cmd = get_command_str(job)
 
         # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'CRAM=\$BATCH_TMPDIR/{cram}', cmd)
         assert re.search(rf'CRAI=\$BATCH_TMPDIR/{cram}.crai', cmd)

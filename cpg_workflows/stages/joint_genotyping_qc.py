@@ -7,8 +7,12 @@ from typing import Any
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows import get_cohort
+from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
+from cpg_workflows.stages.joint_genotyping import JointGenotyping
+from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -19,11 +23,6 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-
-from .. import get_cohort
-from ..jobs.happy import happy
-from ..targets import SequencingGroup
-from .joint_genotyping import JointGenotyping
 
 
 @stage(required_stages=JointGenotyping)
@@ -121,10 +120,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 
 
 @stage(
-    required_stages=[
-        JointVcfQC,
-        JointVcfHappy
-    ],
+    required_stages=[JointVcfQC, JointVcfHappy],
     analysis_type='qc',
     analysis_keys=['json'],
     update_analysis_meta=_update_meta,
