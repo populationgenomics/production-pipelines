@@ -169,10 +169,7 @@ class GatherBatchEvidence(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         # this step runs for approximately 15 hours
         jobs = add_gatk_sv_jobs(
@@ -592,8 +589,8 @@ class GenotypeBatch(CohortStage):
             'batch': get_workflow().output_version,
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
-            'coveragefile': batchevidence_d['merged_bincov'],  # unsure
-            'coveragefile_index': batchevidence_d['merged_bincov_index'],  # unsure
+            'coveragefile': batchevidence_d['merged_bincov'],
+            'coveragefile_index': batchevidence_d['merged_bincov_index'],
             'discfile': batchevidence_d['merged_PE'],
             'discfile_index': batchevidence_d['merged_PE_index'],
             'splitfile': batchevidence_d['merged_SR'],
