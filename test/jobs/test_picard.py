@@ -227,9 +227,6 @@ class TestPicard:
         )
         assert job is not None
         cmd = get_command_str(job)
-
-        # ---- Assertions
-        assert job
         assert job_attrs.items() <= job.attributes.items()
         assert re.search(rf'I=\S*{bam}', cmd)
 
@@ -260,8 +257,8 @@ class TestPicard:
             overwrite=False,
             job_attrs=job_attrs,
         )
-        cmd = get_command_str(job)
         assert job is not None
+        cmd = get_command_str(job)
 
         # ---- Assertions
         assert job_attrs.items() <= job.attributes.items()
