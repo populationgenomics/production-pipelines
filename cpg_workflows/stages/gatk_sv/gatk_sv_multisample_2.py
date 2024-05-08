@@ -640,11 +640,9 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE.py '  # type: ignore
-            f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
-            f'-f vcf '
-            f'-p {phylop_in_batch}',
+            f'python StrVCTVRE.py -i {input_vcf} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '  # type: ignore
+            f'-f vcf -p {phylop_in_batch}',
         )
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
 

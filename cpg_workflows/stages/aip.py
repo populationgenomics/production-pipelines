@@ -60,7 +60,7 @@ from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import copy_common_env, get_batch
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage, StageInputNotFoundError
+from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -326,18 +326,11 @@ class RunHailSVFiltering(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
 
 
-def _aip_summary_meta(output_path: str) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    """
-    return {'type': 'aip_output_json'}
-
-
 @stage(
     required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
-    update_analysis_meta=_aip_summary_meta,
+    update_analysis_meta=lambda x: {'type': 'aip_output_json'},
 )
 class ValidateMOI(DatasetStage):
     """
@@ -407,20 +400,11 @@ class ValidateMOI(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-def _aip_html_meta(output_path: str) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    This isn't quite conformant with what AIP alone produces
-    e.g. doesn't have the full URL to the results in GCP
-    """
-    return {'type': 'aip_output_html'}
-
-
 @stage(
     required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
-    update_analysis_meta=_aip_html_meta,
+    update_analysis_meta=lambda x: {'type': 'aip_output_html'},
     tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
