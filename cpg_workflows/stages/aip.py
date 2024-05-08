@@ -60,7 +60,7 @@ from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import copy_common_env, get_batch
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
+from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage, StageInputNotFoundError
 from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -364,20 +364,23 @@ class ValidateMOI(DatasetStage):
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
 
         # If there are SV VCFs, read each one in and add to the arguments
-        hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+        sv_paths, sv_files = query_for_sv_mt(dataset.name)
         sv_vcf_arg = ''
-        for sv_path, sv_file in query_for_sv_mt(dataset.name):
-            # bump input_path to contain both source files if appropriate
-            # this is a string written into the metadata
-            input_path += f', {sv_path}'
+        if sv_paths:
+            # only go looking for inputs from prior stage where we expect to find them
+            hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+            for sv_path, sv_file in query_for_sv_mt(dataset.name):
+                # bump input_path to contain both source files if appropriate
+                # this is a string written into the metadata
+                input_path += f', {sv_path}'
 
-            labelled_sv_vcf = get_batch().read_input_group(
-                **{
-                    'vcf.bgz': str(hail_sv_inputs[sv_file]),
-                    'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
-                },
-            )['vcf.bgz']
-            sv_vcf_arg += f' {labelled_sv_vcf} '
+                labelled_sv_vcf = get_batch().read_input_group(
+                    **{
+                        'vcf.bgz': str(hail_sv_inputs[sv_file]),
+                        'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
+                    },
+                )['vcf.bgz']
+                sv_vcf_arg += f' {labelled_sv_vcf} '
 
         if sv_vcf_arg:
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
