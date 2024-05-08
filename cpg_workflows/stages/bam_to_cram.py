@@ -25,7 +25,7 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     if not path_prefix:
         raise ValueError('Missing long_read_path_prefix in the config')
     
-    path: Path = sequencing_group.dataset.prefix() / 'cram' / 'long_read' / path_prefix / f'{sequencing_group.id}.cram'
+    path: Path = sequencing_group.dataset.prefix() /'long_read' / 'cram' / path_prefix / f'{sequencing_group.id}.cram'
     return CramPath(
         path=path,
         index_path=path.with_suffix('.cram.crai'),
