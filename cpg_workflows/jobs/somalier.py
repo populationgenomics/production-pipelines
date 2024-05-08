@@ -10,13 +10,11 @@ from hailtop.batch import Batch, Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import (
     command,
     copy_common_env,
     fasta_res_group,
-    image_path,
-    reference_path,
 )
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.python_scripts import check_pedigree
@@ -261,10 +259,10 @@ def extract(
     STANDARD.set_resources(j, ncpu=4, storage_gb=storage_gb)
 
     ref = fasta_res_group(b)
-    sites = b.read_input(str(reference_path('somalier_sites')))
+    sites = b.read_input(reference_path('somalier_sites'))
 
     cmd = f"""\
-    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites').name}
+    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites')}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
