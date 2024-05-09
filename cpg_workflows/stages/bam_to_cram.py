@@ -5,7 +5,7 @@ Stage that converts a BAM file to a CRAM file.
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.filetypes import CramOrBamPath, CramPath
+from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import bam_to_cram
 from cpg_workflows.workflow import (
     SequencingGroup,
@@ -56,7 +56,7 @@ class BamToCram(SequencingGroupStage):
         """
         Using the "bam_to_cram" function implemented in the `jobs` module.
         """
-        input_bam = CramOrBamPath(path=to_path(sequencing_group.alignment_input_by_seq_type.get('genome')))
+        input_bam = BamPath(path=to_path(sequencing_group.alignment_input_by_seq_type.get('genome')))
         job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
             input_bam=input_bam,
