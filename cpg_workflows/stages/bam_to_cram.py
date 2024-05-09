@@ -2,13 +2,11 @@
 Stage that converts a BAM file to a CRAM file.
 """
 
-from hailtop.batch import ResourceGroup
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.filetypes import CramPath, CramOrBamPath
+from cpg_workflows.filetypes import CramOrBamPath, CramPath
 from cpg_workflows.jobs import bam_to_cram
-
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -17,6 +15,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
+
 def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     """
     Path to a CRAM file. Not checking its existence here.
@@ -24,8 +23,8 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     path_prefix = config_retrieve(['workflow', 'long_read_cram_path_prefix'], False)
     if not path_prefix:
         raise ValueError('Missing long_read_path_prefix in the config')
-    
-    path: Path = sequencing_group.dataset.prefix() /'long_read' / 'cram' / path_prefix / f'{sequencing_group.id}.cram'
+
+    path: Path = sequencing_group.dataset.prefix() / 'long_read' / 'cram' / path_prefix / f'{sequencing_group.id}.cram'
     return CramPath(
         path=path,
         index_path=path.with_suffix('.cram.crai'),
@@ -57,14 +56,17 @@ class BamToCram(SequencingGroupStage):
         """
         Using the "bam_to_cram" function implemented in the `jobs` module.
         """
-        input_bam = CramOrBamPath(path=sequencing_group.alignment_input_by_seq_type.get('genome'))
-        job, outbam = bam_to_cram.bam_to_cram(
+        input_bam = CramOrBamPath(path=to_path(sequencing_group.alignment_input_by_seq_type.get('genome')))
+        job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
             input_bam=input_bam,
             extra_label='long_read',
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
         )
+        out_cram_path = to_path(output_cram.path)
+        # b = get_batch()
+        # b.write_output(output_cram, str(out_cram_path.with_suffix('')))
         return self.make_outputs(
             sequencing_group,
             data=self.expected_outputs(sequencing_group),
