@@ -1,0 +1,5 @@
+[workflow]
+name = 'seqr_loader_long_read'
+dataset_gcp_project = 'seqr-308602'
+dataset = 'seqr'
+status_reporter = 'metamist'
