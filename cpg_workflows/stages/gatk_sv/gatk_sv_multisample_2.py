@@ -640,11 +640,9 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE.py '  # type: ignore
-            f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
-            f'-f vcf '
-            f'-p {phylop_in_batch}',
+            f'python StrVCTVRE.py -i {input_vcf} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '  # type: ignore
+            f'-f vcf -p {phylop_in_batch}',
         )
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
 
@@ -787,7 +785,7 @@ class MtToEsSv(DatasetStage):
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
 
-        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id']):
+        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id'], False):
             # noinspection PyProtectedMember
 
             j = dataproc._add_submit_job(

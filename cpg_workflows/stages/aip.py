@@ -326,18 +326,11 @@ class RunHailSVFiltering(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
 
 
-def _aip_summary_meta(output_path: str) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    """
-    return {'type': 'aip_output_json'}
-
-
 @stage(
     required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
-    update_analysis_meta=_aip_summary_meta,
+    update_analysis_meta=lambda x: {'type': 'aip_output_json'},
 )
 class ValidateMOI(DatasetStage):
     """
@@ -364,20 +357,23 @@ class ValidateMOI(DatasetStage):
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
 
         # If there are SV VCFs, read each one in and add to the arguments
-        hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+        sv_paths, sv_files = query_for_sv_mt(dataset.name)
         sv_vcf_arg = ''
-        for sv_path, sv_file in query_for_sv_mt(dataset.name):
-            # bump input_path to contain both source files if appropriate
-            # this is a string written into the metadata
-            input_path += f', {sv_path}'
+        if sv_paths:
+            # only go looking for inputs from prior stage where we expect to find them
+            hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+            for sv_path, sv_file in query_for_sv_mt(dataset.name):
+                # bump input_path to contain both source files if appropriate
+                # this is a string written into the metadata
+                input_path += f', {sv_path}'
 
-            labelled_sv_vcf = get_batch().read_input_group(
-                **{
-                    'vcf.bgz': str(hail_sv_inputs[sv_file]),
-                    'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
-                },
-            )['vcf.bgz']
-            sv_vcf_arg += f' {labelled_sv_vcf} '
+                labelled_sv_vcf = get_batch().read_input_group(
+                    **{
+                        'vcf.bgz': str(hail_sv_inputs[sv_file]),
+                        'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
+                    },
+                )['vcf.bgz']
+                sv_vcf_arg += f' {labelled_sv_vcf} '
 
         if sv_vcf_arg:
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
@@ -404,20 +400,11 @@ class ValidateMOI(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-def _aip_html_meta(output_path: str) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    This isn't quite conformant with what AIP alone produces
-    e.g. doesn't have the full URL to the results in GCP
-    """
-    return {'type': 'aip_output_html'}
-
-
 @stage(
     required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
-    update_analysis_meta=_aip_html_meta,
+    update_analysis_meta=lambda x: {'type': 'aip_output_html'},
     tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
