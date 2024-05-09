@@ -785,7 +785,7 @@ class MtToEsSv(DatasetStage):
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
 
-        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id'],False):
+        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id'], False):
             # noinspection PyProtectedMember
 
             j = dataproc._add_submit_job(
