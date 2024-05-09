@@ -57,7 +57,7 @@ class BamToCram(SequencingGroupStage):
         Using the "bam_to_cram" function implemented in the `jobs` module.
         """
         b=get_batch()
-        input_bam = b.read_input_group({'bam': sequencing_group.alignment_input_by_seq_type.get('genome')})
+        input_bam = b.read_input_group(**{'bam': sequencing_group.alignment_input_by_seq_type.get('genome')})
         job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
             input_bam=input_bam,
