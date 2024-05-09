@@ -51,7 +51,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         Stripy,
         MitoReport,
     ],
-    'seqr_loader_long_read': [BamToCram,],
+    'seqr_loader_long_read': [
+        BamToCram,
+    ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
