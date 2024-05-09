@@ -357,9 +357,9 @@ class ValidateMOI(DatasetStage):
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
 
         # If there are SV VCFs, read each one in and add to the arguments
-        sv_paths, sv_files = query_for_sv_mt(dataset.name)
+        sv_paths_or_empty = query_for_sv_mt(dataset.name)
         sv_vcf_arg = ''
-        if sv_paths:
+        if sv_paths_or_empty:
             # only go looking for inputs from prior stage where we expect to find them
             hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
             for sv_path, sv_file in query_for_sv_mt(dataset.name):
