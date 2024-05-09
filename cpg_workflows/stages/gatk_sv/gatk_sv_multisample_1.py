@@ -9,7 +9,7 @@ across batches between FilterBatch and GenotypeBatch
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -76,19 +76,22 @@ class GatherBatchEvidence(CohortStage):
             'merged_BAF_index': f'{self.name}.baf.txt.gz.tbi',
             'merged_bincov': f'{self.name}.RD.txt.gz',
             'merged_bincov_index': f'{self.name}.RD.txt.gz.tbi',
-            'SR_stats': 'SR.QC_matrix.txt',
-            'PE_stats': 'PE.QC_matrix.txt',
-            'BAF_stats': 'BAF.QC_matrix.txt',
-            'RD_stats': 'RD.QC_matrix.txt',
             'median_cov': 'medianCov.transposed.bed',
             'merged_dels': 'DEL.bed.gz',
             'merged_dups': 'DUP.bed.gz',
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_matrix_qc'):
-                ending_by_key['Matrix_QC_plot'] = '00_matrix_FC_QC.png'
+        if config_retrieve(['resource_overrides', self.name, 'run_matrix_qc'], False):
+            ending_by_key.update(
+                {
+                    'Matrix_QC_plot': '00_matrix_FC_QC.png',
+                    'SR_stats': 'SR.QC_matrix.txt',
+                    'PE_stats': 'PE.QC_matrix.txt',
+                    'BAF_stats': 'BAF.QC_matrix.txt',
+                    'RD_stats': 'RD.QC_matrix.txt',
+                },
+            )
 
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
@@ -199,9 +202,8 @@ class ClusterBatch(CohortStage):
         ending_by_key = {}
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                ending_by_key['metrics_file_clusterbatch'] = 'metrics.tsv'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], False):
+            ending_by_key['metrics_file_clusterbatch'] = 'metrics.tsv'
 
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
@@ -278,7 +280,7 @@ class GenerateBatchMetrics(CohortStage):
     Generates variant metrics for filtering.
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, str | Path]:
         """
         Metrics files
         """
@@ -289,9 +291,8 @@ class GenerateBatchMetrics(CohortStage):
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                outputs['metrics_file_batchmetrics'] = f'GenerateBatchMetrics.{get_workflow().output_version}'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], False):
+            outputs['metrics_file_batchmetrics'] = f'GenerateBatchMetrics.{get_workflow().output_version}'
 
         return outputs
 
@@ -382,9 +383,8 @@ class FilterBatch(CohortStage):
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                ending_by_key['metrics_file_filterbatch'] = 'metrics.tsv'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], False):
+            ending_by_key['metrics_file_filterbatch'] = 'metrics.tsv'
 
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'filtered_{caller}_vcf'] = f'filtered-{caller}.vcf.gz'
@@ -491,25 +491,18 @@ class MergeBatchSites(CohortStage):
         generate a MergeBatchSites job
         """
 
-        batch_names = get_config()['workflow']['batch_names']
+        batch_names = config_retrieve(['workflow', 'batch_names'])
         batch_prefix = cohort.analysis_dataset.prefix() / 'gatk_sv'
         pesr_vcfs = [
             batch_prefix / batch_name / 'FilterBatch' / 'filtered_pesr_merged.vcf.gz' for batch_name in batch_names
         ]
         depth_vcfs = [batch_prefix / batch_name / 'FilterBatch' / 'filtered-depth.vcf.gz' for batch_name in batch_names]
 
-        input_dict: dict[str, Any] = {
-            'cohort': cohort.name,
-            'depth_vcfs': depth_vcfs,
-            'pesr_vcfs': pesr_vcfs,
-        }
+        input_dict: dict[str, Any] = {'cohort': cohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
+        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
@@ -558,7 +551,7 @@ class GenotypeBatch(CohortStage):
         # we want to keep all versions of these outputs generated from separate
         # inputs, so we incorporate the hash from the MergeBatchSites file into
         # the files generated by this step to differentiate the outputs
-        if mbs_file := get_config()['workflow'].get('cohort_depth_vcf'):
+        if mbs_file := config_retrieve(['workflow', 'cohort_depth_vcf']):
             cohort_hash = mbs_file.split('/')[4][-10:]
         else:
             # this method is still run, even if the Stage is skipped
@@ -575,9 +568,8 @@ class GenotypeBatch(CohortStage):
         }
 
         # we don't run metrics as standard, only expect the output if we choose to run
-        if override := get_config()['resource_overrides'].get(self.name):
-            if override.get('run_module_metrics'):
-                ending_by_key['metrics_file_genotypebatch'] = 'metrics.tsv'
+        if config_retrieve(['resource_overrides', self.name, 'run_module_metrics'], False):
+            ending_by_key['metrics_file_genotypebatch'] = 'metrics.tsv'
 
         for mode in ['pesr', 'depth']:
             ending_by_key |= {
@@ -612,7 +604,7 @@ class GenotypeBatch(CohortStage):
         # pull out the merged VCF from MergeBatchSites
         for mode in ['pesr', 'depth']:
             input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = get_config()['workflow'][f'cohort_{mode}_vcf']
+            input_dict[f'cohort_{mode}_vcf'] = config_retrieve(['workflow', f'cohort_{mode}_vcf'])
 
         input_dict |= get_images(
             [

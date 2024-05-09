@@ -4,9 +4,9 @@ Stages that implement GATK-gCNV.
 
 import json
 
-from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
+from cpg_utils import Path, dataproc, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
@@ -128,7 +128,7 @@ class DeterminePloidy(CohortStage):
         ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
 
         jobs = gcnv.filter_and_determine_ploidy(
-            ploidy_priors_path=str(reference_path('gatk_sv/contig_ploidy_priors')),
+            ploidy_priors_path=reference_path('gatk_sv/contig_ploidy_priors'),
             preprocessed_intervals_path=prep_intervals['preprocessed'],
             annotated_intervals_path=prep_intervals['annotated'],
             counts_paths=ordered_read_counts,
@@ -586,7 +586,6 @@ class MtToEsCNV(DatasetStage):
                 f'Elasticsearch index for dataset {dataset}',
             )
 
-        from analysis_runner import dataproc
         from cpg_workflows.stages.seqr_loader import es_password
 
         # transformation is the same, just use the same methods file?

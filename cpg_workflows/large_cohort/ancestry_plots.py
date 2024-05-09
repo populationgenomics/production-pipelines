@@ -17,8 +17,8 @@ from bokeh.transform import factor_cmap, factor_mark
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import genome_build
 
 PROVIDED_LABEL = 'Provided ancestry'
 INFERRED_LABEL = 'Inferred ancestry'
@@ -96,6 +96,7 @@ def run(
     population_label = ht.training_pop.collect() if use_inferred else ht.population.collect()
     # Change 'none' values to dataset name
     analysis_dataset_name = get_config()['workflow']['dataset']
+    # TODO: Input datasets will soon be deprecated, please switch to input_cohorts.
     workflow_dataset = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
     # join dataset names with underscore, in case there are multiple
     workflow_dataset = '_'.join(workflow_dataset)
@@ -201,7 +202,7 @@ def _plot_loadings(number_of_pcs, loadings_ht, out_path_pattern=None):
     if plot_name:
         pca_suffix = plot_name.replace('-', '_')
     gtf_ht = hl.experimental.import_gtf(
-        str(reference_path('gatk_sv/protein_coding_gtf')),
+        reference_path('gatk_sv/protein_coding_gtf'),
         reference_genome=genome_build(),
         skip_invalid_contigs=True,
         min_partitions=12,

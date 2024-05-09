@@ -11,8 +11,7 @@ from typing import Optional
 import pandas as pd
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import dataset_path, reference_path, web_url
+from cpg_utils.config import dataset_path, get_config, reference_path, web_url
 
 from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from .metamist import Assay

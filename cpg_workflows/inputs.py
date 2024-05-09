@@ -4,7 +4,7 @@ Metamist wrapper to get input sequencing groups.
 
 import logging
 
-from cpg_utils.config import get_config, update_dict
+from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
@@ -26,19 +26,43 @@ def create_cohort() -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
-    analysis_dataset_name = get_config()['workflow']['dataset']
-    dataset_names = get_config()['workflow'].get('input_datasets', [analysis_dataset_name])
-    skip_datasets = get_config()['workflow'].get('skip_datasets', [])
+    config = config_retrieve(['workflow'])
+    analysis_dataset_name = config_retrieve(['workflow', 'dataset'])
+    custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
+    input_datasets = config_retrieve(['workflow', 'input_datasets'], [])
+    skip_datasets = config_retrieve(['workflow', 'skip_datasets'], [])
+
+    # Additional logic to support cohorts + datasets as inputs. In future, cohorts will only be supported.
+    if custom_cohort_ids and input_datasets:
+        raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
+
+    if custom_cohort_ids:
+        # TODO: Handle more than one cohort
+        if len(custom_cohort_ids) > 1:
+            raise ValueError('Only one cohort is supported')
+        sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
+        dataset_names = list(sgs_by_dataset.keys())
+    elif input_datasets:
+        dataset_names = input_datasets
+        logging.warning('Using input_datasets will soon be deprecated. Use input_cohorts instead.')
+    else:
+        dataset_names = [analysis_dataset_name]
+        logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
+
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
     cohort = Cohort()
+
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
-        sequencing_group_entries = get_metamist().get_sg_entries(dataset_name)
-        for entry in sequencing_group_entries:
+        if custom_cohort_ids:
+            sgs = sgs_by_dataset[dataset_name]
+        else:
+            sgs = get_metamist().get_sg_entries(dataset_name)
+
+        for entry in sgs:
             metadata = entry.get('meta', {})
             update_dict(metadata, entry['sample']['participant'].get('meta', {}))
-
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
@@ -56,14 +80,14 @@ def create_cohort() -> Cohort:
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
-        if 'skip_sgs' in get_config()['workflow']:
+        if 'skip_sgs' in config:
             msg += ' (after skipping sequencing groups)'
-        if 'only_sgs' in get_config()['workflow']:
+        if 'only_sgs' in config:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
     _populate_analysis(cohort)
-    if get_config()['workflow'].get('read_pedigree', True):
+    if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
     assert cohort.get_sequencing_groups()
     return cohort

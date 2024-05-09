@@ -232,8 +232,8 @@ def run(
             else:
                 mismatching_related_to_unrelated.append(line)
 
-        pairs_df.loc[idx, 'provided_rel'] = expected_rel
-        pairs_df.loc[idx, 'inferred_rel'] = inferred_rel
+        pairs_df.loc[idx, 'provided_rel'] = expected_rel  # type: ignore
+        pairs_df.loc[idx, 'inferred_rel'] = inferred_rel  # type: ignore
 
     if mismatching_unrelated_to_related:
         info(
