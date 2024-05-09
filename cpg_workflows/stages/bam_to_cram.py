@@ -65,6 +65,8 @@ class BamToCram(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
         )
+        b.write_output(output_cram.cram, str(self.expected_outputs(sequencing_group)['cram']))
+        
         return self.make_outputs(
             sequencing_group,
             data=self.expected_outputs(sequencing_group),
