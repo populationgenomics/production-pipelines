@@ -75,8 +75,8 @@ def mock_create_analysis(_, project, analysis) -> int:
 def mock_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
+    ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPGBBB', external_id='SAMPLE2')
     return c
 
 
@@ -196,8 +196,10 @@ def test_attributes(mocker: MockFixture, tmp_path):
         assert job.attributes['dataset'] == 'my_dataset'
         assert job.attributes['tool'] in ['echo', 'metamist']
         assert job.attributes['participant_id'] in ['SAMPLE1', 'SAMPLE2']
-        assert job.attributes['sequencing_group'] in ['CPG01', 'CPG02']
-        assert job.attributes['sequencing_groups'] == "['CPG01']" or job.attributes['sequencing_groups'] == "['CPG02']"
+        assert job.attributes['sequencing_group'] in ['CPGAAA', 'CPGBBB']
+        assert (
+            job.attributes['sequencing_groups'] == "['CPGAAA']" or job.attributes['sequencing_groups'] == "['CPGBBB']"
+        )
         # test job name
         assert job.name
         assert job.name.startswith(
@@ -207,8 +209,8 @@ def test_attributes(mocker: MockFixture, tmp_path):
     # Check that the job_by_stage and job_by_tool dicts are correct
     for stg, job in get_batch().job_by_stage.items():
         assert stg in [s.__name__ for s in workflow_stages]
-        assert job['sequencing_groups'] == {'CPG01', 'CPG02'}
+        assert job['sequencing_groups'] == {'CPGAAA', 'CPGBBB'}
 
     for tool, job in get_batch().job_by_tool.items():
         assert tool in ['echo', 'metamist']
-        assert job['sequencing_groups'] == {'CPG01', 'CPG02'}
+        assert job['sequencing_groups'] == {'CPGAAA', 'CPGBBB'}
