@@ -59,7 +59,7 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if val := config_retrieve(['cromwell_polling_intervals', job_size.value]):
+        if val := config_retrieve(['cromwell_polling_intervals', job_size.value], False):
             polling_interval_dict[job_size].update(val)
     return polling_interval_dict
 
@@ -158,7 +158,7 @@ def add_gatk_sv_jobs(
     polling_maximum = randint(polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2)
 
     # If a config section exists for this workflow, apply overrides
-    if override := config_retrieve(['resource_overrides', wfl_name]):
+    if override := config_retrieve(['resource_overrides', wfl_name], False):
         input_dict |= override
 
     # Where Cromwell writes the output.
@@ -222,6 +222,7 @@ def add_gatk_sv_jobs(
 
 
 def get_ref_panel(keys: list[str] | None = None) -> dict:
+    # mandatory config entry
     ref_panel_samples = config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
     return {
         k: v
