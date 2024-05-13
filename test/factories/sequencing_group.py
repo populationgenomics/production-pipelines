@@ -13,7 +13,7 @@ from .types import (
 
 
 def create_sequencing_group(
-    id: SequencingGroupId = 'CPG000001',
+    id: SequencingGroupId = 'CPGAAAAAA',
     external_id: SequencingGroupExternalId = 'SAMPLE1',
     dataset: DatasetId | Dataset = DEFAULT_DATASET_NAME,
     participant_id: str | None = None,
@@ -32,7 +32,7 @@ def create_sequencing_group(
 
     Args:
         id (SequencingGroupId):
-            The ID of the sequencing group. Defaults to `CPG000001`.
+            The ID of the sequencing group. Defaults to `CPGAAAAAA`.
 
         external_id (SequencingGroupExternalId):
             The external ID of the sequencing group. Defaults to `SAMPLE1`.
