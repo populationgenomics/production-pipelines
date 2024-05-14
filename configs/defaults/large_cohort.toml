@@ -5,7 +5,7 @@ scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
 ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
-
+highmem_workers = true
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
 # (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
@@ -61,6 +61,8 @@ inferred_ancestry = false
 
 # Set whether to allow column discrepancies when unioning background dataset tables
 #allow_missing_columns = false
+# Columns to be dropped from the final unioned background table
+#drop_columns = ['autosomal_mean_dp']
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and

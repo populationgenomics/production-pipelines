@@ -11,8 +11,8 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, query_command, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import query_command
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
 from cpg_workflows.query_modules import vep
@@ -174,7 +174,7 @@ def vep_one(
 
     # check that the cache and image for this version exist
     vep_image = image_path(f'vep_{vep_version}')
-    vep_mount_path = reference_path(f'vep_{vep_version}_mount')
+    vep_mount_path = to_path(reference_path(f'vep_{vep_version}_mount'))
     assert all([vep_image, vep_mount_path])
     logging.info(f'Using VEP {vep_version}')
 
