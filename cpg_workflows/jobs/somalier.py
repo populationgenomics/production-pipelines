@@ -262,7 +262,7 @@ def extract(
     sites = b.read_input(reference_path('somalier_sites'))
 
     cmd = f"""\
-    SITES=$BATCH_TMPDIR/sites/{reference_path('somalier_sites')}
+    SITES=$BATCH_TMPDIR/sites/{to_path(reference_path('somalier_sites')).name}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
