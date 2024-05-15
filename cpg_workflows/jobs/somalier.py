@@ -2,6 +2,7 @@
 Adding jobs for fingerprinting and pedigree checks. Mostly using Somalier.
 """
 
+import os
 from typing import cast
 
 import pandas as pd
@@ -262,7 +263,7 @@ def extract(
     sites = b.read_input(reference_path('somalier_sites'))
 
     cmd = f"""\
-    SITES=$BATCH_TMPDIR/sites/{to_path(reference_path('somalier_sites')).name}
+    SITES=$BATCH_TMPDIR/sites/{os.path.basename(reference_path('somalier_sites'))}
     retry gsutil cp {reference_path('somalier_sites')} $SITES
 
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
