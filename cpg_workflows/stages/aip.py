@@ -431,15 +431,19 @@ class CreateAIPHTML(DatasetStage):
         local_ped = get_batch().read_input(str(pedigree))
 
         expected_out = self.expected_outputs(dataset)
-        job.command(
+        command_string = (
             f'python3 reanalysis/html_builder.py '
             f'--results "{moi_inputs}" '
             f'--panelapp "{panel_input}" '
             f'--pedigree "{local_ped}" '
             f'--output "{expected_out["results_html"]}" '
             f'--latest "{expected_out["latest_html"]}" '
-            f'--dataset "{dataset.name}" ',
+            f'--dataset "{dataset.name}" '
         )
+        if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
+            command_string += f' --split_samples {report_splitting}'
+
+        job.command(command_string)
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
