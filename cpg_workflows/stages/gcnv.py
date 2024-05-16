@@ -397,7 +397,8 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
         # read vcf and index into the batch
         input_vcf = get_batch().read_input_group(
-            vcf=str(input_dict['annotated_vcf']), vcf_index=str(input_dict['annotated_vcf_index'])
+            vcf=str(input_dict['annotated_vcf']),
+            vcf_index=str(input_dict['annotated_vcf_index']),
         )['vcf']
 
         strv_job.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
