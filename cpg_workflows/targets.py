@@ -118,14 +118,30 @@ class Cohort(Target):
         """Unique target ID"""
         return self.name
 
-    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
+    def write_ped_file(
+        self,
+        out_path: Path | None = None,
+        use_participant_id: bool = False,
+        set_sex_unknown: bool = False,
+    ) -> Path:
         """
         Create a PED file for all samples in the whole cohort
         PED is written with no header line to be strict specification compliant
+
+        Args:
+            out_path (Path): destination for new PED file
+            use_participant_id (bool): use participant instead of SG ID
+            set_sex_unknown (bool): if set, the pedigree entries will have unknown sex (gCNV)
+
+        Returns:
+            Path: path to the written PED file
         """
         datas = []
         for sequencing_group in self.get_sequencing_groups():
-            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
+            ped_data = sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id)
+            if set_sex_unknown:
+                ped_data['Sex'] = '0'
+            datas.append(ped_data)
         if not datas:
             raise ValueError(f'No pedigree data found for {self.name}')
         df = pd.DataFrame(datas)

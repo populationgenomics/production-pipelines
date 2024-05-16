@@ -232,7 +232,7 @@ class GCNVJointSegmentation(CohortStage):
 
         expected_out = self.expected_outputs(cohort)
 
-        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        ped_path = cohort.write_ped_file(expected_out['pedigree'], set_sex_unknown=True)
 
         jobs = gcnv.run_joint_segmentation(
             segment_vcfs=all_vcfs,
