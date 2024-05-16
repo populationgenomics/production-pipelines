@@ -10,11 +10,7 @@ from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    get_images,
-    get_references,
-    queue_annotate_sv_jobs,
-)
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import (
     CohortStage,
@@ -26,15 +22,6 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-
-
-def _gcnv_annotated_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Callable, adds custom analysis object meta attribute
-    """
-    return {'type': 'gCNV-annotated'}
 
 
 @stage
@@ -51,7 +38,7 @@ class SetSGIDOrdering(CohortStage):
         sorted_sgids = sorted(cohort.get_sequencing_group_ids())
         with self.expected_outputs(cohort)['sgid_order'].open('w') as f_handler:
             json.dump(sorted_sgids, f_handler, indent=2)
-        return self.make_outputs(cohort)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort))
 
 
 @stage
@@ -336,7 +323,7 @@ class FastCombineGCNVs(CohortStage):
     required_stages=FastCombineGCNVs,
     analysis_type='cnv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=_gcnv_annotated_meta,
+    update_analysis_meta=lambda x: {'type': 'gCNV-annotated'},
 )
 class AnnotateCNV(CohortStage):
     """
@@ -382,20 +369,11 @@ class AnnotateCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-def _gcnv_srvctvre_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Callable, adds custom analysis object meta attribute
-    """
-    return {'type': 'gCNV-STRVCTCRE-annotated'}
-
-
 @stage(
     required_stages=AnnotateCNV,
     analysis_type='cnv',
     analysis_keys=['strvctvre_vcf'],
-    update_analysis_meta=_gcnv_srvctvre_meta,
+    update_analysis_meta=lambda x: {'type': 'gCNV-STRVCTCRE-annotated'},
 )
 class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -419,16 +397,10 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
         # read vcf and index into the batch
         input_vcf = get_batch().read_input_group(
-            vcf=str(input_dict['annotated_vcf']),
-            vcf_index=str(input_dict['annotated_vcf_index']),
+            vcf=str(input_dict['annotated_vcf']), vcf_index=str(input_dict['annotated_vcf_index'])
         )['vcf']
 
-        strv_job.declare_resource_group(
-            output_vcf={
-                'vcf.bgz': '{root}.vcf.bgz',
-                'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            },
-        )
+        strv_job.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         # run strvctvre
         strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
@@ -442,12 +414,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
 
-@stage(
-    required_stages=AnnotateCNVVcfWithStrvctvre,
-    analysis_type='cnv',
-    analysis_keys=['mt'],
-    update_analysis_meta=_gcnv_srvctvre_meta,
-)
+@stage(required_stages=AnnotateCNVVcfWithStrvctvre, analysis_type='cnv', analysis_keys=['mt'])
 class AnnotateCohortgCNV(CohortStage):
     """
     Rearrange the annotations across the cohort to suit Seqr
@@ -455,10 +422,7 @@ class AnnotateCohortgCNV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
         # convert temp path to str to avoid checking existence
-        return {
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'gcnv_annotated_cohort.mt',
-        }
+        return {'tmp_prefix': str(self.tmp_prefix), 'mt': self.prefix / 'gcnv_annotated_cohort.mt'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -485,11 +449,7 @@ class AnnotateCohortgCNV(CohortStage):
         if depends_on := inputs.get_jobs(cohort):
             j.depends_on(*depends_on)
 
-        return self.make_outputs(
-            cohort,
-            data=self.expected_outputs(cohort),
-            jobs=j,
-        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
 
 
 @stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
@@ -528,27 +488,18 @@ class AnnotateDatasetCNV(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
+            depends_on=inputs.get_jobs(dataset),
         )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
-
-
-def _gatk_gcnv_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    https://github.com/populationgenomics/metamist/issues/539
-    """
-    return {'seqr-dataset-type': 'CNV'}
 
 
 @stage(
     required_stages=[AnnotateDatasetCNV],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=_gatk_gcnv_index_meta,
+    # https://github.com/populationgenomics/metamist/issues/539
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'CNV'},
 )
 class MtToEsCNV(DatasetStage):
     """
