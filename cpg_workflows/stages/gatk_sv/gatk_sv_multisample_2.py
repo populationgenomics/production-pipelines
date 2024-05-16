@@ -577,7 +577,7 @@ class SpiceUpSVIDs(CohortStage):
     required_stages=SpiceUpSVIDs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class AnnotateVcf(CohortStage):
     """
