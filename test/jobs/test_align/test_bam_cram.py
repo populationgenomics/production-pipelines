@@ -130,7 +130,7 @@ class TestPreProcessing:
                     'cram_version_reference': {'v1': 'realign.fa'},
                 },
                 True,
-                'CPG000001.cram',
+                'CPGAAAAAA.cram',
                 'realign.fa',
             ),
             (
@@ -233,7 +233,7 @@ class TestPreProcessing:
                     'cram_version_reference': {'v1': 'realign.fa'},
                 },
                 True,
-                'CPG000001.cram',
+                'CPGAAAAAA.cram',
                 'realign.fa',
             ),
             (

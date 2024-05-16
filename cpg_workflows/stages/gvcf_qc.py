@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.happy import happy
@@ -36,7 +36,7 @@ class GvcfQC(SequencingGroupStage):
         Generate a GVCF and corresponding TBI index, as well as QC.
         """
         outs: dict[str, Path] = {}
-        if get_config()['workflow'].get('skip_qc', False) is False:
+        if not config_retrieve(['workflow', 'skip_qc'], False):
             qc_prefix = sequencing_group.dataset.prefix() / 'qc' / sequencing_group.id
             outs |= {
                 'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
@@ -73,7 +73,7 @@ class GvcfHappy(SequencingGroupStage):
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sequencing_group.participant_id not in get_config().get('validation', {}).get('sample_map', {}):
+        if sequencing_group.participant_id not in config_retrieve(['validation', 'sample_map'], {}):
             return None
         return sequencing_group.dataset.prefix() / 'qc' / 'gvcf' / 'hap.py' / f'{sequencing_group.id}.summary.csv'
 
@@ -124,7 +124,7 @@ class GvcfMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
         # get the unique hash for these Sequencing Groups
@@ -139,7 +139,7 @@ class GvcfMultiQC(DatasetStage):
         """
         Collect QC.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
         json_path = self.expected_outputs(dataset)['json']
