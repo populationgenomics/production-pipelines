@@ -55,6 +55,8 @@ liftover_38_to_37 = "stub"
 somalier_sites = "stub"
 seqr_combined_reference_data = "stub"
 seqr_clinvar = "stub"
+[references.hg38_telomeres_and_centromeres_intervals]
+interval_list = "stub"
 
 [storage.default]
 default = "{directory}"
@@ -128,12 +130,12 @@ def _mock_cohort():
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
     ds.add_sequencing_group(
-        'CPG01',
+        'CPGAA',
         'SAMPLE1',
         alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
     )
     ds.add_sequencing_group(
-        'CPG02',
+        'CPGBB',
         'SAMPLE2',
         alignment_input_by_seq_type={
             'genome': FastqPairs(

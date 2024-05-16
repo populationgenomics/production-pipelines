@@ -7,13 +7,11 @@ from hailtop.batch.job import Job
 from hailtop.batch.resource import PythonResult
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import (
     Batch,
     command,
     fasta_res_group,
-    image_path,
-    reference_path,
 )
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import STANDARD
@@ -519,8 +517,8 @@ def filter_variants(
     STANDARD.set_resources(j, ncpu=4)
 
     blacklisted_sites = b.read_input_group(
-        bed=str(reference_path('gnomad_mito/blacklist_sites')),
-        idx=str(reference_path('gnomad_mito/blacklist_sites')) + '.idx',
+        bed=reference_path('gnomad_mito/blacklist_sites'),
+        idx=reference_path('gnomad_mito/blacklist_sites') + '.idx',
     )
 
     j.declare_resource_group(filtered_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})

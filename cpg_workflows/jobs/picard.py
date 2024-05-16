@@ -6,8 +6,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import (
     HIGHMEM,
@@ -22,6 +22,7 @@ def get_intervals(
     b: hb.Batch,
     scatter_count: int,
     source_intervals_path: Path | None = None,
+    exclude_intervals_path: Path | None = None,
     job_attrs: dict[str, str] | None = None,
     output_prefix: Path | None = None,
 ) -> tuple[Job | None, list[hb.ResourceFile]]:
@@ -33,6 +34,8 @@ def get_intervals(
     @param scatter_count: number of target sub-intervals,
     @param source_intervals_path: path to source intervals to split. Would check for
         config if not provided.
+    @param exclude_intervals_path: path to file with intervals to exclude.
+        Would check for config if not provided.
     @param job_attrs: attributes for Hail Batch job,
     @param output_prefix: path optionally to save split subintervals.
 
@@ -48,11 +51,16 @@ def get_intervals(
     """
     assert scatter_count > 0, scatter_count
     sequencing_type = get_config()['workflow']['sequencing_type']
-    source_intervals_path = source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists')
+    source_intervals_path = str(
+        source_intervals_path or reference_path(f'broad/{sequencing_type}_calling_interval_lists'),
+    )
+    exclude_intervals_path = (
+        exclude_intervals_path or reference_path('hg38_telomeres_and_centromeres_intervals/interval_list') or None
+    )
 
     if scatter_count == 1:
         # Special case when we don't need to split
-        return None, [b.read_input(str(source_intervals_path))]
+        return None, [b.read_input(source_intervals_path)]
 
     if output_prefix:
         interval_lists_exist = all(
@@ -73,18 +81,26 @@ def get_intervals(
         'exome': 0,
     }.get(sequencing_type, 0)
 
+    extra_cmd = ''
+    if exclude_intervals_path:
+        # If there are intervals to exclude, subtract them from the source intervals
+        extra_cmd = f"""-ACTION SUBTRACT \
+        -SI {b.read_input(str(exclude_intervals_path))} \
+        """
+
     cmd = f"""
     mkdir $BATCH_TMPDIR/out
 
     picard -Xms1000m -Xmx1500m \
     IntervalListTools \
-    SCATTER_COUNT={scatter_count} \
-    SUBDIVISION_MODE=INTERVAL_SUBDIVISION \
-    UNIQUE=true \
-    SORT=true \
-    BREAK_BANDS_AT_MULTIPLES_OF={break_bands_at_multiples_of} \
-    INPUT={b.read_input(str(source_intervals_path))} \
-    OUTPUT=$BATCH_TMPDIR/out
+    -SCATTER_COUNT {scatter_count} \
+    -SUBDIVISION_MODE INTERVAL_SUBDIVISION \
+    -UNIQUE true \
+    -SORT true \
+    -BREAK_BANDS_AT_MULTIPLES_OF {break_bands_at_multiples_of} \
+    -I {b.read_input(source_intervals_path)} \
+    {extra_cmd} \
+    -OUTPUT $BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out
     ls $BATCH_TMPDIR/out/*
     """
@@ -209,11 +225,11 @@ def vcf_qc(
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
     dbsnp_vcf = b.read_input_group(
-        base=str(reference_path('broad/dbsnp_vcf')),
-        index=str(reference_path('broad/dbsnp_vcf_index')),
+        base=reference_path('broad/dbsnp_vcf'),
+        index=reference_path('broad/dbsnp_vcf_index'),
     )
     sequencing_type = get_config()['workflow']['sequencing_type']
-    intervals_file = b.read_input(str(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists')))
+    intervals_file = b.read_input(reference_path(f'broad/{sequencing_type}_evaluation_interval_lists'))
 
     if is_gvcf:
         input_file = vcf_or_gvcf['g.vcf.gz']
@@ -348,7 +364,7 @@ def picard_hs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(str(reference_path('broad/exome_evaluation_interval_lists')))
+    interval_file = b.read_input(reference_path('broad/exome_evaluation_interval_lists'))
 
     assert cram_path.index_path
     cmd = f"""\
@@ -415,7 +431,7 @@ def picard_wgs_metrics(
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
     reference = fasta_res_group(b)
-    interval_file = b.read_input(str(reference_path('broad/genome_coverage_interval_list')))
+    interval_file = b.read_input(reference_path('broad/genome_coverage_interval_list'))
 
     assert cram_path.index_path
     cmd = f"""\

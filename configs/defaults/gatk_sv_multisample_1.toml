@@ -3,6 +3,7 @@ name = 'gatk_sv'
 dataset_gcp_project = 'seqr-308602'
 dataset = 'seqr'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
 
 # switches to deactivate all Metrics workflows. We ran into some resourcing issues when our total
 # cohort size approached ~1600. Response when raised with GATK team:

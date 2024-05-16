@@ -193,11 +193,11 @@ class TestAllLargeCohortMethods:
 
         siteonly_vcf_path = res_pref / 'siteonly.vcf.bgz'
         site_only_vcf.run(
-            vds_path=vds_path,
-            sample_qc_ht_path=sample_qc_ht_path,
-            relateds_to_drop_ht_path=relateds_to_drop_ht_path,
-            out_vcf_path=siteonly_vcf_path,
-            tmp_prefix=res_pref / 'tmp',
+            vds_path=str(vds_path),
+            sample_qc_ht_path=str(sample_qc_ht_path),
+            relateds_to_drop_ht_path=str(relateds_to_drop_ht_path),
+            out_vcf_path=str(siteonly_vcf_path),
+            tmp_prefix=str(res_pref / 'tmp'),
         )
 
         assert exists(vds_path)

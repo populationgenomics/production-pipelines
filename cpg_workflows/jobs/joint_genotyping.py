@@ -13,8 +13,8 @@ from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
@@ -47,6 +47,7 @@ def make_joint_genotyping_jobs(
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     do_filter_excesshet: bool = True,
     intervals_path: Path | None = None,
+    exclude_intervals_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
@@ -70,6 +71,7 @@ def make_joint_genotyping_jobs(
     intervals_j, intervals = get_intervals(
         b=b,
         source_intervals_path=intervals_path,
+        exclude_intervals_path=exclude_intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
         output_prefix=tmp_bucket / f'intervals_{scatter_count}',
@@ -247,7 +249,7 @@ def genomicsdb(
         #   using the --merge-input-intervals arg. There's no data in between since we
         #   didn't run HaplotypeCaller over those loci, so we're not wasting any
         #   compute.
-        '--merge-input-intervals',
+        # '--merge-input-intervals', # Removed because of issues when excluding intervals - EddieLF 2024-04-06
         '--consolidate',
         # The Broad:
         # > The batch_size value was carefully chosen here as it is the optimal value
@@ -365,8 +367,8 @@ def _add_joint_genotyper_job(
     --create-output-variant-index
     """
     else:
+        # --merge-input-intervals \\  # Removed from cmd because of issues when excluding intervals - EddieLF 2024-04-06
         cmd += f"""\
-    --merge-input-intervals \\
     -G AS_StandardAnnotation
 
     if [[ ! -e {j.output_vcf['vcf.gz.tbi']} ]]; then

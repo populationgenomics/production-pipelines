@@ -71,7 +71,7 @@ if __name__ == '__main__':
     for each in args.i:
         logging.info(f'Loading {each}')
         this_df = pd.read_csv(each, sep='\t', low_memory=False)
-        this_df.columns = [x.replace('#', '') for x in this_df.columns]
+        this_df.columns = [x.replace('#', '') for x in this_df.columns]  # type: ignore
 
         # filter to the active SGs we're interested in
         this_df = this_df.query('ID in @all_sg_ids')

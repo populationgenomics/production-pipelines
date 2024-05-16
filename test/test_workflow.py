@@ -39,8 +39,8 @@ backend = 'local'
 def mock_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
+    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+    ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
     return c
 
 
@@ -52,7 +52,8 @@ def test_workflow(tmp_path):
     conf = TOML.format(directory=tmp_path)
     set_config(conf, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.workflow import (
         CohortStage,
@@ -109,7 +110,7 @@ def test_workflow(tmp_path):
     print(f'Checking result in {output_path}:')
     with output_path.open() as f:
         result = f.read()
-        assert result.split() == ['CPG01_done', 'CPG02_done'], result
+        assert result.split() == ['CPGAA_done', 'CPGBB_done'], result
 
 
 def test_path_walk():

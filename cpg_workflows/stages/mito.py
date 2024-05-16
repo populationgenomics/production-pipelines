@@ -12,8 +12,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, reference_path
+from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
 from cpg_workflows.stages.align import Align
@@ -40,9 +40,9 @@ def get_mito_references(ref_path: str = 'gnomad_mito', shifted: bool = False) ->
         dict: mito config entries
     """
     shifted_str = 'shifted_' if shifted else ''
-    mito_fa = str(reference_path(f'{ref_path}/{shifted_str}fasta'))
+    mito_fa = reference_path(f'{ref_path}/{shifted_str}fasta')
     return get_batch().read_input_group(
-        dict=str(reference_path(f'{ref_path}/{shifted_str}dict')),
+        dict=reference_path(f'{ref_path}/{shifted_str}dict'),
         base=mito_fa,
         amb=mito_fa + '.amb',
         ann=mito_fa + '.ann',
@@ -62,8 +62,8 @@ def get_control_region_intervals() -> hb.ResourceGroup:
     """
 
     return get_batch().read_input_group(
-        control_region_shifted=str(reference_path('gnomad_mito/shifted_control_region_interval')),
-        non_control_region=str(reference_path('gnomad_mito/non_control_region_interval')),
+        control_region_shifted=reference_path('gnomad_mito/shifted_control_region_interval'),
+        non_control_region=reference_path('gnomad_mito/non_control_region_interval'),
     )
 
 
