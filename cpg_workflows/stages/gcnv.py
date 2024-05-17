@@ -136,7 +136,7 @@ class UpgradePedWithInferred(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
-        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': str(self.tmp_prefix / 'pedigree.ped')}
+        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': self.tmp_prefix / 'pedigree.ped'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
