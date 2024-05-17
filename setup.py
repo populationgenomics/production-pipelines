@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.24.3',
+    version='1.24.4',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -19,6 +19,7 @@ setup(
         'hail!=0.2.120',  # Temporarily work around hail-is/hail#13337
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
+        'grpcio-status>=1.62',  # Avoid dependency resolution backtracking
         'onnx',
         'onnxruntime',
         'skl2onnx',
