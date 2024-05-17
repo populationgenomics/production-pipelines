@@ -290,7 +290,7 @@ def rich_sequencing_group_id_seds(
     in each file in `file_names` with an external ID, only if external ID is
     different from the original.
 
-    @param rich_id_map: map used to replace sequencing groups, e.g. {'CPG1': 'CPG1|EXTID'}
+    @param rich_id_map: map used to replace sequencing groups, e.g. {'CPGAA': 'CPGAA|EXTID'}
     @param file_names: file names and Hail Batch Resource files where to replace IDs
     @return: bash command that does replacement
     """

@@ -4,6 +4,7 @@ results of the per-batch workflows into a joint-call across the entire cohort
 """
 
 from datetime import datetime
+from functools import cache
 from os.path import join
 from typing import Any
 
@@ -38,15 +39,25 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-# create the file path outside Stages, so that
-# we can pass this to the metadata update function
-RUN_DATETIME = datetime.now().strftime('%Y-%m-%d')
-EXCLUSION_FILE = join(
-    get_config()['storage']['default']['default'],
-    'gatk_sv',
-    RUN_DATETIME,
-    'combined_exclusion_list.txt',
-)
+
+@cache
+def get_exclusion_filename() -> str:
+    """
+    generate one exclusion filename for this run
+    this is unusual - doing this outside of individual stages so that this file path is available
+    to both the stages and the metamist wrappers
+    the contents of this file will be used to remove SG IDs from the analysis registration if they
+    were filtered from the joint-call as outliers in any metric
+    Returns:
+        str: the exclusion filename
+    """
+    run_datetime = datetime.now().strftime('%Y-%m-%d')
+    return join(
+        get_config()['storage']['default']['default'],
+        'gatk_sv',
+        run_datetime,
+        'combined_exclusion_list.txt',
+    )
 
 
 def _exclusion_callable(output_path: str) -> dict[str, set[str]]:
@@ -81,7 +92,7 @@ class CombineExclusionLists(CohortStage):
         We need this quick stage to run each time
         """
 
-        return {'exclusion_list': to_path(EXCLUSION_FILE)}
+        return {'exclusion_list': to_path(get_exclusion_filename())}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -524,7 +535,7 @@ class FilterGenotypes(CohortStage):
     required_stages=FilterGenotypes,
     analysis_type='sv',
     analysis_keys=['new_id_vcf'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class SpiceUpSVIDs(CohortStage):
     """
@@ -566,7 +577,7 @@ class SpiceUpSVIDs(CohortStage):
     required_stages=SpiceUpSVIDs,
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class AnnotateVcf(CohortStage):
     """
@@ -640,11 +651,9 @@ class AnnotateVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(
-            f'python StrVCTVRE.py '  # type: ignore
-            f'-i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '
-            f'-f vcf '
-            f'-p {phylop_in_batch}',
+            f'python StrVCTVRE.py -i {input_vcf} '
+            f'-o {strv_job.output_vcf["vcf.gz"]} '  # type: ignore
+            f'-f vcf -p {phylop_in_batch}',
         )
         strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
 
@@ -691,7 +700,7 @@ class AnnotateCohortSv(CohortStage):
     required_stages=[CombineExclusionLists, AnnotateCohortSv],
     analysis_type='sv',
     analysis_keys=['mt'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class AnnotateDatasetSv(DatasetStage):
     """
@@ -741,7 +750,7 @@ class AnnotateDatasetSv(DatasetStage):
     required_stages=[AnnotateDatasetSv],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV', 'remove_sgids': get_exclusion_filename()},
 )
 class MtToEsSv(DatasetStage):
     """
@@ -787,7 +796,7 @@ class MtToEsSv(DatasetStage):
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
 
-        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id']):
+        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id'], False):
             # noinspection PyProtectedMember
 
             j = dataproc._add_submit_job(
