@@ -140,7 +140,7 @@ class UpgradePedWithInferred(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
-        ploidy_inputs = get_batch().read_input(inputs.as_dict(cohort, DeterminePloidy)['calls'])
+        ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
         tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
