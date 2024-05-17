@@ -129,6 +129,27 @@ class DeterminePloidy(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
+@stage(required_stages=DeterminePloidy)
+class UpgradePedWithInferred(CohortStage):
+    """
+    Don't trust the metamist pedigrees, update with inferred sexes
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': str(self.tmp_prefix / 'pedigree.ped')}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
+        ploidy_inputs = get_batch().read_input(inputs.as_dict(cohort, DeterminePloidy)['calls'])
+        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))
+        job = gcnv.upgrade_ped_file(
+            local_ped=tmp_ped_path,
+            new_output=str(outputs['pedigree']),
+            ploidy_tar=ploidy_inputs,
+        )
+        return self.make_outputs(cohort, data=outputs, jobs=job)
+
+
 @stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
 class GermlineCNV(CohortStage):
     """
@@ -195,7 +216,7 @@ class GermlineCNVCalls(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals])
+@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred])
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -232,11 +253,11 @@ class GCNVJointSegmentation(CohortStage):
 
         expected_out = self.expected_outputs(cohort)
 
-        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        pedigree = inputs.as_dict(cohort, UpgradePedWithInferred)['pedigree']
 
         jobs = gcnv.run_joint_segmentation(
             segment_vcfs=all_vcfs,
-            pedigree=str(ped_path),
+            pedigree=str(pedigree),
             intervals=str(intervals),
             tmp_prefix=expected_out['tmp_prefix'],
             output_path=expected_out['clustered_vcf'],
