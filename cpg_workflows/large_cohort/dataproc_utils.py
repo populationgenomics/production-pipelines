@@ -121,5 +121,4 @@ def dataproc_job(
         worker_boot_disk_size=worker_boot_disk_size,
         secondary_worker_boot_disk_size=secondary_worker_boot_disk_size,
         pyfiles=pyfiles,
-        init_timeout='60m',
     )
