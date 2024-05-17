@@ -56,7 +56,7 @@ def wrangle_genotypes(ploidy_folder: str) -> dict[str, str]:
                 if l_list[0] == 'chrX':
                     file_x = int(l_list[1])
                 if l_list[0] == 'chrY':
-                    file_x = int(l_list[1])
+                    file_y = int(l_list[1])
 
             new_sex_dict[sgid] = find_sex(file_x, file_y)
 
@@ -80,13 +80,15 @@ def update_pedigree(original_ped: str, new_ped: str, new_sexes: dict[str, str]):
                 l_list = line.split()
                 sgid = l_list[1]
                 l_list[5] = new_sexes[sgid]
-                out_handle.write('\t'.join(l_list))
+                out_handle.write('\t'.join(l_list) + '\n')
 
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('original_ped', required=True)
-    parser.add_argument('new_ped', required=True)
-    parser.add_argument('ploidy_folder', required=True)
+    parser.add_argument('original_ped')
+    parser.add_argument('new_ped')
+    parser.add_argument('ploidy_folder')
     args = parser.parse_args()
     new_sexes = wrangle_genotypes(args.ploidy_folder)
+    print(new_sexes)
+    update_pedigree(args.original_ped, args.new_ped, new_sexes)
