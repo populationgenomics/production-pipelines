@@ -85,8 +85,8 @@ def update_pedigree(original_ped: str, new_ped: str, new_sexes: dict[str, str]):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('original_ped', required=True)
-    parser.add_argument('new_ped', required=True)
-    parser.add_argument('ploidy_folder', required=True)
+    parser.add_argument('original_ped')
+    parser.add_argument('new_ped')
+    parser.add_argument('ploidy_folder')
     args = parser.parse_args()
     new_sexes = wrangle_genotypes(args.ploidy_folder)
