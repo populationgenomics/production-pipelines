@@ -4,9 +4,9 @@ Uses the contained ploidy to update the default pedigree
 Writes a new pedigree file to use in gCNV
 """
 
+from argparse import ArgumentParser
 from os import listdir
 from os.path import join
-from argparse import ArgumentParser
 
 
 def find_sex(x_ploidy: int | None, y_ploidy: int | None) -> str:
