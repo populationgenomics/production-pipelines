@@ -90,3 +90,4 @@ if __name__ == '__main__':
     parser.add_argument('ploidy_folder')
     args = parser.parse_args()
     new_sexes = wrangle_genotypes(args.ploidy_folder)
+    update_pedigree(args.original_ped, args.new_ped, new_sexes)
