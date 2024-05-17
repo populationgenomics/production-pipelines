@@ -16,16 +16,16 @@ setup(
         'cpg-utils>=5.0.4',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        'hail!=0.2.120',  # Temporarily work around hail-is/hail#13337
+        'hail==0.2.126',  # Temporarily pin a pre-job-groups Hail version
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
-        'grpcio-status>=1.62',  # Avoid dependency resolution backtracking
+        'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
         'onnx',
         'onnxruntime',
         'skl2onnx',
         'metamist>=6.9.0',
         'pandas',
-        'peddy',
+        'peddy>=0.4.8',  # Avoid 0.4.7, which is incompatible
         'fsspec',
         'slack_sdk',
         'elasticsearch==8.*',
