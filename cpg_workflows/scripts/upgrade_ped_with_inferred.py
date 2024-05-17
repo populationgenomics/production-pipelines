@@ -80,7 +80,7 @@ def update_pedigree(original_ped: str, new_ped: str, new_sexes: dict[str, str]):
                 l_list = line.split()
                 sgid = l_list[1]
                 l_list[5] = new_sexes[sgid]
-                out_handle.write('\t'.join(l_list))
+                out_handle.write('\t'.join(l_list) + '\n')
 
 
 if __name__ == '__main__':
