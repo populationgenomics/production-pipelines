@@ -5,11 +5,12 @@ test script, see what happens when we compare two of our own callsets
 from dataclasses import dataclass
 
 from cpg_utils import to_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
-    get_references,
+    get_references
 )
 
 
@@ -42,4 +43,4 @@ jobs = add_gatk_sv_jobs(
     input_dict=input_dict,
     expected_out_dict=expected_outs
 )
-
+get_batch().run(wait=False)
