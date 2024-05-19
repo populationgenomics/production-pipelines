@@ -130,12 +130,12 @@ def _mock_cohort():
     cohort = Cohort()
     ds = cohort.create_dataset('test-input-dataset')
     ds.add_sequencing_group(
-        'CPG01',
+        'CPGAA',
         'SAMPLE1',
         alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
     )
     ds.add_sequencing_group(
-        'CPG02',
+        'CPGBB',
         'SAMPLE2',
         alignment_input_by_seq_type={
             'genome': FastqPairs(

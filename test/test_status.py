@@ -66,8 +66,8 @@ def _common(mocker, tmp_path):
     def mock_create_cohort() -> Cohort:
         c = Cohort()
         ds = c.create_dataset('my_dataset')
-        ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
-        ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
+        ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+        ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
         return c
 
     mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
@@ -76,7 +76,8 @@ def _common(mocker, tmp_path):
 def test_status_reporter(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch, reset_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
@@ -141,7 +142,8 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -170,7 +172,8 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
 def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,

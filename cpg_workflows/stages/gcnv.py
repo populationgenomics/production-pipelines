@@ -4,18 +4,18 @@ Stages that implement GATK-gCNV.
 
 import json
 
-from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch, image_path, query_command, reference_path
+from google.api_core.exceptions import PermissionDenied
+
+from cpg_utils import Path, dataproc, to_path
+from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    get_images,
-    get_references,
-    queue_annotate_sv_jobs,
-)
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
+from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     Dataset,
@@ -26,15 +26,6 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-
-
-def _gcnv_annotated_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Callable, adds custom analysis object meta attribute
-    """
-    return {'type': 'gCNV-annotated'}
 
 
 @stage
@@ -51,7 +42,7 @@ class SetSGIDOrdering(CohortStage):
         sorted_sgids = sorted(cohort.get_sequencing_group_ids())
         with self.expected_outputs(cohort)['sgid_order'].open('w') as f_handler:
             json.dump(sorted_sgids, f_handler, indent=2)
-        return self.make_outputs(cohort)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort))
 
 
 @stage
@@ -128,7 +119,7 @@ class DeterminePloidy(CohortStage):
         ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
 
         jobs = gcnv.filter_and_determine_ploidy(
-            ploidy_priors_path=str(reference_path('gatk_sv/contig_ploidy_priors')),
+            ploidy_priors_path=reference_path('gatk_sv/contig_ploidy_priors'),
             preprocessed_intervals_path=prep_intervals['preprocessed'],
             annotated_intervals_path=prep_intervals['annotated'],
             counts_paths=ordered_read_counts,
@@ -136,6 +127,27 @@ class DeterminePloidy(CohortStage):
             output_paths=outputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=DeterminePloidy)
+class UpgradePedWithInferred(CohortStage):
+    """
+    Don't trust the metamist pedigrees, update with inferred sexes
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': self.tmp_prefix / 'pedigree.ped'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
+        ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
+        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))
+        job = gcnv.upgrade_ped_file(
+            local_ped=tmp_ped_path,
+            new_output=str(outputs['pedigree']),
+            ploidy_tar=ploidy_inputs,
+        )
+        return self.make_outputs(cohort, data=outputs, jobs=job)
 
 
 @stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
@@ -204,7 +216,7 @@ class GermlineCNVCalls(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals])
+@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred])
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -241,11 +253,11 @@ class GCNVJointSegmentation(CohortStage):
 
         expected_out = self.expected_outputs(cohort)
 
-        ped_path = cohort.write_ped_file(expected_out['pedigree'])
+        pedigree = inputs.as_dict(cohort, UpgradePedWithInferred)['pedigree']
 
         jobs = gcnv.run_joint_segmentation(
             segment_vcfs=all_vcfs,
-            pedigree=str(ped_path),
+            pedigree=str(pedigree),
             intervals=str(intervals),
             tmp_prefix=expected_out['tmp_prefix'],
             output_path=expected_out['clustered_vcf'],
@@ -336,7 +348,7 @@ class FastCombineGCNVs(CohortStage):
     required_stages=FastCombineGCNVs,
     analysis_type='cnv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=_gcnv_annotated_meta,
+    update_analysis_meta=lambda x: {'type': 'gCNV-annotated'},
 )
 class AnnotateCNV(CohortStage):
     """
@@ -382,20 +394,11 @@ class AnnotateCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-def _gcnv_srvctvre_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Callable, adds custom analysis object meta attribute
-    """
-    return {'type': 'gCNV-STRVCTCRE-annotated'}
-
-
 @stage(
     required_stages=AnnotateCNV,
     analysis_type='cnv',
     analysis_keys=['strvctvre_vcf'],
-    update_analysis_meta=_gcnv_srvctvre_meta,
+    update_analysis_meta=lambda x: {'type': 'gCNV-STRVCTCRE-annotated'},
 )
 class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -423,12 +426,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
             vcf_index=str(input_dict['annotated_vcf_index']),
         )['vcf']
 
-        strv_job.declare_resource_group(
-            output_vcf={
-                'vcf.bgz': '{root}.vcf.bgz',
-                'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            },
-        )
+        strv_job.declare_resource_group(output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         # run strvctvre
         strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
@@ -442,12 +440,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
 
-@stage(
-    required_stages=AnnotateCNVVcfWithStrvctvre,
-    analysis_type='cnv',
-    analysis_keys=['mt'],
-    update_analysis_meta=_gcnv_srvctvre_meta,
-)
+@stage(required_stages=AnnotateCNVVcfWithStrvctvre, analysis_type='cnv', analysis_keys=['mt'])
 class AnnotateCohortgCNV(CohortStage):
     """
     Rearrange the annotations across the cohort to suit Seqr
@@ -455,10 +448,7 @@ class AnnotateCohortgCNV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
         # convert temp path to str to avoid checking existence
-        return {
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'gcnv_annotated_cohort.mt',
-        }
+        return {'tmp_prefix': str(self.tmp_prefix), 'mt': self.prefix / 'gcnv_annotated_cohort.mt'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -485,11 +475,7 @@ class AnnotateCohortgCNV(CohortStage):
         if depends_on := inputs.get_jobs(cohort):
             j.depends_on(*depends_on)
 
-        return self.make_outputs(
-            cohort,
-            data=self.expected_outputs(cohort),
-            jobs=j,
-        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
 
 
 @stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
@@ -528,27 +514,18 @@ class AnnotateDatasetCNV(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),  # todo is this necessary?
+            depends_on=inputs.get_jobs(dataset),
         )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
-
-
-def _gatk_gcnv_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, str]:
-    """
-    Add meta.type to custom analysis object
-    https://github.com/populationgenomics/metamist/issues/539
-    """
-    return {'seqr-dataset-type': 'CNV'}
 
 
 @stage(
     required_stages=[AnnotateDatasetCNV],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=_gatk_gcnv_index_meta,
+    # https://github.com/populationgenomics/metamist/issues/539
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'CNV'},
 )
 class MtToEsCNV(DatasetStage):
     """
@@ -570,24 +547,19 @@ class MtToEsCNV(DatasetStage):
         """
         Uses analysis-runner's dataproc helper to run a hail query script
         """
-        if (
-            es_datasets := get_config()['workflow'].get('create_es_index_for_datasets')
-        ) and dataset.name not in es_datasets:
-            # Skipping dataset that wasn't explicitly requested to upload to ES
+
+        try:
+            es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
         dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt')
         index_name = self.expected_outputs(dataset)['index_name']
         done_flag_path = self.expected_outputs(dataset)['done_flag']
-
-        if 'elasticsearch' not in get_config():
-            raise ValueError(
-                f'"elasticsearch" section is not defined in config, cannot create '
-                f'Elasticsearch index for dataset {dataset}',
-            )
-
-        from analysis_runner import dataproc
-        from cpg_workflows.stages.seqr_loader import es_password
 
         # transformation is the same, just use the same methods file?
         script = (
@@ -595,7 +567,7 @@ class MtToEsCNV(DatasetStage):
             f'--mt-path {dataset_mt_path} '
             f'--es-index {index_name} '
             f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password()}'
+            f'--es-password {es_password_string}'
         )
         pyfiles = ['seqr-loading-pipelines/hail_scripts']
         job_name = f'{dataset.name}: create ES index'
