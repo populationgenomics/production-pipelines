@@ -112,6 +112,10 @@ def run(
             logging.info(f'Subsetting samples prior to PCA analysis. Subsetting to {sgids_keep}')
             dense_mt = dense_mt.filter_cols(hl.literal(sgids_keep).contains(dense_mt.s))
             sample_qc_ht = sample_qc_ht.filter(hl.literal(sgids_keep).contains(sample_qc_ht.s))
+            logging.info('Dense MT: ')
+            dense_mt.show()
+            logging.info('Sample QC HT: ')
+            sample_qc_ht.show()
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
