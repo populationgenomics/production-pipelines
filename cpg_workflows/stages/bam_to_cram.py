@@ -21,11 +21,7 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     """
     Path to a CRAM file. Not checking its existence here.
     """
-    path_prefix = config_retrieve(['workflow', 'long_read_cram_path_prefix'], False)
-    if not path_prefix:
-        raise ValueError('Missing long_read_path_prefix in the config')
-
-    path: Path = sequencing_group.dataset.prefix() / 'long_read' / 'cram' / path_prefix / f'{sequencing_group.id}.cram'
+    path: Path = sequencing_group.dataset.prefix() / 'pacbio' / 'cram' / f'{sequencing_group.id}.cram'
     return CramPath(
         path=path,
         index_path=path.with_suffix('.cram.crai'),
