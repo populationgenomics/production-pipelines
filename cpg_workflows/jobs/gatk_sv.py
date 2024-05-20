@@ -36,13 +36,21 @@ def rename_sv_ids(input_tmp: str, output_file: str):
                 l_split = line.split('\t')
 
                 # some entries are not key-value, so skip them
-                # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT
+                # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP;BOTHSIDES_SUPPORT;TRUTH_VID=CNV_1-46855888-56855888
                 info_dict: dict[str, str] = {}
                 for entry in l_split[7].split(';'):
                     if '=' in entry:
                         key, value = entry.split('=')
                         info_dict[key] = value
 
+                # if this matches a previous ID, use that. TRUTH_VID = Truth dataset Variant ID
+                # In this context 'truth' was previous results for consistency. Not a validation truth set
+                if info_dict.get('TRUTH_VID'):
+                    l_split[2] = info_dict['TRUTH_VID']
+                    f_out.write('\t'.join(l_split))
+                    continue
+
+                # otherwise generate a new ID
                 # strip out the "chr" prefix to abbreviate String
                 chrom = l_split[0].removeprefix('chr')
                 start = l_split[1]
