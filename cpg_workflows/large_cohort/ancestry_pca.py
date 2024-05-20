@@ -105,13 +105,8 @@ def run(
 
     # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
     sgids_remove = get_config()['large_cohort'].get('pca_samples_to_remove', [])
-    remove_relateds = get_config()['large_cohort'].get('remove_relateds', False)
 
-    # If remove_relateds is set to True, add related individuals to the list of samples to remove
-    if remove_relateds:
-        sgids_remove = list(set(sgids_remove).union(set(relateds_to_drop_ht.s.collect())))
-
-    if not sgids_remove and not remove_relateds:
+    if not sgids_remove:
         logging.info('No specific samples provided for removal. Continuing with the full cohort.')
     else:
         logging.info(f'Removing samples prior to PCA analysis. Removing {sgids_remove}')
@@ -226,6 +221,11 @@ def _run_pca_ancestry_analysis(
     if n_pcs > samples_to_use:
         logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
+
+    inlcude_relateds = get_config()['large_cohort'].get('inlcude_relateds', False)
+    if inlcude_relateds:
+        logging.info('Not removing relateds from the PCA analysis')
+        sample_to_drop_ht = None
 
     eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)
     logging.info(f'scores_ht.s: {list(scores_ht.s.collect())}')
