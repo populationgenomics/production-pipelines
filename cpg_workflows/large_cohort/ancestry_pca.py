@@ -12,7 +12,7 @@ from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
-MIN_N_SAMPLES = 2
+MIN_N_SAMPLES = 10
 
 
 def add_background(
@@ -105,17 +105,12 @@ def run(
 
     # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
     sgids_remove = get_config()['large_cohort'].get('pca_samples_to_remove', [])
-
     if not sgids_remove:
         logging.info('No specific samples provided for removal. Continuing with the full cohort.')
     else:
         logging.info(f'Removing samples prior to PCA analysis. Removing {sgids_remove}')
         dense_mt = dense_mt.filter_cols(~hl.literal(sgids_remove).contains(dense_mt.s))
         sample_qc_ht = sample_qc_ht.filter(~hl.literal(sgids_remove).contains(sample_qc_ht.s))
-        logging.info('Dense MT: ')
-        dense_mt.show()
-        logging.info('Sample QC HT: ')
-        sample_qc_ht.show()
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
