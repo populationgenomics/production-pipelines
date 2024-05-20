@@ -1,8 +1,9 @@
 """
 Stage that converts a BAM file to a CRAM file.
+Intended for use with long-read BAM files from PacBio.
 """
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
@@ -32,7 +33,7 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     )
 
 
-@stage(analysis_type='cram', analysis_keys=['cram'])
+@stage(analysis_type='pacbio_cram', analysis_keys=['cram'])
 class BamToCram(SequencingGroupStage):
     """
     Convert a BAM to a CRAM file.
@@ -54,9 +55,9 @@ class BamToCram(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
-        Using the "bam_to_cram" function implemented in the `jobs` module.
+        Using the existing `bam_to_cram` function from the `jobs` module.
         """
-        b=get_batch()
+        b = get_batch()
         input_bam = b.read_input_group(bam=str(sequencing_group.alignment_input_by_seq_type.get('genome')))
         job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
@@ -66,7 +67,7 @@ class BamToCram(SequencingGroupStage):
             requested_nthreads=1,
         )
         b.write_output(output_cram.cram, str(self.expected_outputs(sequencing_group)['cram']))
-        
+
         return self.make_outputs(
             sequencing_group,
             data=self.expected_outputs(sequencing_group),
