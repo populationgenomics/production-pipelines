@@ -40,7 +40,6 @@ from cpg_workflows.workflow import (
 )
 from metamist.graphql import gql, query
 
-
 VCF_QUERY = gql(
     """
     query MyQuery($dataset: String!) {
