@@ -167,11 +167,11 @@ class Relatedness(CohortStage):
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            scores=get_workflow().prefix / 'ancestry_NO_filter' / 'scores.ht',
-            eigenvalues=get_workflow().prefix / 'ancestry_NO_filter' / 'eigenvalues.ht',
-            loadings=get_workflow().prefix / 'ancestry_NO_filter' / 'loadings.ht',
-            inferred_pop=get_workflow().prefix / 'ancestry_NO_filter' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry_NO_filter' / 'sample_qc_ht.ht',
+            scores=get_workflow().prefix / 'ancestry_filter' / 'scores.ht',
+            eigenvalues=get_workflow().prefix / 'ancestry_filter' / 'eigenvalues.ht',
+            loadings=get_workflow().prefix / 'ancestry_filter' / 'loadings.ht',
+            inferred_pop=get_workflow().prefix / 'ancestry_filter' / 'inferred_pop.ht',
+            sample_qc_ht=get_workflow().prefix / 'ancestry_filter' / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -205,7 +205,7 @@ class Ancestry(CohortStage):
 class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.out_prefix = get_workflow().web_prefix / 'ancestry_NO_filter'
+        self.out_prefix = get_workflow().web_prefix / 'ancestry_filter'
         self.out_fname_pattern = '{scope}_pc{pci}_{pca_suffix}.{ext}'
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:

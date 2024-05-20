@@ -104,18 +104,23 @@ def run(
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
     # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
-    if get_config()['large_cohort'].get('pca_subset', False):
-        sgids_keep = get_config()['large_cohort'].get('pca_subset_sgs', [])
-        if not sgids_keep:
-            logging.info('No specific samples provided for subsetting. Continuing with the full cohort.')
-        else:
-            logging.info(f'Subsetting samples prior to PCA analysis. Subsetting to {sgids_keep}')
-            dense_mt = dense_mt.filter_cols(hl.literal(sgids_keep).contains(dense_mt.s))
-            sample_qc_ht = sample_qc_ht.filter(hl.literal(sgids_keep).contains(sample_qc_ht.s))
-            logging.info('Dense MT: ')
-            dense_mt.show()
-            logging.info('Sample QC HT: ')
-            sample_qc_ht.show()
+    sgids_remove = get_config()['large_cohort'].get('pca_samples_to_remove', [])
+    remove_relateds = get_config()['large_cohort'].get('remove_relateds', False)
+
+    # If remove_relateds is set to True, add related individuals to the list of samples to remove
+    if remove_relateds:
+        sgids_remove = list(set(sgids_remove).union(set(relateds_to_drop_ht.s.collect())))
+
+    if not sgids_remove and not remove_relateds:
+        logging.info('No specific samples provided for removal. Continuing with the full cohort.')
+    else:
+        logging.info(f'Removing samples prior to PCA analysis. Removing {sgids_remove}')
+        dense_mt = dense_mt.filter_cols(~hl.literal(sgids_remove).contains(dense_mt.s))
+        sample_qc_ht = sample_qc_ht.filter(~hl.literal(sgids_remove).contains(sample_qc_ht.s))
+        logging.info('Dense MT: ')
+        dense_mt.show()
+        logging.info('Sample QC HT: ')
+        sample_qc_ht.show()
 
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
