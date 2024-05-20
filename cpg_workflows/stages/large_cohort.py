@@ -205,7 +205,7 @@ class Ancestry(CohortStage):
 class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.out_prefix = get_workflow().web_prefix / 'ancestry'
+        self.out_prefix = get_workflow().web_prefix / 'ancestry_filter'
         self.out_fname_pattern = '{scope}_pc{pci}_{pca_suffix}.{ext}'
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
