@@ -19,7 +19,7 @@ class Dataset:
     name: str
 
 
-truth_vcf = 'gs://cpg-seqr-test/gatk_sv/d84fe17c11fba10df5749878e62065f1624b35_3461/FilterGenotypes/filtered.vcf.gz'
+truth_vcf = 'gs://cpg-seqr-test/gatk_sv/d84fe17c11fba10df5749878e62065f1624b35_3461/SpiceUpSVIDs/fresh_ids.vcf.bgz'
 eval_vcf = 'gs://cpg-seqr-test/gatk_sv/b00828c6cf20df7160f20b23537148dbd8b270_2700/FilterGenotypes/filtered.vcf.gz'
 input_dict: dict = {
     'output_prefix': 'concordance_test',
