@@ -38,6 +38,55 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from metamist.graphql import gql, query
+
+VCF_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+        project(name: $dataset) {
+            analyses(active: {eq: true}, type: {eq: "sv"}, status: {eq: COMPLETED}) {
+                output
+                timestampCompleted
+            }
+        }
+    }
+""",
+)
+
+
+@cache
+def query_for_spicy_vcf(dataset: str) -> str | None:
+    """
+    query for the most recent previous SpiceUpSVIDs VCF
+    the SpiceUpSVIDs Stage involves overwriting the generic sequential variant IDs
+    with meaningful Identifiers, so we can track the same variant across different callsets
+
+    Args:
+        dataset (str): project to query for
+
+    Returns:
+        str, the path to the latest Spicy VCF
+        or None, if there are no Spicy VCFs
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
+        query_dataset += '-test'
+
+    result = query(VCF_QUERY, variables={'dataset': query_dataset})
+    spice_by_date: dict[str, str] = {}
+    for analysis in result['project']['analyses']:
+        if analysis['output'] and analysis['output'].endswith('fresh_ids.vcf.bgz'):
+            spice_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not spice_by_date:
+        return None
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return spice_by_date[sorted(spice_by_date)[-1]]
 
 
 @cache
@@ -164,10 +213,10 @@ class MakeCohortVcf(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        This is a little bit spicy. Instead of taking a direct dependency on the
-        previous stage, we use the output hash to find all the previous batches
+        Instead of taking a direct dependency on the previous stage,
+        we use the output hash to find all the previous batches
 
-        Replacing this nasty mess with nested/fancy cohorts would be ace
+        Replacing this nasty mess with MultiCohorts would be ace
         """
         genotypebatch_hash = config_retrieve(['workflow', 'genotypebatch_hash'], default=cohort.alignment_inputs_hash())
         cohort_partial_hash = genotypebatch_hash[-10:]
@@ -264,17 +313,12 @@ class MakeCohortVcf(CohortStage):
         )
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
             job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
@@ -313,17 +357,12 @@ class FormatVcfForGatk(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
             job_size=CromwellJobSizes.SMALL,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
@@ -372,17 +411,12 @@ class JoinRawCalls(CohortStage):
             ]
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -407,31 +441,24 @@ class SVConcordance(CohortStage):
         """
         configure and queue jobs for SV concordance
         """
-        raw_calls = inputs.as_dict(cohort, JoinRawCalls)
-        format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
 
         input_dict: dict[str, Any] = {
             'output_prefix': cohort.name,
             'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'eval_vcf': format_vcf['gatk_formatted_vcf'],
-            'truth_vcf': raw_calls['joined_raw_calls_vcf'],
+            'eval_vcf': inputs.as_dict(cohort, FormatVcfForGatk)['gatk_formatted_vcf'],
+            'truth_vcf': inputs.as_dict(cohort, JoinRawCalls)['joined_raw_calls_vcf'],
         }
         input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -519,20 +546,56 @@ class FilterGenotypes(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+# check for the ID of equivalent variants in previous callset
+@stage(required_stages=FilterGenotypes)
+class UpdateStructuralVariantIDs(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'concordance_vcf': self.prefix / 'updated_ids.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'updated_ids.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # allow for no prior name/IDs
+        if spicy_vcf := query_for_spicy_vcf(cohort.analysis_dataset.name) is None:
+            get_logger().info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            return self.make_outputs(cohort, skipped=True)
+
+        expected_d = self.expected_outputs(cohort)
+
+        # run concordance between this and the previous VCF
+        input_dict: dict = {
+            'output_prefix': cohort.name,
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'eval_vcf': inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
+            'truth_vcf': spicy_vcf,
+        }
+        input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
+        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
+
+        jobs = add_gatk_sv_jobs(
+            dataset=cohort.analysis_dataset,
+            wfl_name='SVConcordance',
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
 @stage(
-    required_stages=FilterGenotypes,
+    required_stages=[UpdateStructuralVariantIDs, FilterGenotypes],
     analysis_type='sv',
     analysis_keys=['new_id_vcf'],
     update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
@@ -540,25 +603,36 @@ class FilterGenotypes(CohortStage):
 class SpiceUpSVIDs(CohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
-    This new ID is based on the call attributes itself
+    This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
+    or a new one is generated based on the call attributes itself
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
-            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
-        }
+        return {'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz', 'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # read the filtered VCF into the batch
-        input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
+
+        # if this stage hasn't been run yet, don't take any TRUTH_VID names
+        # they would be coming from the RAW/joined calls comparison, which is not meaningful
+        skip_prior_names: bool = bool(query_for_spicy_vcf(cohort.analysis_dataset.name) is None)
+
+        # read the concordance-with-prev-batch VCF
+        if skip_prior_names:
+            get_logger().info(f'No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
+        else:
+            get_logger().info(f'Using previous Spicy VCF IDs for {cohort.analysis_dataset.name}')
+            input_vcf = get_batch().read_input(
+                str(inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']),
+            )
+
         expected_output = self.expected_outputs(cohort)
         new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
 
         # update the IDs using a PythonJob
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
-        pyjob.call(rename_sv_ids, input_vcf, pyjob.output)
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, skip_prior_names)
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
