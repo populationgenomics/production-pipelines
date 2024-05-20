@@ -54,15 +54,19 @@ VCF_QUERY = gql(
 )
 
 
-def query_for_spicy_vcf(dataset: str) -> str:
+@cache
+def query_for_spicy_vcf(dataset: str) -> str | None:
     """
-    query for the most recent previous SpicyID VCF
+    query for the most recent previous SpiceUpSVIDs VCF
+    the SpiceUpSVIDs Stage involves overwriting the generic sequential variant IDs
+    with meaningful Identifiers, so we can track the same variant across different callsets
 
     Args:
         dataset (str): project to query for
 
     Returns:
         str, the path to the latest Spicy VCF
+        or None, if there are no Spicy VCFs
     """
 
     # hot swapping to a string we can freely modify
@@ -76,6 +80,9 @@ def query_for_spicy_vcf(dataset: str) -> str:
     for analysis in result['project']['analyses']:
         if analysis['output'] and analysis['output'].endswith('fresh_ids.vcf.bgz'):
             spice_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not spice_by_date:
+        return None
 
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
@@ -206,10 +213,10 @@ class MakeCohortVcf(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        This is a little bit spicy. Instead of taking a direct dependency on the
-        previous stage, we use the output hash to find all the previous batches
+        Instead of taking a direct dependency on the previous stage,
+        we use the output hash to find all the previous batches
 
-        Replacing this nasty mess with nested/fancy cohorts would be ace
+        Replacing this nasty mess with MultiCohorts would be ace
         """
         genotypebatch_hash = config_retrieve(['workflow', 'genotypebatch_hash'], default=cohort.alignment_inputs_hash())
         cohort_partial_hash = genotypebatch_hash[-10:]
@@ -559,6 +566,12 @@ class UpdateStructuralVariantIDs(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # allow for no prior name/IDs
+        if spicy_vcf := query_for_spicy_vcf(cohort.analysis_dataset.name) is None:
+            get_logger().info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            return self.make_outputs(cohort, skipped=True)
+
         expected_d = self.expected_outputs(cohort)
 
         # run concordance between this and the previous VCF
@@ -566,7 +579,7 @@ class UpdateStructuralVariantIDs(CohortStage):
             'output_prefix': cohort.name,
             'reference_dict': str(get_fasta().with_suffix('.dict')),
             'eval_vcf': inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf'],
-            'truth_vcf': query_for_spicy_vcf(cohort.analysis_dataset.name),  # previous Spicy VCF
+            'truth_vcf': spicy_vcf,
         }
         input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
@@ -582,7 +595,7 @@ class UpdateStructuralVariantIDs(CohortStage):
 
 
 @stage(
-    required_stages=UpdateStructuralVariantIDs,
+    required_stages=[UpdateStructuralVariantIDs, FilterGenotypes],
     analysis_type='sv',
     analysis_keys=['new_id_vcf'],
     update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
@@ -598,15 +611,26 @@ class SpiceUpSVIDs(CohortStage):
         return {'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz', 'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # if this stage hasn't been run yet, don't take any TRUTH_VID names
+        # they would be coming from the RAW/joined calls comparison, which is not meaningful
+        skip_prior_names: bool = bool(query_for_spicy_vcf(cohort.analysis_dataset.name) is None)
+
         # read the concordance-with-prev-batch VCF
-        input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']))
+        if skip_prior_names:
+            get_logger().info(f'No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
+        else:
+            get_logger().info(f'Using previous Spicy VCF IDs for {cohort.analysis_dataset.name}')
+            input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']))
+
         expected_output = self.expected_outputs(cohort)
         new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
 
         # update the IDs using a PythonJob
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
-        pyjob.call(rename_sv_ids, input_vcf, pyjob.output)
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, skip_prior_names)
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')

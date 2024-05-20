@@ -9,7 +9,7 @@ And don't store any substantial amount of data in memory
 from argparse import ArgumentParser
 
 
-def rename_sv_ids(input_tmp: str, output_file: str):
+def rename_sv_ids(input_tmp: str, output_file: str, skip_prior_names: bool = False):
     """
     A Python method to call as a PythonJob, edits content of the VCF
     Replaces the standard ID with a guaranteed-unique ID (hopefully)
@@ -45,7 +45,9 @@ def rename_sv_ids(input_tmp: str, output_file: str):
 
                 # if this matches a previous ID, use that. TRUTH_VID = Truth dataset Variant ID
                 # In this context 'truth' was previous results for consistency. Not a validation truth set
-                if info_dict.get('TRUTH_VID'):
+                # boolean here indicates when we should ignore TRUTH_VID
+                # this occurs when we have not yet created meaningful IDs for this cohort
+                if info_dict.get('TRUTH_VID') and not skip_prior_names:
                     l_split[2] = info_dict['TRUTH_VID']
                     f_out.write('\t'.join(l_split))
                     continue
