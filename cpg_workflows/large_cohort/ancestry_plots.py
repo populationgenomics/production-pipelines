@@ -2,6 +2,7 @@
 Plot ancestry PCA analysis results
 """
 
+import logging
 from collections import Counter
 from typing import Iterable, List
 
@@ -31,6 +32,7 @@ def run(
     eigenvalues_ht_path: Path,
     loadings_ht_path: Path,
     inferred_pop_ht_path: Path,
+    relateds_to_drop_ht_path: Path,
 ):
     """
     Generate plots in HTML format, write for each PC (of n_pcs) and
@@ -42,6 +44,16 @@ def run(
     eigenvalues_ht = hl.read_table(str(eigenvalues_ht_path))
     loadings_ht = hl.read_table(str(loadings_ht_path))
     inferred_pop_ht = hl.read_table(str(inferred_pop_ht_path))
+    relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
+
+    def filter_relateds(table, relateds_to_drop):
+        return table.filter(hl.is_defined(relateds_to_drop[table.s]), keep=False)
+
+    remove_relateds = get_config()['large_cohort'].get('remove_relateds', False)
+    if remove_relateds:
+        logging.info('Removing relateds from tables prior to plotting.')
+        tables = [sample_ht, scores_ht, inferred_pop_ht]
+        sample_ht, scores_ht, inferred_pop_ht = [filter_relateds(table, relateds_to_drop_ht) for table in tables]
 
     scores_ht = scores_ht.annotate(
         superpopulation=sample_ht[scores_ht.s].superpopulation,

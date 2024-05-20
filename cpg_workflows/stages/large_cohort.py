@@ -244,6 +244,11 @@ class AncestryPlots(CohortStage):
                     Ancestry,
                     key='inferred_pop',
                 ),
+                relateds_to_drop_ht_path=inputs.as_path(
+                    cohort,
+                    Relatedness,
+                    key='relateds_to_drop',
+                ),
             ),
             depends_on=inputs.get_jobs(cohort),
         )
