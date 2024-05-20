@@ -167,11 +167,11 @@ class Relatedness(CohortStage):
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
-            eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
-            loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
-            inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
+            scores=get_workflow().prefix / 'ancestry_filter' / 'scores.ht',
+            eigenvalues=get_workflow().prefix / 'ancestry_filter' / 'eigenvalues.ht',
+            loadings=get_workflow().prefix / 'ancestry_filter' / 'loadings.ht',
+            inferred_pop=get_workflow().prefix / 'ancestry_filter' / 'inferred_pop.ht',
+            sample_qc_ht=get_workflow().prefix / 'ancestry_filter' / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

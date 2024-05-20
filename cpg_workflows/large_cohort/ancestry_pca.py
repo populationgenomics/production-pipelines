@@ -210,6 +210,7 @@ def _run_pca_ancestry_analysis(
             f'Removing the {samples_to_drop} relateds from the list of samples used '
             f'for PCA, got remaining {samples_to_use} samples',
         )
+        logging.info(f'Samples to drop: {sample_to_drop_ht.show()}')
 
     if samples_to_use < MIN_N_SAMPLES:
         raise ValueError(
