@@ -33,7 +33,7 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     )
 
 
-@stage(analysis_type='pacbio_cram', analysis_keys=['cram'])
+@stage(analysis_type=config_retrieve(['workflow', 'bam_to_cram_analysis_type'], 'cram'), analysis_keys=['cram'])
 class BamToCram(SequencingGroupStage):
     """
     Convert a BAM to a CRAM file.
