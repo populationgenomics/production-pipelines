@@ -222,8 +222,8 @@ def _run_pca_ancestry_analysis(
         logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
 
-    inlcude_relateds = get_config()['large_cohort'].get('inlcude_relateds', False)
-    if inlcude_relateds:
+    include_relateds = get_config()['large_cohort'].get('include_relateds', False)
+    if include_relateds:
         logging.info('Not removing relateds from the PCA analysis')
         sample_to_drop_ht = None
 
