@@ -5,7 +5,7 @@ Stage that summarises QC.
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
@@ -75,7 +75,7 @@ class JointVcfHappy(SequencingGroupStage):
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sequencing_group.participant_id not in get_config().get('validation', {}).get('sample_map', {}):
+        if sequencing_group.participant_id not in config_retrieve(['validation', 'sample_map'], {}):
             return None
 
         return (
@@ -110,25 +110,7 @@ class JointVcfHappy(SequencingGroupStage):
             return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
-    import json
-
-    from cloudpathlib import CloudPath
-
-    with CloudPath(output_path).open() as f:
-        d = json.load(f)
-    return {'multiqc': d['report_general_stats_data']}
-
-
-@stage(
-    required_stages=[
-        JointVcfQC,
-        JointVcfHappy,
-    ],
-    analysis_type='qc',
-    analysis_keys=['json'],
-    update_analysis_meta=_update_meta,
-)
+@stage(required_stages=[JointVcfQC, JointVcfHappy], analysis_type='qc', analysis_keys=['json'])
 class JointVcfMultiQC(CohortStage):
     """
     Run MultiQC to summarise all GVCF QC.
@@ -138,8 +120,9 @@ class JointVcfMultiQC(CohortStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
+
         h = get_workflow().output_version
         return {
             'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / h / 'multiqc.html',
