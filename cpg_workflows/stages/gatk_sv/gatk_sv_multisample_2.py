@@ -622,7 +622,9 @@ class SpiceUpSVIDs(CohortStage):
             input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
         else:
             get_logger().info(f'Using previous Spicy VCF IDs for {cohort.analysis_dataset.name}')
-            input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']))
+            input_vcf = get_batch().read_input(
+                str(inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']),
+            )
 
         expected_output = self.expected_outputs(cohort)
         new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
