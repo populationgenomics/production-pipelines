@@ -568,7 +568,7 @@ class UpdateStructuralVariantIDs(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         # allow for no prior name/IDs
-        if spicy_vcf := query_for_spicy_vcf(cohort.analysis_dataset.name) is None:
+        if not (spicy_vcf := query_for_spicy_vcf(cohort.analysis_dataset.name)):
             get_logger().info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
             return self.make_outputs(cohort, skipped=True)
 
