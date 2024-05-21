@@ -201,7 +201,7 @@ class Ancestry(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=[SampleQC, Ancestry])
+@stage(required_stages=[SampleQC, Ancestry, Relatedness])
 class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

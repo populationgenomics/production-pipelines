@@ -50,7 +50,7 @@ pca_samples_to_remove = []
 # Set 'include_relateds' to true to include related individuals in the PCA analysis.
 # By default, 'include_relateds' is set to false, meaning that related individuals are not included in the PCA analysis but are projected back into the PC space.
 # This can be useful for discerning outliers in PC plots.
-include_relateds = false
+remove_relateds = false
 
 # Section that specifies background samples for PCA analysis.
 # `datasets` must be a list paths to matrix tables or VDS, and
