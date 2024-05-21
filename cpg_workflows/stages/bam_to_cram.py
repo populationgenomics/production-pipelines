@@ -63,6 +63,7 @@ class BamToCram(SequencingGroupStage):
             requested_nthreads=1,
         )
         b.write_output(output_cram.cram, str(self.expected_outputs(sequencing_group)['cram']))
+        b.write_output(output_cram.crai, str(self.expected_outputs(sequencing_group)['crai']))
 
         return self.make_outputs(
             sequencing_group,
