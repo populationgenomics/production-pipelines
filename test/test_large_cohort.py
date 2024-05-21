@@ -189,6 +189,7 @@ class TestAllLargeCohortMethods:
             eigenvalues_ht_path=eigenvalues_ht_path,
             loadings_ht_path=loadings_ht_path,
             inferred_pop_ht_path=inferred_pop_ht_path,
+            relateds_to_drop_ht_path=relateds_to_drop_ht_path,
         )
 
         siteonly_vcf_path = res_pref / 'siteonly.vcf.bgz'
