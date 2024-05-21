@@ -46,7 +46,7 @@ class BamToCram(SequencingGroupStage):
 
         return {
             'cram': cram_path.path,
-            'crai': cram_path.index_path,
+            'cram.crai': cram_path.index_path,
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -62,8 +62,7 @@ class BamToCram(SequencingGroupStage):
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
         )
-        b.write_output(output_cram.cram, str(self.expected_outputs(sequencing_group)['cram']))
-        b.write_output(output_cram.crai, str(self.expected_outputs(sequencing_group)['crai']))
+        b.write_output(output_cram, str(self.expected_outputs(sequencing_group)))
 
         return self.make_outputs(
             sequencing_group,
