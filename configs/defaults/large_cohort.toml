@@ -46,10 +46,9 @@ pca_plot_name = 'hgdp_1kg_sites'
 # Provide a list of sample IDs in 'pca_samples_to_remove'.
 # If 'pca_samples_to_remove' is empty or not provided, the PCA analysis will include all samples.
 pca_samples_to_remove = []
-# Specify whether to include related individuals in the PCA analysis.
-# Set 'include_relateds' to true to include related individuals in the PCA analysis.
-# By default, 'include_relateds' is set to false, meaning that related individuals are not included in the PCA analysis but are projected back into the PC space.
-# This can be useful for discerning outliers in PC plots.
+# Specify whether to remove related individuals prior to plotting.
+# Set 'remove_relateds' to true to remove related individuals from the tables before generating plots.
+# By default, 'remove_relateds' is set to false, meaning that related individuals are included in the tables used for plotting.
 remove_relateds = false
 
 # Section that specifies background samples for PCA analysis.
