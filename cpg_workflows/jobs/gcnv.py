@@ -420,7 +420,7 @@ def joint_segment_vcfs(
     segment_vcfs: list[ResourceFile],
     pedigree: ResourceFile,
     reference: ResourceGroup,
-    intervals: ResourceFile,  # hmm,
+    intervals: ResourceFile,
     title: str,
     job_attrs: dict,
 ) -> tuple[Job, ResourceGroup]:
@@ -475,9 +475,6 @@ def run_joint_segmentation(
     Depending on the config setting workflow.num_samples_per_scatter_block
     this may be conducted in hierarchical 2-step, with intermediate merges
     being conducted, then a merge of those intermediates
-
-    Returns:
-
     """
 
     if can_reuse(output_path):
