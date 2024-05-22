@@ -748,7 +748,7 @@ class SpiceUpSVIDs(CohortStage):
         return self.make_outputs(cohort, data=expected_output, jobs=[pyjob, bcftools_job])
 
 
-@stage(required_stages=AnnotateVcfWithStrvctvre)
+@stage(required_stages=SpiceUpSVIDs)
 class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
@@ -769,7 +769,7 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = inputs.as_path(target=cohort, stage=SpiceUpSVIDs, key='new_id_vcf')
         checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
 
         job = annotate_cohort_jobs_sv(
