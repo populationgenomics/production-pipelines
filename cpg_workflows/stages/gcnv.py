@@ -248,6 +248,10 @@ class TrimOffSexChromosomes(CohortStage):
                     # find the SGID
                     sgid = line.strip()
 
+                    # could be an empty newline
+                    if not sgid:
+                        continue
+
                     # log an expected output
                     return_dict[sgid] = self.prefix / f'{sgid}.segments.vcf.bgz'
 
