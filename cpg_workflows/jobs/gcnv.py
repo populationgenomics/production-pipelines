@@ -17,17 +17,16 @@ from cpg_workflows.scripts import upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
 
 
-def upgrade_ped_file(local_ped: ResourceFile, new_output: str, ploidy_tar: str):
+def upgrade_ped_file(local_ped: ResourceFile, new_output: str, aneuploidies: str, ploidy_tar: str):
     """
     Update the default Pedigree with the inferred ploidy information
+    update a ped file, and
 
     Args:
         local_ped ():
         new_output ():
+        aneuploidies (str): where to write identified aneuploidies
         ploidy_tar ():
-
-    Returns:
-
     """
 
     j = get_batch().new_bash_job('Upgrade PED file with inferred Ploidy')
@@ -36,18 +35,15 @@ def upgrade_ped_file(local_ped: ResourceFile, new_output: str, ploidy_tar: str):
     # path to the python script
     script_path = upgrade_ped_with_inferred.__file__.removeprefix('/production-pipelines')
     j.command(f'tar -xf {ploidy_tar} -C .')  # creates the folder ploidy-calls
-    j.command(f'python3 {script_path} {local_ped} {j.output} ploidy-calls')
+    j.command(f'python3 {script_path} {local_ped} {j.output} {j.aneuploidies} ploidy-calls')
     get_batch().write_output(j.output, new_output)
+    get_batch().write_output(j.aneuploidies, aneuploidies)
     return j
 
 
 def prepare_intervals(job_attrs: dict[str, str], output_paths: dict[str, Path]) -> Job:
     j = get_batch().new_job(
-        'Prepare intervals',
-        job_attrs
-        | {
-            'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
-        },
+        'Prepare intervals', job_attrs | {'tool': 'gatk PreprocessIntervals/AnnotateIntervals'},
     )
     j.image(image_path('gatk_gcnv'))
 

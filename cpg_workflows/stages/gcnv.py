@@ -15,7 +15,7 @@ from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_logger, ExpectedResultT
 from cpg_workflows.workflow import (
     CohortStage,
     Dataset,
@@ -136,7 +136,11 @@ class UpgradePedWithInferred(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
-        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': self.tmp_prefix / 'pedigree.ped'}
+        return {
+            'aneuploidy_samples': self.prefix / 'aneuploidies.txt',
+            'pedigree': self.prefix / 'inferred_sex_pedigree.ped',
+            'tmp_ped': self.tmp_prefix / 'pedigree.ped',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
@@ -145,6 +149,7 @@ class UpgradePedWithInferred(CohortStage):
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
             new_output=str(outputs['pedigree']),
+            aneuploidies=str(outputs['aneuploidy_samples']),
             ploidy_tar=ploidy_inputs,
         )
         return self.make_outputs(cohort, data=outputs, jobs=job)
@@ -214,6 +219,43 @@ class GermlineCNVCalls(SequencingGroupStage):
             output_prefix=str(self.prefix / seqgroup.id),
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=UpgradePedWithInferred)
+class TrimOffSexChromosomes(CohortStage):
+    """
+    Trim off sex chromosomes for gCNV VCFs where the SGID is detected to be Aneuploid
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+
+        # returning an empty dictionary might cause the pipeline setup to break
+        return_dict = {'placeholder': str(self.prefix / 'placeholder.txt')}
+
+        # load up the file of aneuploidies - I don't think the pipeline supports passing an input directly here
+        # so.. I'm making a similar path and manually string-replacing it
+        aneuploidy_file = str(self.prefix / 'aneuploidies.txt').replace(self.name, 'UpgradePedWithInferred')
+
+        # can I walrus here?? I can!
+        if (aneuploidy_path := to_path(aneuploidy_file)).exists():
+
+            # read the identified aneuploidy samples file
+            with aneuploidy_path.open() as handle:
+
+                # iterate over the lines
+                for line in handle:
+
+                    # find the SGID
+                    sgid = line.strip()
+
+                    # log an expected output
+                    return_dict[sgid] = self.prefix / f'{sgid}.segments.vcf.bgz'
+
+        return return_dict
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        ...
+    # do all the things
 
 
 @stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred])
