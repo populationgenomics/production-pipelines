@@ -527,6 +527,34 @@ def run_joint_segmentation(
     return jobs
 
 
+def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict[str, str]) -> Job:
+    """
+    Create a BCFtools job to trim chrX and chrY from this VCF
+
+    Args:
+        sgid (str): the SG ID, used in naming the job
+        sg_vcf (str): the path to the input VCF
+        no_xy_vcf (str): the path to the output VCF
+        job_attrs ():
+
+    Returns:
+        the job which generates the output file
+    """
+    job = get_batch().new_bash_job(f'remove sex chromosomes from {sgid}', job_attrs | {'tool': 'bcftools'})
+    job.image(image_path('bcftools'))
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+    localised_vcf = get_batch().read_input(sg_vcf)
+    job.command(f"""
+    bcftools view {localised_vcf} \
+    chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
+    chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 \
+    | bgzip -c > {job.output['vcf.bgz']}
+    tabix {job.output['vcf.bgz']}
+    """)
+    get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
+    return job
+
+
 def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path):
     """
     This job will run a fast simple merge on per-SGID call files
