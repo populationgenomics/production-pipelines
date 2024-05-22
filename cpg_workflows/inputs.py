@@ -37,7 +37,7 @@ def create_cohort() -> Cohort:
         raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
 
     if custom_cohort_ids:
-        # TODO: Handle more than one cohort
+        # TODO: Handle more than one cohort here
         if len(custom_cohort_ids) > 1:
             raise ValueError('Only one cohort is supported')
         sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
