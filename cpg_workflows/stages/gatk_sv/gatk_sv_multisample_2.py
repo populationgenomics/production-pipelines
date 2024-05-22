@@ -4,6 +4,7 @@ results of the per-batch workflows into a joint-call across the entire cohort
 """
 
 from datetime import datetime
+from functools import cache
 from os.path import join
 from typing import Any
 
@@ -37,16 +38,75 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from metamist.graphql import gql, query
 
-# create the file path outside Stages, so that
-# we can pass this to the metadata update function
-RUN_DATETIME = datetime.now().strftime('%Y-%m-%d')
-EXCLUSION_FILE = join(
-    get_config()['storage']['default']['default'],
-    'gatk_sv',
-    RUN_DATETIME,
-    'combined_exclusion_list.txt',
+VCF_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+        project(name: $dataset) {
+            analyses(active: {eq: true}, type: {eq: "sv"}, status: {eq: COMPLETED}) {
+                output
+                timestampCompleted
+            }
+        }
+    }
+""",
 )
+
+
+@cache
+def query_for_spicy_vcf(dataset: str) -> str | None:
+    """
+    query for the most recent previous SpiceUpSVIDs VCF
+    the SpiceUpSVIDs Stage involves overwriting the generic sequential variant IDs
+    with meaningful Identifiers, so we can track the same variant across different callsets
+
+    Args:
+        dataset (str): project to query for
+
+    Returns:
+        str, the path to the latest Spicy VCF
+        or None, if there are no Spicy VCFs
+    """
+
+    # hot swapping to a string we can freely modify
+    query_dataset = dataset
+
+    if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
+        query_dataset += '-test'
+
+    result = query(VCF_QUERY, variables={'dataset': query_dataset})
+    spice_by_date: dict[str, str] = {}
+    for analysis in result['project']['analyses']:
+        if analysis['output'] and analysis['output'].endswith('fresh_ids.vcf.bgz'):
+            spice_by_date[analysis['timestampCompleted']] = analysis['output']
+
+    if not spice_by_date:
+        return None
+
+    # return the latest, determined by a sort on timestamp
+    # 2023-10-10... > 2023-10-09..., so sort on strings
+    return spice_by_date[sorted(spice_by_date)[-1]]
+
+
+@cache
+def get_exclusion_filename() -> str:
+    """
+    generate one exclusion filename for this run
+    this is unusual - doing this outside of individual stages so that this file path is available
+    to both the stages and the metamist wrappers
+    the contents of this file will be used to remove SG IDs from the analysis registration if they
+    were filtered from the joint-call as outliers in any metric
+    Returns:
+        str: the exclusion filename
+    """
+    run_datetime = datetime.now().strftime('%Y-%m-%d')
+    return join(
+        get_config()['storage']['default']['default'],
+        'gatk_sv',
+        run_datetime,
+        'combined_exclusion_list.txt',
+    )
 
 
 def _exclusion_callable(output_path: str) -> dict[str, set[str]]:
@@ -81,7 +141,7 @@ class CombineExclusionLists(CohortStage):
         We need this quick stage to run each time
         """
 
-        return {'exclusion_list': to_path(EXCLUSION_FILE)}
+        return {'exclusion_list': to_path(get_exclusion_filename())}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -153,10 +213,10 @@ class MakeCohortVcf(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        This is a little bit spicy. Instead of taking a direct dependency on the
-        previous stage, we use the output hash to find all the previous batches
+        Instead of taking a direct dependency on the previous stage,
+        we use the output hash to find all the previous batches
 
-        Replacing this nasty mess with nested/fancy cohorts would be ace
+        Replacing this nasty mess with MultiCohorts would be ace
         """
         genotypebatch_hash = config_retrieve(['workflow', 'genotypebatch_hash'], default=cohort.alignment_inputs_hash())
         cohort_partial_hash = genotypebatch_hash[-10:]
@@ -253,17 +313,12 @@ class MakeCohortVcf(CohortStage):
         )
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
             job_size=CromwellJobSizes.MEDIUM,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
@@ -302,17 +357,12 @@ class FormatVcfForGatk(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
             job_size=CromwellJobSizes.SMALL,
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
@@ -361,17 +411,12 @@ class JoinRawCalls(CohortStage):
             ]
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -396,31 +441,24 @@ class SVConcordance(CohortStage):
         """
         configure and queue jobs for SV concordance
         """
-        raw_calls = inputs.as_dict(cohort, JoinRawCalls)
-        format_vcf = inputs.as_dict(cohort, FormatVcfForGatk)
 
         input_dict: dict[str, Any] = {
             'output_prefix': cohort.name,
             'reference_dict': str(get_fasta().with_suffix('.dict')),
-            'eval_vcf': format_vcf['gatk_formatted_vcf'],
-            'truth_vcf': raw_calls['joined_raw_calls_vcf'],
+            'eval_vcf': inputs.as_dict(cohort, FormatVcfForGatk)['gatk_formatted_vcf'],
+            'truth_vcf': inputs.as_dict(cohort, JoinRawCalls)['joined_raw_calls_vcf'],
         }
         input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {
-            'stage': self.name.lower(),
-            AR_GUID_NAME: try_get_ar_guid(),
-        }
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
@@ -508,65 +546,68 @@ class FilterGenotypes(CohortStage):
 
         expected_d = self.expected_outputs(cohort)
 
-        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-
         jobs = add_gatk_sv_jobs(
             dataset=cohort.analysis_dataset,
             wfl_name=self.name,
             input_dict=input_dict,
             expected_out_dict=expected_d,
-            labels=billing_labels,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
+        )
+        return self.make_outputs(cohort, data=expected_d, jobs=jobs)
+
+
+# check for the ID of equivalent variants in previous callset
+@stage(required_stages=FilterGenotypes)
+class UpdateStructuralVariantIDs(CohortStage):
+    """
+    Runs SVConcordance between the results of this callset and the results of a previous callset
+    This causes the Variant IDs of a matching variant to be updated to the previous callset's ID
+    Consistency of Variant ID is crucial to Seqr/AIP identifying the same variant across different callsets
+    By default GATK-SV creates an auto-incrementing ID, rather than one based on variant attributes
+    If a new call is added at a chromosome start for any sample, the ID for all variants on the chromosome
+    will be shifted up, meaning that Seqr labels/any other process linked to the ID will be incorrect
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'concordance_vcf': self.prefix / 'updated_ids.vcf.gz',
+            'concordance_vcf_index': self.prefix / 'updated_ids.vcf.gz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # allow for no prior name/IDs
+        if not (spicy_vcf := query_for_spicy_vcf(cohort.analysis_dataset.name)):
+            get_logger().info('No previous Spicy VCF found for {cohort.analysis_dataset.name}')
+            return self.make_outputs(cohort, skipped=True)
+
+        expected_d = self.expected_outputs(cohort)
+
+        # run concordance between this and the previous VCF
+        input_dict: dict = {
+            'output_prefix': cohort.name,
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'eval_vcf': inputs.as_path(cohort, FilterGenotypes, key='filtered_vcf'),
+            'truth_vcf': spicy_vcf,
+        }
+        input_dict |= get_images(['gatk_docker', 'sv_base_mini_docker'])
+        input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
+
+        jobs = add_gatk_sv_jobs(
+            dataset=cohort.analysis_dataset,
+            wfl_name='SVConcordance',
+            input_dict=input_dict,
+            expected_out_dict=expected_d,
+            labels={'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()},
         )
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
 @stage(
-    required_stages=FilterGenotypes,
-    analysis_type='sv',
-    analysis_keys=['new_id_vcf'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
-)
-class SpiceUpSVIDs(CohortStage):
-    """
-    Overwrites the GATK-SV assigned IDs with a meaningful ID
-    This new ID is based on the call attributes itself
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
-            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # read the filtered VCF into the batch
-        input_vcf = get_batch().read_input(str(inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']))
-        expected_output = self.expected_outputs(cohort)
-        new_vcf = str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz')
-
-        # update the IDs using a PythonJob
-        pyjob = get_batch().new_python_job('rename_sv_ids')
-        pyjob.storage('10Gi')
-        pyjob.call(rename_sv_ids, input_vcf, pyjob.output)
-
-        # then compress & run tabix on that plain text result
-        bcftools_job = get_batch().new_job('bgzip and tabix')
-        bcftools_job.image(image_path('bcftools'))
-        bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-        bcftools_job.command(f'bcftools view {pyjob.output} | bgzip -c > {bcftools_job.output["vcf.bgz"]}')  # type: ignore
-        bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
-
-        # get the output root to write to
-        get_batch().write_output(bcftools_job.output, new_vcf)
-
-        return self.make_outputs(cohort, data=expected_output, jobs=[pyjob, bcftools_job])
-
-
-@stage(
-    required_stages=SpiceUpSVIDs,
+    required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
     analysis_type='sv',
     analysis_keys=['annotated_vcf'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class AnnotateVcf(CohortStage):
     """
@@ -581,6 +622,11 @@ class AnnotateVcf(CohortStage):
       all samples, and samples of specific sex, as well as specific subpopulations.
     * Allele Frequency annotation with external callset - annotate SVs with the allele
       frequencies of their overlapping SVs in another callset, e.g. gnomad SV callset.
+
+    Note: the annotation stage is stupid, and re-orders the VCF by ID instead of position
+    This means that we run SVConcordance before this stage, to ensure that the IDs are correct
+    But we don't apply those IDs, in case multiple variants map to the same ID, which would
+    cause the variants to become unsorted when ordered by ID.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict:
@@ -594,15 +640,18 @@ class AnnotateVcf(CohortStage):
         configure and queue jobs for SV annotation
         passing the VCF Index has become implicit, which may be a problem for us
         """
+
+        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
+        if query_for_spicy_vcf(cohort.analysis_dataset.name):
+            get_logger().info(f'Variant IDs were updated for {cohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(cohort, UpdateStructuralVariantIDs)['concordance_vcf']
+        else:
+            get_logger().info(f'No Spicy VCF was found, default IDs for {cohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(cohort, FilterGenotypes)['filtered_vcf']
+
         expected_out = self.expected_outputs(cohort)
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-        job_or_none = queue_annotate_sv_jobs(
-            cohort=cohort,
-            cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(cohort, SpiceUpSVIDs)['new_id_vcf'],
-            outputs=expected_out,
-            labels=billing_labels,
-        )
+        job_or_none = queue_annotate_sv_jobs(cohort, self.prefix, input_vcf, expected_out, billing_labels)
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
@@ -650,7 +699,56 @@ class AnnotateVcfWithStrvctvre(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=strv_job)
 
 
-@stage(required_stages=AnnotateVcfWithStrvctvre)
+# insert spicy-naming here instead
+
+
+@stage(
+    required_stages=AnnotateVcfWithStrvctvre,
+    analysis_type='sv',
+    analysis_keys=['new_id_vcf'],
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
+)
+class SpiceUpSVIDs(CohortStage):
+    """
+    Overwrites the GATK-SV assigned IDs with a meaningful ID
+    This new ID is either taken from an equivalent variant ID in the previous callset (found through SVConcordance)
+    or a new one is generated based on the call attributes itself
+    A boolean flag is used to switch behaviour, based on the truthiness of the return value of query_for_spicy_vcf
+    If a VCF is returned, True, which also means a VCF should have been used in UpdateStructuralVariantIDs
+    If the return is None, False, and the IDs will be generated from the call attributes alone
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
+            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        input_vcf = get_batch().read_input(
+            str(inputs.as_path(target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')),
+        )
+        expected_output = self.expected_outputs(cohort)
+
+        # update the IDs using a PythonJob
+        pyjob = get_batch().new_python_job('rename_sv_ids')
+        pyjob.storage('10Gi')
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, bool(query_for_spicy_vcf(cohort.analysis_dataset.name)))
+
+        # then compress & run tabix on that plain text result
+        bcftools_job = get_batch().new_job('bgzip and tabix')
+        bcftools_job.image(image_path('bcftools'))
+        bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        bcftools_job.command(f'bcftools view {pyjob.output} | bgzip -c > {bcftools_job.output["vcf.bgz"]}')
+        bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
+
+        # get the output root to write to
+        get_batch().write_output(bcftools_job.output, str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(cohort, data=expected_output, jobs=[pyjob, bcftools_job])
+
+
+@stage(required_stages=SpiceUpSVIDs)
 class AnnotateCohortSv(CohortStage):
     """
     What do we want?! SV Data in Seqr!
@@ -671,7 +769,7 @@ class AnnotateCohortSv(CohortStage):
         queue job(s) to rearrange the annotations prior to Seqr transformation
         """
 
-        vcf_path = inputs.as_path(target=cohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = inputs.as_path(target=cohort, stage=SpiceUpSVIDs, key='new_id_vcf')
         checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
 
         job = annotate_cohort_jobs_sv(
@@ -689,7 +787,7 @@ class AnnotateCohortSv(CohortStage):
     required_stages=[CombineExclusionLists, AnnotateCohortSv],
     analysis_type='sv',
     analysis_keys=['mt'],
-    update_analysis_meta=lambda x: {'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'remove_sgids': get_exclusion_filename()},
 )
 class AnnotateDatasetSv(DatasetStage):
     """
@@ -739,7 +837,7 @@ class AnnotateDatasetSv(DatasetStage):
     required_stages=[AnnotateDatasetSv],
     analysis_type='es-index',  # specific type of es index
     analysis_keys=['index_name'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV', 'remove_sgids': EXCLUSION_FILE},
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV', 'remove_sgids': get_exclusion_filename()},
 )
 class MtToEsSv(DatasetStage):
     """

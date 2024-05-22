@@ -38,7 +38,7 @@ input_datasets = [
     'broad-rgp',
     'acute-care',
 ]
-only_sgs = ['CPG1', 'CPG2', 'CPG3', 'CPG4', 'CPG5']
+only_sgs = ['CPGAA', 'CPGBB', 'CPGCC', 'CPGDD', 'CPGEE']
 ```
 
 There's a few considerations when building this list of SGs:

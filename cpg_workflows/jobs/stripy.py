@@ -72,6 +72,7 @@ def stripy(
     # quick an dirty edit of the default config on the fly and cat to the job log.
     sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' config.json \
         | sed 's/"output_json": false/"output_json": true/' \
+        | sed 's/]/], "verbose": true/' \
         > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
