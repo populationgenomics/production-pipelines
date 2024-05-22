@@ -586,7 +586,7 @@ class AnnotateDatasetCNV(DatasetStage):
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
-            job_attrs=self.get_job_attrs(dataset)
+            job_attrs=self.get_job_attrs(dataset),
         )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

@@ -1,13 +1,14 @@
 """
 Jobs that implement GATK-gCNV.
 """
+
 from collections.abc import Iterable
 
 from hailtop.batch.job import BashJob, Job
-from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup, Resource
+from hailtop.batch.resource import JobResourceFile, Resource, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path, config_retrieve
+from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_command
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
@@ -394,7 +395,7 @@ def postprocess_calls(
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
         cat {j.qc_file}
-        """
+        """,
         )
         get_batch().write_output(j.qc_file, qc_file)
 
@@ -668,7 +669,7 @@ def annotate_dataset_jobs_cnv(
     sgids: list[str],
     out_mt_path: Path,
     tmp_prefix: Path,
-    job_attrs: dict | None = None
+    job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets

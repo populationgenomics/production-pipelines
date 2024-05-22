@@ -15,7 +15,7 @@ def annotate_cohort_jobs_sv(
     vcf_path: Path,
     out_mt_path: Path,
     checkpoint_prefix: Path,
-    job_attrs: dict | None = None
+    job_attrs: dict | None = None,
 ) -> Job:
     """
     Annotate cohort for seqr loader, SV style.
