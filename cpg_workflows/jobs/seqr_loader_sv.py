@@ -15,8 +15,7 @@ def annotate_cohort_jobs_sv(
     vcf_path: Path,
     out_mt_path: Path,
     checkpoint_prefix: Path,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
+    job_attrs: dict | None = None
 ) -> Job:
     """
     Annotate cohort for seqr loader, SV style.
@@ -35,8 +34,6 @@ def annotate_cohort_jobs_sv(
             setup_gcp=True,
         ),
     )
-    if depends_on:
-        j.depends_on(*depends_on)
     return j
 
 
@@ -46,7 +43,6 @@ def annotate_dataset_jobs_sv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
     exclusion_file: str | None = None,
 ) -> list[Job]:
     """
@@ -82,8 +78,6 @@ def annotate_dataset_jobs_sv(
             setup_gcp=True,
         ),
     )
-    if depends_on:
-        subset_j.depends_on(*depends_on)
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))

@@ -1,11 +1,10 @@
 """
 Jobs that implement GATK-gCNV.
 """
-
 from collections.abc import Iterable
 
-from hailtop.batch.job import Job
-from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
+from hailtop.batch.job import BashJob, Job
+from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup, Resource
 
 from cpg_utils import Path
 from cpg_utils.config import get_config, image_path, config_retrieve
@@ -306,13 +305,7 @@ def postprocess_calls(
     if any([clustered_vcf, intervals_vcf, qc_file]):
         assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
 
-    j = get_batch().new_job(
-        'Postprocess gCNV calls',
-        job_attrs
-        | {
-            'tool': 'gatk PostprocessGermlineCNVCalls',
-        },
-    )
+    j = get_batch().new_job('Postprocess gCNV calls', job_attrs | {'tool': 'gatk PostprocessGermlineCNVCalls'})
     j.image(image_path('gatk_gcnv'))
 
     # set highmem resources for this job
@@ -352,6 +345,7 @@ def postprocess_calls(
 
     extra_args = ''
     if clustered_vcf:
+        assert isinstance(intervals_vcf, str)
         local_clusters = get_batch().read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi').vcf
         local_intervals = get_batch().read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi').vcf
         extra_args += f"""--clustered-breakpoints {local_clusters} \\
@@ -375,20 +369,16 @@ def postprocess_calls(
     """,
     )
 
-    # index the output VCFs - GATK does this already?
-    # or maybe it only generates indexes when the clustered input is provided
-    j.command(
-        f"""
-    tabix -f {j.output['intervals.vcf.gz']}
-    tabix -f {j.output['segments.vcf.gz']}
-    """,
-    )
+    # index the output VCFs
+    j.command(f'tabix -f {j.output["intervals.vcf.gz"]}')  # type: ignore
+    j.command(f'tabix -f {j.output["segments.vcf.gz"]}')  # type: ignore
 
     if clustered_vcf:
+        assert isinstance(qc_file, str)
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
-        # do some additional stuff to determine pass/fail
-        # flake8: noqa
+
+        # do some additional QC to determine pass/fail
         j.command(
             f"""
         #use awk instead of grep - grep returning no lines causes a pipefailure
@@ -420,7 +410,7 @@ def joint_segment_vcfs(
     intervals: ResourceFile,
     title: str,
     job_attrs: dict,
-) -> tuple[Job, ResourceGroup]:
+) -> tuple[BashJob, Resource]:
     """
     This job will run the joint segmentation step of the gCNV workflow
     Takes individual Segment VCFs and merges them into a single VCF
@@ -431,7 +421,7 @@ def joint_segment_vcfs(
     Returns:
         the job that does the work, and the resulting resource group of VCF & index
     """
-    job = get_batch().new_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
+    job = get_batch().new_bash_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
     job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     job.image(image_path('gatk_gcnv'))
 
@@ -465,7 +455,7 @@ def run_joint_segmentation(
     tmp_prefix: str,
     output_path: Path,
     job_attrs: dict[str, str] | None = None,
-) -> list[Job]:
+) -> list[BashJob]:
     """
     This job will run the joint segmentation step of the gCNV workflow
     Takes individual Segment VCFs and merges them into a single VCF
@@ -504,7 +494,7 @@ def run_joint_segmentation(
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
                 title=f'sub-chunk_{subchunk_index}',
             )
-            chunked_vcfs.append(vcf_group['vcf.gz'])
+            chunked_vcfs.append(vcf_group['vcf.gz'])  # type: ignore
             get_batch().write_output(vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}')
             jobs.append(job)
 
@@ -528,7 +518,7 @@ def run_joint_segmentation(
     return jobs
 
 
-def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict[str, str]) -> Job:
+def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict[str, str]) -> BashJob:
     """
     Create a BCFtools job to trim chrX and chrY from this VCF
 
@@ -545,15 +535,9 @@ def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict
     job.image(image_path('bcftools'))
     job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
     localised_vcf = get_batch().read_input(sg_vcf)
-    job.command(
-        f"""
-    bcftools view {localised_vcf} \
-    chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
-    chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 \
-    | bgzip -c > {job.output['vcf.bgz']}
-    tabix {job.output['vcf.bgz']}
-    """
-    )
+    autosomes = ' '.join([f'chr{i}' for i in range(1, 23)])
+    job.command(f'bcftools view {localised_vcf} {autosomes} | bgzip -c > {job.output["vcf.bgz"]}')  # type: ignore
+    job.command(f'tabix {job.output["vcf.bgz"]}')  # type: ignore
     get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
     return job
 
@@ -585,12 +569,7 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     batch_vcfs = []
     for each_vcf in sg_vcfs:
         batch_vcfs.append(
-            get_batch().read_input_group(
-                **{
-                    'vcf.gz': each_vcf,
-                    'vcf.gz.tbi': f'{each_vcf}.tbi',
-                },
-            )['vcf.gz'],
+            get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz'],
         )
 
     # option breakdown:
@@ -613,8 +592,8 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')
-    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')
+    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')  # type: ignore
+    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')  # type: ignore
 
     # dependency setting between jobs should be implicit due to temp file passing
 
@@ -689,8 +668,7 @@ def annotate_dataset_jobs_cnv(
     sgids: list[str],
     out_mt_path: Path,
     tmp_prefix: Path,
-    job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
+    job_attrs: dict | None = None
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -717,8 +695,6 @@ def annotate_dataset_jobs_cnv(
                 setup_gcp=True,
             ),
         )
-        if depends_on:
-            subset_j.depends_on(*depends_on)
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))
@@ -733,4 +709,6 @@ def annotate_dataset_jobs_cnv(
     )
     if subset_j:
         annotate_j.depends_on(subset_j)
-    return [subset_j, annotate_j]
+        return [subset_j, annotate_j]
+    else:
+        return [annotate_j]

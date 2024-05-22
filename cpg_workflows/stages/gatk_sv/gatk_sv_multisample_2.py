@@ -777,7 +777,6 @@ class AnnotateCohortSv(CohortStage):
             out_mt_path=self.expected_outputs(cohort)['mt'],
             checkpoint_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(cohort),
-            depends_on=inputs.get_jobs(cohort),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=job)
@@ -826,7 +825,6 @@ class AnnotateDatasetSv(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),
             exclusion_file=str(exclusion_file),
         )
 
@@ -904,11 +902,9 @@ class MtToEsSv(DatasetStage):
                 num_workers=2,
                 num_secondary_workers=0,
                 job_name=job_name,
-                depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
-        jobs = [j]
-        return self.make_outputs(dataset, data=index_name, jobs=jobs)
+        return self.make_outputs(dataset, data=index_name, jobs=j)

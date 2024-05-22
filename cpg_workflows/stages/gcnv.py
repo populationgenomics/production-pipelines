@@ -145,14 +145,14 @@ class UpgradePedWithInferred(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
         ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
-        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))
+        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))  # type: ignore
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
             new_output=str(outputs['pedigree']),
             aneuploidies=str(outputs['aneuploidy_samples']),
             ploidy_tar=ploidy_inputs,
         )
-        return self.make_outputs(cohort, data=outputs, jobs=job)
+        return self.make_outputs(cohort, data=outputs, jobs=job)  # type: ignore
 
 
 @stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
@@ -271,7 +271,13 @@ class TrimOffSexChromosomes(CohortStage):
 
 
 @stage(
-    required_stages=[TrimOffSexChromosomes, SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred],
+    required_stages=[
+        TrimOffSexChromosomes,
+        SetSGIDOrdering,
+        GermlineCNVCalls,
+        PrepareIntervals,
+        UpgradePedWithInferred,
+    ],
 )
 class GCNVJointSegmentation(CohortStage):
     """
@@ -298,7 +304,8 @@ class GCNVJointSegmentation(CohortStage):
 
         # get the individual Segment VCFs
         cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
-        # and the dict of trimmed VCFs
+
+        # and the dict of trimmed VCFs (can be empty)
         trimmed_vcfs = inputs.as_dict(cohort, TrimOffSexChromosomes)
 
         # pull the json file with the sgid ordering
@@ -328,11 +335,11 @@ class GCNVJointSegmentation(CohortStage):
             segment_vcfs=all_vcfs,
             pedigree=str(pedigree),
             intervals=str(intervals),
-            tmp_prefix=expected_out['tmp_prefix'],
-            output_path=expected_out['clustered_vcf'],
+            tmp_prefix=expected_out['tmp_prefix'],  # type: ignore
+            output_path=expected_out['clustered_vcf'],  # type: ignore
             job_attrs=self.get_job_attrs(cohort),
         )
-        return self.make_outputs(cohort, data=expected_out, jobs=jobs)
+        return self.make_outputs(cohort, data=expected_out, jobs=jobs)  # type: ignore
 
 
 @stage(
@@ -484,6 +491,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         strv_job.memory('8Gi')
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        assert isinstance(strvctvre_phylop, str)
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(cohort, AnnotateCNV)
@@ -499,8 +507,8 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
-        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
+        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
 
         get_batch().write_output(
             strv_job.output_vcf,
@@ -540,10 +548,6 @@ class AnnotateCohortgCNV(CohortStage):
             ),
         )
 
-        # todo is this necessary?
-        if depends_on := inputs.get_jobs(cohort):
-            j.depends_on(*depends_on)
-
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
 
 
@@ -582,8 +586,7 @@ class AnnotateDatasetCNV(DatasetStage):
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
-            job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),
+            job_attrs=self.get_job_attrs(dataset)
         )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
@@ -666,11 +669,9 @@ class MtToEsCNV(DatasetStage):
                 num_workers=2,
                 num_secondary_workers=0,
                 job_name=job_name,
-                depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
-        jobs = [j]
-        return self.make_outputs(dataset, data=index_name, jobs=jobs)
+        return self.make_outputs(dataset, data=index_name, jobs=j)
