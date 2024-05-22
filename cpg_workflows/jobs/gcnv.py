@@ -43,7 +43,8 @@ def upgrade_ped_file(local_ped: ResourceFile, new_output: str, aneuploidies: str
 
 def prepare_intervals(job_attrs: dict[str, str], output_paths: dict[str, Path]) -> Job:
     j = get_batch().new_job(
-        'Prepare intervals', job_attrs | {'tool': 'gatk PreprocessIntervals/AnnotateIntervals'},
+        'Prepare intervals',
+        job_attrs | {'tool': 'gatk PreprocessIntervals/AnnotateIntervals'},
     )
     j.image(image_path('gatk_gcnv'))
 
@@ -544,13 +545,15 @@ def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict
     job.image(image_path('bcftools'))
     job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
     localised_vcf = get_batch().read_input(sg_vcf)
-    job.command(f"""
+    job.command(
+        f"""
     bcftools view {localised_vcf} \
     chr1 chr2 chr3 chr4 chr5 chr6 chr7 chr8 chr9 chr10 \
     chr11 chr12 chr13 chr14 chr15 chr16 chr17 chr18 chr19 chr20 chr21 chr22 \
     | bgzip -c > {job.output['vcf.bgz']}
     tabix {job.output['vcf.bgz']}
-    """)
+    """
+    )
     get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
     return job
 

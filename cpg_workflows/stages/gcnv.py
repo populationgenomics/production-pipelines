@@ -15,7 +15,7 @@ from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
-from cpg_workflows.utils import get_logger, ExpectedResultT
+from cpg_workflows.utils import ExpectedResultT, get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     Dataset,
@@ -270,8 +270,9 @@ class TrimOffSexChromosomes(CohortStage):
         return self.make_outputs(cohort, data=expected, jobs=jobs)  # type: ignore
 
 
-
-@stage(required_stages=[TrimOffSexChromosomes, SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred])
+@stage(
+    required_stages=[TrimOffSexChromosomes, SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred],
+)
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
