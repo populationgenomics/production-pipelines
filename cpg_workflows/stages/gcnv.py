@@ -15,7 +15,7 @@ from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
-from cpg_workflows.utils import ExpectedResultT, get_logger
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     Dataset,
