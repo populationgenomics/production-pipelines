@@ -720,8 +720,8 @@ class SpiceUpSVIDs(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'new_id_vcf': self.prefix / 'fresh_ids_post_annotation.vcf.bgz',
-            'new_id_index': self.prefix / 'fresh_ids_post_annotation.vcf.bgz.tbi',
+            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
+            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
