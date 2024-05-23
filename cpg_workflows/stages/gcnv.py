@@ -316,14 +316,13 @@ class GCNVJointSegmentation(CohortStage):
         sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
 
         # for each SGID, either get the sex chrom-trimmed one, or the default
-        # fail if
         all_vcfs: list[str] = []
         for sgid in sgid_ordering:
             if sgid in trimmed_vcfs:
-                get_logger().info(f'Using trimmed VCF for {sgid}')
+                get_logger().info(f'Using XY-trimmed VCF for {sgid}')
                 all_vcfs.append(str(trimmed_vcfs[sgid]))
             elif sgid in cnv_vcfs:
-                get_logger().info(f'Using standard VCF for {sgid}')
+                get_logger().warning(f'Using standard VCF for {sgid}')
                 all_vcfs.append(str(cnv_vcfs[sgid]['segments']))
             else:
                 raise ValueError(f'No VCF found for {sgid}')

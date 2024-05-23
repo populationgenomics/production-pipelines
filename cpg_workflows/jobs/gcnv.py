@@ -535,7 +535,7 @@ def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict
     job = get_batch().new_bash_job(f'remove sex chromosomes from {sgid}', job_attrs | {'tool': 'bcftools'})
     job.image(image_path('bcftools'))
     job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    localised_vcf = get_batch().read_input(sg_vcf)
+    localised_vcf = get_batch().read_input_group(**{'vcf.gz': sg_vcf, 'vcf.gz.tbi': f'{sg_vcf}.tbi'})['vcf.gz']
     autosomes = ' '.join([f'chr{i}' for i in range(1, 23)])
     job.command(f'bcftools view {localised_vcf} {autosomes} | bgzip -c > {job.output["vcf.bgz"]}')  # type: ignore
     job.command(f'tabix {job.output["vcf.bgz"]}')  # type: ignore
