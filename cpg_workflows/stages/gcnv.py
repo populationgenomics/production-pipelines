@@ -136,18 +136,23 @@ class UpgradePedWithInferred(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
-        return {'pedigree': self.prefix / 'inferred_sex_pedigree.ped', 'tmp_ped': self.tmp_prefix / 'pedigree.ped'}
+        return {
+            'aneuploidy_samples': self.prefix / 'aneuploidies.txt',
+            'pedigree': self.prefix / 'inferred_sex_pedigree.ped',
+            'tmp_ped': self.tmp_prefix / 'pedigree.ped',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
         ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
-        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))
+        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(outputs['tmp_ped'])))  # type: ignore
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
             new_output=str(outputs['pedigree']),
+            aneuploidies=str(outputs['aneuploidy_samples']),
             ploidy_tar=ploidy_inputs,
         )
-        return self.make_outputs(cohort, data=outputs, jobs=job)
+        return self.make_outputs(cohort, data=outputs, jobs=job)  # type: ignore
 
 
 @stage(required_stages=[SetSGIDOrdering, PrepareIntervals, CollectReadCounts, DeterminePloidy])
@@ -216,7 +221,68 @@ class GermlineCNVCalls(SequencingGroupStage):
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[SetSGIDOrdering, GermlineCNVCalls, PrepareIntervals, UpgradePedWithInferred])
+@stage(required_stages=[GermlineCNVCalls, UpgradePedWithInferred])
+class TrimOffSexChromosomes(CohortStage):
+    """
+    Trim off sex chromosomes for gCNV VCFs where the SGID is detected to be Aneuploid
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+
+        # returning an empty dictionary might cause the pipeline setup to break?
+        return_dict: dict[str, Path | str] = {'placeholder': str(self.prefix / 'placeholder.txt')}
+
+        # load up the file of aneuploidies - I don't think the pipeline supports passing an input directly here
+        # so.. I'm making a similar path and manually string-replacing it
+        aneuploidy_file = str(self.prefix / 'aneuploidies.txt').replace(self.name, 'UpgradePedWithInferred')
+
+        # can I walrus here?? I can!
+        if (aneuploidy_path := to_path(aneuploidy_file)).exists():
+
+            # read the identified aneuploidy samples file
+            with aneuploidy_path.open() as handle:
+
+                # iterate over the lines
+                for line in handle:
+
+                    # find the SGID
+                    sgid = line.strip()
+
+                    # could be an empty newline
+                    if not sgid:
+                        continue
+
+                    # log an expected output
+                    return_dict[sgid] = self.prefix / f'{sgid}.segments.vcf.bgz'
+
+        return return_dict
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        For each of the SGIDs which are identified as aneuploid, create a version
+        with the X & Y chromosomes trimmed off
+        Plan to generate every file, so that the stage can be forced to re-run if needed
+        """
+        expected = self.expected_outputs(cohort)
+        germline_calls = inputs.as_dict_by_target(GermlineCNVCalls)
+        jobs = []
+        for sgid, new_vcf in expected.items():
+            if sgid == 'placeholder':
+                continue
+            sg_vcf = germline_calls[sgid]['segments']
+            jobs.append(gcnv.trim_sex_chromosomes(sgid, str(sg_vcf), str(new_vcf), self.get_job_attrs(cohort)))
+        return self.make_outputs(cohort, data=expected, jobs=jobs)  # type: ignore
+
+
+@stage(
+    required_stages=[
+        TrimOffSexChromosomes,
+        SetSGIDOrdering,
+        GermlineCNVCalls,
+        PrepareIntervals,
+        UpgradePedWithInferred,
+    ],
+)
 class GCNVJointSegmentation(CohortStage):
     """
     various config elements scavenged from https://github.com/broadinstitute/gatk/blob/cfd4d87ec29ac45a68f13a37f30101f326546b7d/scripts/cnv_cromwell_tests/germline/cnv_germline_case_scattered_workflow.json#L26
@@ -240,13 +306,26 @@ class GCNVJointSegmentation(CohortStage):
         - Then merge those intermediate merges to produce the final result
         """
 
-        # get the list of individual Segment VCFs
+        # get the individual Segment VCFs
         cnv_vcfs = inputs.as_dict_by_target(GermlineCNVCalls)
+
+        # and the dict of trimmed VCFs (can be empty)
+        trimmed_vcfs = inputs.as_dict(cohort, TrimOffSexChromosomes)
 
         # pull the json file with the sgid ordering
         sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
 
-        all_vcfs = [str(cnv_vcfs[sgid]['segments']) for sgid in sgid_ordering]
+        # for each SGID, either get the sex chrom-trimmed one, or the default
+        all_vcfs: list[str] = []
+        for sgid in sgid_ordering:
+            if sgid in trimmed_vcfs:
+                get_logger().info(f'Using XY-trimmed VCF for {sgid}')
+                all_vcfs.append(str(trimmed_vcfs[sgid]))
+            elif sgid in cnv_vcfs:
+                get_logger().warning(f'Using standard VCF for {sgid}')
+                all_vcfs.append(str(cnv_vcfs[sgid]['segments']))
+            else:
+                raise ValueError(f'No VCF found for {sgid}')
 
         # get the intervals
         intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
@@ -259,11 +338,11 @@ class GCNVJointSegmentation(CohortStage):
             segment_vcfs=all_vcfs,
             pedigree=str(pedigree),
             intervals=str(intervals),
-            tmp_prefix=expected_out['tmp_prefix'],
-            output_path=expected_out['clustered_vcf'],
+            tmp_prefix=expected_out['tmp_prefix'],  # type: ignore
+            output_path=expected_out['clustered_vcf'],  # type: ignore
             job_attrs=self.get_job_attrs(cohort),
         )
-        return self.make_outputs(cohort, data=expected_out, jobs=jobs)
+        return self.make_outputs(cohort, data=expected_out, jobs=jobs)  # type: ignore
 
 
 @stage(
@@ -415,6 +494,7 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
         strv_job.memory('8Gi')
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+        assert isinstance(strvctvre_phylop, str)
         phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(cohort, AnnotateCNV)
@@ -430,8 +510,8 @@ class AnnotateCNVVcfWithStrvctvre(CohortStage):
 
         # run strvctvre
         strv_job.command(f'python StrVCTVRE.py -i {input_vcf} -o temp.vcf -f vcf -p {phylop_in_batch}')
-        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')
+        strv_job.command(f'bgzip temp.vcf -c > {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
+        strv_job.command(f'tabix {strv_job.output_vcf["vcf.bgz"]}')  # type: ignore
 
         get_batch().write_output(
             strv_job.output_vcf,
@@ -470,10 +550,6 @@ class AnnotateCohortgCNV(CohortStage):
                 setup_gcp=True,
             ),
         )
-
-        # todo is this necessary?
-        if depends_on := inputs.get_jobs(cohort):
-            j.depends_on(*depends_on)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
 
@@ -514,7 +590,6 @@ class AnnotateDatasetCNV(DatasetStage):
             out_mt_path=self.expected_outputs(dataset)['mt'],
             tmp_prefix=checkpoint_prefix,
             job_attrs=self.get_job_attrs(dataset),
-            depends_on=inputs.get_jobs(dataset),
         )
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
@@ -597,11 +672,9 @@ class MtToEsCNV(DatasetStage):
                 num_workers=2,
                 num_secondary_workers=0,
                 job_name=job_name,
-                depends_on=inputs.get_jobs(dataset),
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
-        jobs = [j]
-        return self.make_outputs(dataset, data=index_name, jobs=jobs)
+        return self.make_outputs(dataset, data=index_name, jobs=j)
