@@ -12,6 +12,7 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
+from cpg_workflows.stages.bam_to_cram import BamToCram
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -49,6 +50,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         CramMultiQC,
         Stripy,
         MitoReport,
+    ],
+    'seqr_loader_long_read': [
+        BamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
