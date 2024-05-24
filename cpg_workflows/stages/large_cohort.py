@@ -48,16 +48,11 @@ class Combiner(CohortStage):
             )
 
         j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                combiner,
-                combiner.run.__name__,
-                str(self.expected_outputs(cohort)),
-                str(self.tmp_prefix),
-                setup_gcp=True,
-                init_batch_args=init_batch_args,
-            ),
-        )
+        cmd = f"python -m cpg_workflows.large_cohort.combiner \
+            {str(self.expected_outputs(cohort))} \
+            {str(self.tmp_prefix)}"
+        j.command(cmd)
+
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 

@@ -1,5 +1,8 @@
 import collections
 import logging
+from os import name
+
+import click
 
 import hail as hl
 
@@ -54,6 +57,10 @@ def check_duplicates(iterable):
     return duplicates
 
 
+@click.command()
+@click.option('--out_vds_path', required=True, type=Path)
+@click.option('--tmp_prefix', required=True, type=Path)
+@click.option('--sequencing_group_ids', multiple=True)
 def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.VariantDataset:
     """
     run VDS combiner, assuming we are on a cluster.
@@ -120,3 +127,7 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
     )
     combiner.run()
     return hl.vds.read_vds(str(out_vds_path))
+
+
+if __name__ == "__main__":
+    run()  # pylint: disable=no-value-for-parameter
