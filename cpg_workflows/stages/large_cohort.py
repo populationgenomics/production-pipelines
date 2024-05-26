@@ -48,9 +48,9 @@ class Combiner(CohortStage):
             )
 
         j.image(image_path('cpg_workflows'))
-        cmd = f"python -m cpg_workflows.large_cohort.combiner.run \
-            {str(self.expected_outputs(cohort))} \
-            {str(self.tmp_prefix)}"
+        cmd = f"python -m cpg_workflows.large_cohort.combiner \
+            --out_vds_path {str(self.expected_outputs(cohort))} \
+            --tmp_prefix {str(self.tmp_prefix)}"
         j.command(cmd)
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
