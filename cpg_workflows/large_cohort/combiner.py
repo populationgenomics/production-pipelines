@@ -58,10 +58,10 @@ def check_duplicates(iterable):
 
 
 @click.command()
-@click.option('--out_vds_path', required=True, type=Path)
-@click.option('--tmp_prefix', required=True, type=Path)
+@click.option('--out_vds_path', required=True, type=str)
+@click.option('--tmp_prefix', required=True, type=str)
 @click.option('--sequencing_group_ids', multiple=True)
-def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.VariantDataset:
+def run(out_vds_path: str, tmp_prefix: str, *sequencing_group_ids) -> hl.vds.VariantDataset:
     """
     run VDS combiner, assuming we are on a cluster.
     @param out_vds_path: output path for VDS
@@ -69,6 +69,9 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
     @param sequencing_group_ids: optional list of sequencing groups to subset from get_cohort()
     @return: VDS object
     """
+    out_vds_path = Path(out_vds_path)
+    tmp_prefix = Path(tmp_prefix)
+
     if can_reuse(out_vds_path):
         return hl.vds.read_vds(str(out_vds_path))
 
