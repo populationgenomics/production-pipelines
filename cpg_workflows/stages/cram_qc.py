@@ -4,19 +4,15 @@ Stages that generates and summarises CRAM QC.
 
 import dataclasses
 import logging
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
-from cpg_workflows.jobs.picard import (
-    picard_collect_metrics,
-    picard_hs_metrics,
-    picard_wgs_metrics,
-)
+from cpg_workflows.jobs.picard import picard_collect_metrics, picard_hs_metrics, picard_wgs_metrics
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
@@ -53,7 +49,7 @@ def qc_functions() -> list[Qc]:
     """
     QC functions and their outputs for MultiQC aggregation
     """
-    if get_config()['workflow'].get('skip_qc', False) is True:
+    if config_retrieve(['workflow', 'skip_qc'], False):
         return []
 
     qcs = [
@@ -81,7 +77,7 @@ def qc_functions() -> list[Qc]:
         ),
     ]
 
-    sequencing_type = get_config()['workflow']['sequencing_type']
+    sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
     if sequencing_type == 'genome':
         qcs.append(
             Qc(
@@ -156,8 +152,9 @@ class SomalierPedigree(DatasetStage):
         https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns
         .yaml#L472-L481
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
+
         prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
@@ -174,7 +171,7 @@ class SomalierPedigree(DatasetStage):
         verifybamid_by_sgid = {}
         somalier_path_by_sgid = {}
         for sequencing_group in dataset.get_sequencing_groups():
-            if get_config().get('somalier', {}).get('exclude_high_contamination'):
+            if config_retrieve(['somalier', 'exclude_high_contamination'], False):
                 verify_bamid_path = inputs.as_path(stage=CramQC, target=sequencing_group, key='verify_bamid')
                 if not exists(verify_bamid_path):
                     logging.warning(
@@ -213,25 +210,7 @@ class SomalierPedigree(DatasetStage):
             return self.make_outputs(dataset, skipped=True)
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
-    import json
-
-    from cloudpathlib import CloudPath
-
-    with CloudPath(output_path).open() as f:
-        d = json.load(f)
-    return {'multiqc': d['report_general_stats_data']}
-
-
-@stage(
-    required_stages=[
-        CramQC,
-        SomalierPedigree,
-    ],
-    analysis_type='qc',
-    analysis_keys=['json'],
-    update_analysis_meta=_update_meta,
-)
+@stage(required_stages=[CramQC, SomalierPedigree], analysis_type='qc', analysis_keys=['json'])
 class CramMultiQC(DatasetStage):
     """
     Run MultiQC to aggregate CRAM QC stats.
@@ -241,7 +220,7 @@ class CramMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
         # get the unique hash for these Sequencing Groups
@@ -257,7 +236,7 @@ class CramMultiQC(DatasetStage):
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
         json_path = self.expected_outputs(dataset)['json']

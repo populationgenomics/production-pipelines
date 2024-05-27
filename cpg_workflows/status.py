@@ -29,7 +29,7 @@ def complete_analysis_job(
     Args:
         output (str): path to the output file
         analysis_type (str): metamist analysis type
-        sg_ids (list[str]): all CPG IDs
+        sg_ids (list[str]): all CPG IDs relevant to this target
         project_name (str): project/dataset name
         meta (dict): any metadata to add
         update_analysis_meta (Callable | None): function to update analysis meta
@@ -47,6 +47,10 @@ def complete_analysis_job(
 
     if update_analysis_meta is not None:
         meta | update_analysis_meta(output)
+
+    # if SG IDs are listed in the meta, remove them
+    # these are already captured in the sg_ids list
+    _drop_sgids = meta.pop('sequencing_groups', None)
 
     # if the meta has a remove_sgids key, we need to remove those from the list
     # this occurs when samples are soft-filtered from joint-calls in a way that
