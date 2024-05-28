@@ -45,6 +45,7 @@ def batch_sgs(md, min_batch_size, max_batch_size) -> list[dict]:
     import logging
 
     import numpy as np
+    import pandas as pd
 
     # Split SGs based on >= 2 copies of chrX vs. < 2 copies
     is_female = md.chrX_CopyNumber_rounded >= 2
