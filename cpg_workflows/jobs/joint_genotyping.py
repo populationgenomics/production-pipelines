@@ -123,7 +123,6 @@ def make_joint_genotyping_jobs(
             b,
             genomicsdb_path=genomicsdb_path,
             interval=interval,
-            exclude_intervals_path=exclude_intervals_path,
             tool=tool,
             output_vcf_path=jc_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
@@ -292,7 +291,6 @@ def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
     interval: hb.Resource | None = None,
-    exclude_intervals_path: Path | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
     job_attrs: dict | None = None,
@@ -361,7 +359,6 @@ def _add_joint_genotyper_job(
     -D {reference_path('broad/dbsnp_vcf')} \\
     -V $WORKSPACE \\
     {f'-L {interval} ' if interval else ''} \\
-    -XL {exclude_intervals_path} \\
     --only-output-calls-starting-in-intervals \\
     """
     if tool == JointGenotyperTool.GnarlyGenotyper:
