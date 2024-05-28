@@ -8,10 +8,19 @@ from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
-from .targets import Cohort, PedigreeInfo, SequencingGroup, Sex
+from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
 _cohort: Cohort | None = None
+_multicohort: MultiCohort | None = None
+
+
+def get_multicohort() -> MultiCohort:
+    """Return the multicohort object"""
+    global _multicohort
+    if not _multicohort:
+        _multicohort = create_multicohort()
+    return _multicohort
 
 
 def get_cohort() -> Cohort:
@@ -22,10 +31,38 @@ def get_cohort() -> Cohort:
     return _cohort
 
 
-def create_cohort() -> Cohort:
+def create_multicohort() -> MultiCohort:
+    """
+    Add cohorts in the multicohort.
+    """
+    config = config_retrieve(['workflow'])
+    custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
+    multicohort = MultiCohort()
+
+    datasets_by_cohort = get_metamist().get_cohorts(custom_cohort_ids)
+
+    for cohort_id in custom_cohort_ids:
+        cohort = multicohort.create_cohort(cohort_id)
+        datasets_for_cohort = datasets_by_cohort[cohort_id]
+        for dataset_name, sgs in sgs_by_dataset.items():
+            dataset = cohort.create_dataset(dataset_name)
+            for entry in sgs:
+                metadata = entry.get('meta', {})
+                update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+                sequencing_group = dataset.add_sequencing_group(
+                    id=str(entry['id']),
+                    external_id=str(entry['sample']['externalId']),
+                    participant_id=entry['sample']['participant'].get('externalId'),
+                    meta=metadata,
+                )
+
+
+def create_cohort(cohort_name: str) -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
+
     config = config_retrieve(['workflow'])
     analysis_dataset_name = config_retrieve(['workflow', 'dataset'])
     custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
@@ -53,7 +90,7 @@ def create_cohort() -> Cohort:
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
-    cohort = Cohort(name=None, multicohort=None)
+    cohort = Cohort(name=cohort_name, multicohort=None)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
