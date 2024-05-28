@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     billing_labels = {'stage': 'fake_annotation', 'ar-guid': try_get_ar_guid()}
 
-    input_dict: dict[str, Any] = {
+    input_dict: dict = {
         'vcf': input_vcf,
         'prefix': cohort.name,
         'ped_file': make_combined_ped(cohort, cohort_prefix),
