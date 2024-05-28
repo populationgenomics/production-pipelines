@@ -19,7 +19,6 @@ def complete_analysis_job(
     sg_ids: list[str],
     project_name: str,
     meta: dict,
-    update_analysis_meta: Callable | None = None,
     tolerate_missing: bool = False,
 ):
     """
@@ -32,7 +31,6 @@ def complete_analysis_job(
         sg_ids (list[str]): all CPG IDs relevant to this target
         project_name (str): project/dataset name
         meta (dict): any metadata to add
-        update_analysis_meta (Callable | None): function to update analysis meta
         tolerate_missing (bool): if True, allow missing output
     """
     import traceback
@@ -44,9 +42,6 @@ def complete_analysis_job(
 
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
-
-    if update_analysis_meta is not None:
-        meta | update_analysis_meta(output)
 
     # if SG IDs are listed in the meta, remove them
     # these are already captured in the sg_ids list
@@ -156,6 +151,9 @@ class MetamistStatusReporter(StatusReporter):
         if meta is None:
             meta = {}
 
+        if update_analysis_meta:
+            meta |= update_analysis_meta(str(output))
+
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
         py_job = b.new_python_job(f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'})
@@ -167,7 +165,6 @@ class MetamistStatusReporter(StatusReporter):
             sg_ids,
             project_name,
             meta,
-            update_analysis_meta,
             tolerate_missing_output,
         )
 
