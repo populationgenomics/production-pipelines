@@ -2,18 +2,12 @@
 extract from Broad sample batching script for GATK-SV
 """
 
-import json
-import logging
-
-import numpy as np
-import pandas as pd
-
-from cpg_utils import to_path
-
 SEX_VALS = {'male', 'female'}
 
 
-def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
+# 2024-05-28 mfranklin: Drop the type annotation for the dataframe to simplify pickling
+#   (when called as a python job)
+def batch_sgs(md, min_batch_size, max_batch_size) -> list[dict]:
     """
     Batch sequencing groups by coverage, and chrX ploidy
 
@@ -32,7 +26,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     This method maintains a consistent sex ratio across all batches
 
     Args:
-        md (str): DataFrame of metadata
+        md (pd.Dataframe): DataFrame of metadata
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
 
@@ -48,6 +42,9 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
             }
         }
     """
+    import logging
+
+    import numpy as np
 
     # Split SGs based on >= 2 copies of chrX vs. < 2 copies
     is_female = md.chrX_CopyNumber_rounded >= 2
@@ -134,6 +131,12 @@ def partition_batches(
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
     """
+    import json
+    import logging
+
+    import pandas as pd
+
+    from cpg_utils import to_path
 
     # read in the metadata contents
     logging.basicConfig(level=logging.INFO)
