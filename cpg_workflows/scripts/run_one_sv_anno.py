@@ -5,6 +5,7 @@ this demo script takes a long-read SV VCF, defined in config, and annotates it
 """
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve, output_path, try_get_ar_guid
+from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_references, get_images, add_gatk_sv_jobs
 
@@ -53,3 +54,5 @@ if __name__ == '__main__':
         expected_out_dict=expected_out,
         labels=labels,
     )
+
+    get_batch().run(wait=False)
