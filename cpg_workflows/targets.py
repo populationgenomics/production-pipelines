@@ -97,6 +97,95 @@ class Target:
         return {s.id: s.rich_id for s in self.get_sequencing_groups() if s.participant_id != s.id}
 
 
+class MultiCohort(Target):
+    """
+    Represents a "multi-cohort" target - multiple cohorts in the workflow.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        # NOTE: For a cohort, we simply pull the dataset name from the config.
+        input_cohorts = get_config()['workflow'].get('input_cohorts', [])
+        if input_cohorts:
+            cohorts_string = '_'.join(input_cohorts)
+
+        self.name = cohorts_string or get_config()['workflow']['dataset']
+
+        assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
+
+        self._cohorts_by_name: dict[str, Cohort] = {}
+
+    def __repr__(self):
+        return f'MultiCohort({len(self.get_cohorts())} cohorts)'
+
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return self.name
+
+    def get_cohorts(self, only_active: bool = True) -> list['Cohort']:
+        """
+        Gets list of all cohorts.
+        Include only "active" cohorts (unless only_active is False)
+        """
+        cohorts = [cohort for _name, cohort in self._cohorts_by_name.items()]
+        if only_active:
+            cohorts = [c for c in cohorts if c.active and c.get_datasets()]
+        return cohorts
+
+    def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
+        """
+        Get cohort by name.
+        Include only "active" cohorts (unless only_active is False)
+        """
+        cohort = self._cohorts_by_name.get(name)
+        if not cohort:
+            logging.warning(f'Cohort {name} not found in the multi-cohort')
+            return None
+        if not only_active:  # Return cohort even if it's inactive
+            return cohort
+        if cohort.active and cohort.get_datasets():
+            return cohort
+        return None
+
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
+        """
+        Gets a flat list of all sequencing groups from all cohorts.
+        Include only "active" sequencing groups (unless only_active is False)
+        """
+        all_sequencing_groups = []
+        for cohort in self.get_cohorts(only_active):
+            all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
+        return all_sequencing_groups
+
+    def add_cohort(self, cohort: 'Cohort') -> 'Cohort':
+        """
+        Add existing cohort into the multi-cohort.
+        """
+        cohort.mutlicohort = self
+        if cohort.name in self._cohorts_by_name:
+            logging.debug(f'Cohort {cohort.name} already exists in the multi-cohort')
+            return cohort
+        self._cohorts_by_name[cohort.name] = cohort
+        return cohort
+
+    def create_cohort(
+        self,
+        name: str,
+    ):
+        """
+        Create a cohort and add it to the multi-cohort.
+        """
+        if name in self._cohorts_by_name:
+            logging.debug(f'Cohort {name} already exists in the multi-cohort')
+            return self._cohorts_by_name[name]
+
+        c = Cohort(name=name, multicohort=self)
+        self._cohorts_by_name[c.name] = c
+        return c
+
+
 class Cohort(Target):
     """
     Represents a "cohort" target - all sequencing groups from all datasets in the workflow.
@@ -104,11 +193,13 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, name: str | None, multicohort: MultiCohort | None) -> None:
         super().__init__()
-        self.name = get_config()['workflow']['dataset']
+        # self.name = get_config()['workflow']['dataset']
+        self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=self.name, cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
+        self.mutlicohort = multicohort
 
     def __repr__(self):
         return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'

@@ -39,6 +39,8 @@ def create_cohort() -> Cohort:
     if custom_cohort_ids:
         # TODO: Handle more than one cohort here
         if len(custom_cohort_ids) > 1:
+            multicohort = get_metamist().get_cohorts(custom_cohort_ids)
+            print(multicohort)
             raise ValueError('Only one cohort is supported')
         sgs_by_dataset = get_metamist().get_sgs_by_project_from_cohort(custom_cohort_ids[0])
         dataset_names = list(sgs_by_dataset.keys())
@@ -51,7 +53,7 @@ def create_cohort() -> Cohort:
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
-    cohort = Cohort()
+    cohort = Cohort(name=None, multicohort=None)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
