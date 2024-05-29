@@ -1,7 +1,5 @@
 [workflow]
 name = 'seqr_loader'
-dataset_gcp_project = 'seqr-308602'
-dataset = 'seqr'
 status_reporter = 'metamist'
 
 # Use GnarlyGenotyper instead of GenotypeGVCFs
