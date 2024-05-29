@@ -249,7 +249,7 @@ def genomicsdb(
         #   using the --merge-input-intervals arg. There's no data in between since we
         #   didn't run HaplotypeCaller over those loci, so we're not wasting any
         #   compute.
-        # '--merge-input-intervals', # Removed because of issues when excluding intervals - EddieLF 2024-04-06
+        '--merge-input-intervals',
         '--consolidate',
         # The Broad:
         # > The batch_size value was carefully chosen here as it is the optimal value
