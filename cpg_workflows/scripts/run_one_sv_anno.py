@@ -23,8 +23,6 @@ if __name__ == '__main__':
 
     input_vcf = to_path(config_retrieve(['workflow', 'input_vcf']))
 
-    labels = {'stage': 'fake_annotation', 'ar-guid': try_get_ar_guid()}
-
     input_dict: dict = {
         'vcf': input_vcf,
         'prefix': 'rdnow',
@@ -52,7 +50,7 @@ if __name__ == '__main__':
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=expected_out,
-        labels=labels,
+        labels={'ar-guid': try_get_ar_guid()},
     )
 
     get_batch().run(wait=False)
