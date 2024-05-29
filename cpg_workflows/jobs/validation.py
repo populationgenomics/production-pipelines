@@ -3,23 +3,13 @@ jobs relating to the validation steps of the pipeline
 """
 
 import json
-from csv import DictReader
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config, image_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import fasta_res_group, query_command
-from cpg_workflows.workflow import SequencingGroup
-
-from ..metamist import AnalysisStatus, get_metamist
-
-SUMMARY_KEYS = {
-    'TRUTH.TOTAL': 'true_variants',
-    'METRIC.Recall': 'recall',
-    'METRIC.Precision': 'precision',
-}
 
 
 def get_sample_truth_data(sequencing_group_id: str):
@@ -32,8 +22,9 @@ def get_sample_truth_data(sequencing_group_id: str):
     Returns:
         The specific truth data from config
     """
+    from cpg_utils.config import config_retrieve
 
-    ref_data = get_config()['references'][sequencing_group_id]
+    ref_data = config_retrieve(['references', sequencing_group_id])
     assert all(key in ref_data for key in ['vcf', 'index', 'bed'])
     return ref_data
 
@@ -132,7 +123,7 @@ def run_happy_on_vcf(
     )
 
     # read in all the SDF genome indices used by hap.py
-    ref_genome_sdf = get_config()['references']['refgenome_sdf']
+    ref_genome_sdf = config_retrieve(['references', 'refgenome_sdf'])
     sdf = b.read_input_group(
         **{file.name: file.as_uri() for file in to_path(ref_genome_sdf).glob('*')},
     )
@@ -150,7 +141,7 @@ def run_happy_on_vcf(
     )
 
     # region: stratification BED files
-    if stratification := get_config()['references']['stratification']:
+    if stratification := config_retrieve(['references', 'stratification']):
         strat_folder = to_path(stratification)
         strat_dict = {file.name: str(file) for file in strat_folder.glob('*')}
         assert 'definition.tsv' in strat_dict, 'definition.tsv file does not exist'
@@ -185,6 +176,19 @@ def parse_and_post_results(
     Returns:
         this job
     """
+    from csv import DictReader
+
+    from cpg_utils import to_path
+    from cpg_utils.config import config_retrieve
+    from cpg_workflows.metamist import AnalysisStatus, get_metamist
+
+    # 2024-05-28 mfranklin: this function is defined as a PythonJob, so simplify the
+    #   pickling by defining this here
+    SUMMARY_KEYS = {
+        'TRUTH.TOTAL': 'true_variants',
+        'METRIC.Recall': 'recall',
+        'METRIC.Precision': 'precision',
+    }
 
     # handler for the CSV file
     happy_handle = to_path(happy_csv)
@@ -199,7 +203,7 @@ def parse_and_post_results(
         'truth_bed': ref_data['bed'],
     }
 
-    if stratification := get_config()['references']['stratification']:
+    if stratification := config_retrieve(['references', 'stratification']):
         summary_data['stratified'] = stratification
 
     # read in the summary CSV file
@@ -217,7 +221,7 @@ def parse_and_post_results(
         json.dump(summary_data, handle)
 
     get_metamist().create_analysis(
-        dataset=get_config()['workflow']['dataset'],
+        dataset=config_retrieve(['workflow', 'dataset']),
         status=AnalysisStatus('completed'),
         sequencing_group_ids=[sequencing_group_id],
         type_='qc',
