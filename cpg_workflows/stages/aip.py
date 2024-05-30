@@ -330,7 +330,6 @@ class RunHailSVFiltering(DatasetStage):
     required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
-    update_analysis_meta=lambda x: {'type': 'aip_output_json'},
 )
 class ValidateMOI(DatasetStage):
     """
@@ -404,7 +403,6 @@ class ValidateMOI(DatasetStage):
     required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
-    update_analysis_meta=lambda x: {'type': 'aip_output_html'},
     tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):

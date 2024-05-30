@@ -423,12 +423,7 @@ class FastCombineGCNVs(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job_or_none)
 
 
-@stage(
-    required_stages=FastCombineGCNVs,
-    analysis_type='cnv',
-    analysis_keys=['annotated_vcf'],
-    update_analysis_meta=lambda x: {'type': 'gCNV-annotated'},
-)
+@stage(required_stages=FastCombineGCNVs, analysis_type='cnv', analysis_keys=['annotated_vcf'])
 class AnnotateCNV(CohortStage):
     """
     Smaller, direct annotation using SvAnnotate
@@ -473,12 +468,7 @@ class AnnotateCNV(CohortStage):
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
 
 
-@stage(
-    required_stages=AnnotateCNV,
-    analysis_type='cnv',
-    analysis_keys=['strvctvre_vcf'],
-    update_analysis_meta=lambda x: {'type': 'gCNV-STRVCTCRE-annotated'},
-)
+@stage(required_stages=AnnotateCNV, analysis_type='cnv', analysis_keys=['strvctvre_vcf'])
 class AnnotateCNVVcfWithStrvctvre(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {

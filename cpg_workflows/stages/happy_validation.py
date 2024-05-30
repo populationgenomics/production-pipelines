@@ -7,12 +7,12 @@ Content relating to the hap.py validation process
 import logging
 
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.validation import (
     parse_and_post_results,
     run_happy_on_vcf,
     validation_mt_to_vcf_job,
 )
-from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -22,14 +22,8 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .. import get_batch
 
-
-@stage(
-    analysis_type='custom',
-    update_analysis_meta=_sg_vcf_meta,
-    analysis_keys=['vcf'],
-)
+@stage(analysis_type='custom', analysis_keys=['vcf'])
 class ValidationMtToVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {

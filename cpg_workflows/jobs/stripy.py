@@ -29,12 +29,7 @@ def stripy(
     """
     Run STRipy
     """
-    if can_reuse(
-        [
-            out_path,
-        ],
-        overwrite,
-    ):
+    if can_reuse(out_path, overwrite):
         return None
 
     job_attrs = (job_attrs or {}) | {'tool': 'stripy'}
@@ -46,7 +41,6 @@ def stripy(
     # Stripy accesses a relatively small number of discrete regions from each cram
     # accessing the cram via cloudfuse is faster than localising the full cram
     bucket = cram_path.path.drive
-    print(f'bucket = {bucket}')
     bucket_mount_path = to_path('/bucket')
     j.cloudfuse(bucket, str(bucket_mount_path), read_only=True)
     mounted_cram_path = bucket_mount_path / '/'.join(cram_path.path.parts[2:])
