@@ -176,7 +176,7 @@ def vep_one(
     vep_image = image_path(f'vep_{vep_version}')
     vep_mount_path = to_path(reference_path(f'vep_{vep_version}_mount'))
     assert all([vep_image, vep_mount_path])
-    logging.info(f'Using VEP {vep_version}')
+    logging.debug(f'Using VEP {vep_version}')
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
     j.image(vep_image)
