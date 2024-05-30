@@ -13,7 +13,6 @@ from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
-    _sv_batch_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
@@ -497,7 +496,6 @@ class MergeBatchSites(CohortStage):
     required_stages=[FilterBatch, GatherBatchEvidence],
     analysis_type='sv',
     analysis_keys=[f'genotyped_{mode}_vcf' for mode in ['pesr', 'depth']],
-    update_analysis_meta=_sv_batch_meta,
 )
 class GenotypeBatch(CohortStage):
     """

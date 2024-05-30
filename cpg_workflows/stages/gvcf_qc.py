@@ -3,7 +3,6 @@ Stages that generates and summarises GVCF QC.
 """
 
 import logging
-from typing import Any
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve
@@ -96,25 +95,7 @@ class GvcfHappy(SequencingGroupStage):
             return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
-    import json
-
-    from cloudpathlib import CloudPath
-
-    with CloudPath(output_path).open() as f:
-        d = json.load(f)
-    return {'multiqc': d['report_general_stats_data']}
-
-
-@stage(
-    required_stages=[
-        GvcfQC,
-        GvcfHappy,
-    ],
-    analysis_type='qc',
-    analysis_keys=['json'],
-    update_analysis_meta=_update_meta,
-)
+@stage(required_stages=[GvcfQC, GvcfHappy], analysis_type='qc', analysis_keys=['json'])
 class GvcfMultiQC(DatasetStage):
     """
     Run MultiQC to summarise all GVCF QC.

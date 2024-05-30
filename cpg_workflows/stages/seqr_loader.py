@@ -25,10 +25,10 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .. import get_batch
-from .joint_genotyping import JointGenotyping
-from .vep import Vep
-from .vqsr import Vqsr
+from cpg_utils.hail_batch import get_batch
+from cpg_workflows.stages.joint_genotyping import JointGenotyping
+from cpg_workflows.stages.vep import Vep
+from cpg_workflows.stages.vqsr import Vqsr
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -81,55 +81,7 @@ class AnnotateCohort(CohortStage):
         )
 
 
-def _update_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'annotated-dataset-callset'}
-
-
-def _dataset_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
-
-
-def _sg_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
-
-
-def _snv_es_index_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to es-index analysis object
-    https://github.com/populationgenomics/metamist/issues/539
-    """
-    return {'seqr-dataset-type': 'VARIANTS'}
-
-
-@stage(
-    required_stages=[AnnotateCohort],
-    analysis_type='custom',
-    update_analysis_meta=_update_meta,
-    analysis_keys=['mt'],
-)
+@stage(required_stages=[AnnotateCohort], analysis_type='custom', analysis_keys=['mt'])
 class AnnotateDataset(DatasetStage):
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -166,12 +118,7 @@ class AnnotateDataset(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-@stage(
-    required_stages=[AnnotateDataset],
-    analysis_type='custom',
-    update_analysis_meta=_dataset_vcf_meta,
-    analysis_keys=['vcf'],
-)
+@stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
 class DatasetVCF(DatasetStage):
     """
     Take the per-dataset MT and write out as a VCF
@@ -227,7 +174,7 @@ def es_password() -> str:
     required_stages=[AnnotateDataset],
     analysis_type='es-index',
     analysis_keys=['index_name'],
-    update_analysis_meta=_snv_es_index_meta,
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'VARIANTS'},
 )
 class MtToEs(DatasetStage):
     """
