@@ -7,6 +7,7 @@ Content relating to the hap.py validation process
 import logging
 
 from cpg_utils.config import get_config
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.validation import (
     parse_and_post_results,
     run_happy_on_vcf,
@@ -20,8 +21,6 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-
-from cpg_utils.hail_batch import get_batch
 
 
 @stage(analysis_type='custom', analysis_keys=['vcf'])

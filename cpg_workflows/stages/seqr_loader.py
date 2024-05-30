@@ -8,12 +8,15 @@ from typing import Any
 from cpg_utils import Path, dataproc, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config, image_path
-from cpg_utils.hail_batch import query_command
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.seqr_loader import (
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )
 from cpg_workflows.query_modules import seqr_loader
+from cpg_workflows.stages.joint_genotyping import JointGenotyping
+from cpg_workflows.stages.vep import Vep
+from cpg_workflows.stages.vqsr import Vqsr
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -24,11 +27,6 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-
-from cpg_utils.hail_batch import get_batch
-from cpg_workflows.stages.joint_genotyping import JointGenotyping
-from cpg_workflows.stages.vep import Vep
-from cpg_workflows.stages.vqsr import Vqsr
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
