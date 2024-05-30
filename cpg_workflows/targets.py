@@ -193,7 +193,7 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(self, name: str | None, multicohort: MultiCohort | None) -> None:
+    def __init__(self, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
         # self.name = get_config()['workflow']['dataset']
         self.name = name or get_config()['workflow']['dataset']

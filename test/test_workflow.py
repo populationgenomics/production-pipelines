@@ -36,7 +36,7 @@ backend = 'local'
 """
 
 
-def mock_create_cohort() -> Cohort:
+def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
     ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
@@ -44,7 +44,7 @@ def mock_create_cohort() -> Cohort:
     return c
 
 
-@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+@mock.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)
 def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.

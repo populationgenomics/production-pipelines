@@ -72,7 +72,7 @@ def mock_create_analysis(_, project, analysis) -> int:
     return 1  # metamist "analysis" entry ID
 
 
-def mock_create_cohort() -> Cohort:
+def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
     ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
@@ -160,7 +160,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), [j])
 
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)
 
     set_config(config, tmp_path / 'config.toml')
 

@@ -70,7 +70,7 @@ def _common(mocker, tmp_path):
         ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
         return c
 
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_create_cohort)
 
 
 def test_status_reporter(mocker: MockFixture, tmp_path):

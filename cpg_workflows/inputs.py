@@ -27,8 +27,23 @@ def get_cohort() -> Cohort:
     """Return the cohort object"""
     global _cohort
     if not _cohort:
-        _cohort = create_cohort()
+        _cohort = deprecated_create_cohort()
     return _cohort
+
+
+def get_inputs() -> Cohort | MultiCohort:
+    """
+    Return the cohort or multicohort object based on the workflow configuration.
+    """
+    input_datasets = config_retrieve(['workflow', 'input_datasets'], [])
+    custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
+    if custom_cohort_ids and input_datasets:
+        raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
+
+    # NOTE: When configuring sgs in the config is deprecated, this will be removed.
+    if config_retrieve(['workflow', 'input_cohorts']):
+        return get_multicohort()
+    return get_cohort()
 
 
 def create_multicohort() -> MultiCohort:
@@ -44,21 +59,49 @@ def create_multicohort() -> MultiCohort:
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)
         datasets_for_cohort = datasets_by_cohort[cohort_id]
-        for dataset_name, sgs in sgs_by_dataset.items():
-            dataset = cohort.create_dataset(dataset_name)
-            for entry in sgs:
-                metadata = entry.get('meta', {})
-                update_dict(metadata, entry['sample']['participant'].get('meta', {}))
-                update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
-                sequencing_group = dataset.add_sequencing_group(
-                    id=str(entry['id']),
-                    external_id=str(entry['sample']['externalId']),
-                    participant_id=entry['sample']['participant'].get('externalId'),
-                    meta=metadata,
-                )
+        populate_cohort(cohort, datasets_for_cohort, read_pedigree=config.get('read_pedigree', True))
+
+    return multicohort
 
 
-def create_cohort(cohort_name: str) -> Cohort:
+def populate_cohort(cohort: Cohort, sgs_by_dataset, read_pedigree: bool = True):
+    """
+    Add datasets in the cohort. There exists only one cohort for the workflow run.
+    """
+    dataset_names = list(sgs_by_dataset.keys())
+
+    for dataset_name in dataset_names:
+        dataset = cohort.create_dataset(dataset_name)
+        sgs = sgs_by_dataset[dataset_name]
+
+        for entry in sgs:
+            metadata = entry.get('meta', {})
+            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+            # phenotypes are managed badly here, need a cleaner way to get them into the SG
+            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+
+            sequencing_group = dataset.add_sequencing_group(
+                id=str(entry['id']),
+                external_id=str(entry['sample']['externalId']),
+                participant_id=entry['sample']['participant'].get('externalId'),
+                meta=metadata,
+            )
+
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
+                sequencing_group.pedigree.sex = Sex.parse(reported_sex)
+
+            _populate_alignment_inputs(sequencing_group, entry)
+
+    if not cohort.get_datasets():
+        raise MetamistError('No datasets populated')
+
+    _populate_analysis(cohort)
+    if read_pedigree:
+        _populate_pedigree(cohort)
+    assert cohort.get_sequencing_groups()
+
+
+def deprecated_create_cohort() -> Cohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
@@ -90,7 +133,7 @@ def create_cohort(cohort_name: str) -> Cohort:
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
-    cohort = Cohort(name=cohort_name, multicohort=None)
+    cohort = Cohort()
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)

@@ -174,7 +174,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG],
     )
 
-    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', _mock_cohort)
 
     def do_nothing(*args, **kwargs):
         return None

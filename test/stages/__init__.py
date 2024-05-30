@@ -79,7 +79,7 @@ def run_workflow(
     cohort_mocker: Callable[..., Cohort] = mock_cohort,
     stages: list[Type[TestStage]] | None = None,
 ):
-    mocker.patch('cpg_workflows.inputs.create_cohort', cohort_mocker)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', cohort_mocker)
 
     stages = stages or [C, C2]
     _run_workflow(stages)  # type: ignore
