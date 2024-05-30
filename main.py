@@ -34,27 +34,30 @@ from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 #     ValidationParseHappy,
 # )
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
-
-# from cpg_workflows.stages.mito import MitoReport
-# from cpg_workflows.stages.outrider import Outrider
-# from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
-# from cpg_workflows.stages.stripy import Stripy
+from cpg_workflows.stages.mito import MitoReport
+from cpg_workflows.stages.outrider import Outrider
+from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
+from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    # 'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
-    # 'exomiser': [RunExomiser, ExomiserSeqrTSV],
-    # 'pre_alignment': [FastQCMultiQC],
-    # 'seqr_loader': [
-    #     DatasetVCF,
-    #     AnnotateDataset,
-    #     MtToEs,
-    #     GvcfMultiQC,
-    #     CramMultiQC,
-    #     Stripy,
-    #     MitoReport,
-    # ],
-    # 'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
+    'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
+    'exomiser': [RunExomiser, ExomiserSeqrTSV],
+    'pre_alignment': [FastQCMultiQC],
+    'seqr_loader': [
+        DatasetVCF,
+        AnnotateDataset,
+        MtToEs,
+        GvcfMultiQC,
+        CramMultiQC,
+        Stripy,
+        MitoReport,
+    ],
+    'seqr_loader_long_read': [
+        BamToCram,
+    ],
+    'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     # 'gatk_sv_singlesample': [CreateSampleBatches],
     # 'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
