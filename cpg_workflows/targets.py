@@ -115,6 +115,7 @@ class MultiCohort(Target):
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
         self._cohorts_by_name: dict[str, Cohort] = {}
+        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
 
     def __repr__(self):
         return f'MultiCohort({len(self.get_cohorts())} cohorts)'
@@ -148,6 +149,16 @@ class MultiCohort(Target):
         if cohort.active and cohort.get_datasets():
             return cohort
         return None
+
+    def get_datasets(self, only_active: bool = True) -> list['Dataset']:
+        """
+        Gets list of all datasets.
+        Include only "active" datasets (unless only_active is False)
+        """
+        datasets = []
+        for cohort in self.get_cohorts(only_active):
+            datasets.extend(cohort.get_datasets(only_active))
+        return datasets
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
