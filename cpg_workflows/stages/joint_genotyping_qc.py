@@ -20,7 +20,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .. import get_cohort
+from .. import get_inputs
 from ..jobs.happy import happy
 from ..targets import SequencingGroup
 from .joint_genotyping import JointGenotyping
@@ -79,7 +79,7 @@ class JointVcfHappy(SequencingGroupStage):
             return None
 
         return (
-            get_cohort().analysis_dataset.prefix()
+            get_inputs().analysis_dataset.prefix()
             / 'qc'
             / 'jc'
             / 'hap.py'

@@ -54,7 +54,7 @@ def test_workflow(tmp_path):
 
     from cpg_utils.config import dataset_path
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_inputs
     from cpg_workflows.workflow import (
         CohortStage,
         SequencingGroupStage,
@@ -66,7 +66,7 @@ def test_workflow(tmp_path):
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_cohort().get_sequencing_groups()) == 2
+    assert len(get_inputs().get_sequencing_groups()) == 2
 
     @stage
     class MySequencingGroupStage(SequencingGroupStage):
