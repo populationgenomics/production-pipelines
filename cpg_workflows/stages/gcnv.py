@@ -81,6 +81,8 @@ class CollectReadCounts(SequencingGroupStage):
         if seqgroup.cram is None:
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
+        assert seqgroup.dataset.cohort
+
         jobs = gcnv.collect_read_counts(
             intervals_path=inputs.as_path(seqgroup.dataset.cohort, PrepareIntervals, 'preprocessed'),
             cram_path=seqgroup.cram,
@@ -205,6 +207,7 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
+        assert seqgroup.dataset.cohort
         determine_ploidy = inputs.as_dict(seqgroup.dataset.cohort, DeterminePloidy)
 
         # pull the json file with the sgid ordering
@@ -369,6 +372,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
+        assert sequencing_group.dataset.cohort
 
         # get the clustered VCF from the previous stage
         joint_seg = inputs.as_dict(sequencing_group.dataset.cohort, GCNVJointSegmentation)
