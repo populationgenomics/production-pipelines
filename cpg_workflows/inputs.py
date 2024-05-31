@@ -23,7 +23,7 @@ def get_multicohort() -> MultiCohort:
     return _multicohort
 
 
-def get_cohort() -> Cohort:
+def deprecated_get_cohort() -> Cohort:
     """Return the cohort object"""
     global _cohort
     if not _cohort:
@@ -41,9 +41,9 @@ def get_inputs() -> Cohort | MultiCohort:
         raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
 
     # NOTE: When configuring sgs in the config is deprecated, this will be removed.
-    if config_retrieve(['workflow', 'input_cohorts']):
+    if config_retrieve(['workflow', 'input_cohorts'], []):
         return get_multicohort()
-    return get_cohort()
+    return deprecated_get_cohort()
 
 
 def create_multicohort() -> MultiCohort:
