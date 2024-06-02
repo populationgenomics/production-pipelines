@@ -12,7 +12,6 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
-from cpg_workflows.stages.bam_to_cram import BamToCram
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -35,10 +34,13 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'alignment': [CramMultiQC],
+    'genotype': [GvcfMultiQC],
     'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'pre_alignment': [FastQCMultiQC],
@@ -55,7 +57,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         BamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
-    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
     'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
