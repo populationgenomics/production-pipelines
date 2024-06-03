@@ -203,3 +203,22 @@ cpg = [
     "hail_scripts",
     "metamist",
 ]
+
+[tool.coverage.run]
+omit = [
+    "gnomad_methods/*",
+    "seqr-loading-pipelines/*",
+    "cpg_workflows/stages/*",
+    "cpg_workflows/jobs/*",
+    "cpg_workflows/large_cohort/*",
+    "cpg_workflows/scripts/*",
+    "cpg_workflows/query_modules/*",
+    "cpg_workflows/dataproc_scripts/*",
+    "cpg_workflows/python_scripts/*",
+    "scripts/*",
+    "cpg_workflows/stages/*",
+    "test/*",
+    "main.py",
+    "pca_dataproc_runner.py",
+    "setup.py",
+]
