@@ -423,28 +423,24 @@ def _align_one(
         """,
         )
 
-    if aligner == Aligner.DRAGMAP:
-        j.image(image_path('dragmap'))
-        dragmap_index = b.read_input_group(
-            **{
-                k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k)
-                for k in DRAGMAP_INDEX_FILES
-            },
-        )
-        if use_bazam:
-            input_params = f'--interleaved=1 -b {r1_param}'
-        else:
-            input_params = f'-1 {r1_param} -2 {r2_param}'
-        # TODO: consider reverting to use of all threads if node capacity
-        # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
-        cmd = f"""\
-        {prepare_fastq_cmd}
-        dragen-os -r {dragmap_index} {input_params} \\
-            --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
-            --num-threads {nthreads - 1}
-        """
-
+    j.image(image_path('dragmap'))
+    dragmap_index = b.read_input_group(
+        **{k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k) for k in DRAGMAP_INDEX_FILES},
+    )
+    if use_bazam:
+        input_params = f'--interleaved=1 -b {r1_param}'
     else:
+        input_params = f'-1 {r1_param} -2 {r2_param}'
+    # TODO: consider reverting to use of all threads if node capacity
+    # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
+    cmd = f"""\
+    {prepare_fastq_cmd}
+    dragen-os -r {dragmap_index} {input_params} \\
+        --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
+        --num-threads {nthreads - 1}
+    """
+
+    if aligner is not Aligner.DRAGMAP:
         raise ValueError(f'Unsupported aligner: {aligner.value}')
 
     # prepare command for adding sort on the end
@@ -561,13 +557,12 @@ def finalise_alignment(
     j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
     assert isinstance(j.sorted_bam, hb.ResourceFile)
-    if markdup_tool == MarkDupTool.PICARD:
-        md_j = picard.markdup(
-            b,
-            j.sorted_bam,
-            job_attrs=job_attrs,
-            overwrite=overwrite,
-        )
+    md_j = picard.markdup(
+        b,
+        j.sorted_bam,
+        job_attrs=job_attrs,
+        overwrite=overwrite,
+    )
 
     if output_path:
         if md_j is not None:
