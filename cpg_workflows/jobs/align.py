@@ -308,7 +308,7 @@ def _align_one(
     requested_nthreads: int,
     sequencing_group_name: str,
     job_attrs: dict | None = None,
-    aligner: Aligner = Aligner.BWA,
+    aligner: Aligner = Aligner.DRAGMAP,
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
     should_sort: bool = False,
@@ -406,7 +406,7 @@ def _align_one(
         )
         prepare_fastq_cmd = ''
         r1_param = 'r1'
-        r2_param = ''
+        r2_param = ''  # not used for bazam as we will output interleaved fastq thus only one FIFO is needed
         fifo_commands[r1_param] = bazam_cmd
 
     else:  # only for BAMs that are missing index
@@ -423,31 +423,7 @@ def _align_one(
         """,
         )
 
-    if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
-        if aligner == Aligner.BWAMEM2:
-            tool_name = 'bwa-mem2'
-            j.image(image_path('bwamem2'))
-            index_exts = BWAMEM2_INDEX_EXTS
-        else:
-            tool_name = 'bwa'
-            j.image(image_path('bwa'))
-            index_exts = BWA_INDEX_EXTS
-        bwa_reference = fasta_res_group(b, index_exts)
-        rg_line = f'@RG\\tID:{sequencing_group_name}\\tSM:{sequencing_group_name}'
-        # BWA command options:
-        # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
-        # -p   smart pairing (ignoring in2.fq)
-        # -t16 threads
-        # -Y   use soft clipping for supplementary alignments
-        # -R   read group header line such as '@RG\tID:foo\tSM:bar'
-        cmd = f"""\
-        {prepare_fastq_cmd}
-        {tool_name} mem -K 100000000 \\
-        {'-p' if use_bazam else ''} -t{nthreads - 1} -Y -R '{rg_line}' \\
-        {bwa_reference.base} {r1_param} {r2_param}
-        """
-
-    elif aligner == Aligner.DRAGMAP:
+    if aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
             **{
@@ -569,7 +545,6 @@ def finalise_alignment(
     overwrite: bool = False,
 ) -> Job | None:
     """
-    For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.
     For `MarkDupTool.PICARD`, creates a new job, as Picard can't read from stdin.
     """
 
@@ -578,31 +553,10 @@ def finalise_alignment(
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
 
     md_j = None
-    if markdup_tool == MarkDupTool.BIOBAMBAM:
-        j.declare_resource_group(  # type: ignore
-            output_cram={
-                'cram': '{root}.cram',
-                'cram.crai': '{root}.cram.crai',
-            },
-        )
-        assert isinstance(j.output_cram, hb.ResourceGroup)
-        align_cmd = f"""\
-        {align_cmd.strip()} \\
-        | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} \\
-        SO=coordinate M={j.markdup_metrics} outputformat=sam \\
-        tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
-        -Ocram -o {j.output_cram.cram}
-
-        samtools index -@{nthreads - 1} {j.output_cram.cram} \\
-        {j.output_cram["cram.crai"]}
-        """.strip()
-        md_j = j
-    else:
-        align_cmd = align_cmd.strip()
-        if not stdout_is_sorted:
-            align_cmd += f' {sort_cmd(nthreads)}'
-        align_cmd += f' > {j.sorted_bam}'
+    align_cmd = align_cmd.strip()
+    if not stdout_is_sorted:
+        align_cmd += f' {sort_cmd(nthreads)}'
+    align_cmd += f' > {j.sorted_bam}'
 
     j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
