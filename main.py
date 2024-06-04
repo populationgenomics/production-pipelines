@@ -12,7 +12,7 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
-from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.alignment.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -24,7 +24,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
-from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+from cpg_workflows.stages.genotype.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import (
     ValidationHappyOnVcf,
     ValidationMtToVcf,

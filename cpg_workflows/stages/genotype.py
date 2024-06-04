@@ -14,7 +14,6 @@ from cpg_workflows.workflow import (
 )
 
 from .. import get_batch
-from .align import Align
 
 
 @stage(
