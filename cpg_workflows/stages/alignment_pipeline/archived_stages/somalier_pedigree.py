@@ -4,7 +4,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import somalier
-from cpg_workflows.stages.alignment.cram_qc import CramQC
+from cpg_workflows.stages.alignment_pipeline.cram_qc import CramQC
 from cpg_workflows.targets import Dataset
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
