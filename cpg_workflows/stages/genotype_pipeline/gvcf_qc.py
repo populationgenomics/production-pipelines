@@ -12,7 +12,6 @@ from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
-from cpg_workflows.stages.genotype import Genotype
 from cpg_workflows.targets import Dataset
 from cpg_workflows.workflow import (
     DatasetStage,
@@ -23,6 +22,8 @@ from cpg_workflows.workflow import (
     StageOutput,
     stage,
 )
+
+from ..genotype import Genotype
 
 
 @stage(required_stages=Genotype)
