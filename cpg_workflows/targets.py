@@ -196,6 +196,16 @@ class MultiCohort(Target):
         self._cohorts_by_name[c.name] = c
         return c
 
+    def get_job_attrs(self) -> dict:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {
+            'sequencing_groups': self.get_sequencing_group_ids(),
+            'datasets': [d.name for d in self.get_datasets()],
+            'cohorts': [c.name for c in self.get_cohorts()],
+        }
+
 
 class Cohort(Target):
     """
