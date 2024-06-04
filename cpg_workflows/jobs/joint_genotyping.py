@@ -6,15 +6,14 @@ import logging
 import math
 from enum import Enum
 
-import pandas as pd
-
 import hailtop.batch as hb
-from hailtop.batch import Resource
-from hailtop.batch.job import Job
-
+import pandas as pd
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
+from hailtop.batch import Resource
+from hailtop.batch.job import Job
+
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
@@ -55,17 +54,17 @@ def make_joint_genotyping_jobs(
     Outputs a multi-sample VCF under `output_vcf_path`.
     """
     if len(gvcf_by_sgid) == 0:
-        raise ValueError('Provided samples collection for joint calling should contain at least one active sample')
+        raise ValueError("Provided samples collection for joint calling should contain at least one active sample")
     scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sgid))
 
     all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
     if out_siteonly_vcf_part_paths:
         assert len(out_siteonly_vcf_part_paths) == scatter_count
         all_output_paths.extend(out_siteonly_vcf_part_paths)
-    if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
+    if can_reuse(all_output_paths + [to_path(f"{p}.tbi") for p in all_output_paths]):
         return []
 
-    logging.info('Submitting joint-calling jobs')
+    logging.info("Submitting joint-calling jobs")
 
     jobs: list[Job] = []
     intervals_j, intervals = get_intervals(
@@ -74,7 +73,7 @@ def make_joint_genotyping_jobs(
         exclude_intervals_path=exclude_intervals_path,
         scatter_count=scatter_count,
         job_attrs=job_attrs,
-        output_prefix=tmp_bucket / f'intervals_{scatter_count}',
+        output_prefix=tmp_bucket / f"intervals_{scatter_count}",
     )
     if intervals_j:
         jobs.append(intervals_j)
@@ -83,30 +82,30 @@ def make_joint_genotyping_jobs(
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
     # Preparing inputs for GenomicsDB
-    genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
-    sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
-    df = pd.DataFrame([{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sgid.items()])
-    if not get_config()['workflow'].get('dry_run', False):
-        with sample_map_bucket_path.open('w') as fp:
-            df.to_csv(fp, index=False, header=False, sep='\t')
+    genomicsdb_bucket = tmp_bucket / "genomicsdbs"
+    sample_map_bucket_path = genomicsdb_bucket / "sample_map.csv"
+    df = pd.DataFrame([{"id": sid, "path": str(path)} for sid, path in gvcf_by_sgid.items()])
+    if not get_config()["workflow"].get("dry_run", False):
+        with sample_map_bucket_path.open("w") as fp:
+            df.to_csv(fp, index=False, header=False, sep="\t")
 
     do_filter_excesshet = len(gvcf_by_sgid) >= 1000 and do_filter_excesshet
 
     for idx, interval in enumerate(intervals):
-        genomicsdb_path = genomicsdb_bucket / f'interval_{idx + 1}_outof_{scatter_count}.tar'
+        genomicsdb_path = genomicsdb_bucket / f"interval_{idx + 1}_outof_{scatter_count}.tar"
         import_gvcfs_j = genomicsdb(
             b=b,
             sample_map_bucket_path=sample_map_bucket_path,
             interval=interval,
             output_path=genomicsdb_path,
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f"{idx + 1}/{scatter_count}"),
         )
 
         jc_vcf_path = (
-            (tmp_bucket / 'joint-genotyper' / 'parts' / f'part{idx + 1}.vcf.gz') if scatter_count > 1 else out_vcf_path
+            (tmp_bucket / "joint-genotyper" / "parts" / f"part{idx + 1}.vcf.gz") if scatter_count > 1 else out_vcf_path
         )
         filt_jc_vcf_path = (
-            (tmp_bucket / 'excess-filter' / 'parts' / f'part{idx + 1}.vcf.gz')
+            (tmp_bucket / "excess-filter" / "parts" / f"part{idx + 1}.vcf.gz")
             if scatter_count > 1 and do_filter_excesshet
             else out_vcf_path
         )
@@ -114,7 +113,7 @@ def make_joint_genotyping_jobs(
             siteonly_jc_vcf_path = out_siteonly_vcf_part_paths[idx]
         else:
             siteonly_jc_vcf_path = (
-                (tmp_bucket / 'siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
+                (tmp_bucket / "siteonly" / "parts" / f"part{idx + 1}.vcf.gz")
                 if scatter_count > 1
                 else out_siteonly_vcf_path
             )
@@ -123,9 +122,10 @@ def make_joint_genotyping_jobs(
             b,
             genomicsdb_path=genomicsdb_path,
             interval=interval,
+            exclude_intervals_path=exclude_intervals_path,
             tool=tool,
             output_vcf_path=jc_vcf_path,
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f"{idx + 1}/{scatter_count}"),
         )
         if jc_vcf_j:
             jobs.append(jc_vcf_j)
@@ -139,7 +139,7 @@ def make_joint_genotyping_jobs(
                 input_vcf=jc_vcf,
                 interval=interval,
                 output_vcf_path=filt_jc_vcf_path,
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+                job_attrs=(job_attrs or {}) | dict(part=f"{idx + 1}/{scatter_count}"),
             )
             if excess_filter_j:
                 jobs.append(excess_filter_j)
@@ -153,7 +153,7 @@ def make_joint_genotyping_jobs(
             b=b,
             input_vcf=vcfs[idx],
             output_vcf_path=siteonly_jc_vcf_path,
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f"{idx + 1}/{scatter_count}"),
         )
         # make add_make_sitesonly_job return the vcf file as apointer
         siteonly_vcfs.append(siteonly_j_vcf)
@@ -161,7 +161,7 @@ def make_joint_genotyping_jobs(
             jobs.append(siteonly_j)
 
     if scatter_count > 1:
-        logging.info('Queueing gather VCFs job')
+        logging.info("Queueing gather VCFs job")
         jobs.extend(
             gather_vcfs(
                 b,
@@ -173,7 +173,7 @@ def make_joint_genotyping_jobs(
             ),
         )
 
-        logging.info('Queueing gather site-only VCFs job')
+        logging.info("Queueing gather site-only VCFs job")
         jobs.extend(
             gather_vcfs(
                 b,
@@ -186,7 +186,7 @@ def make_joint_genotyping_jobs(
 
     jobs = [j for j in jobs if j is not None]
     for j in jobs:
-        j.name = f'Joint genotyping: {j.name}'
+        j.name = f"Joint genotyping: {j.name}"
     return jobs
 
 
@@ -213,15 +213,15 @@ def genomicsdb(
     if can_reuse(output_path):
         return None
 
-    job_name = 'Create GenomicsDB'
+    job_name = "Create GenomicsDB"
     j = b.new_job(
         job_name,
         (job_attrs or {})
         | dict(
-            tool='gatk GenomicsDBImport',
+            tool="gatk GenomicsDBImport",
         ),
     )
-    j.image(image_path('gatk'))
+    j.image(image_path("gatk"))
 
     sample_map = b.read_input(str(sample_map_bucket_path))
 
@@ -249,14 +249,14 @@ def genomicsdb(
         #   using the --merge-input-intervals arg. There's no data in between since we
         #   didn't run HaplotypeCaller over those loci, so we're not wasting any
         #   compute.
-        '--merge-input-intervals',
-        '--consolidate',
+        "--merge-input-intervals",
+        "--consolidate",
         # The Broad:
         # > The batch_size value was carefully chosen here as it is the optimal value
         #   for the amount of memory allocated within the task; please do not change
         #   it without consulting the Hellbender (GATK engine) team!
-        '--batch-size',
-        '50',
+        "--batch-size",
+        "50",
     ]
 
     cmd = f"""\
@@ -291,6 +291,7 @@ def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
     interval: hb.Resource | None = None,
+    exclude_intervals_path: Path | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
     job_attrs: dict | None = None,
@@ -314,14 +315,14 @@ def _add_joint_genotyper_job(
     if can_reuse(output_vcf_path):
         return None, b.read_input_group(
             **{
-                'vcf.gz': str(output_vcf_path),
-                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+                "vcf.gz": str(output_vcf_path),
+                "vcf.gz.tbi": str(output_vcf_path) + ".tbi",
             },
         )
-    job_name = f'{tool.name}'
-    job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
+    job_name = f"{tool.name}"
+    job_attrs = (job_attrs or {}) | {"tool": f"gatk {tool.name}"}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path("gatk"))
     # Standard 375/4 = 93G storage should be enough, based on the following estimations:
     # For example, for 1359 samples, and scatter_count=200,
     # * all of 200 GenomicsDBs tarballs = 1.09 TB
@@ -332,11 +333,15 @@ def _add_joint_genotyper_job(
     res = STANDARD.request_resources(ncpu=4)
     res.set_to_job(j)
 
-    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.declare_resource_group(output_vcf={"vcf.gz": "{root}.vcf.gz", "vcf.gz.tbi": "{root}.vcf.gz.tbi"})
 
     reference = fasta_res_group(b)
 
-    if str(genomicsdb_path).endswith('.tar'):
+    exclude_intervals_path = (
+        exclude_intervals_path or reference_path("hg38_telomeres_and_centromeres_intervals/interval_list") or None
+    )
+
+    if str(genomicsdb_path).endswith(".tar"):
         # can't use directly from cloud, need to copy and uncompress:
         input_cmd = f"""\
         retry_gs_cp {genomicsdb_path} $BATCH_TMPDIR/{genomicsdb_path.name}
@@ -361,6 +366,10 @@ def _add_joint_genotyper_job(
     {f'-L {interval} ' if interval else ''} \\
     --only-output-calls-starting-in-intervals \\
     """
+    if exclude_intervals_path:
+        cmd += f"""\
+            --exclude-intervals {b.read_input(exclude_intervals_path)} \\
+        """
     if tool == JointGenotyperTool.GnarlyGenotyper:
         cmd += """\
     --keep-all-sites \\
@@ -377,7 +386,7 @@ def _add_joint_genotyper_job(
     """
     j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
     if output_vcf_path:
-        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace(".vcf.gz", ""))
     return j, j.output_vcf
 
 
@@ -407,16 +416,16 @@ def _add_excess_het_filter(
     if can_reuse(output_vcf_path):
         return None, b.read_input_group(
             **{
-                'vcf.gz': str(output_vcf_path),
-                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+                "vcf.gz": str(output_vcf_path),
+                "vcf.gz.tbi": str(output_vcf_path) + ".tbi",
             },
         )
 
-    job_name = 'ExcessHet filter'
+    job_name = "ExcessHet filter"
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path("gatk"))
     res = STANDARD.set_resources(j, ncpu=2)
-    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.declare_resource_group(output_vcf={"vcf.gz": "{root}.vcf.gz", "vcf.gz.tbi": "{root}.vcf.gz.tbi"})
 
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
@@ -441,7 +450,7 @@ def _add_excess_het_filter(
         ),
     )
     if output_vcf_path:
-        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace(".vcf.gz", ""))
     return j, j.output_vcf
 
 
@@ -461,19 +470,19 @@ def add_make_sitesonly_job(
     if output_vcf_path and can_reuse(output_vcf_path):
         return None, b.read_input_group(
             **{
-                'vcf.gz': str(output_vcf_path),
-                'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
+                "vcf.gz": str(output_vcf_path),
+                "vcf.gz.tbi": str(output_vcf_path) + ".tbi",
             },
         )
 
-    job_name = 'MakeSitesOnlyVcf'
-    job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
+    job_name = "MakeSitesOnlyVcf"
+    job_attrs = (job_attrs or {}) | {"tool": "gatk MakeSitesOnlyVcf"}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path("gatk"))
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
-        j.storage(f'{storage_gb}G')
-    j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+        j.storage(f"{storage_gb}G")
+    j.declare_resource_group(output_vcf={"vcf.gz": "{root}.vcf.gz", "vcf.gz.tbi": "{root}.vcf.gz.tbi"})
 
     assert isinstance(j.output_vcf, hb.ResourceGroup)
     j.command(
@@ -491,5 +500,5 @@ def add_make_sitesonly_job(
         ),
     )
     if output_vcf_path:
-        b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+        b.write_output(j.output_vcf, str(output_vcf_path).replace(".vcf.gz", ""))
     return j, j.output_vcf
