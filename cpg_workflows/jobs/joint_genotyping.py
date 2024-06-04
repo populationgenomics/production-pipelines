@@ -266,19 +266,19 @@ def genomicsdb(
     # Multiple GenomicsDBImport read same GVCFs in parallel, which could lead to
     # some of the jobs failing reading a GVCF, e.g.:
     # https://batch.hail.populationgenomics.org.au/batches/74388/jobs/45
-    # So wrapping the command in a 'retry' call, which would attempt it multiple
+    # So wrapping the command in a "retry" call, which would attempt it multiple
     # times after a timeout using.
     # --overwrite-existing-genomicsdb-workspace is to make sure the $WORKSPACE
     # directory from a previous attempt is not in the way of a new attempt.
     function run {{
-    gatk --java-options '-Xms{xms_gb}g -Xmx{xmx_gb}g' \\
+    gatk --java-options "-Xms{xms_gb}g -Xmx{xmx_gb}g" \\
     GenomicsDBImport \\
     --genomicsdb-workspace-path $WORKSPACE \\
     {f'-L {interval}' if interval is not None else ''} \\
     --sample-name-map {sample_map} \\
     --reader-threads {nthreads} \\
     --overwrite-existing-genomicsdb-workspace \\
-    {' '.join(params)} && \\
+    {" ".join(params)} && \\
     tar -cf {j.db_tar} $WORKSPACE
     }}
     retry run
@@ -304,7 +304,7 @@ def _add_joint_genotyper_job(
     GenotypeGVCFs is a standard GATK joint-genotyping tool.
 
     GnarlyGenotyper is an experimental GATK joint-genotyping tool that performs
-    'quick and dirty' joint genotyping on large cohorts, of GVCFs post-processed
+    "quick and dirty" joint genotyping on large cohorts, of GVCFs post-processed
     with ReblockGVCF.
 
     HaplotypeCaller must be used with `-ERC GVCF` or `-ERC BP_RESOLUTION` to add
@@ -358,7 +358,7 @@ def _add_joint_genotyper_job(
     cmd = f"""\
     {input_cmd}
 
-    gatk --java-options '{res.java_mem_options()}' \\
+    gatk --java-options "{res.java_mem_options()}" \\
     {tool.name} \\
     -R {reference.base} \\
     -O {j.output_vcf['vcf.gz']} \\
@@ -435,7 +435,7 @@ def _add_excess_het_filter(
     # Capturing stderr to avoid Batch pod from crashing with OOM from millions of
     # warning messages from VariantFiltration, e.g.:
     # > JexlEngine - ![0,9]: 'ExcessHet > 54.69;' undefined variable ExcessHet
-    gatk --java-options '{res.java_mem_options()}' \\
+    gatk --java-options "{res.java_mem_options()}" \\
     VariantFiltration \\
     --filter-expression 'ExcessHet > {excess_het_threshold}' \\
     --filter-name ExcessHet \\
@@ -489,7 +489,7 @@ def add_make_sitesonly_job(
     j.command(
         command(
             f"""
-    gatk --java-options '{res.java_mem_options()}' \\
+    gatk --java-options "{res.java_mem_options()}" \\
     MakeSitesOnlyVcf \\
     -I {input_vcf['vcf.gz']} \\
     -O {j.output_vcf['vcf.gz']}
