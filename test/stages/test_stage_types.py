@@ -89,7 +89,7 @@ def test_dataset_stages(mocker: MockFixture, tmp_path):
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage.get('DatasetStage1')
     # The next two tests are looking at the same behaviour, but from different angles
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 2
+    assert len(get_inputs().get_datasets()) == 2
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
 
 
@@ -108,8 +108,7 @@ def test_multiple_dataset_stages(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('DatasetStage1')
     assert get_batch().job_by_stage.get('DatasetStage2')
 
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 2
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == 2
+    assert len(get_inputs().get_datasets()) == 2
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
 
@@ -130,8 +129,8 @@ def test_mixture_dataset_stage_sg_stage(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('DatasetStage1')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 2
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == 4
+    assert len(get_inputs().get_datasets()) == 2
+    assert len(get_inputs().get_sequencing_groups()) == 4
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
 
@@ -161,9 +160,8 @@ def test_mixture_of_multiple_dataset_and_sg_stages(mocker: MockFixture, tmp_path
     assert get_batch().job_by_stage.get('DatasetStage2')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 2
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == 2
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == 4
+    assert len(get_inputs().get_datasets()) == 2
+    assert len(get_inputs().get_sequencing_groups()) == 4
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
@@ -213,11 +211,10 @@ def test_mix_all_stage_types(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('DatasetStage2')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == 1
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 2
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == 2
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == 4
+    assert len(get_inputs().get_datasets()) == 2
+    assert len(get_inputs().get_sequencing_groups()) == 4
 
+    assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == 1
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
     assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
@@ -268,12 +265,11 @@ def test_mixture_multicohort_and_other_stages(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('SGStage1')
     assert get_batch().job_by_stage.get('MultiCohortStage1')
 
-    assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == 2
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == 3
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == 3
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == 6
-    assert get_batch().job_by_stage.get('MultiCohortStage1').get('job_n') == 1
+    assert len(multicohort.get_datasets()) == 3
+    assert len(multicohort.get_sequencing_groups()) == 6
+    assert len(multicohort.get_cohorts()) == 2
 
+    assert get_batch().job_by_stage.get('MultiCohortStage1').get('job_n') == 1
     assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(multicohort.get_datasets())
     assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(multicohort.get_datasets())
     assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(multicohort.get_sequencing_groups())

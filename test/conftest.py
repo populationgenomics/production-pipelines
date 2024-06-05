@@ -33,5 +33,4 @@ def pre_and_post_test():
     setattr(cpg_workflows.inputs, '_cohort', None)  # noqa: B010
     setattr(cpg_workflows.stages.gatk_sv, '_FASTA', None)  # noqa: B010
     setattr(cpg_workflows.metamist, '_metamist', None)  # noqa: B010
-    setattr(cpg_workflows.inputs, '_cohort', None)  # noqa: B010
     setattr(cpg_workflows.inputs, '_multicohort', None)  # noqa: B010

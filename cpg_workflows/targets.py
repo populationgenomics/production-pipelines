@@ -205,7 +205,6 @@ class Cohort(Target):
 
     def __init__(self, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
-        # self.name = get_config()['workflow']['dataset']
         self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=self.name, cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}

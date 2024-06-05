@@ -1153,7 +1153,7 @@ class Workflow:
 
         # Round 6: actually adding jobs from the stages.
         if not self.dry_run:
-            inputs = get_inputs()
+            inputs = get_inputs()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
                 logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')
@@ -1388,6 +1388,7 @@ class MultiCohortStage(Stage, ABC):
         """
         Override to declare expected output paths.
         """
+        pass
 
     @abstractmethod
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
