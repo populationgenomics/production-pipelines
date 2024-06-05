@@ -259,7 +259,7 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
-    def get_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
+    def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
         """
         Retrieve the sequencing groups per dataset for a list of cohort IDs.
         """

@@ -54,7 +54,7 @@ def create_multicohort() -> MultiCohort:
     custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
     multicohort = MultiCohort()
 
-    datasets_by_cohort = get_metamist().get_cohorts(custom_cohort_ids)
+    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids)
 
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)

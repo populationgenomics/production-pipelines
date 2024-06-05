@@ -233,7 +233,7 @@ def test_multicohort(
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    mocker.patch('cpg_workflows.metamist.Metamist.get_cohorts', mock_get_cohorts)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_cohorts)
 
     from cpg_workflows.inputs import get_inputs
 
