@@ -198,7 +198,7 @@ class MultiCohort(Target):
 
 class Cohort(Target):
     """
-    Represents a "cohort" target - all sequencing groups from all datasets in the workflow.
+    Represents a "cohort" target - all sequencing groups from a single CustomCohort (potentially spanning multiple datasets) in the workflow.
     Analysis dataset name is required and will be used as the default name for the
     cohort.
     """
