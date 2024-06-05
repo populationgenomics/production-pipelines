@@ -70,9 +70,7 @@ def populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bo
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
-    dataset_names = list(sgs_by_dataset_for_cohort.keys())
-
-    for dataset_name in dataset_names:
+    for dataset_name in sgs_by_dataset_for_cohort.keys():
         dataset = cohort.create_dataset(dataset_name)
         sgs = sgs_by_dataset_for_cohort[dataset_name]
 
