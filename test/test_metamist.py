@@ -131,7 +131,7 @@ class TestMetamist:
                 'type': 'custom',
                 'status': 'in-progress',
                 'sequencingGroups': [],
-            }
+            },
         )
         status_to_be_set = AnalysisStatus.parse('completed')
 
