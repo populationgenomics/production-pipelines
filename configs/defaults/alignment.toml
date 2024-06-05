@@ -14,6 +14,10 @@ highmem_workers = true
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
+[cramqc]
+assume_sorted = true
+num_pcs = 4
+
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below
