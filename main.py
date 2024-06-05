@@ -39,6 +39,8 @@ from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'alignment': [CramMultiQC],
+    'genotype': [GvcfMultiQC],
     'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'pre_alignment': [FastQCMultiQC],
@@ -55,7 +57,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         BamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
-    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
     'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch
