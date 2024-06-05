@@ -208,7 +208,7 @@ class Cohort(Target):
         self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=self.name, cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
-        self.mutlicohort = multicohort
+        self.multicohort = multicohort
 
     def __repr__(self):
         return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
