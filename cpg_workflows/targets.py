@@ -170,17 +170,6 @@ class MultiCohort(Target):
             all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
         return all_sequencing_groups
 
-    def add_cohort(self, cohort: 'Cohort') -> 'Cohort':
-        """
-        Add existing cohort into the multi-cohort.
-        """
-        cohort.mutlicohort = self
-        if cohort.name in self._cohorts_by_name:
-            logging.debug(f'Cohort {cohort.name} already exists in the multi-cohort')
-            return cohort
-        self._cohorts_by_name[cohort.name] = cohort
-        return cohort
-
     def create_cohort(
         self,
         name: str,
