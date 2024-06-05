@@ -58,10 +58,11 @@ def create_multicohort() -> MultiCohort:
 
     datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids)
 
+    read_pedigree = config.get('read_pedigree', True)
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
-        populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=config.get('read_pedigree', True))
+        populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
     return multicohort
 
