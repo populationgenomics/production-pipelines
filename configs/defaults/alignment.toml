@@ -1,0 +1,39 @@
+[workflow]
+name = 'alignment'
+scatter_count = 50
+scatter_count_genotype = 50
+status_reporter = 'metamist'
+# define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
+ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+highmem_workers = true
+# Realign CRAM when available, instead of using FASTQ.
+# The parameter value should correspond to CRAM version
+# (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
+#realign_from_cram_version = 'v0'
+
+# Calling intervals (defauls to whole genome intervals)
+#intervals_path =
+
+[cramqc]
+assume_sorted = true
+num_pcs = 4
+
+[resource_overrides]
+# Override default resource requirements for unusually large seq data without
+# demanding higher resources for all operations as standard. Examples below
+
+[hail]
+pool_label = 'alignment'
+delete_scratch_on_exit = false
+
+
+# Autoscaling policy must be created in the project that corresponds
+# to the analysis dataset.
+#[hail.dataproc]
+#combiner_autoscaling_policy = 'vcf-combiner-50'
+
+[references.gnomad]
+tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centromeres/hg38.telomeresAndMergedCentromeres.ht"
+[references.hg38_telomeres_and_centromeres_intervals]
+# Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3
+interval_list = "gs://cpg-common-main/references/hg38/v0/hg38.telomeresAndMergedCentromeres.interval_list"
