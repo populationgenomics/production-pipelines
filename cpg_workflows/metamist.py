@@ -264,13 +264,13 @@ class Metamist:
         Retrieve the sequencing groups per dataset for a list of cohort IDs.
         """
 
-        cohorts: dict[str, dict[str, Any]] = {}
+        sgs_per_dataset_per_cohort: dict[str, dict[str, Any]] = {}
 
         for cohort_id in cohort_ids:
-            cohort = self.get_sgs_by_project_from_cohort(cohort_id)
-            cohorts[cohort_id] = cohort
+            sgs_per_dataset_for_cohort = self.get_sgs_by_project_from_cohort(cohort_id)
+            sgs_per_dataset_per_cohort[cohort_id] = sgs_per_dataset_for_cohort
 
-        return cohorts
+        return sgs_per_dataset_per_cohort
 
     def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
         """
