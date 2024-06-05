@@ -42,6 +42,8 @@ def get_inputs() -> Cohort | MultiCohort:
 
     # NOTE: When configuring sgs in the config is deprecated, this will be removed.
     if config_retrieve(['workflow', 'input_cohorts'], []):
+        if not isinstance(custom_cohort_ids, list):
+            raise ValueError('input_cohorts must be a list')
         return get_multicohort()
     return deprecated_get_cohort()
 
