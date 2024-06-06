@@ -113,7 +113,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
 
     from cpg_utils.config import dataset_path
     from cpg_utils.hail_batch import get_batch, reset_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -172,7 +172,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         print(b.attributes)
         print(b.name)
     # Check that the correct number of jobs were created
-    assert len(get_batch()._jobs) == len(get_inputs().get_sequencing_groups()) * len(workflow_stages) * 2
+    assert len(get_batch()._jobs) == len(get_multicohort().get_sequencing_groups()) * len(workflow_stages) * 2
     # 2 jobs per stage, assumes no nested workflow stages
     # ((1 per SG * 2 SG) * 2 workflow stages) * 2 (1 job per stage, 1 result registration)
 
@@ -203,7 +203,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         # test job name
         assert job.name
         assert job.name.startswith(
-            f'{get_inputs().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}',
+            f'{get_multicohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}',
         )
 
     # Check that the job_by_stage and job_by_tool dicts are correct

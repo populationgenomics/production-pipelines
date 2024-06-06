@@ -83,14 +83,14 @@ def test_dataset_stages(mocker: MockFixture, tmp_path):
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(mocker, cohort_mocker=mock_multidataset_cohort, stages=[DatasetStage1])
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage.get('DatasetStage1')
     # The next two tests are looking at the same behaviour, but from different angles
-    assert len(get_inputs().get_datasets()) == 2
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
+    assert len(get_multicohort().get_datasets()) == 2
+    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_multicohort().get_datasets())
 
 
 def test_multiple_dataset_stages(mocker: MockFixture, tmp_path):
@@ -101,16 +101,16 @@ def test_multiple_dataset_stages(mocker: MockFixture, tmp_path):
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(mocker, cohort_mocker=mock_multidataset_cohort, stages=[DatasetStage1, DatasetStage2])
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage.get('DatasetStage1')
     assert get_batch().job_by_stage.get('DatasetStage2')
 
-    assert len(get_inputs().get_datasets()) == 2
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
+    assert len(get_multicohort().get_datasets()) == 2
+    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_multicohort().get_datasets())
 
 
 def test_mixture_dataset_stage_sg_stage(mocker: MockFixture, tmp_path):
@@ -122,17 +122,17 @@ def test_mixture_dataset_stage_sg_stage(mocker: MockFixture, tmp_path):
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(mocker, cohort_mocker=mock_multidataset_cohort, stages=[DatasetStage1, SGStage1])
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage.get('DatasetStage1')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert len(get_inputs().get_datasets()) == 2
-    assert len(get_inputs().get_sequencing_groups()) == 4
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
+    assert len(get_multicohort().get_datasets()) == 2
+    assert len(get_multicohort().get_sequencing_groups()) == 4
+    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_multicohort().get_sequencing_groups())
 
 
 def test_mixture_of_multiple_dataset_and_sg_stages(mocker: MockFixture, tmp_path):
@@ -144,7 +144,7 @@ def test_mixture_of_multiple_dataset_and_sg_stages(mocker: MockFixture, tmp_path
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(
         mocker,
@@ -160,11 +160,11 @@ def test_mixture_of_multiple_dataset_and_sg_stages(mocker: MockFixture, tmp_path
     assert get_batch().job_by_stage.get('DatasetStage2')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert len(get_inputs().get_datasets()) == 2
-    assert len(get_inputs().get_sequencing_groups()) == 4
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
+    assert len(get_multicohort().get_datasets()) == 2
+    assert len(get_multicohort().get_sequencing_groups()) == 4
+    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_multicohort().get_sequencing_groups())
 
 
 def test_depcrecated_cohort_stage_implementation(mocker: MockFixture, tmp_path):
@@ -175,14 +175,14 @@ def test_depcrecated_cohort_stage_implementation(mocker: MockFixture, tmp_path):
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(mocker, cohort_mocker=mock_multidataset_cohort, stages=[CohortStage1])
     print('Job by stage:', get_batch().job_by_stage)
     assert get_batch().job_by_stage.get('CohortStage1')
     assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == 1
 
-    print(get_inputs())
+    print(get_multicohort())
 
 
 def test_mix_all_stage_types(mocker: MockFixture, tmp_path):
@@ -193,7 +193,7 @@ def test_mix_all_stage_types(mocker: MockFixture, tmp_path):
     set_config(get_config(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
 
     run_workflow(
         mocker,
@@ -211,13 +211,13 @@ def test_mix_all_stage_types(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('DatasetStage2')
     assert get_batch().job_by_stage.get('SGStage1')
 
-    assert len(get_inputs().get_datasets()) == 2
-    assert len(get_inputs().get_sequencing_groups()) == 4
+    assert len(get_multicohort().get_datasets()) == 2
+    assert len(get_multicohort().get_sequencing_groups()) == 4
 
     assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == 1
-    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_inputs().get_datasets())
-    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_inputs().get_sequencing_groups())
+    assert get_batch().job_by_stage.get('DatasetStage1').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(get_multicohort().get_datasets())
+    assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(get_multicohort().get_sequencing_groups())
 
 
 def test_multicohort_stage(mocker: MockFixture, tmp_path):
@@ -243,7 +243,7 @@ def test_mixture_multicohort_and_other_stages(mocker: MockFixture, tmp_path):
     set_config(get_config_multicohort(tmp_path=tmp_path), tmp_path / 'config.toml')
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import MultiCohort, get_inputs
+    from cpg_workflows.inputs import MultiCohort, get_multicohort
 
     run_workflow(
         mocker,
@@ -257,7 +257,7 @@ def test_mixture_multicohort_and_other_stages(mocker: MockFixture, tmp_path):
         ],
     )
     print('Job by stage:', get_batch().job_by_stage)
-    multicohort = get_inputs()
+    multicohort = get_multicohort()
     assert isinstance(multicohort, MultiCohort)
     assert get_batch().job_by_stage.get('CohortStage1')
     assert get_batch().job_by_stage.get('DatasetStage1')

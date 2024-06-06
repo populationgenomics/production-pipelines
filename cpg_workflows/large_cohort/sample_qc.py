@@ -9,7 +9,7 @@ import hail as hl
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, reference_path
 from cpg_utils.hail_batch import genome_build
-from cpg_workflows.inputs import get_inputs
+from cpg_workflows.inputs import get_multicohort
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
 
@@ -65,7 +65,7 @@ def initialise_sample_table() -> hl.Table:
             'superpopulation': s.meta.get('Superpopulation name'),
             'population': s.meta.get('Population name'),
         }
-        for s in get_inputs().get_sequencing_groups()
+        for s in get_multicohort().get_sequencing_groups()
         if s.gvcf
     ]
     if not entries:

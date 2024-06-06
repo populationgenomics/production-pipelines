@@ -28,7 +28,7 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
-from .inputs import get_inputs
+from .inputs import get_multicohort
 from .status import MetamistStatusReporter
 from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
 from .utils import (
@@ -885,7 +885,7 @@ class Workflow:
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
         if not self.dry_run:
-            if ds_set := set(d.name for d in get_inputs().get_datasets()):
+            if ds_set := set(d.name for d in get_multicohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
             reset_batch()
             get_batch().name = description
@@ -898,7 +898,7 @@ class Workflow:
 
     @property
     def output_version(self) -> str:
-        return self._output_version or get_inputs().alignment_inputs_hash()
+        return self._output_version or get_multicohort().alignment_inputs_hash()
 
     @property
     def analysis_prefix(self) -> Path:
@@ -920,7 +920,7 @@ class Workflow:
         """
         Prepare a unique path for the workflow with this name and this input data.
         """
-        return get_inputs().analysis_dataset.prefix(category=category) / self.name / self.output_version
+        return get_multicohort().analysis_dataset.prefix(category=category) / self.name / self.output_version
 
     def run(
         self,
@@ -1153,7 +1153,7 @@ class Workflow:
 
         # Round 6: actually adding jobs from the stages.
         if not self.dry_run:
-            inputs = get_inputs()  # Would communicate with metamist.
+            inputs = get_multicohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
                 logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')

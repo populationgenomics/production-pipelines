@@ -15,7 +15,7 @@ _cohort: Cohort | None = None
 _multicohort: MultiCohort | None = None
 
 
-def get_multicohort() -> MultiCohort:
+def actual_get_multicohort() -> MultiCohort:
     """Return the multicohort object"""
     global _multicohort
     if not _multicohort:
@@ -31,7 +31,7 @@ def deprecated_get_cohort() -> Cohort:
     return _cohort
 
 
-def get_inputs() -> Cohort | MultiCohort:
+def get_multicohort() -> Cohort | MultiCohort:
     """
     Return the cohort or multicohort object based on the workflow configuration.
     """

@@ -12,7 +12,7 @@ import pandas as pd
 
 from cpg_utils import to_path
 from cpg_utils.config import dataset_path, get_config, output_path
-from cpg_workflows import get_batch, get_inputs
+from cpg_workflows import get_batch, get_multicohort
 
 # benchmark matrix:
 N_WORKERS = [10, 30, 20, 40, 50]
@@ -20,9 +20,11 @@ N_SEQUENCING_GROUPS = [100, 200, 300, 400, 500]
 
 
 def main():
-    df = pd.DataFrame([{'s': s.id, 'gvcf': s.gvcf} for s in get_inputs().get_sequencing_groups() if s.gvcf.exists()])
+    df = pd.DataFrame(
+        [{'s': s.id, 'gvcf': s.gvcf} for s in get_multicohort().get_sequencing_groups() if s.gvcf.exists()],
+    )
     logging.info(
-        f'Found {len(df)}/{len(get_inputs().get_sequencing_groups())} sequencing groups '
+        f'Found {len(df)}/{len(get_multicohort().get_sequencing_groups())} sequencing groups '
         f'in {get_config()["workflow"]["dataset"]} with GVCFs',
     )
 
@@ -33,7 +35,7 @@ def main():
         for n_sequencing_groups in N_SEQUENCING_GROUPS:
             label = f'nseqgroups-{n_sequencing_groups}-nworkers-{n_workers}'
             out_vds_path = out_prefix / label / 'combined.vds'
-            sequencing_group_ids = get_inputs().get_sequencing_group_ids()[:n_sequencing_groups]
+            sequencing_group_ids = get_multicohort().get_sequencing_group_ids()[:n_sequencing_groups]
 
             from cpg_workflows.large_cohort.combiner import run
             from cpg_workflows.large_cohort.dataproc_utils import dataproc_job

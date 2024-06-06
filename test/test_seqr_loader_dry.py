@@ -196,7 +196,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_inputs
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
@@ -205,11 +205,13 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
-    assert get_batch().job_by_tool['gatk HaplotypeCaller']['job_n'] == len(get_inputs().get_sequencing_groups()) * 50
-    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(get_inputs().get_sequencing_groups())
-    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(get_inputs().get_sequencing_groups())
+    assert (
+        get_batch().job_by_tool['gatk HaplotypeCaller']['job_n'] == len(get_multicohort().get_sequencing_groups()) * 50
+    )
+    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(get_multicohort().get_sequencing_groups())
+    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(get_multicohort().get_sequencing_groups())
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
-        == len(get_inputs().get_sequencing_groups()) + 1
+        == len(get_multicohort().get_sequencing_groups()) + 1
     )
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50

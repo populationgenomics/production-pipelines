@@ -6,7 +6,7 @@ import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
-from cpg_workflows.inputs import get_inputs
+from cpg_workflows.inputs import get_multicohort
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse, exists
 
@@ -59,13 +59,13 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
     run VDS combiner, assuming we are on a cluster.
     @param out_vds_path: output path for VDS
     @param tmp_prefix: tmp path for intermediate fields
-    @param sequencing_group_ids: optional list of sequencing groups to subset from get_inputs()
+    @param sequencing_group_ids: optional list of sequencing groups to subset from get_multicohort()
     @return: VDS object
     """
     if can_reuse(out_vds_path):
         return hl.vds.read_vds(str(out_vds_path))
 
-    sequencing_groups = get_inputs().get_sequencing_groups()
+    sequencing_groups = get_multicohort().get_sequencing_groups()
     if sequencing_group_ids:
         sequencing_groups = [s for s in sequencing_groups if s in sequencing_group_ids]
 
