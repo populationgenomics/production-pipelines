@@ -23,7 +23,7 @@ num_pcs = 4
 # demanding higher resources for all operations as standard. Examples below
 
 [hail]
-pool_label = 'large_cohort'
+pool_label = 'alignment'
 delete_scratch_on_exit = false
 
 
