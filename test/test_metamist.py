@@ -9,7 +9,15 @@ import pytest
 from pytest_mock import MockFixture
 
 from cpg_utils import to_path
-from cpg_workflows.metamist import Analysis, AnalysisStatus, AnalysisType, Metamist
+from cpg_workflows.filetypes import FastqPair
+from cpg_workflows.metamist import (
+    Analysis,
+    AnalysisStatus,
+    AnalysisType,
+    Metamist,
+    MetamistError,
+    parse_reads,
+)
 from metamist.exceptions import ApiException
 
 from . import set_config
@@ -66,13 +74,70 @@ def mock_aapi_update_analysis_err(*args, **kwargs):
     )
 
 
-def mock_query_get_sg_entries_returns_empty_sg_list(*args, **kwargs):
+def mock_query_get_sg_entries_query_returns_empty_data(*args, **kwargs):
     """
-    Mock function for AnalysisApi.get_sg_entries as sucess, returns [].
+    Mock function for AnalysisApi.query(GET_SEQUENCING_GROUPS_QUERY) as sucess.
+    It returns empty seq groups.
     """
     return {
         'project': {
             'sequencingGroups': [],
+        },
+    }
+
+
+def mock_query_get_analysis_query_returns_empty_data(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.query(GET_ANALYSES_QUERY) as sucess.
+    It returns empty analyses.
+    """
+    return {
+        'project': {
+            'analyses': [],
+        },
+    }
+
+
+def mock_query_get_analysis_query_returns_one_analysis_no_sg(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.query(GET_ANALYSES_QUERY) as sucess.
+    It returns valid analyses data.
+    where type and status are derived from the input kwargs.
+    """
+    return {
+        'project': {
+            'analyses': [
+                {
+                    'id': 12345,
+                    'type': kwargs.get('variables', {}).get('analysis_type', None),
+                    'meta': {},
+                    'output': 'test_output',
+                    'status': kwargs.get('variables', {}).get('analysis_status', None),
+                    'sequencingGroups': [],
+                },
+            ],
+        },
+    }
+
+
+def mock_query_get_analysis_query_returns_one_analysis_one_sg(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.query(GET_ANALYSES_QUERY) as sucess.
+    It returns valid analyses data.
+    where type and status are derived from the input kwargs.
+    """
+    return {
+        'project': {
+            'analyses': [
+                {
+                    'id': 12345,
+                    'type': kwargs.get('variables', {}).get('analysis_type', None),
+                    'meta': {},
+                    'output': 'test_output',
+                    'status': kwargs.get('variables', {}).get('analysis_status', None),
+                    'sequencingGroups': [{'id': 'SG01'}],
+                },
+            ],
         },
     }
 
@@ -166,9 +231,269 @@ class TestMetamist:
         dataset_name = 'test'
         mocker.patch(
             'cpg_workflows.metamist.query',
-            mock_query_get_sg_entries_returns_empty_sg_list,
+            mock_query_get_sg_entries_query_returns_empty_data,
         )
         sgs = metamist.get_sg_entries(dataset_name)
 
         assert sgs is not None
         assert sgs == []
+
+    def test_metamist_get_analyses_by_sgid_no_data(
+        self,
+        mocker: MockFixture,
+        metamist: Metamist,
+    ):
+        """
+        This test gets empty data from analyses by sgid entries from the Metamist API.
+        """
+
+        mocker.patch(
+            'cpg_workflows.metamist.query',
+            mock_query_get_analysis_query_returns_empty_data,
+        )
+        analysis_dict = metamist.get_analyses_by_sgid(
+            sg_ids=[],
+            analysis_type=AnalysisType.parse('custom'),
+        )
+        # should return empty dictionary
+        assert analysis_dict is not None
+        assert analysis_dict == {}
+
+        # test graphql query with one analysis, but no sgids
+        mocker.patch(
+            'cpg_workflows.metamist.query',
+            mock_query_get_analysis_query_returns_one_analysis_no_sg,
+        )
+        analysis_dict = metamist.get_analyses_by_sgid(
+            sg_ids=[],
+            analysis_type=AnalysisType.parse('custom'),
+        )
+        # should return empty dictionary
+        assert analysis_dict is not None
+        assert analysis_dict == {}
+
+    def test_metamist_get_analyses_by_sgid(
+        self,
+        mocker: MockFixture,
+        metamist: Metamist,
+    ):
+        """
+        This test gets analyses by sgid entries from the Metamist API.
+        """
+        analysis_type = AnalysisType.parse('custom')
+        mocker.patch(
+            'cpg_workflows.metamist.query',
+            mock_query_get_analysis_query_returns_one_analysis_one_sg,
+        )
+        analysis_dict = metamist.get_analyses_by_sgid(
+            sg_ids=[],  # NOTE: This param is not used in the metamist implementation, but has to be a list ???
+            analysis_type=analysis_type,
+        )
+        # should return dictionary with one record
+        assert analysis_dict is not None
+        assert len(analysis_dict) == 1
+        assert analysis_dict.get('SG01', None) is not None
+        assert analysis_dict['SG01'].type == analysis_type
+
+    def test_metamist_parse_reads_errors(self):
+        """
+        This test parses the reads various errors paths of the implementation
+        """
+
+        # test missing reads error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={},
+                check_existence=False,
+            )
+
+        assert str(exc_info.value) == 'SG01: no "meta/reads" field in meta'
+
+        # test missing reads_type error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={'reads': [{'location': 'test.fastq.gz'}]},
+                check_existence=False,
+            )
+
+        assert str(exc_info.value) == 'SG01: no "meta/reads_type" field in meta'
+
+        # test unsupported reads_type error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [{'location': 'test.fastq.gz'}],
+                    'reads_type': 'rubbish',
+                },
+                check_existence=False,
+            )
+        assert (
+            str(exc_info.value) == 'SG01: ERROR: "reads_type" is expected to be one of (\'fastq\', \'bam\', \'cram\')'
+        )
+
+        # test incorrectly formatted error
+        with pytest.raises(ValueError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [{'location': 'test.fastq.gz'}],
+                    'reads_type': 'fastq',
+                },
+                check_existence=False,
+            )
+        assert str(exc_info.value) == (
+            'Sequence data for sequencing group SG01 is incorrectly formatted. '
+            'Expecting 2 entries per lane (R1 and R2 fastqs), but got 1. '
+            'Read data: {\'location\': \'test.fastq.gz\'}'
+        )
+
+        # test file does not exist error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [
+                        [
+                            {'location': 'test1.fastq.gz'},
+                            {'location': 'test2.fastq.gz'},
+                        ],
+                    ],
+                    'reads_type': 'fastq',
+                },
+                check_existence=True,
+            )
+        assert str(exc_info.value) == ('SG01: ERROR: read 1 file does not exist: test1.fastq.gz')
+
+    def test_metamist_parse_reads_errors_bam(self, metamist: Metamist):
+        """
+        This test parses the reads various errors paths of the implementation
+        for bam files
+        NOTE: metamist param needed to populate config,
+        even if not referenced in the test itself
+        """
+
+        # test presents of multiple files as an error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [
+                        {'location': 'file1'},
+                        {'location': 'file2'},
+                    ],
+                    'reads_type': 'bam',
+                },
+                check_existence=False,
+            )
+        assert str(exc_info.value) == ('SG01: supporting only single bam/cram input')
+
+        # test incorrect file extension error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [
+                        {'location': 'file.rubbish'},
+                    ],
+                    'reads_type': 'bam',
+                },
+                check_existence=False,
+            )
+        assert str(exc_info.value) == (
+            'SG01: ERROR: expected the file to have an extension .cram or .bam, got: file.rubbish'
+        )
+
+        # test file does not exist error
+        with pytest.raises(MetamistError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [
+                        {'location': 'file.bam'},
+                    ],
+                    'reads_type': 'bam',
+                },
+                check_existence=True,
+            )
+        assert str(exc_info.value) == ('SG01: ERROR: index file does not exist: file.bam')
+
+        # test secondaryFiles file incorrect extension error
+        # This should throw MetamistError, however because of bug in implementation
+        # it fails later with assertion error
+        with pytest.raises(AssertionError) as exc_info:
+            parse_reads(
+                sequencing_group_id='SG01',
+                assay_meta={
+                    'reads': [
+                        {
+                            'location': 'file.bam',
+                            'secondaryFiles': [{'location': 'file.rubbish'}],
+                        },
+                    ],
+                    'reads_type': 'bam',
+                },
+                check_existence=False,
+            )
+        # TODO: once parse_reads implementation fixed, fix the exception message
+        # ATM it is not clear what the error is as it is AssertionError
+        assert str(exc_info.value) == ''
+
+    def test_metamist_parse_reads_bam_ok(self, metamist: Metamist):
+        """
+        Test simple bam case, do not check for file existence
+        """
+        reads = parse_reads(
+            sequencing_group_id='SG01',
+            assay_meta={
+                'reads': [
+                    {
+                        'location': 'file.bam',
+                        'secondaryFiles': [{'location': 'file.bai'}],
+                    },
+                ],
+                'reads_type': 'bam',
+            },
+            check_existence=False,
+        )
+        assert str(reads) == 'file.bam'
+
+    def test_metamist_parse_reads_cram_ok(self, metamist: Metamist):
+        """
+        Test simple cram case, do not check for file existence
+        """
+        reads = parse_reads(
+            sequencing_group_id='SG01',
+            assay_meta={
+                'reads': [
+                    {
+                        'location': 'file.cram',
+                        'secondaryFiles': [{'location': 'file.crai'}],
+                    },
+                ],
+                'reads_type': 'cram',
+            },
+            check_existence=False,
+        )
+        assert str(reads) == 'file.cram'
+
+    def test_metamist_parse_reads_fastq_ok(self, metamist: Metamist):
+        """
+        Test simple fastq case, do not check for file existence
+        """
+        reads = parse_reads(
+            sequencing_group_id='SG01',
+            assay_meta={
+                'reads': [
+                    [
+                        {'location': 'test1.fastq.gz'},
+                        {'location': 'test2.fastq.gz'},
+                    ],
+                ],
+                'reads_type': 'fastq',
+            },
+            check_existence=False,
+        )
+        assert str(reads) == 'test{1,2}.fastq.gz'
