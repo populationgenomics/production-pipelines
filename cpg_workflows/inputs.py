@@ -44,7 +44,7 @@ def get_multicohort() -> Cohort | MultiCohort:
     if config_retrieve(['workflow', 'input_cohorts'], []):
         if not isinstance(custom_cohort_ids, list):
             raise ValueError('input_cohorts must be a list')
-        return get_multicohort()
+        return actual_get_multicohort()
     return deprecated_get_cohort()
 
 

@@ -172,7 +172,7 @@ def run_workflow(
     stages: list[StageType] | None = None,
 ):
     mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', cohort_mocker)
-    mocker.patch('cpg_workflows.inputs.get_multicohort', cohort_mocker)
+    mocker.patch('cpg_workflows.inputs.actual_get_multicohort', cohort_mocker)
 
     stages = stages or [C, C2]
     _run_workflow(stages)  # type: ignore
