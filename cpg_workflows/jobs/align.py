@@ -13,7 +13,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path
 from cpg_utils.config import get_config, image_path, reference_path
-from cpg_utils.hail_batch import command, fasta_res_group
+from cpg_utils.hail_batch import Batch, command, fasta_res_group
 from cpg_workflows.filetypes import (
     AlignmentInput,
     BamPath,
@@ -105,7 +105,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
 
 
 def align(
-    b,
+    b: Batch,
     sequencing_group: SequencingGroup,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
@@ -302,7 +302,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
 
 def _align_one(
-    b,
+    b: Batch,
     job_name: str,
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
@@ -507,7 +507,7 @@ def _align_one(
 
 
 def extract_fastq(
-    b,
+    b: Batch,
     bam_or_cram_group: hb.ResourceGroup,
     ext: str = 'cram',
     job_attrs: dict | None = None,
