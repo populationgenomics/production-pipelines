@@ -239,13 +239,13 @@ def genomicsdb(
             'resource_overrides',
             'genomicsdb_import_mem_gb',
         ],
-        xmx_gb,
+        25,
     )
 
     STANDARD.set_resources(
         j,
         nthreads=nthreads,
-        mem_gb=xmx_gb + 1,
+        mem_gb=xmx_gb + 4,
         storage_gb=20,
     )
 
