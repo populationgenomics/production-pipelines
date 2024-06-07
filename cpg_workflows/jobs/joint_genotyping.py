@@ -238,7 +238,7 @@ def genomicsdb(
             'resource_overrides',
             'genomicsdb_import_mem_gb',
         ],
-        32,  # total memory allocated to the VM
+        32,  # 32GB total memory allocated to the VM by default
     )
     xmx_gb = genomicsdb_import_mem_gb - 7  # 25GB heap memory by default
 
