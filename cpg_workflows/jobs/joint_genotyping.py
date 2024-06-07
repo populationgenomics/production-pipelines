@@ -233,18 +233,19 @@ def genomicsdb(
     # GiB lower than the total memory allocated to the VM because this tool uses
     # a significant amount of non-heap memory for native libraries.
     xms_gb = 8
-    xmx_gb = config_retrieve(
+    genomicsdb_import_mem_gb = config_retrieve(
         [
             'resource_overrides',
             'genomicsdb_import_mem_gb',
         ],
-        25,
+        32,  # total memory allocated to the VM
     )
+    xmx_gb = genomicsdb_import_mem_gb - 7  # 25GB heap memory by default
 
     STANDARD.set_resources(
         j,
         nthreads=nthreads,
-        mem_gb=xmx_gb + 4,
+        mem_gb=genomicsdb_import_mem_gb,
         storage_gb=20,
     )
 

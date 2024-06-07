@@ -118,7 +118,7 @@ delete_scratch_on_exit = false
 # postproc_gvcf_storage = 50
 
 # JointGenotyping GenomicsDBImport job overrides
-# genomicsdb_import_mem_gb = 60
+# genomicsdb_import_mem_gb = 32
 
 [mito_snv]
 # Example config for broad wdl found here:
