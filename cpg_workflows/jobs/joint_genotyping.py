@@ -13,7 +13,7 @@ from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
@@ -86,7 +86,7 @@ def make_joint_genotyping_jobs(
     genomicsdb_bucket = tmp_bucket / 'genomicsdbs'
     sample_map_bucket_path = genomicsdb_bucket / 'sample_map.csv'
     df = pd.DataFrame([{'id': sid, 'path': str(path)} for sid, path in gvcf_by_sgid.items()])
-    if not get_config()['workflow'].get('dry_run', False):
+    if not config_retrieve(['workflow', 'dry_run'], False):
         with sample_map_bucket_path.open('w') as fp:
             df.to_csv(fp, index=False, header=False, sep='\t')
 
@@ -234,6 +234,13 @@ def genomicsdb(
     # a significant amount of non-heap memory for native libraries.
     xms_gb = 8
     xmx_gb = 25
+    xmx_gb = config_retrieve(
+        [
+            'resource_overrides',
+            'genomicsdb_import_mem_gb',
+        ],
+        xmx_gb,
+    )
 
     STANDARD.set_resources(
         j,
