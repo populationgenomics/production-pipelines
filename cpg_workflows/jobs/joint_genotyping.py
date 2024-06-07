@@ -246,9 +246,9 @@ def genomicsdb(
         ['resource_overrides', 'genomicsdb_import_use_highmem'],
         False,
     ):
-        genomicsdb_import_machine_type = STANDARD
-    else:
         genomicsdb_import_machine_type = HIGHMEM
+    else:
+        genomicsdb_import_machine_type = STANDARD
 
     genomicsdb_import_machine_type.set_resources(
         j,
