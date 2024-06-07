@@ -16,7 +16,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.resources import STANDARD, joint_calling_scatter_count
+from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
 
 from .picard import get_intervals
@@ -242,7 +242,15 @@ def genomicsdb(
     )
     xmx_gb = genomicsdb_import_mem_gb - 7  # 25GB heap memory by default
 
-    STANDARD.set_resources(
+    if config_retrieve(
+        ['resource_overrides', 'genomicsdb_import_use_highmem'],
+        False,
+    ):
+        genomicsdb_import_machine_type = STANDARD
+    else:
+        genomicsdb_import_machine_type = HIGHMEM
+
+    genomicsdb_import_machine_type.set_resources(
         j,
         nthreads=nthreads,
         mem_gb=genomicsdb_import_mem_gb,

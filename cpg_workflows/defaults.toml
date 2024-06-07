@@ -119,6 +119,7 @@ delete_scratch_on_exit = false
 
 # JointGenotyping GenomicsDBImport job overrides
 # genomicsdb_import_mem_gb = 32
+# genomicsdb_import_use_highmem = false
 
 [mito_snv]
 # Example config for broad wdl found here:

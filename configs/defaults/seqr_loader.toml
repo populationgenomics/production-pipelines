@@ -39,6 +39,7 @@ write_vcf = ["udn-aus"]
 
 # JointGenotyping GenomicsDBImport job overrides
 # genomicsdb_import_mem_gb = 32
+# genomicsdb_import_use_highmem = false
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
