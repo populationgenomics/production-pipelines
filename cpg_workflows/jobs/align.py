@@ -298,7 +298,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
         # For unindexed/unsorted CRAM or BAM inputs, extra storage is needed for tmp
         if isinstance(alignment_input, CramPath | BamPath) and not alignment_input.index_path:
             storage_gb += 150
-    return 100
+    return storage_gb
 
 
 def _align_one(

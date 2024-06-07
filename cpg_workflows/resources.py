@@ -2,6 +2,7 @@
 Functions to set up Hail Batch resources (cores, memory, storage).
 """
 
+import logging
 import math
 from dataclasses import dataclass
 
@@ -84,6 +85,15 @@ class MachineType:
         Set resources to a Job object. If any optional parameters are set,
         they will be used as a bound to request a fraction of an instance.
         """
+        logging.info(
+            f"""Setting resources for job {j.name}
+                machine_type: {self.name}
+                fraction: {fraction}
+                ncpu: {ncpu}
+                nthreads: {nthreads}
+                mem_gb: {mem_gb}
+                storage_gb: {storage_gb}""",
+        )
         return self.request_resources(
             fraction=fraction,
             ncpu=ncpu,
