@@ -233,7 +233,6 @@ def genomicsdb(
     # GiB lower than the total memory allocated to the VM because this tool uses
     # a significant amount of non-heap memory for native libraries.
     xms_gb = 8
-    xmx_gb = 25
     xmx_gb = config_retrieve(
         [
             'resource_overrides',
