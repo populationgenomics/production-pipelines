@@ -39,7 +39,6 @@ from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'alignment': [CramMultiQC],
     'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'pre_alignment': [FastQCMultiQC],
