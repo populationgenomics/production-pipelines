@@ -327,8 +327,9 @@ def joint_calling_scatter_count(sequencing_group_count: int) -> int:
     if scatter_count := get_config()['workflow'].get('scatter_count'):
         return scatter_count
 
-    # Values adjusted based on experience with the joint-calling jobs
-    # on genome sequencing groups.
+    # Estimating this is challenging because GenotypeGVCFs does not scale
+    # linearly with the number of genomes.
+    # Values are adjusted based on experience with the actual number of genomes.
     # e.g. 1000 scatter count was too low for 3800 genomes.
     for threshold, scatter_count in {
         4000: 1400,
