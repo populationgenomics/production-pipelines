@@ -2,19 +2,60 @@
 Stage that converts a BAM file to a CRAM file.
 Intended for use with long-read BAM files from PacBio.
 """
-
+from functools import cache
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import bam_to_cram
 from cpg_workflows.workflow import (
+    Cohort,
+    CohortStage,
     SequencingGroup,
     SequencingGroupStage,
     StageInput,
     StageOutput,
     stage,
 )
+
+from metamist.graphql import gql, query
+
+
+VCF_QUERY = gql(
+    """
+    query MyQuery($dataset: String!, $sgid: String!) {
+  project(name: $dataset) {
+    sequencingGroups(id: {eq: $sgid}) {
+      analyses(type: {eq: "pacbio_vcf"}) {
+        output
+      }
+    }
+  }
+}
+    """
+)
+
+
+@cache
+def query_sv_vcf_for_sgid(dataset_name: str, sgid: str) -> str | None:
+    """
+    query metamist for the SV VCF, possibility of none found
+
+    Args:
+        dataset_name ():
+        sgid ():
+
+    Returns:
+
+    """
+    analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name, 'sgid': sgid})
+    for sg_id_section in analysis_results['data']['project']['sequencingGroups']:
+        for analysis in sg_id_section['analyses']:
+            if analysis['output'].endswith('.SVs.phased.vcf.gz'):
+                return analysis['output']
+
+    # null case, no recorded data for this SG
+    return None
 
 
 def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
@@ -44,10 +85,7 @@ class BamToCram(SequencingGroupStage):
         else:
             cram_path = make_long_read_cram_path(sequencing_group)
 
-        return {
-            'cram': cram_path.path,
-            'cram.crai': cram_path.index_path,
-        }
+        return {'cram': cram_path.path, 'cram.crai': cram_path.index_path}
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
@@ -64,8 +102,39 @@ class BamToCram(SequencingGroupStage):
         )
         b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
 
-        return self.make_outputs(
-            sequencing_group,
-            data=self.expected_outputs(sequencing_group),
-            jobs=[job],
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[job])
+
+
+@stage()
+class ReFormatPacBioSVs(SequencingGroupStage):
+    """
+    take each of the long-read SV VCFs, and re-format the contents
+    """
+
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'reformatted_svs.vcf.bgz', 'index': self.prefix / 'reformatted_svs.vcf.bgz.tbi'}
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
+        """
+        a python job to change their contents
+
+        Args:
+            sequencing_group ():
+            inputs ():
+
+        Returns:
+
+        """
+        # query for the SV VCF
+        return self.make_outputs(...)
+
+
+@stage(required_stages=ReFormatPacBioSVs)
+# do a thing
+class AnnotateLongReadSVs(CohortStage):
+    """
+    find all the analysis entries for a long-read SV VCF for these SG IDs
+    do
+    """
+    ...
+
