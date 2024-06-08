@@ -344,7 +344,12 @@ def _add_joint_genotyper_job(
     # * max one-interval full VCF = 5.25G
     # * gathered full VCF: 528.86 GB
     # * gathered site-only VCF: 4.29 GB
-    res = STANDARD.request_resources(ncpu=4)
+    if config_retrieve(['resource_overrides', 'genotype_gvcfs_use_highmem'], False):
+        genotype_gvcfs_machine_type = STANDARD
+    else:
+        genotype_gvcfs_machine_type = HIGHMEM
+
+    res = genotype_gvcfs_machine_type.request_resources(ncpu=4)
     res.set_to_job(j)
 
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
