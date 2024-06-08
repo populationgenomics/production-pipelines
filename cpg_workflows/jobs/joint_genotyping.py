@@ -349,7 +349,11 @@ def _add_joint_genotyper_job(
     else:
         genotype_gvcfs_machine_type = HIGHMEM
 
-    res = genotype_gvcfs_machine_type.request_resources(ncpu=4)
+    genotype_gvcfs_mem_gb = config_retrieve(
+        ['resource_overrides', 'genotype_gvcfs_mem_gb'],
+        16,
+    )
+    res = genotype_gvcfs_machine_type.request_resources(ncpu=4, mem_gb=genotype_gvcfs_mem_gb)
     res.set_to_job(j)
 
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
