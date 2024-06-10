@@ -1,4 +1,4 @@
-import click
+#!/usr/bin/env python3
 
 import hailtop.batch as hb
 
