@@ -351,7 +351,7 @@ def _add_joint_genotyper_job(
 
     genotype_gvcfs_mem_gb = config_retrieve(
         ['resource_overrides', 'genotype_gvcfs_mem_gb'],
-        16,
+        15,  # 15GB memory default is conistent with ncpu=4 in request_resources
     )
     res = genotype_gvcfs_machine_type.request_resources(ncpu=4, mem_gb=genotype_gvcfs_mem_gb)
     res.set_to_job(j)
