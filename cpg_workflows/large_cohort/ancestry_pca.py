@@ -29,6 +29,7 @@ def add_background(
     qc_variants_ht = hl.read_table(sites_table)
     dense_mt = dense_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     dataset = get_config()['large_cohort']['pca_background']
+    population_to_filter = get_config()['large_cohort']['pca_background'].get('superpopulation_to_filter', False)
     for dataset in get_config()['large_cohort']['pca_background']['datasets']:
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
         path = dataset_dict['dataset_path']
@@ -58,6 +59,11 @@ def add_background(
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
+            if population_to_filter:
+                background_mt = background_mt.filter_cols(
+                    hl.is_defined(background_mt[population_to_filter]),
+                    keep=True,
+                )
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
