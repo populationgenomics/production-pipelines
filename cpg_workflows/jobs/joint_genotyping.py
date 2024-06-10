@@ -345,9 +345,9 @@ def _add_joint_genotyper_job(
     # * gathered full VCF: 528.86 GB
     # * gathered site-only VCF: 4.29 GB
     if config_retrieve(['resource_overrides', 'genotype_gvcfs_use_highmem'], False):
-        genotype_gvcfs_machine_type = STANDARD
-    else:
         genotype_gvcfs_machine_type = HIGHMEM
+    else:
+        genotype_gvcfs_machine_type = STANDARD
 
     genotype_gvcfs_mem_gb = config_retrieve(
         ['resource_overrides', 'genotype_gvcfs_mem_gb'],
