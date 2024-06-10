@@ -21,9 +21,6 @@ highmem_workers = true
 snp_filter_level = 99.7
 indel_filter_level = 99.0
 
-[cramqc]
-assume_sorted = true
-num_pcs = 4
 
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without
@@ -58,6 +55,11 @@ inferred_ancestry = false
 # Setting `variants_only_x_ploidy` and `variants_only_y_ploidy` to `False` (default value) causes
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
+
+# Extra functionality at the Ancestry stage to make a PCA at a more granular level,
+# by subsetting the background population to individuals of a particular ancestry.
+# https://centrepopgen.slack.com/archives/C018KFBCR1C/p1717731698661969
+# superpopulation_to_filter = 'African'
 
 # Set whether to allow column discrepancies when unioning background dataset tables
 #allow_missing_columns = false
