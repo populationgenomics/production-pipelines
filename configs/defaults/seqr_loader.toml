@@ -42,7 +42,7 @@ write_vcf = ["udn-aus"]
 # genomicsdb_import_use_highmem = false
 
 # JointGenotyping GenotypeGVCFs job overrides
-# genotype_gvcfs_mem_gb = 16
+# genotype_gvcfs_mem_gb = 15
 # genotype_gvcfs_use_highmem = false
 
 [vqsr]

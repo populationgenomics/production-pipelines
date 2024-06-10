@@ -122,7 +122,7 @@ delete_scratch_on_exit = false
 # genomicsdb_import_use_highmem = false
 
 # JointGenotyping GenotypeGVCFs job overrides
-# genotype_gvcfs_mem_gb = 16
+# genotype_gvcfs_mem_gb = 15
 # genotype_gvcfs_use_highmem = false
 
 [mito_snv]
