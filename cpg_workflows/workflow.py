@@ -1259,8 +1259,27 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
         Plug the stage into the workflow.
         """
         output_by_target: dict[str, StageOutput | None] = dict()
-        for cohort in multicohort.get_cohorts():
-            for dataset in cohort.get_datasets():
+
+        if not (cohorts := multicohort.get_cohorts()):
+            logging.warning(
+                f'{len(multicohort.get_cohorts())}/'
+                f'{len(multicohort.get_cohorts(only_active=False))} '
+                f'usable (active=True) cohorts found in the multicohort. Check that '
+                f'`workflow.input_cohorts` is provided, and not all cohorts are skipped ',
+            )
+            return output_by_target
+
+        for cohort in cohorts:
+            if not (datasets := cohort.get_datasets()):
+                logging.warning(
+                    f'{len(cohort.get_datasets())}/'
+                    f'{len(cohort.get_datasets(only_active=False))} '
+                    f'usable (active=True) datasets found in the cohort. Check that '
+                    f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and each cohort is populated in metamist.',
+                )
+                continue
+
+            for dataset in datasets:
                 if not dataset.get_sequencing_groups():
                     logging.warning(
                         f'{dataset}: '
