@@ -57,7 +57,7 @@ from os.path import join
 
 from cpg_utils import Path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
-from cpg_utils.hail_batch import copy_common_env, get_batch
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
@@ -169,19 +169,28 @@ def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
 
 @stage
 class GeneratePED(DatasetStage):
+    """
+    this calls the script which reads pedigree data from metamist
+    """
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """fake jobs, just write a pedigree"""
+        """generate a pedigree from metamist"""
+        ped_job = get_batch().new_job('Generate PED from Metamist')
+        ped_job.cpu(0.25).memory('lowmem').image(image_path('talos'))
         expected_out = self.expected_outputs(dataset)
-        pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
-        get_logger().info(f'PED file for {dataset.name} written to {pedigree}')
+        query_dataset = dataset.name
+        if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
+            query_dataset += '-test'
+
+        ped_job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {expected_out["pedigree"]}')
+        get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
         return self.make_outputs(dataset, data=expected_out)
 
 
-@stage
+@stage(required_stages=GeneratePED)
 class GeneratePanelData(DatasetStage):
     """
     PythonJob to find HPO-matched panels
@@ -195,23 +204,15 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
-        job.cpu(0.25)
-        job.memory('lowmem')
-        job.image(image_path('aip'))
-        copy_common_env(job)
+        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
 
         expected_out = self.expected_outputs(dataset)
 
-        query_dataset = dataset.name
-        if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
-            query_dataset += '-test'
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
-
+        local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         job.command(
-            f'python3 reanalysis/hpo_panel_match.py '
-            f'--dataset "{query_dataset}" '
-            f'--hpo "{hpo_file}" '
-            f'--out "{str(expected_out["hpo_panels"])}" ',
+            'python3 reanalysis/hpo_panel_match.py '
+            f'-i "{local_ped}" --hpo "{hpo_file}" --out "{str(expected_out["hpo_panels"])}"',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -228,11 +229,7 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
-        job.cpu(0.25)
-        job.memory('lowmem')
-        job.image(image_path('aip'))
-        copy_common_env(job)
-
+        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
@@ -249,6 +246,10 @@ class QueryPanelapp(DatasetStage):
 class RunHailFiltering(DatasetStage):
     """
     hail job to filter & label the MT
+    TODO get clinvar data
+    TODO et clinvar pm5
+    TODO copy in
+    TODO ggit gud
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
@@ -260,11 +261,8 @@ class RunHailFiltering(DatasetStage):
         # if this becomes integrated in the main pipeline
         input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
-        job.image(image_path('aip'))
+        job.image(image_path('talos'))
         STANDARD.set_resources(job, ncpu=1, storage_gb=4)
-
-        # auth and copy env
-        copy_common_env(job)
 
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
@@ -308,17 +306,14 @@ class RunHailSVFiltering(DatasetStage):
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
-            job.image(image_path('aip'))
-            STANDARD.set_resources(job, ncpu=1, storage_gb=4)
+            job.image(image_path('talos'))
+            STANDARD.set_resources(job, ncpu=2, storage_gb=4, mem_gb=16)
 
-            # auth and copy env
-            copy_common_env(job)
-
+            # copy the mt in
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                f'python3 reanalysis/hail_filter_sv.py '
-                f'--mt "{sv_path}" '
-                f'--panelapp "{panelapp_json}" '
-                f'--pedigree "{local_ped}" '
+                f'python3 reanalysis/hail_filter_sv.py --mt "{sv_file}" '
+                f'--panelapp "{panelapp_json}" --pedigree "{local_ped}" '
                 f'--vcf_out "{str(expected_out[sv_file])}" ',
             )
             sv_jobs.append(job)
@@ -330,7 +325,6 @@ class RunHailSVFiltering(DatasetStage):
     required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
     analysis_type='aip-results',
     analysis_keys=['summary_json'],
-    update_analysis_meta=lambda x: {'type': 'aip_output_json'},
 )
 class ValidateMOI(DatasetStage):
     """
@@ -342,14 +336,11 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'AIP summary: {dataset.name}')
-        job.cpu(2.0)
-        job.memory('highmem')
-        job.image(image_path('aip'))
-        copy_common_env(job)
+        job.cpu(2.0).memory('highmem').image(image_path('talos'))
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
 
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-        # peddy can't read cloud paths
+
         local_ped = get_batch().read_input(str(pedigree))
 
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
@@ -404,7 +395,6 @@ class ValidateMOI(DatasetStage):
     required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
-    update_analysis_meta=lambda x: {'type': 'aip_output_html'},
     tolerate_missing_output=True,
 )
 class CreateAIPHTML(DatasetStage):
@@ -418,16 +408,13 @@ class CreateAIPHTML(DatasetStage):
         job = get_batch().new_job(f'AIP HTML: {dataset.name}')
         job.cpu(1.0)
         job.memory('lowmem')
-        job.image(image_path('aip'))
-
-        # auth and copy env
-        copy_common_env(job)
+        job.image(image_path('talos'))
 
         moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
         panel_input = inputs.as_dict(dataset, QueryPanelapp)['panel_data']
-
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-        # peddy can't read cloud paths
+
+        # peds can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
         expected_out = self.expected_outputs(dataset)
@@ -453,7 +440,7 @@ class CreateAIPHTML(DatasetStage):
     required_stages=ValidateMOI,
     analysis_keys=['seqr_file', 'seqr_pheno_file'],
     analysis_type='custom',
-    tolerate_missing_output=True,
+    tolerate_missing_output=True
 )
 class GenerateSeqrFile(DatasetStage):
     """
@@ -484,7 +471,7 @@ class GenerateSeqrFile(DatasetStage):
         job = get_batch().new_job(f'AIP Prep for Seqr: {dataset.name}')
         job.cpu(1.0)
         job.memory('lowmem')
-        job.image(image_path('aip'))
+        job.image(image_path('talos'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             f'python3 reanalysis/minimise_output_for_seqr.py '
