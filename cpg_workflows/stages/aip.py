@@ -58,7 +58,7 @@ from os.path import join
 from cpg_utils import Path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
@@ -247,9 +247,9 @@ class RunHailFiltering(DatasetStage):
     """
     hail job to filter & label the MT
     TODO get clinvar data
-    TODO et clinvar pm5
+    TODO get clinvar pm5
     TODO copy in
-    TODO ggit gud
+    TODO git gud
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
@@ -262,7 +262,9 @@ class RunHailFiltering(DatasetStage):
         input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
-        STANDARD.set_resources(job, ncpu=1, storage_gb=4)
+
+        # todo
+        HIGHMEM.set_resources(job, storage_gb=500 if config_retrieve(['workflow', 'sequencing_type'], 'exome') == 'genome' else 50)
 
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
@@ -440,7 +442,7 @@ class CreateAIPHTML(DatasetStage):
     required_stages=ValidateMOI,
     analysis_keys=['seqr_file', 'seqr_pheno_file'],
     analysis_type='custom',
-    tolerate_missing_output=True
+    tolerate_missing_output=True,
 )
 class GenerateSeqrFile(DatasetStage):
     """
