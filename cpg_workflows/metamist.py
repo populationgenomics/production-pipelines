@@ -263,7 +263,6 @@ class Metamist:
         """
         Retrieve the sequencing groups per dataset for a list of cohort IDs.
         """
-
         return {cohort_id: self.get_sgs_by_project_from_cohort(cohort_id) for cohort_id in cohort_ids}
 
     def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
