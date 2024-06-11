@@ -19,7 +19,7 @@ highmem_workers = true
 # demanding higher resources for all operations as standard. Examples below
 
 [hail]
-pool_label = 'genotype'
+pool_label = 'large-cohort'
 delete_scratch_on_exit = false
 
 
