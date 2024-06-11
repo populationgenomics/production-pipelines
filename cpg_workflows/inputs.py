@@ -62,12 +62,12 @@ def create_multicohort() -> MultiCohort:
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
-        populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
+        _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
     return multicohort
 
 
-def populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
+def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
