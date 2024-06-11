@@ -60,11 +60,13 @@ def add_background(
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if populations_to_filter:
+                logging.info(f'Superpopulations before filtering {background_mt.superpopulation.collect()}')
                 logging.info(f'Filtering background samples by {populations_to_filter}')
                 background_mt = background_mt.filter_cols(
                     hl.literal(populations_to_filter).contains(background_mt.superpopulation),
                 )
                 logging.info(f'Finished filtering background, kept samples that are {populations_to_filter}')
+                logging.info(f'Superpopulations after filtering {background_mt.superpopulation.collect()}')
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
