@@ -130,7 +130,7 @@ class MultiCohort(Target):
         Gets list of all cohorts.
         Include only "active" cohorts (unless only_active is False)
         """
-        cohorts = [cohort for _name, cohort in self._cohorts_by_name.items()]
+        cohorts = list(self._cohorts_by_name.values())
         if only_active:
             cohorts = [c for c in cohorts if c.active and c.get_datasets()]
         return cohorts
