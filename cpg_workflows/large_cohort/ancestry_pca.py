@@ -61,10 +61,7 @@ def add_background(
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if population_to_filter:
                 logging.info(f'Filtering background samples by {population_to_filter}')
-                background_mt = background_mt.filter_cols(
-                    hl.is_defined(background_mt[population_to_filter]),
-                    keep=True,
-                )
+                background_mt = background_mt.filter_cols(background_mt.superpopulation == population_to_filter)
                 logging.info(f'Finished filtering background, kept samples that are {population_to_filter}')
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
