@@ -21,6 +21,9 @@ highmem_workers = true
 snp_filter_level = 99.7
 indel_filter_level = 99.0
 
+[cramqc]
+assume_sorted = true
+num_pcs = 4
 
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without
