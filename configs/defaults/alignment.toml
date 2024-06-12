@@ -37,3 +37,7 @@ tel_and_cent_ht = "gs://cpg-common-main/references/gnomad/v0/telomeres_and_centr
 [references.hg38_telomeres_and_centromeres_intervals]
 # Derived from hg38.telomeresAndMergedCentromeres.bed used in gnomAD v3
 interval_list = "gs://cpg-common-main/references/hg38/v0/hg38.telomeresAndMergedCentromeres.interval_list"
+
+[version_control]
+aligner = 'dragmap'
+markduplicates = 'picard'

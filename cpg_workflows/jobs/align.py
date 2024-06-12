@@ -5,6 +5,7 @@ FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 import logging
 import os.path
 from enum import Enum
+from math import e
 from textwrap import dedent
 from typing import cast
 
@@ -110,7 +111,7 @@ def align(
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
-    aligner: Aligner = Aligner.DRAGMAP,
+    aligner: Aligner | str = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
     overwrite: bool = False,
@@ -138,6 +139,9 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job
     doesn't take entire 32-cpu/64-threaded instance.
     """
+    if isinstance(aligner, str):
+        aligner = Aligner[aligner.upper()]
+
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
