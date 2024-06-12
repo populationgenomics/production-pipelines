@@ -20,18 +20,15 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-ALIGNER = config_retrieve(['version_control', 'aligner'])
-MARKDUP = config_retrieve(['version_control', 'markduplicates'])
-
 
 @stage(
     analysis_type='cram',
     analysis_keys=['cram'],
     update_analysis_meta=lambda x: {
-        'aligner': ALIGNER,
-        'aligner_version': config_retrieve(['images', ALIGNER]),
-        'markduplicates': MARKDUP,
-        'markduplicates_version': config_retrieve(['images', MARKDUP]),
+        'aligner': config_retrieve(['version_control', 'aligner']),
+        'aligner_version': config_retrieve(['images', config_retrieve(['version_control', 'aligner'])]),
+        'markduplicates': config_retrieve(['version_control', 'markduplicates']),
+        'markduplicates_version': config_retrieve(['images', config_retrieve(['version_control', 'markduplicates'])]),
     },
 )
 class Align(SequencingGroupStage):
