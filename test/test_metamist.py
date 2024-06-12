@@ -18,9 +18,29 @@ from cpg_workflows.metamist import (
     MetamistError,
     parse_reads,
 )
-from metamist.exceptions import ApiException
+from metamist.exceptions import ApiException, ServiceException
 
 from . import set_config
+
+
+class TimeOutCounter:
+    """
+    This is a little helper to count attempts in the mock function
+    """
+
+    def __init__(self):
+        self.count = 0
+
+    def reset(self):
+        self.count = 0
+
+    def increment(self):
+        self.count += 1
+
+
+# global variable to count the number of attempts in the mock function
+timeout_counter = TimeOutCounter()
+
 
 TOML = """
 [workflow]
@@ -56,6 +76,21 @@ def mock_aapi_create_analysis_err(*args, **kwargs):
     )
 
 
+def mock_aapi_create_analysis_timeout(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.create_analysis time out.
+    First 2x ServiceException(Gateway Timeout), then success.
+    """
+    if timeout_counter.count < 2:
+        timeout_counter.increment()
+        raise ServiceException(
+            status=504,
+            reason='Gateway Timeout',
+            http_resp=None,
+        )
+    return 12345
+
+
 def mock_aapi_update_analysis_ok(*args, **kwargs):
     """
     Mock function for AnalysisApi.update_analysis as sucess, returns True.
@@ -72,6 +107,21 @@ def mock_aapi_update_analysis_err(*args, **kwargs):
         reason="You don't have access to this resources, as the resource you requested didn't belong to a project",
         http_resp=None,
     )
+
+
+def mock_aapi_update_analysis_timeout(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.update_analysis time out.
+    First 2x ServiceException(Gateway Timeout), then success.
+    """
+    if timeout_counter.count < 2:
+        timeout_counter.increment()
+        raise ServiceException(
+            status=504,
+            reason='Gateway Timeout',
+            http_resp=None,
+        )
+    return True
 
 
 def mock_query_get_sg_entries_query_returns_empty_data(*args, **kwargs):
@@ -171,6 +221,20 @@ class TestMetamist:
         )
         assert analysis is None
 
+        # test timout in API call
+        timeout_counter.reset()
+        mocker.patch(
+            'cpg_workflows.metamist.AnalysisApi.create_analysis',
+            mock_aapi_create_analysis_timeout,
+        )
+        analysis = metamist.create_analysis(
+            output=to_path('test_output'),
+            type_=AnalysisType.parse('custom'),
+            status=AnalysisStatus.parse('completed'),
+            sequencing_group_ids=['test'],
+        )
+        assert analysis is not None
+
         # test sucess
         mocker.patch(
             'cpg_workflows.metamist.AnalysisApi.create_analysis',
@@ -211,6 +275,18 @@ class TestMetamist:
         )
         # TODO fix implementation
         # assert analysis.status != status_to_be_set
+
+        # test timout in API call
+        timeout_counter.reset()
+        mocker.patch(
+            'cpg_workflows.metamist.AnalysisApi.update_analysis',
+            side_effect=mock_aapi_update_analysis_timeout,
+        )
+        metamist.update_analysis(
+            analysis,
+            status_to_be_set,
+        )
+        assert analysis.status == status_to_be_set
 
         # test success
         mocker.patch(

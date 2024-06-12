@@ -7,7 +7,15 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    retry_if_not_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -21,7 +29,7 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.utils import exists
 from metamist import models
 from metamist.apis import AnalysisApi
-from metamist.exceptions import ApiException
+from metamist.exceptions import ApiException, ServiceException
 from metamist.graphql import gql, query
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
@@ -259,6 +267,29 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=10),
+        retry=retry_if_exception_type(ServiceException),
+        reraise=True,
+    )
+    def make_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi.
+        TODO:
+        try 3 times, wait 1, 2, 4 seconds?
+        retry only if ServiceException is thrown
+        """
+        try:
+            return api_func(**kwargv)
+        except ServiceException:
+            traceback.print_exc()
+            # if we raise here, the retry decorator will catch it
+            raise
+        except ApiException:
+            traceback.print_exc()
+        return None
+
     def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
         """
         Retrieve sequencing group entries for a cohort.
@@ -308,13 +339,14 @@ class Metamist:
         """
         Update "status" of an Analysis entry.
         """
-        try:
-            self.aapi.update_analysis(
-                analysis.id,
-                models.AnalysisUpdateModel(status=models.AnalysisStatus(status.value)),
-            )
-        except ApiException:
-            traceback.print_exc()
+        self.make_aapi_call(
+            self.aapi.update_analysis,
+            analysis_id=analysis.id,
+            analysis_update_model=models.AnalysisUpdateModel(
+                status=models.AnalysisStatus(status.value),
+            ),
+        )
+        # should this be set when the API call fails?
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
@@ -329,16 +361,19 @@ class Metamist:
         metamist_proj = dataset or self.default_dataset
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
-        try:
-            data = self.aapi.get_latest_complete_analysis_for_type(
-                project=metamist_proj,
-                analysis_type=models.AnalysisType('joint-calling'),
-            )
-        except ApiException:
+
+        data = self.make_aapi_call(
+            self.aapi.get_latest_complete_analysis_for_type,
+            project=metamist_proj,
+            analysis_type=models.AnalysisType('joint-calling'),
+        )
+        if data is None:
             return None
+
         a = Analysis.parse(data)
         if not a:
             return None
+
         assert a.type == AnalysisType.JOINT_CALLING, data
         assert a.status == AnalysisStatus.COMPLETED, data
         if a.sequencing_group_ids != set(sequencing_group_ids):
@@ -422,10 +457,15 @@ class Metamist:
             sequencing_group_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
-        try:
-            aid = self.aapi.create_analysis(project=metamist_proj, analysis=am)
-        except ApiException:
-            traceback.print_exc()
+        aid = self.make_aapi_call(
+            self.aapi.create_analysis,
+            project=metamist_proj,
+            analysis=am,
+        )
+        if aid is None:
+            logging.error(
+                f'Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
+            )
             return None
         else:
             logging.info(
