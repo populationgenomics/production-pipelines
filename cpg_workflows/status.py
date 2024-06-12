@@ -35,7 +35,6 @@ def complete_analysis_job(
         update_analysis_meta (Callable | None): function to update analysis meta
         tolerate_missing (bool): if True, allow missing output
     """
-    import traceback
 
     from cpg_utils import to_path
 
