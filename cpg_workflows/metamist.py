@@ -669,11 +669,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         index_location = None
         if reads_data[0].get('secondaryFiles'):
             index_location = reads_data[0]['secondaryFiles'][0]['location']
-            if (
-                location.endswith('.cram')
-                and not index_location.endswith('.crai')
-                or location.endswith('.bai')
-                and not index_location.endswith('.bai')
+            if (location.endswith('.cram') and not index_location.endswith('.crai')) or (
+                location.endswith('.bai') and not index_location.endswith('.bai')
             ):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: expected the index file to have an extension '
