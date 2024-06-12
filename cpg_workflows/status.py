@@ -38,9 +38,8 @@ def complete_analysis_job(
     import traceback
 
     from cpg_utils import to_path
-    from metamist.apis import AnalysisApi
-    from metamist.exceptions import ApiException
-    from metamist.models import Analysis, AnalysisStatus
+
+    from .metamist import AnalysisStatus, get_metamist
 
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
@@ -76,22 +75,20 @@ def complete_analysis_job(
         if not output_cloudpath.is_dir():
             meta |= {'size': output_cloudpath.stat().st_size}
 
-    this_analysis = Analysis(
-        type=analysis_type,
-        status=AnalysisStatus('completed'),
+    a_id = get_metamist().create_analysis(
         output=output,
+        type_=analysis_type,
+        status=AnalysisStatus('completed'),
         sequencing_group_ids=sg_ids,
+        dataset=project_name,
         meta=meta,
     )
-    aapi = AnalysisApi()
-    try:
-        a_id = aapi.create_analysis(project=project_name, analysis=this_analysis)
-    except ApiException:
-        traceback.print_exc()
+    if a_id is None:
+        print(f'Creation of Analysis failed (type={analysis_type}, output={output}) in {project_name}')
+        # What Exception should we raise here?
         raise
     else:
         print(f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}')
-        return
 
 
 class StatusReporterError(Exception):
@@ -158,7 +155,10 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
-        py_job = b.new_python_job(f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'})
+        py_job = b.new_python_job(
+            f'Register analysis output {output}',
+            job_attr or {} | {'tool': 'metamist'},
+        )
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             complete_analysis_job,
