@@ -59,6 +59,12 @@ inferred_ancestry = false
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
+# Extra functionality at the Ancestry stage to make a PCA at a more granular level,
+# by subsetting the background population to individuals of a particular ancestry.
+# Specify in list format the superpopulations to filter for.
+# https://centrepopgen.slack.com/archives/C018KFBCR1C/p1717731698661969
+# superpopulation_to_filter = ['African']
+
 # Set whether to allow column discrepancies when unioning background dataset tables
 #allow_missing_columns = false
 # Columns to be dropped from the final unioned background table
