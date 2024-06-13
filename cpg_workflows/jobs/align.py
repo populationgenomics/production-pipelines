@@ -4,6 +4,7 @@ FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 
 import logging
 import os.path
+from ctypes import alignment
 from enum import Enum
 from math import e
 from textwrap import dedent
@@ -358,64 +359,16 @@ def _align_one(
     fifo_commands: dict[str, str] = {}
 
     if isinstance(alignment_input, CramPath | BamPath):
-        use_bazam = True
-        if number_of_shards_for_realignment and number_of_shards_for_realignment > 1:
-            assert shard_number is not None and shard_number >= 0, (
-                shard_number,
-                sequencing_group_name,
-            )
-            shard_param = f' -s {shard_number + 1},{number_of_shards_for_realignment}'
-        else:
-            shard_param = ''
+        # 1) If the input is a CRAM/BAM, we need to extract FASTQs from it
+        # 2) If the input is a CRAM, we need to use not use BAZAM anymore and instead use samtools to extract fastqs
+        #    - Possibly extract them as interleaved fastq's to avoid changing DRAGMAP command
+        # 3) Then take these fastq's and input them into DRAGMAP
 
-        bazam_ref_cmd = ''
-        samtools_ref_cmd = ''
-        if isinstance(alignment_input, CramPath):
-            assert (
-                alignment_input.reference_assembly
-            ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
-            reference_inp = b.read_input_group(
-                base=str(alignment_input.reference_assembly),
-                fai=str(alignment_input.reference_assembly) + '.fai',
-            ).base
-            bazam_ref_cmd = f'-Dsamjdk.reference_fasta={reference_inp}'
-            samtools_ref_cmd = f'--reference {reference_inp}'
-
-        group = alignment_input.resource_group(b)
-
-        if not alignment_input.index_path:
-            sort_index_input_cmd = dedent(
-                f"""
-            mkdir -p $BATCH_TMPDIR/sorted
-            mkdir -p $BATCH_TMPDIR/sort_tmp
-            samtools sort {samtools_ref_cmd} \
-            {group[alignment_input.ext]} \
-            -@{nthreads - 1} \
-            -T $BATCH_TMPDIR/sort_tmp \
-            > $BATCH_TMPDIR/sorted.{alignment_input.ext}
-
-            mv $BATCH_TMPDIR/sorted.{alignment_input.ext} {group[alignment_input.ext]}
-            rm -rf $BATCH_TMPDIR/sort_tmp
-
-            # bazam requires an index at foo.crai (not foo.cram.crai) so we must set the
-            # path explicitly. We can not access the localized cram file's basename via the
-            # Input ResourceGroup so using shell magic to strip the trailing "m" and add an
-            # "i" to the alignment_path. This should work for both .cram and .bam files.
-            alignment_path="{group[alignment_input.ext]}"
-            samtools index -@{nthreads - 1} $alignment_path  ${{alignment_path%m}}i
-            """,
-            )
-
-        bazam_cmd = dedent(
-            f"""\
-        bazam -Xmx16g {bazam_ref_cmd} \
-        -n{min(nthreads, 6)} -bam {group[alignment_input.ext]}{shard_param} \
-        """,
-        )
-        prepare_fastq_cmd = ''
-        r1_param = 'r1'
-        r2_param = ''  # not used for bazam as we will output interleaved fastq thus only one FIFO is needed
-        fifo_commands[r1_param] = bazam_cmd
+        # Extract fastqs from CRAM/BAM
+        bam_or_cram_group = alignment_input.resource_group(b)
+        extract_fastq_j = extract_fastq(b, bam_or_cram_group)
+        r1_param = extract_fastq_j.fq1
+        r2_param = extract_fastq_j.fq2
 
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
