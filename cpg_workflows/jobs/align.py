@@ -170,10 +170,10 @@ def align(
         realignment_shards_num = 1
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
-    sharded_bazam = (
-        isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path and realignment_shards_num > 1
-    )
-    sharded = sharded_fq or sharded_bazam
+    # sharded_bazam = (
+    #     isinstance(alignment_input, CramPath | BamPath) and alignment_input.index_path and realignment_shards_num > 1
+    # )
+    sharded = sharded_fq  # or sharded_bazam
 
     jobs: list[Job] = []
     sharded_align_jobs = []
@@ -219,27 +219,27 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
-        elif sharded_bazam:  # Using BAZAM to shard CRAM
-            assert realignment_shards_num, realignment_shards_num
+        else:  # sharded_bazam:  # Using BAZAM to shard CRAM
+            # assert realignment_shards_num, realignment_shards_num
             assert isinstance(alignment_input, CramPath | BamPath)
-            for shard_number in range(realignment_shards_num):
-                j, cmd = _align_one(
-                    b=b,
-                    job_name=base_job_name,
-                    alignment_input=alignment_input,
-                    sequencing_group_name=sequencing_group.id,
-                    job_attrs=job_attrs,
-                    aligner=aligner,
-                    requested_nthreads=requested_nthreads,
-                    number_of_shards_for_realignment=realignment_shards_num,
-                    shard_number=shard_number,
-                    should_sort=True,
-                )
-                # Sorting with samtools, but not adding deduplication yet, because we
-                # need to merge first.
-                j.command(command(cmd, monitor_space=True))  # type: ignore
-                sorted_bams.append(j.sorted_bam)
-                sharded_align_jobs.append(j)
+            # for shard_number in range(realignment_shards_num):
+            j, cmd = _align_one(
+                b=b,
+                job_name=base_job_name,
+                alignment_input=alignment_input,
+                sequencing_group_name=sequencing_group.id,
+                job_attrs=job_attrs,
+                aligner=aligner,
+                requested_nthreads=requested_nthreads,
+                # number_of_shards_for_realignment=realignment_shards_num,
+                # shard_number=shard_number,
+                should_sort=True,
+            )
+            # Sorting with samtools, but not adding deduplication yet, because we
+            # need to merge first.
+            j.command(command(cmd, monitor_space=True))  # type: ignore
+            sorted_bams.append(j.sorted_bam)
+            sharded_align_jobs.append(j)
 
         merge_j = b.new_job('Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge'))
         merge_j.image(image_path('samtools'))
