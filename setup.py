@@ -38,6 +38,7 @@ setup(
         'test': [
             'pytest',
             'pytest-mock',
+            'coverage',
         ],
     },
     package_data={
