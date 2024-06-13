@@ -367,22 +367,20 @@ def _align_one(
         # Extract fastqs from CRAM/BAM
         bam_or_cram_group = alignment_input.resource_group(b)
         extract_fastq_j = extract_fastq(b, bam_or_cram_group)
-        r1_param = extract_fastq_j.fq1
-        r2_param = extract_fastq_j.fq2
+        fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
 
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
         fastq_pair = alignment_input.as_resources(b)
-        use_bazam = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
         # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
-        prepare_fastq_cmd = dedent(
-            f"""\
-        mv {fastq_pair.r1} {r1_param}
-        mv {fastq_pair.r2} {r2_param}
-        """,
-        )
+    prepare_fastq_cmd = dedent(
+        f"""\
+    mv {fastq_pair.r1} {r1_param}
+    mv {fastq_pair.r2} {r2_param}
+    """,
+    )
 
     j.image(image_path('dragmap'))
     dragmap_index = b.read_input_group(
