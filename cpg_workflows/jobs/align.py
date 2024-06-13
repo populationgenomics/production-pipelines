@@ -388,10 +388,10 @@ def _align_one(
     dragmap_index = b.read_input_group(
         **{k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k) for k in DRAGMAP_INDEX_FILES},
     )
-    if use_bazam:
-        input_params = f'--interleaved=1 -b {r1_param}'
-    else:
-        input_params = f'-1 {r1_param} -2 {r2_param}'
+    # if use_bazam:
+    #     input_params = f'--interleaved=1 -b {r1_param}'
+    # else:
+    input_params = f'-1 {r1_param} -2 {r2_param}'
     # TODO: consider reverting to use of all threads if node capacity
     # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
     cmd = f"""\
