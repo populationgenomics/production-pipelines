@@ -459,9 +459,10 @@ def extract_fastq(
         res.attach_disk_storage_gb = 700
     res.set_to_job(j)
     tmp_prefix = '$BATCH_TMPDIR/collate'
+    # samtools view -b -t {reference_path} {bam_or_cram_group[ext]} > newfile.bam
     cmd = f"""
     export REF_PATH={reference_path}
-    samtools collate -@{res.get_nthreads() - 1} -u -O -T {reference_path}\
+    samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
