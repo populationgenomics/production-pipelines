@@ -461,7 +461,7 @@ def extract_fastq(
     tmp_prefix = '$BATCH_TMPDIR/collate'
     cmd = f"""
     export REF_PATH={reference_path}
-    samtools collate -@{res.get_nthreads() - 1} -u -O \
+    samtools collate -@{res.get_nthreads() - 1} -u -O -T {reference_path}\
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
