@@ -366,6 +366,8 @@ def _align_one(
         # 3) Then take these fastq's and input them into DRAGMAP
 
         # Extract fastqs from CRAM/BAM
+        # chck if the reference used in the CRAM file is the same as the one used in the current workflow
+        logging.info(f'{alignment_input.reference_assembly}')
         bam_or_cram_group = alignment_input.resource_group(b)
         extract_fastq_j = extract_fastq(b, bam_or_cram_group)
         fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
@@ -439,6 +441,14 @@ def _align_one(
     return j, cmd
 
 
+def check_cram_reference(cram_path: CramPath) -> None:
+    """
+    Check if the reference used in the CRAM file is the same as the one
+    used in the current workflow.
+    """
+    pass
+
+
 def extract_fastq(
     b,
     bam_or_cram_group: hb.ResourceGroup,
@@ -459,7 +469,6 @@ def extract_fastq(
         res.attach_disk_storage_gb = 700
     res.set_to_job(j)
     tmp_prefix = '$BATCH_TMPDIR/collate'
-    # samtools view -b -t {reference_path} {bam_or_cram_group[ext]} > newfile.bam
     cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
