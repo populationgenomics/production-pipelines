@@ -9,6 +9,7 @@ from enum import Enum
 from math import e
 from textwrap import dedent
 from typing import cast
+from weakref import ref
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
@@ -451,13 +452,15 @@ def extract_fastq(
     """
     j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
     j.image(image_path('samtools'))
+    # TODO: add ability to detect reference used in current BAM/CRAM and provide error handling
+    reference_path = fasta_res_group(b)['base']
     res = STANDARD.request_resources(ncpu=16)
     if get_config()['workflow']['sequencing_type'] == 'genome':
         res.attach_disk_storage_gb = 700
     res.set_to_job(j)
     tmp_prefix = '$BATCH_TMPDIR/collate'
     cmd = f"""
-    samtools collate -@{res.get_nthreads() - 1} -u -O \
+    samtools collate -@{res.get_nthreads() - 1} -u -O -T {reference_path}\
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
