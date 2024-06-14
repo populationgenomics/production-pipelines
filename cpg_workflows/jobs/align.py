@@ -360,14 +360,7 @@ def _align_one(
     fifo_commands: dict[str, str] = {}
 
     if isinstance(alignment_input, CramPath | BamPath):
-        # 1) If the input is a CRAM/BAM, we need to extract FASTQs from it
-        # 2) If the input is a CRAM, we need to use not use BAZAM anymore and instead use samtools to extract fastqs
-        #    - Possibly extract them as interleaved fastq's to avoid changing DRAGMAP command
-        # 3) Then take these fastq's and input them into DRAGMAP
-
         # Extract fastqs from CRAM/BAM
-        # chck if the reference used in the CRAM file is the same as the one used in the current workflow
-        logging.info(f'{alignment_input.reference_assembly}')
         bam_or_cram_group = alignment_input.resource_group(b)
         extract_fastq_j = extract_fastq(b, bam_or_cram_group)
         fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
@@ -390,9 +383,6 @@ def _align_one(
     dragmap_index = b.read_input_group(
         **{k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k) for k in DRAGMAP_INDEX_FILES},
     )
-    # if use_bazam:
-    #     input_params = f'--interleaved=1 -b {r1_param}'
-    # else:
     input_params = f'-1 {r1_param} -2 {r2_param}'
     # TODO: consider reverting to use of all threads if node capacity
     # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
@@ -439,14 +429,6 @@ def _align_one(
         # Now prepare command
         cmd = '\n'.join([sort_index_input_cmd, *fifo_pre, cmd, fifo_post])
     return j, cmd
-
-
-def check_cram_reference(cram_path: CramPath) -> None:
-    """
-    Check if the reference used in the CRAM file is the same as the one
-    used in the current workflow.
-    """
-    pass
 
 
 def extract_fastq(
