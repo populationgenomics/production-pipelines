@@ -16,7 +16,6 @@ from cpg_workflows.workflow import (
 from .genotype import Genotype
 
 
-@stage(required_stages=[Genotype])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if vds_version := get_config()['workflow'].get('vds_version'):
