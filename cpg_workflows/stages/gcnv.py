@@ -674,7 +674,7 @@ class MtToEsCNV(DatasetStage):
                 job_name=job_name,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
-                depends_on=inputs.get_jobs(dataset),
+                depends_on=inputs.get_jobs(dataset),  # Do not remove, see production-pipelines/issues/791
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
