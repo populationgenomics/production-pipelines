@@ -904,6 +904,7 @@ class MtToEsSv(DatasetStage):
                 job_name=job_name,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
+                depends_on=inputs.get_jobs(dataset),
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
