@@ -220,14 +220,14 @@ class GeneratePED(DatasetStage):
         generate a pedigree from metamist
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
         """
-        ped_job = get_batch().new_job('Generate PED from Metamist')
-        ped_job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job = get_batch().new_job('Generate PED from Metamist')
+        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
         expected_out = self.expected_outputs(dataset)
         query_dataset = dataset.name
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        ped_job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
+        job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -310,7 +310,7 @@ class RunHailFiltering(DatasetStage):
         HIGHMEM.set_resources(job, storage_gb=required_storage)
 
         panelapp_json = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
         expected_out = self.expected_outputs(dataset)
@@ -369,7 +369,7 @@ class RunHailSVFiltering(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
         panelapp_json = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
 
