@@ -55,7 +55,7 @@ from datetime import datetime
 from functools import lru_cache
 from os.path import join
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.resources import HIGHMEM, STANDARD
@@ -167,6 +167,45 @@ def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
     return mt_by_date[sorted(mt_by_date)[-1]]
 
 
+@lru_cache(2)
+def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
+    """
+    this is used to retrieve two types of object - clinvar_decisions & clinvar_pm5
+
+    try and identify the clinvar table to use
+    - try the config specified path
+    - fall back to storage:common default path - try with multiple dir names in case we change this
+    - if neither works, choose to fail instead
+
+    Args
+        key (str): the key to look for in the config
+
+    Returns:
+        a path to a clinvar table, or None
+    """
+
+    if (clinvar_table := config_retrieve(['workflow', key], None)) is not None:
+        get_logger().info(f'Using clinvar table {clinvar_table} from config')
+        return clinvar_table
+
+    get_logger().info(f'No forced {key} table available, trying default')
+
+    # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
+    for default_name in ['talos_clinvar', 'clinvarbitration', 'aip_clinvar']:
+        clinvar_table = join(
+            config_retrieve(['storage', 'common', 'analysis']),
+            default_name,
+            datetime.now().strftime('%y-%m'),
+            f'{key}.ht',
+        )
+
+        if to_path(clinvar_table).exists():
+            get_logger().info(f'Using clinvar table {clinvar_table}')
+            return clinvar_table
+
+    raise ValueError('no Clinvar Tables were identified')
+
+
 @stage
 class GeneratePED(DatasetStage):
     """
@@ -213,7 +252,9 @@ class GeneratePanelData(DatasetStage):
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         job.command(
             'python3 reanalysis/hpo_panel_match.py '
-            f'-i "{local_ped}" --hpo "{hpo_file}" --out "{str(expected_out["hpo_panels"])}"',
+            f'-i {local_ped!r} '
+            f'--hpo {hpo_file!r} '
+            f'--out {str(expected_out["hpo_panels"])!r}',
         )
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -235,8 +276,8 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/query_panelapp.py '
-            f'--panels "{str(hpo_panel_json)}" '
-            f'--out_path "{str(expected_out["panel_data"])}" '
+            f'--panels {str(hpo_panel_json)!r} '
+            f'--out_path {str(expected_out["panel_data"])!r} '
             f'--dataset {dataset.name} ',
         )
 
@@ -247,41 +288,63 @@ class QueryPanelapp(DatasetStage):
 class RunHailFiltering(DatasetStage):
     """
     hail job to filter & label the MT
-    TODO get clinvar data
-    TODO get clinvar pm5
-    TODO copy in
-    TODO git gud
+
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {'labelled_vcf': dataset.prefix() / DATED_FOLDER / 'hail_labelled.vcf.bgz'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        # either do as you're told, or find the latest
-        # this could potentially follow on from the AnnotateDataset stage
-        # if this becomes integrated in the main pipeline
         input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
+        job.command('set -eux pipefail')
 
-        # based on one estimate, an Exome MT for a large callset sits under 10GB
-        is_exome: bool = config_retrieve(['workflow', 'sequencing_type'], 'genome') == 'exome'
-        HIGHMEM.set_resources(job, storage_gb=500 if is_exome else 50)
+        # MTs can vary from <10GB for a small exome, to 170GB for a larger one
+        # Genomes are more like 500GB
+        seq_type: str = config_retrieve(['workflow', 'sequencing_type'], 'genome')
+        required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
+        HIGHMEM.set_resources(job, storage_gb=required_storage)
 
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
         expected_out = self.expected_outputs(dataset)
-        # peddy can't read cloud paths
+
+        # copy vcf & index out manually
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+
+        # peds can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
+
+        # find the clinvar tables, and localise
+        clinvar_decisions = get_clinvar_table()
+        clinvar_name = clinvar_decisions.split('/')[-1]
+
+        # localise the clinvar decisions table
+        job.command(
+            f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} . && cd -',
+        )
+
+        # find, localise, and use the clinvar PM5 table
+        pm5 = get_clinvar_table('clinvar_pm5')
+        pm5_name = pm5.split('/')[-1]
+        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {pm5} . && cd -')
+
+        # finally, localise the whole MT (this takes the longest
+        mt_name = input_mt.split('/')[-1]
+        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
 
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
-            f'--mt "{input_mt}" '
-            f'--panelapp "{panelapp_json}" '
-            f'--pedigree "{local_ped}" '
-            f'--vcf_out "{str(expected_out["labelled_vcf"])}" '
-            f'--dataset {dataset.name} ',
+            f'--mt "${{BATCH_TMPDIR}}{mt_name}" '
+            f'--panelapp {str(panelapp_json)!r} '
+            f'--pedigree {local_ped!r} '
+            f'--vcf_out {job.output["vcf.bgz"]} '
+            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
+            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
+            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
         )
+        get_batch().write_output(job.output, str(expected_out["labelled_vcf"]).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -300,26 +363,31 @@ class RunHailSVFiltering(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-
         panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
 
         # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
+        required_storage: int = config_retrieve(['hail', 'storage', 'sv'], 10)
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
+            # manually extract the VCF and index
+            job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
             job.image(image_path('talos'))
-            STANDARD.set_resources(job, ncpu=2, storage_gb=4, mem_gb=16)
+            STANDARD.set_resources(job, ncpu=2, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                f'python3 reanalysis/hail_filter_sv.py --mt "{sv_file}" '
-                f'--panelapp "{panelapp_json}" --pedigree "{local_ped}" '
-                f'--vcf_out "{str(expected_out[sv_file])}" ',
+                f'python3 reanalysis/hail_filter_sv.py '
+                f'--mt {sv_file!r} '
+                f'--panelapp {str(panelapp_json)!r} '
+                f'--pedigree {local_ped!r} '
+                f'--vcf_out {str(job.output["vcf.bgz"])} ',
             )
+            get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
             sv_jobs.append(job)
 
         return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
@@ -342,11 +410,8 @@ class ValidateMOI(DatasetStage):
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
         job.cpu(2.0).memory('highmem').image(image_path('talos'))
         hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
-
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-
         local_ped = get_batch().read_input(str(pedigree))
-
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
@@ -363,10 +428,7 @@ class ValidateMOI(DatasetStage):
                 input_path += f', {sv_path}'
 
                 labelled_sv_vcf = get_batch().read_input_group(
-                    **{
-                        'vcf.bgz': str(hail_sv_inputs[sv_file]),
-                        'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi',
-                    },
+                    **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
                 )['vcf.bgz']
                 sv_vcf_arg += f' {labelled_sv_vcf} '
 
@@ -375,21 +437,18 @@ class ValidateMOI(DatasetStage):
 
         panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
         labelled_vcf = get_batch().read_input_group(
-            **{
-                'vcf.bgz': str(hail_inputs['labelled_vcf']),
-                'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi',
-            },
+            **{'vcf.bgz': str(hail_inputs['labelled_vcf']), 'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi'},
         )['vcf.bgz']
         out_json_path = str(self.expected_outputs(dataset)['summary_json'])
         job.command(
             f'python3 reanalysis/validate_categories.py '
-            f'--labelled_vcf "{labelled_vcf}" '
-            f'--out_json "{out_json_path}" '
-            f'--panelapp "{panel_input}" '
-            f'--pedigree "{local_ped}" '
-            f'--input_path "{input_path}" '
-            f'--participant_panels "{hpo_panels}" '
-            f'--dataset "{dataset.name}" {sv_vcf_arg}',
+            f'--labelled_vcf {labelled_vcf!r} '
+            f'--out_json {out_json_path!r} '
+            f'--panelapp {panel_input!r} '
+            f'--pedigree {local_ped!r} '
+            f'--input_path {input_path!r} '
+            f'--participant_panels {hpo_panels!r} '
+            f'--dataset {dataset.name!r} {sv_vcf_arg}',
         )
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -424,12 +483,12 @@ class CreateTalosHTML(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         command_string = (
             f'python3 reanalysis/html_builder.py '
-            f'--results "{moi_inputs}" '
-            f'--panelapp "{panel_input}" '
-            f'--pedigree "{local_ped}" '
-            f'--output "{expected_out["results_html"]}" '
-            f'--latest "{expected_out["latest_html"]}" '
-            f'--dataset "{dataset.name}" '
+            f'--results {moi_inputs!r} '
+            f'--panelapp {panel_input!r} '
+            f'--pedigree {local_ped!r} '
+            f'--output {expected_out["results_html"]!r} '
+            f'--latest {expected_out["latest_html"]!r} '
+            f'--dataset {dataset.name!r} '
         )
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
             command_string += f' --split_samples {report_splitting}'
@@ -479,7 +538,8 @@ class GenerateSeqrFile(DatasetStage):
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             f'python3 reanalysis/minimise_output_for_seqr.py '
-            f'{input_localised} {job.out_json} {job.pheno_json} --external_map {lookup_in_batch}',
+            f'{input_localised} {job.out_json} {job.pheno_json} '
+            f'--external_map {lookup_in_batch}',
         )
 
         # write the results out

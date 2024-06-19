@@ -13,8 +13,10 @@ status_reporter = 'metamist'
 
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
 
+[]
+
 [images]
-aip = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_aip:latest"
+talos = "australia-southeast1-docker.pkg.dev/cpg-common/images/talos:latest"
 
 [panels]
 default_panel = 137
@@ -70,6 +72,11 @@ sv1 = 'Predicted LOF SV'
 cancel_after_n_failures = 1
 default_timeout = 6000
 default_memory = 'highmem'
+
+[hail.storage]
+sv = 10
+exome = 50
+genome = 500
 
 [references]
 genome_build = 'GRCh38'
