@@ -33,6 +33,7 @@ class Genotype(SequencingGroupStage):
         """
         if sequencing_group.gvcf:
             gvcf_path = sequencing_group.gvcf
+            realigned_bam = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
         else:
             gvcf_path = sequencing_group.make_gvcf_path()
             realigned_bam = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
