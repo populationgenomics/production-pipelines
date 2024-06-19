@@ -24,6 +24,7 @@ def genotype(
     cram_path: CramPath,
     job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
+    out_bam_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> list[Job]:
@@ -42,6 +43,7 @@ def genotype(
             sequencing_group_name=sequencing_group_name,
             job_attrs=job_attrs,
             output_path=hc_gvcf_path,
+            out_bam_path=out_bam_path,
             cram_path=cram_path,
             tmp_prefix=tmp_prefix,
             scatter_count=get_config()['workflow'].get('scatter_count_genotype', 50),
@@ -81,6 +83,7 @@ def haplotype_caller(
     scatter_count: int,
     job_attrs: dict[str, str] | None = None,
     output_path: Path | None = None,
+    out_bam_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> list[Job | None]:
@@ -119,6 +122,7 @@ def haplotype_caller(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 out_gvcf_path=fragment,
+                out_bam_path=out_bam_path,
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
@@ -160,6 +164,7 @@ def _haplotype_caller_one(
     job_attrs: dict | None = None,
     interval: hb.Resource | None = None,
     out_gvcf_path: Path | None = None,
+    out_bam_path: Path | None = None,
     overwrite: bool = False,
     dragen_mode: bool = True,
 ) -> tuple[Job, hb.ResourceGroup] | tuple[None, str]:
@@ -242,6 +247,8 @@ def _haplotype_caller_one(
     j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
+    if out_bam_path:
+        b.write_output(j.output_gvcf['.bam'], str(out_bam_path).replace('.bam', ''))
     return j, j.output_gvcf
 
 

@@ -35,10 +35,12 @@ class Genotype(SequencingGroupStage):
             gvcf_path = sequencing_group.gvcf
         else:
             gvcf_path = sequencing_group.make_gvcf_path()
+            realigned_bam = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
 
         return {
             'gvcf': gvcf_path.path,
             'tbi': gvcf_path.tbi_path,
+            'realigned_bam': realigned_bam,
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -49,6 +51,7 @@ class Genotype(SequencingGroupStage):
         jobs = genotype.genotype(
             b=get_batch(),
             output_path=self.expected_outputs(sequencing_group)['gvcf'],
+            out_bam_path=self.expected_outputs(sequencing_group)['realigned_bam'],
             sequencing_group_name=sequencing_group.id,
             cram_path=sequencing_group.cram or sequencing_group.make_cram_path(),
             tmp_prefix=self.tmp_prefix / sequencing_group.id,
