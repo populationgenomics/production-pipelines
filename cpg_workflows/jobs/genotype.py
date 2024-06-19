@@ -205,6 +205,7 @@ def _haplotype_caller_one(
         output_gvcf={
             'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
             'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
+            '.bam': '{root}-' + sequencing_group_name + 'local_realigned.bam',
         },
     )
 
@@ -228,6 +229,7 @@ def _haplotype_caller_one(
     -R {reference.base} \\
     -I $CRAM \\
     --read-index $CRAI \\
+    --bamout {j.output_gvcf['.bam']} \\
     {f"-L {interval} " if interval is not None else ""} \\
     --disable-spanning-event-genotyping \\
     {"--dragen-mode " if dragen_mode else ""} \\
