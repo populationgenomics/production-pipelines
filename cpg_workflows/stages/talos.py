@@ -57,7 +57,7 @@ from os.path import join
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
@@ -216,7 +216,10 @@ class GeneratePED(DatasetStage):
         return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        """generate a pedigree from metamist"""
+        """
+        generate a pedigree from metamist
+        script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
+        """
         ped_job = get_batch().new_job('Generate PED from Metamist')
         ped_job.cpu(0.25).memory('lowmem').image(image_path('talos'))
         expected_out = self.expected_outputs(dataset)
@@ -224,7 +227,8 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        ped_job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {expected_out["pedigree"]}')
+        ped_job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
+        get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
         return self.make_outputs(dataset, data=expected_out)
@@ -251,11 +255,9 @@ class GeneratePanelData(DatasetStage):
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         job.command(
-            'python3 reanalysis/hpo_panel_match.py '
-            f'-i {local_ped!r} '
-            f'--hpo {hpo_file!r} '
-            f'--out {str(expected_out["hpo_panels"])!r}',
+            'python3 reanalysis/hpo_panel_match.py ' f'-i {local_ped!r} ' f'--hpo {hpo_file!r} ' f'--out {job.output}',
         )
+        get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -276,10 +278,11 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'python3 reanalysis/query_panelapp.py '
-            f'--panels {str(hpo_panel_json)!r} '
-            f'--out_path {str(expected_out["panel_data"])!r} '
+            f'--panels {get_batch().read_input(str(hpo_panel_json))!r} '
+            f'--out_path {job.output} '
             f'--dataset {dataset.name} ',
         )
+        get_batch().write_output(job.output, str(expected_out["panel_data"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -306,7 +309,9 @@ class RunHailFiltering(DatasetStage):
         required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
         HIGHMEM.set_resources(job, storage_gb=required_storage)
 
-        panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
+        panelapp_json = get_batch().read_input(
+            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+        )
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
         expected_out = self.expected_outputs(dataset)
 
@@ -337,7 +342,7 @@ class RunHailFiltering(DatasetStage):
         job.command(
             f'python3 reanalysis/hail_filter_and_label.py '
             f'--mt "${{BATCH_TMPDIR}}{mt_name}" '
-            f'--panelapp {str(panelapp_json)!r} '
+            f'--panelapp {panelapp_json!r} '
             f'--pedigree {local_ped!r} '
             f'--vcf_out {job.output["vcf.bgz"]} '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
@@ -363,7 +368,9 @@ class RunHailSVFiltering(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        panelapp_json = inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')
+        panelapp_json = get_batch().read_input(
+            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+        )
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
 
         # peddy can't read cloud paths
@@ -383,7 +390,7 @@ class RunHailSVFiltering(DatasetStage):
             job.command(
                 f'python3 reanalysis/hail_filter_sv.py '
                 f'--mt {sv_file!r} '
-                f'--panelapp {str(panelapp_json)!r} '
+                f'--panelapp {panelapp_json!r} '
                 f'--pedigree {local_ped!r} '
                 f'--vcf_out {str(job.output["vcf.bgz"])} ',
             )
@@ -409,9 +416,8 @@ class ValidateMOI(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
         job.cpu(2.0).memory('highmem').image(image_path('talos'))
-        hpo_panels = str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels'])
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-        local_ped = get_batch().read_input(str(pedigree))
+        hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
+        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
         input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
@@ -435,21 +441,22 @@ class ValidateMOI(DatasetStage):
         if sv_vcf_arg:
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
 
-        panel_input = str(inputs.as_dict(dataset, QueryPanelapp)['panel_data'])
+        panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
         labelled_vcf = get_batch().read_input_group(
             **{'vcf.bgz': str(hail_inputs['labelled_vcf']), 'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi'},
         )['vcf.bgz']
-        out_json_path = str(self.expected_outputs(dataset)['summary_json'])
+
         job.command(
             f'python3 reanalysis/validate_categories.py '
             f'--labelled_vcf {labelled_vcf!r} '
-            f'--out_json {out_json_path!r} '
+            f'--out_json {job.output!r} '
             f'--panelapp {panel_input!r} '
-            f'--pedigree {local_ped!r} '
+            f'--pedigree {pedigree!r} '
             f'--input_path {input_path!r} '
             f'--participant_panels {hpo_panels!r} '
             f'--dataset {dataset.name!r} {sv_vcf_arg}',
         )
+        get_batch().write_output(job.output, str(self.expected_outputs(dataset)['summary_json']))
         expected_out = self.expected_outputs(dataset)
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -473,27 +480,33 @@ class CreateTalosHTML(DatasetStage):
         job.memory('lowmem')
         job.image(image_path('talos'))
 
-        moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
+        moi_inputs = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
         panel_input = inputs.as_dict(dataset, QueryPanelapp)['panel_data']
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
 
         # peds can't read cloud paths
-        local_ped = get_batch().read_input(str(pedigree))
+        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
 
         expected_out = self.expected_outputs(dataset)
+
+        # this will still try to write directly out - latest is optional, and splitting is arbitrary
+        # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
             f'python3 reanalysis/html_builder.py '
             f'--results {moi_inputs!r} '
             f'--panelapp {panel_input!r} '
-            f'--pedigree {local_ped!r} '
+            f'--pedigree {pedigree!r} '
             f'--output {expected_out["results_html"]!r} '
             f'--latest {expected_out["latest_html"]!r} '
             f'--dataset {dataset.name!r} '
         )
+
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
             command_string += f' --split_samples {report_splitting}'
 
         job.command(command_string)
+
+        # this + copy_common_env (called by default) should be enough to write using cloudpathlib
+        authenticate_cloud_credentials_in_job(job)
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
