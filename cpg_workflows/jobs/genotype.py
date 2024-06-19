@@ -245,7 +245,7 @@ def _haplotype_caller_one(
     -R {reference.base} \\
     -I $CRAM \\
     --read-index $CRAI \\
-    --bamout {j.output_gvcf['.bam']} \\
+    --bamout {j.output_gvcf['bam']} \\
     {f"-L {interval} " if interval is not None else ""} \\
     --disable-spanning-event-genotyping \\
     {"--dragen-mode " if dragen_mode else ""} \\
