@@ -115,6 +115,7 @@ def haplotype_caller(
             assert intervals[idx], intervals
             # give each fragment a tmp location
             fragment = tmp_prefix / 'haplotypecaller' / f'{idx}_of_{scatter_count}_{sequencing_group_name}.g.vcf.gz'
+            bam_fragment = tmp_prefix / 'haplotypecaller' / f'{idx}_of_{scatter_count}_{sequencing_group_name}.bam'
             j, result = _haplotype_caller_one(
                 b,
                 sequencing_group_name=sequencing_group_name,
@@ -122,7 +123,7 @@ def haplotype_caller(
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
                 interval=intervals[idx],
                 out_gvcf_path=fragment,
-                out_bam_path=out_bam_path,
+                out_bam_path=bam_fragment,
                 dragen_mode=dragen_mode,
                 overwrite=overwrite,
             )
@@ -132,6 +133,14 @@ def haplotype_caller(
             if j is not None:
                 jobs.append(j)
 
+        merge_bams_j = merge_bams(
+            b=b,
+            sequencing_group_name=sequencing_group_name,
+            bam_groups=hc_fragments,
+            job_attrs=job_attrs,
+            out_bam_path=out_bam_path,
+            overwrite=overwrite,
+        )
         merge_j = merge_gvcfs_job(
             b=b,
             sequencing_group_name=sequencing_group_name,
@@ -142,6 +151,8 @@ def haplotype_caller(
         )
         if merge_j:
             jobs.append(merge_j)
+        if merge_bams_j:
+            jobs.append(merge_bams_j)
     else:
         hc_j, _result = _haplotype_caller_one(
             b,
@@ -210,7 +221,7 @@ def _haplotype_caller_one(
         output_gvcf={
             'g.vcf.gz': '{root}-' + sequencing_group_name + '.g.vcf.gz',
             'g.vcf.gz.tbi': '{root}-' + sequencing_group_name + '.g.vcf.gz.tbi',
-            '.bam': '{root}-' + sequencing_group_name + 'local_realigned.bam',
+            'bam': sequencing_group_name + '_local_realigned.bam',
         },
     )
 
@@ -248,8 +259,50 @@ def _haplotype_caller_one(
     if out_gvcf_path:
         b.write_output(j.output_gvcf, str(out_gvcf_path).replace('.g.vcf.gz', ''))
     if out_bam_path:
-        b.write_output(j.output_gvcf['.bam'], str(out_bam_path).replace('.bam', ''))
+        b.write_output(j.output_gvcf['bam'], str(out_bam_path).replace('.bam', ''))
     return j, j.output_gvcf
+
+
+def merge_bams(
+    b: hb.Batch,
+    sequencing_group_name: str,
+    bam_groups: list[str | hb.ResourceGroup],
+    job_attrs: dict | None = None,
+    out_bam_path: Path | None = None,
+    overwrite: bool = False,
+) -> tuple[Job, hb.ResourceFile]:
+    """
+    Merge a list of BAM files into a single BAM file.
+    """
+    job_name = 'merge_bams'
+
+    merge_tool = 'samtools'
+    j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
+    j = b.new_job(name=job_name, attributes=j_attrs)
+    j.image(image_path('samtools'))
+    j.declare_resource_group(
+        output_bam={
+            'bam': '{root}-' + sequencing_group_name + '.bam',
+        },
+    )
+    # Set resource requirements
+    nthreads = 8
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=50,  # TODO: make configurable
+    )
+
+    bam_paths = []
+    for bam_group in bam_groups:
+        if isinstance(bam_group, str):
+            bam_group = b.read_input_group(**{'bam': bam_group})
+        bam_paths.append(str(bam_group['bam']))
+    cmd = f'samtools merge -@ {res.get_nthreads() - 1} -o {j.output_bam["bam"]} {" ".join(bam_paths)}'
+    j.command(command(cmd, monitor_space=True))
+    if out_bam_path:
+        b.write_output(j.output_bam, str(out_bam_path).replace('.bam', ''))
+    return j
 
 
 def merge_gvcfs_job(
