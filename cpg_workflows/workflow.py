@@ -1026,7 +1026,7 @@ class Workflow:
                 )
 
         # We want to run stages only appearing in only_stages, and check outputs of
-        # imediate predecessor stages, but skip everything else.
+        # immediate predecessor stages, but skip everything else.
         required_stages: set[str] = set()
         for os in only_stages:
             rs = nx.descendants_at_distance(graph, os, 1)
@@ -1044,7 +1044,7 @@ class Workflow:
 
     def set_stages(
         self,
-        requested_stages: list[StageDecorator],
+        requested_stages: list[StageDecorator]
     ):
         """
         Iterate over stages and call their queue_for_cohort(cohort) methods;
