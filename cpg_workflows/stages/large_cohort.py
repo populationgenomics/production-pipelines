@@ -3,12 +3,14 @@ import logging
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
     StageInput,
     StageOutput,
+    WorkflowError,
     get_workflow,
     stage,
 )
@@ -30,6 +32,19 @@ class Combiner(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
+
+        gvcf_by_sgid = {
+            sequencing_group.id: GvcfPath(inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf'))
+            for sequencing_group in cohort.get_sequencing_groups()
+        }
+
+        not_found_gvcfs: list[str] = []
+        for sgid, gvcf_path in gvcf_by_sgid.items():
+            if gvcf_path is None:
+                logging.error(f'Stage {self.name} could not find GVCF for {sgid}')
+                not_found_gvcfs.append(sgid)
+        if not_found_gvcfs:
+            raise WorkflowError(f'Could not find GVCFs for {not_found_gvcfs}')
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
