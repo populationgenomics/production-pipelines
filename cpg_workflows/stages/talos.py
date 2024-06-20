@@ -307,7 +307,8 @@ class RunHailFiltering(DatasetStage):
         # Genomes are more like 500GB
         seq_type: str = config_retrieve(['workflow', 'sequencing_type'], 'genome')
         required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
-        HIGHMEM.set_resources(job, storage_gb=required_storage)
+        required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
+        HIGHMEM.set_resources(job, ncpu=required_cpu, storage_gb=required_storage)
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
@@ -377,13 +378,14 @@ class RunHailSVFiltering(DatasetStage):
         local_ped = get_batch().read_input(str(pedigree))
 
         required_storage: int = config_retrieve(['hail', 'storage', 'sv'], 10)
+        required_cpu: int = config_retrieve(['hail', 'cores', 'sv'], 2)
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
             # manually extract the VCF and index
             job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
             job.image(image_path('talos'))
-            STANDARD.set_resources(job, ncpu=2, storage_gb=required_storage, mem_gb=16)
+            STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
@@ -392,7 +394,7 @@ class RunHailSVFiltering(DatasetStage):
                 f'--mt {sv_file!r} '
                 f'--panelapp {panelapp_json!r} '
                 f'--pedigree {local_ped!r} '
-                f'--vcf_out {str(job.output["vcf.bgz"])} ',
+                f'--vcf_out {job.output["vcf.bgz"]} ',
             )
             get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
             sv_jobs.append(job)
