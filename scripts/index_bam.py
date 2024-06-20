@@ -19,6 +19,7 @@ def main(bam_path: str, output_path: str):
 
     j.command(command(cmd))
     b.write_output(j.out_bam_index, output_path)
+    b.run(wait=False)
 
 
 if __name__ == '__main__':
