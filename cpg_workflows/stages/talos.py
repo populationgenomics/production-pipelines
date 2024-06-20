@@ -231,7 +231,7 @@ class GeneratePED(DatasetStage):
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
-        return self.make_outputs(dataset, data=expected_out)
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
 @stage(required_stages=GeneratePED)
