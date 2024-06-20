@@ -11,7 +11,6 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from cpg_workflows.stages.aip import CreateAIPHTML, GenerateSeqrFile, ValidateMOI
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
@@ -36,10 +35,11 @@ from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.stripy import Stripy
+from cpg_workflows.stages.talos import CreateTalosHTML, GenerateSeqrFile, ValidateMOI
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'aip': [ValidateMOI, CreateAIPHTML, GenerateSeqrFile],
+    'talos': [ValidateMOI, CreateTalosHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [

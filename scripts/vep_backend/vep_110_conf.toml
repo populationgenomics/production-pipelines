@@ -3,7 +3,7 @@ sequencing_type = 'genome'
 vep_version = '110'
 
 [vep]
-scatter_count = 1
+scatter_count = 50
 
 [references]
 vep_105_mount = "gs://cpg-common-main/references/vep/105.0/mount"
