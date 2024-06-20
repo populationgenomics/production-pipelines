@@ -16,6 +16,7 @@ exclude = '''
 
 [tool.mypy]
 ignore_missing_imports = true
+exlcude = '^gnomad_methods/'
 
 [tool.pytest.ini_options]
 pythonpath = ['gnomad_methods', 'seqr-loading-pipelines']
