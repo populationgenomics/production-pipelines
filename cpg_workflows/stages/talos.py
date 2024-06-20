@@ -227,7 +227,7 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        job.command(f'python3 reanalysis/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
+        job.command(f'python3 talos/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -255,7 +255,7 @@ class GeneratePanelData(DatasetStage):
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         job.command(
-            'python3 reanalysis/hpo_panel_match.py ' f'-i {local_ped!r} ' f'--hpo {hpo_file!r} ' f'--out {job.output}',
+            'python3 talos/hpo_panel_match.py ' f'-i {local_ped!r} ' f'--hpo {hpo_file!r} ' f'--out {job.output}',
         )
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
@@ -277,7 +277,7 @@ class QueryPanelapp(DatasetStage):
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
-            f'python3 reanalysis/query_panelapp.py '
+            f'python3 talos/query_panelapp.py '
             f'--panels {get_batch().read_input(str(hpo_panel_json))!r} '
             f'--out_path {job.output} '
             f'--dataset {dataset.name} ',
@@ -341,7 +341,7 @@ class RunHailFiltering(DatasetStage):
         job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
 
         job.command(
-            f'python3 reanalysis/hail_filter_and_label.py '
+            f'python3 talos/hail_filter_and_label.py '
             f'--mt "${{BATCH_TMPDIR}}{mt_name}" '
             f'--panelapp {panelapp_json!r} '
             f'--pedigree {local_ped!r} '
@@ -390,7 +390,7 @@ class RunHailSVFiltering(DatasetStage):
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                f'python3 reanalysis/hail_filter_sv.py '
+                f'python3 talos/hail_filter_sv.py '
                 f'--mt {sv_file!r} '
                 f'--panelapp {panelapp_json!r} '
                 f'--pedigree {local_ped!r} '
@@ -449,7 +449,7 @@ class ValidateMOI(DatasetStage):
         )['vcf.bgz']
 
         job.command(
-            f'python3 reanalysis/validate_categories.py '
+            f'python3 talos/validate_categories.py '
             f'--labelled_vcf {labelled_vcf!r} '
             f'--out_json {job.output!r} '
             f'--panelapp {panel_input!r} '
@@ -493,7 +493,7 @@ class CreateTalosHTML(DatasetStage):
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
         # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
-            f'python3 reanalysis/html_builder.py '
+            f'python3 talos/html_builder.py '
             f'--results {moi_inputs!r} '
             f'--panelapp {panel_input!r} '
             f'--pedigree {pedigree!r} '
@@ -552,7 +552,7 @@ class GenerateSeqrFile(DatasetStage):
         job.image(image_path('talos'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'python3 reanalysis/minimise_output_for_seqr.py '
+            f'python3 talos/minimise_output_for_seqr.py '
             f'{input_localised} {job.out_json} {job.pheno_json} '
             f'--external_map {lookup_in_batch}',
         )
