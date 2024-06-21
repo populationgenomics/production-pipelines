@@ -342,7 +342,7 @@ class RunHailFiltering(DatasetStage):
 
         job.command(
             f'python3 talos/hail_filter_and_label.py '
-            f'--mt "${{BATCH_TMPDIR}}{mt_name}" '
+            f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '
             f'--panelapp {panelapp_json!r} '
             f'--pedigree {local_ped!r} '
             f'--vcf_out {job.output["vcf.bgz"]} '

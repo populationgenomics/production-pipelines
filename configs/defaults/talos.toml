@@ -14,7 +14,7 @@ status_reporter = 'metamist'
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
 
 [images]
-talos = "australia-southeast1-docker.pkg.dev/cpg-common/images/talos:latest"
+talos = "australia-southeast1-docker.pkg.dev/cpg-common/images/talos:4.0.1"
 
 [panels]
 default_panel = 137
