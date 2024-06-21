@@ -484,10 +484,6 @@ class CreateTalosHTML(DatasetStage):
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
-
-        # peds can't read cloud paths
-        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
-
         expected_out = self.expected_outputs(dataset)
 
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
@@ -496,7 +492,6 @@ class CreateTalosHTML(DatasetStage):
             f'python3 talos/html_builder.py '
             f'--results {results_json!r} '
             f'--panelapp {panel_input!r} '
-            f'--pedigree {pedigree!r} '
             f'--output {str(expected_out["results_html"])!r} '
             f'--latest {str(expected_out["latest_html"])!r} '
             f'--dataset {dataset.name!r} '
