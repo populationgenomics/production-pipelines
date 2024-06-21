@@ -33,19 +33,6 @@ class Combiner(CohortStage):
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-        # gvcf_by_sgid = {
-        #     sequencing_group.id: sequencing_group.gvcf for sequencing_group in cohort.get_sequencing_groups()
-        # }
-        # not_found_gvcfs: list[str] = []
-        # for sgid, gvcf_path in gvcf_by_sgid.items():
-        #     if gvcf_path is None:
-        #         logging.error(f'Stage {self.name} could not find GVCF for {sgid}')
-        #         not_found_gvcfs.append(sgid)
-        # if not_found_gvcfs:
-        #     raise WorkflowError(
-        #         f'Could not find GVCFs for {not_found_gvcfs}. Before running this stage, ensure that all sequencing groups have a GVCF.',
-        #     )
-
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
         init_batch_args: dict[str, str | int] = {}
