@@ -33,7 +33,7 @@ class Combiner(CohortStage):
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-        logging.info(f'Inputs: {inputs}')
+        logging.info(f'Inputs: {inputs._outputs_by_target_by_stage}')
         gvcf_by_sgid = {
             sequencing_group.id: GvcfPath(inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf'))
             for sequencing_group in cohort.get_sequencing_groups()
