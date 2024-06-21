@@ -33,11 +33,10 @@ class Combiner(CohortStage):
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-        logging.info(f'Inputs: {inputs._outputs_by_target_by_stage}')
         gvcf_by_sgid = {
             sequencing_group.id: sequencing_group.gvcf for sequencing_group in cohort.get_sequencing_groups()
         }
-
+        logging.info(f'Found GVCFs for {gvcf_by_sgid}')
         not_found_gvcfs: list[str] = []
         for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
