@@ -26,7 +26,8 @@ def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGro
                     f'Sequencing group {sequencing_group} is missing GVCF. '
                     f'Use workflow/skip_sgs = [] or '
                     f'workflow/skip_sgs_with_missing_input '
-                    f'to control behaviour',
+                    f'to control behaviour.',
+                    'Alternatively, run Genotype stage on this sequencing group to generate GVCF.',
                 )
 
         if get_config()['workflow'].get('check_inputs', True):
@@ -40,6 +41,7 @@ def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGro
                         f'Use workflow/skip_sgs = [] or '
                         f'workflow/skip_sgs_with_missing_input '
                         f'to control behaviour',
+                        'Alternatively, run Genotype stage on this sequencing group to generate GVCF.',
                     )
     return [s for s in sequencing_groups if s.active]
 
