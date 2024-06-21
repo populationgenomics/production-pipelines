@@ -300,7 +300,7 @@ class MtToEs(DatasetStage):
                 num_workers=2,
                 num_secondary_workers=0,
                 job_name=job_name,
-                depends_on=inputs.get_jobs(dataset),
+                depends_on=inputs.get_jobs(dataset),  # Do not remove, see production-pipelines/issues/791
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
             )

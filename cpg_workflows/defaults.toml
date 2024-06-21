@@ -88,6 +88,9 @@ reblock_gq_bands = [20, 30, 40]
 # the code can be run without permissions.
 #dry_run = true
 
+# By default, BamToCram stage will create CRAM analysis types, this can be overridden
+# bam_to_cram_analysis_type = 'pacbio_cram'
+
 # Map internally used validation sample external_id to truth sample names
 [validation.sample_map]
 HG001_NA12878 = 'na12878'
@@ -113,6 +116,14 @@ delete_scratch_on_exit = false
 
 # Use additional storage in postproc_gvcf job for large gVCFs
 # postproc_gvcf_storage = 50
+
+# JointGenotyping GenomicsDBImport job overrides
+# genomicsdb_import_mem_gb = 32
+# genomicsdb_import_use_highmem = false
+
+# JointGenotyping GenotypeGVCFs job overrides
+# genotype_gvcfs_mem_gb = 15
+# genotype_gvcfs_use_highmem = false
 
 [mito_snv]
 # Example config for broad wdl found here:
