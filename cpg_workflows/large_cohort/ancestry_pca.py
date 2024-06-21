@@ -110,6 +110,15 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
+    # If requested, subset the dense_mt and sample_qc_ht to the samples provided in the config
+    sgids_remove = get_config()['large_cohort'].get('pca_samples_to_remove', [])
+    if not sgids_remove:
+        logging.info('No specific samples provided for removal. Continuing with the full cohort.')
+    else:
+        logging.info(f'Removing samples prior to PCA analysis. Removing {sgids_remove}')
+        dense_mt = dense_mt.filter_cols(~hl.literal(sgids_remove).contains(dense_mt.s))
+        sample_qc_ht = sample_qc_ht.filter(~hl.literal(sgids_remove).contains(sample_qc_ht.s))
+
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
         dense_mt_checkpoint_path = tmp_prefix / 'modified_dense_mt.mt'
