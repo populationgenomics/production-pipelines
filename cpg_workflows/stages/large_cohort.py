@@ -15,7 +15,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .genotype import Genotype
+from .genotyping.genotype import Genotype
 
 
 @stage()

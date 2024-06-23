@@ -23,7 +23,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from ..genotype import Genotype
+from .genotype import Genotype
 
 
 @stage(required_stages=Genotype)

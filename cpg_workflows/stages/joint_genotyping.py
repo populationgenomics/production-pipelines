@@ -19,7 +19,7 @@ from cpg_workflows.workflow import (
 
 from .. import get_batch
 from ..resources import joint_calling_scatter_count
-from .genotype import Genotype
+from .genotyping.genotype import Genotype
 
 
 @stage(required_stages=Genotype)

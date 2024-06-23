@@ -13,7 +13,7 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .. import get_batch
+from ... import get_batch
 
 
 @stage(

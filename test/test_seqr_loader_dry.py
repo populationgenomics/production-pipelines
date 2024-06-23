@@ -198,7 +198,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     from cpg_utils.hail_batch import get_batch
     from cpg_workflows.inputs import get_cohort
     from cpg_workflows.stages.alignment_pipeline.cram_qc import CramMultiQC
-    from cpg_workflows.stages.genotype_pipeline.gvcf_qc import GvcfMultiQC
+    from cpg_workflows.stages.genotyping.gvcf_qc import GvcfMultiQC
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
     from cpg_workflows.stages.seqr_loader import MtToEs
     from cpg_workflows.workflow import get_workflow

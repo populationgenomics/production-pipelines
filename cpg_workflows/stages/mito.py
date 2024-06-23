@@ -16,8 +16,8 @@ from cpg_utils.config import get_config, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
-from cpg_workflows.stages.align import Align
-from cpg_workflows.stages.alignment_pipeline.cram_qc import CramQC
+from cpg_workflows.stages.alignment.align import Align
+from cpg_workflows.stages.alignment.cram_qc import CramQC
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,

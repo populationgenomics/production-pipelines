@@ -14,7 +14,7 @@ from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import picard_collect_metrics, picard_hs_metrics, picard_wgs_metrics
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
-from cpg_workflows.stages.align import Align
+from cpg_workflows.stages.alignment.align import Align
 from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
