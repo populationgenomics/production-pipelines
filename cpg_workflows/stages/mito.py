@@ -23,6 +23,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    WorkflowError,
     stage,
 )
 
@@ -72,7 +73,6 @@ MAX_ALT_ALLELE_COUNT = 4
 
 
 @stage(
-    required_stages=Align,
     analysis_type='mito-cram',
     analysis_keys=['non_shifted_cram'],
 )
@@ -132,6 +132,16 @@ class RealignMito(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+
+        if not sequencing_group.cram:
+            raise WorkflowError(
+                f'RealignMito requires a cram input. Please run the Align stage on {sequencing_group.id} first.',
+            )
+        else:
+            assert isinstance(sequencing_group.cram, CramPath)
+            cram_path = sequencing_group.cram
+            crai_path = cram_path.index_path
+
         # Mitochondrial specific reference files.
         mito_ref = get_mito_references()
         shifted_mito_ref = get_mito_references(shifted=True)
@@ -140,8 +150,6 @@ class RealignMito(SequencingGroupStage):
         jobs = []
 
         # Extract reads mapped to chrM
-        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
-        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
         subset_bam_j = mito.subset_cram_to_chrM(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
