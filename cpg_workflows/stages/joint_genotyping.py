@@ -22,7 +22,7 @@ from ..resources import joint_calling_scatter_count
 from .genotyping.genotype import Genotype
 
 
-@stage(required_stages=Genotype)
+@stage
 class JointGenotyping(CohortStage):
     """
     Joint-calling of GVCFs together.
@@ -46,17 +46,17 @@ class JointGenotyping(CohortStage):
         Submit jobs.
         """
         gvcf_by_sgid = {
-            sequencing_group.id: GvcfPath(inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf'))
-            for sequencing_group in cohort.get_sequencing_groups()
+            sequencing_group.id: GvcfPath(sequencing_group.gvcf) for sequencing_group in cohort.get_sequencing_groups()
         }
-
         not_found_gvcfs: list[str] = []
         for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
-                logging.error(f'Joint genotyping: could not find GVCF for {sgid}')
+                logging.error(f'Stage {self.name} could not find GVCF for {sgid}')
                 not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
-            raise WorkflowError(f'Joint genotyping: could not find {len(not_found_gvcfs)} GVCFs, exiting')
+            raise WorkflowError(
+                f'Could not find GVCFs for {not_found_gvcfs}. Before running this stage, ensure that all sequencing groups have a GVCF.',
+            )
 
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']
