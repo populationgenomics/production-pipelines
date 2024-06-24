@@ -6,6 +6,7 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 
 """
 
+import logging
 from functools import cache
 
 import hailtop.batch as hb
@@ -16,8 +17,7 @@ from cpg_utils.config import get_config, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
-from cpg_workflows.stages.alignment.align import Align
-from cpg_workflows.stages.alignment.cram_qc import CramQC
+from cpg_workflows.stages.alignment.cram_qc import qc_functions
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -66,6 +66,14 @@ def get_control_region_intervals() -> hb.ResourceGroup:
         control_region_shifted=reference_path('gnomad_mito/shifted_control_region_interval'),
         non_control_region=reference_path('gnomad_mito/non_control_region_interval'),
     )
+
+
+def get_qc_output_path(sequencing_group: SequencingGroup, qc_key: str) -> Path | None:
+    for qc in qc_functions():
+        for key, out in qc.outs.items():
+            if key == qc_key and out:
+                return sequencing_group.dataset.prefix() / 'qc' / key / f'{sequencing_group.id}{out.suf}'
+    return None
 
 
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
@@ -264,7 +272,7 @@ class RealignMito(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
-@stage(required_stages=[RealignMito, CramQC])
+@stage(required_stages=[RealignMito])
 class GenotypeMito(SequencingGroupStage):
     """
     Call SNVs in the mitochondrial genome of a single sequencing_group.
@@ -333,11 +341,12 @@ class GenotypeMito(SequencingGroupStage):
             crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
         )
         if get_config()['mito_snv']['use_verifybamid']:
-            verifybamid_output = get_batch().read_input(
-                str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
-            )
-        else:
-            verifybamid_output = None
+            verify_bamid_path = get_qc_output_path(sequencing_group, 'verify_bamid')
+            if verify_bamid_path and verify_bamid_path.exists():
+                verifybamid_output = get_batch().read_input(str(verify_bamid_path))
+            else:
+                verifybamid_output = None
+                logging.info("Please run the alignment pipeline to generate verify_bamid output.")
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
