@@ -482,23 +482,18 @@ class CreateTalosHTML(DatasetStage):
         job.memory('lowmem')
         job.image(image_path('talos'))
 
-        moi_inputs = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
-        panel_input = inputs.as_dict(dataset, QueryPanelapp)['panel_data']
-
-        # peds can't read cloud paths
-        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
-
+        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
+        panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
         expected_out = self.expected_outputs(dataset)
 
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
         # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
             f'python3 talos/html_builder.py '
-            f'--results {moi_inputs!r} '
+            f'--results {results_json!r} '
             f'--panelapp {panel_input!r} '
-            f'--pedigree {pedigree!r} '
-            f'--output {expected_out["results_html"]!r} '
-            f'--latest {expected_out["latest_html"]!r} '
+            f'--output {str(expected_out["results_html"])!r} '
+            f'--latest {str(expected_out["latest_html"])!r} '
             f'--dataset {dataset.name!r} '
         )
 
@@ -542,8 +537,7 @@ class GenerateSeqrFile(DatasetStage):
             get_logger().warning(f'No Seqr lookup file for {dataset.name} {seq_type}')
             return self.make_outputs(dataset, skipped=True)
 
-        moi_inputs = inputs.as_dict(dataset, ValidateMOI)['summary_json']
-        input_localised = get_batch().read_input(str(moi_inputs))
+        input_localised = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'Talos Prep for Seqr: {dataset.name}')
