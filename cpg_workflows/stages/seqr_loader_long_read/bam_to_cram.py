@@ -113,6 +113,8 @@ class BamToCram(SequencingGroupStage):
 class ReFormatPacBioSVs(SequencingGroupStage):
     """
     take each of the long-read SV VCFs, and re-format the contents
+    the huge REF strings are just not required
+    a symbolic ALT allele (instead of "N") is required for annotation
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
@@ -123,11 +125,9 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         """
-        a python job to change their contents
-
-        Args:
-            sequencing_group ():
-            inputs ():
+        a python job to change the VCF contents
+        - use a python job to modify all VCF lines, in-line
+        - use a follow-up job to block-gzip and index
         """
 
         # find the vcf for this SG
@@ -149,7 +149,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         # block-gzip and index that result
         tabix_job = get_batch().new_job(
             name=f'BGZipping and Indexing for {sequencing_group.id}',
-            attributes={'tool': 'bcftools'}
+            attributes={'tool': 'bcftools'},
         )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
@@ -167,7 +167,6 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 class MergeLongReadSVs(CohortStage):
     """
     find all the amended VCFs, and do a naive merge into one huge VCF
-
     """
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         return {
@@ -177,8 +176,7 @@ class MergeLongReadSVs(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        reuse the gVCF method which does the same? FastCombineVcfs. Nah, not yet
-        unhappy with the redundancy
+        reuse the gVCF method which does the same? FastCombineVcfs. Nah, not yet - that contains other modifications
         """
 
         outputs = self.expected_outputs(cohort)
@@ -194,6 +192,7 @@ class MergeLongReadSVs(CohortStage):
         # just gonna create a job and commands here... this could be in a jobs file, but... shrug
         merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
         merge_job.image(image=image_path('bcftools'))
+
         # guessing at resource requirements
         merge_job.cpu(4)
         merge_job.memory('16Gi')
