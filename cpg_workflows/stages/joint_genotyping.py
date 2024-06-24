@@ -3,6 +3,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 """
 
 import logging
+from test.factories import sequencing_group
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
@@ -45,9 +46,7 @@ class JointGenotyping(CohortStage):
         """
         Submit jobs.
         """
-        gvcf_by_sgid = {
-            sequencing_group.id: GvcfPath(sequencing_group.gvcf) for sequencing_group in cohort.get_sequencing_groups()
-        }
+        gvcf_by_sgid: dict[str, GvcfPath] = {sg.id: sg.gvcf for sg in cohort.get_sequencing_groups() if sg.gvcf}
         not_found_gvcfs: list[str] = []
         for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:

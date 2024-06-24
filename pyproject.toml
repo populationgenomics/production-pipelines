@@ -182,6 +182,7 @@ ignore = [
     "E401",
     "SIM212",
     "DTZ002",
+    "TCH002", # Third-party imports for type-checking within scope into a type-checking block
 ]
 
 [tool.ruff.lint.isort]
