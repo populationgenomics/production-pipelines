@@ -42,7 +42,9 @@ VCF_QUERY = gql(
 @cache
 def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
     """
-    query metamist for the SV VCF, possibility of none found
+    query metamist for the PacBio SV VCFs
+    return a dictionary of each CPG ID and its corresponding VCF
+    this is cached - used in a SequencingGroupStage, but we only want to query for it once instead of once/SG
 
     Args:
         dataset_name (str):
