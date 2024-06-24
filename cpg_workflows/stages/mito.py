@@ -346,7 +346,9 @@ class GenotypeMito(SequencingGroupStage):
                 verifybamid_output = get_batch().read_input(str(verify_bamid_path))
             else:
                 verifybamid_output = None
-                logging.info("Please run the alignment pipeline to generate verify_bamid output.")
+                logging.info(
+                    "No VerifyBamID output detected. Please run the alignment pipeline to generate verify_bamid output.",
+                )
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(
