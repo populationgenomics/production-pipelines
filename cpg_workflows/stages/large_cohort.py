@@ -15,8 +15,6 @@ from cpg_workflows.workflow import (
     stage,
 )
 
-from .genotyping.genotype import Genotype
-
 
 @stage
 class Combiner(CohortStage):
