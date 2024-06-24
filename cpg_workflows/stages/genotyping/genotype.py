@@ -2,12 +2,9 @@
 Stage that generates a GVCF file.
 """
 
-from numpy import require
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.jobs import genotype
-from cpg_workflows.stages.alignment.align import Align
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -20,7 +17,6 @@ from ... import get_batch
 
 
 @stage(
-    required_stages=Align,
     analysis_type='gvcf',
     analysis_keys=['gvcf'],
 )
