@@ -2,12 +2,15 @@
 Stage that converts a BAM file to a CRAM file.
 Intended for use with long-read BAM files from PacBio.
 """
+
 from functools import cache
+
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, image_path, reference_path, try_get_ar_guid, AR_GUID_NAME
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import bam_to_cram, seqr_loader_long_read
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs
 from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     Cohort,
@@ -18,10 +21,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     stage,
 )
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs
-
 from metamist.graphql import gql, query
-
 
 VCF_QUERY = gql(
     """
@@ -34,8 +34,7 @@ VCF_QUERY = gql(
       }
     }
   }
-}
-    """
+}""",
 )
 
 
@@ -120,7 +119,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
             'vcf': self.prefix / f'{sequencing_group.id}_reformatted_svs.vcf.bgz',
-            'index': self.prefix / f'{sequencing_group.id}_reformatted_svs.vcf.bgz.tbi'
+            'index': self.prefix / f'{sequencing_group.id}_reformatted_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -168,10 +167,11 @@ class MergeLongReadSVs(CohortStage):
     """
     find all the amended VCFs, and do a naive merge into one huge VCF
     """
+
     def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
         return {
             'vcf': self.prefix / 'merged_reformatted_svs.vcf.bgz',
-            'index': self.prefix / 'merged_reformatted_svs.vcf.bgz.tbi'
+            'index': self.prefix / 'merged_reformatted_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -207,12 +207,12 @@ class MergeLongReadSVs(CohortStage):
         # -0: compression level
         merge_job.command(
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m all -0'  # type: ignore
+            f'{merge_job.output["vcf.bgz"]} --threads 4 -m all -0',  # type: ignore
         )
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
         # write the result out
-        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('vcf.bgz'))
+        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('vcf.bgz'))  # type: ignore
 
         return self.make_outputs(cohort, data=outputs, jobs=merge_job)
 
@@ -222,7 +222,7 @@ class AnnotateLongReadSVs(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'annotated_vcf': self.prefix / 'annotated_long_read_svs.vcf.bgz',
-            'annotated_vcf_index': self.prefix / 'annotated_long_read_svs.vcf.bgz.tbi'
+            'annotated_vcf_index': self.prefix / 'annotated_long_read_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -241,5 +241,3 @@ class AnnotateLongReadSVs(CohortStage):
             labels=billing_labels,
         )
         return self.make_outputs(cohort, data=expected_out, jobs=job_or_none)
-
-

@@ -1,5 +1,3 @@
-
-
 def modify_sniffles_vcf(file_in: str, file_out: str):
     """
     to be run as a PythonJob - scrolls through the
