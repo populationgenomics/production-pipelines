@@ -46,7 +46,7 @@ class JointGenotyping(CohortStage):
         """
         Submit jobs.
         """
-        gvcf_by_sgid: dict[str, GvcfPath] = {sg.id: sg.gvcf for sg in cohort.get_sequencing_groups() if sg.gvcf}
+        gvcf_by_sgid: dict[str, GvcfPath | None] = {sg.id: sg.gvcf for sg in cohort.get_sequencing_groups()}
         not_found_gvcfs: list[str] = []
         for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
@@ -56,6 +56,9 @@ class JointGenotyping(CohortStage):
             raise WorkflowError(
                 f'Could not find GVCFs for {not_found_gvcfs}. Before running this stage, ensure that all sequencing groups have a GVCF.',
             )
+        existing_gvcfs: dict[str, GvcfPath] = {
+            sgid: gvcf_path for sgid, gvcf_path in gvcf_by_sgid.items() if gvcf_path
+        }  # fixing linting error
 
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']
@@ -71,7 +74,7 @@ class JointGenotyping(CohortStage):
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
-            gvcf_by_sgid=gvcf_by_sgid,
+            gvcf_by_sgid=existing_gvcfs,
             tool=(
                 joint_genotyping.JointGenotyperTool.GnarlyGenotyper
                 if get_config()['workflow'].get('use_gnarly', False)
