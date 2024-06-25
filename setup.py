@@ -33,6 +33,7 @@ setup(
         'bokeh',
         'numpy',
         'click',
+        'tenacity',
     ],
     extras_require={
         'test': [
