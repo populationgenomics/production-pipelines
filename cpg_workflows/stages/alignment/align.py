@@ -24,12 +24,6 @@ from cpg_workflows.workflow import (
 @stage(
     analysis_type='cram',
     analysis_keys=['cram'],
-    update_analysis_meta=lambda x: {
-        'aligner': config_retrieve(['version_control', 'aligner']),
-        'aligner_version': config_retrieve(['images', config_retrieve(['version_control', 'aligner'])]),
-        'markduplicates': config_retrieve(['version_control', 'markduplicates']),
-        'markduplicates_version': config_retrieve(['images', config_retrieve(['version_control', 'markduplicates'])]),
-    },
 )
 class Align(SequencingGroupStage):
     """
