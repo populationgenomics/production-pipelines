@@ -65,7 +65,6 @@ class Align(SequencingGroupStage):
         try:
             jobs = align.align(
                 b=get_batch(),
-                aligner=config_retrieve(['version_control', 'aligner']),
                 sequencing_group=sequencing_group,
                 output_path=sequencing_group.make_cram_path(),
                 job_attrs=self.get_job_attrs(sequencing_group),
