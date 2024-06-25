@@ -275,8 +275,10 @@ class QueryPanelapp(DatasetStage):
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
-            f'query_panelapp --panels {get_batch().read_input(str(hpo_panel_json))} '
-            f'--out_path {job.output} --dataset {dataset.name} ',
+            'query_panelapp '
+            f'--panels {get_batch().read_input(str(hpo_panel_json))} '
+            f'--out_path {job.output} '
+            f'--dataset {dataset.name} ',
         )
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
@@ -337,9 +339,13 @@ class RunHailFiltering(DatasetStage):
         job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
 
         job.command(
-            f'hail_label --mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
-            f'--panelapp {panelapp_json} --pedigree {local_ped} --vcf_out {job.output["vcf.bgz"]} '
-            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" --pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
+            'hail_label '
+            f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--panelapp {panelapp_json} '
+            f'--pedigree {local_ped} '
+            f'--vcf_out {job.output["vcf.bgz"]} '
+            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
+            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
         )
         get_batch().write_output(job.output, str(expected_out["labelled_vcf"]).removesuffix('.vcf.bgz'))
 
@@ -379,8 +385,11 @@ class RunHailSVFiltering(DatasetStage):
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                f'hail_label_sv --mt {sv_file} --panelapp {panelapp_json} '  # type: ignore
-                f'--pedigree {local_ped} --vcf_out {job.output["vcf.bgz"]} ',
+                'hail_label_sv '
+                f'--mt {sv_file} '
+                f'--panelapp {panelapp_json} '
+                f'--pedigree {local_ped} '
+                f'--vcf_out {job.output["vcf.bgz"]} ',  # type: ignore
             )
             get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
             sv_jobs.append(job)
@@ -435,7 +444,8 @@ class ValidateMOI(DatasetStage):
         )['vcf.bgz']
 
         job.command(
-            f'run_moi_tests --labelled_vcf {labelled_vcf} '
+            'run_moi_tests '
+            f'--labelled_vcf {labelled_vcf} '
             f'--out_json {job.output} '
             f'--panelapp {panel_input} '
             f'--pedigree {pedigree} '
@@ -474,8 +484,12 @@ class CreateTalosHTML(DatasetStage):
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
         # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
-            f'build_html --results {results_json} --panelapp {panel_input} --dataset {dataset.name} '
-            f'--output {str(expected_out["results_html"])}  --latest {str(expected_out["latest_html"])} '
+            'build_html '
+            '--results {results_json} '
+            '--panelapp {panel_input} '
+            '--dataset {dataset.name} '
+            f'--output {str(expected_out["results_html"])} '
+            f'--latest {str(expected_out["latest_html"])} '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
@@ -526,7 +540,11 @@ class GenerateSeqrFile(DatasetStage):
         job.image(image_path('talos'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'generate_seqr_file {input_localised} {job.out_json} {job.pheno_json} --external_map {lookup_in_batch}',
+            'generate_seqr_file '
+            f'{input_localised} '
+            f'{job.out_json} '
+            f'{job.pheno_json} '
+            f'--external_map {lookup_in_batch}',
         )
 
         # write the results out
