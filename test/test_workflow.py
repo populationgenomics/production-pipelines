@@ -36,7 +36,7 @@ backend = 'local'
 """
 
 
-def mock_create_cohort() -> Cohort:
+def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
     ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
@@ -44,7 +44,7 @@ def mock_create_cohort() -> Cohort:
     return c
 
 
-@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+@mock.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)
 def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.
@@ -54,7 +54,7 @@ def test_workflow(tmp_path):
 
     from cpg_utils.config import dataset_path
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.workflow import (
         CohortStage,
         SequencingGroupStage,
@@ -66,7 +66,7 @@ def test_workflow(tmp_path):
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_cohort().get_sequencing_groups()) == 2
+    assert len(get_multicohort().get_sequencing_groups()) == 2
 
     @stage
     class MySequencingGroupStage(SequencingGroupStage):

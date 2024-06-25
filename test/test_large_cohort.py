@@ -129,7 +129,7 @@ class TestAllLargeCohortMethods:
         )
 
         mocker.patch(
-            'cpg_workflows.inputs.create_cohort',
+            'cpg_workflows.inputs.deprecated_create_cohort',
             lambda: _mock_cohort(conf.workflow.dataset),
         )
         # skip can_reuse, implicit skip of existence checks
