@@ -154,13 +154,11 @@ def _populate_analysis(cohort: Cohort) -> None:
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
         )
-        logging.info(f'GVCF entries found for dataset {dataset.name}: {gvcf_by_sgid}')
         cram_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
         )
-        logging.info(f'CRAM entries found for dataset {dataset.name}: {cram_by_sgid}')
 
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
@@ -170,7 +168,6 @@ def _populate_analysis(cohort: Cohort) -> None:
                     analysis.output,
                 )
                 sequencing_group.gvcf = GvcfPath(path=analysis.output)
-                logging.info(f'Found gvcf file for {sequencing_group.id}: {analysis.output}')
             elif exists(sequencing_group.make_gvcf_path()):
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
