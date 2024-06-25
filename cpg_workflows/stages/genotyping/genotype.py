@@ -2,8 +2,6 @@
 Stage that generates a GVCF file.
 """
 
-import logging
-
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_workflows.jobs import genotype
@@ -12,6 +10,8 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    Workflow,
+    WorkflowError,
     stage,
 )
 
@@ -45,9 +45,11 @@ class Genotype(SequencingGroupStage):
         """
         Use function from the jobs module
         """
-        logging.warning(
-            f'Input cram: sequencing_group.cram: {sequencing_group.cram} or sequencing_group.make_cram_path(): {sequencing_group.make_cram_path()}',
-        )
+        if not sequencing_group.cram:
+            raise WorkflowError(
+                f'Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
+            )
+
         jobs = genotype.genotype(
             b=get_batch(),
             output_path=self.expected_outputs(sequencing_group)['gvcf'],
