@@ -47,7 +47,7 @@ class Genotype(SequencingGroupStage):
         """
         if not sequencing_group.cram:
             raise WorkflowError(
-                f'Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
+                f'Genotype requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
             )
 
         jobs = genotype.genotype(

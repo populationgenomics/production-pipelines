@@ -54,7 +54,7 @@ class JointGenotyping(CohortStage):
                 not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
             raise WorkflowError(
-                f'Could not find GVCFs for {not_found_gvcfs}. Before running this stage, ensure that all sequencing groups have a GVCF.',
+                f'JointGenotyping requires a GVCF as input. Missing GVCF for {not_found_gvcfs}; run the genotype pipeline first.',
             )
         existing_gvcfs: dict[str, GvcfPath] = {
             sgid: gvcf_path for sgid, gvcf_path in gvcf_by_sgid.items() if gvcf_path

@@ -70,7 +70,7 @@ class Stripy(SequencingGroupStage):
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         if not sequencing_group.cram:
             raise WorkflowError(
-                f'Stripy requires a cram input. Please run the Align stage on {sequencing_group.id} first.',
+                f'Stripy requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
             )
         else:
             assert isinstance(sequencing_group.cram, CramPath)

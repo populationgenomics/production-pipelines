@@ -143,7 +143,7 @@ class RealignMito(SequencingGroupStage):
 
         if not sequencing_group.cram:
             raise WorkflowError(
-                f'RealignMito requires a cram input. Please run the Align stage on {sequencing_group.id} first.',
+                f'RealignMito requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
             )
         else:
             assert isinstance(sequencing_group.cram, CramPath)
