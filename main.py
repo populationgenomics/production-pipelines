@@ -34,6 +34,7 @@ from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
+from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import AnnotateLongReadSVs, ReFormatPacBioSVs
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.talos import CreateTalosHTML, GenerateSeqrFile, ValidateMOI
 from cpg_workflows.workflow import StageDecorator, run_workflow
@@ -41,6 +42,10 @@ from cpg_workflows.workflow import StageDecorator, run_workflow
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'talos': [ValidateMOI, CreateTalosHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
+    'long_read_sv_annotation': [
+        ReFormatPacBioSVs,
+        AnnotateLongReadSVs,
+    ],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
         DatasetVCF,
