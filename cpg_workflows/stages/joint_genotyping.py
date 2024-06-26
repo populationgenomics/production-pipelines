@@ -3,6 +3,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 """
 
 import logging
+from test.factories import sequencing_group
 
 from cpg_utils import to_path
 from cpg_utils.config import get_config
@@ -19,10 +20,10 @@ from cpg_workflows.workflow import (
 
 from .. import get_batch
 from ..resources import joint_calling_scatter_count
-from .genotype import Genotype
+from .genotyping.genotype import Genotype
 
 
-@stage(required_stages=Genotype)
+@stage
 class JointGenotyping(CohortStage):
     """
     Joint-calling of GVCFs together.
@@ -45,18 +46,19 @@ class JointGenotyping(CohortStage):
         """
         Submit jobs.
         """
-        gvcf_by_sgid = {
-            sequencing_group.id: GvcfPath(inputs.as_path(target=sequencing_group, stage=Genotype, key='gvcf'))
-            for sequencing_group in cohort.get_sequencing_groups()
-        }
-
+        gvcf_by_sgid: dict[str, GvcfPath | None] = {sg.id: sg.gvcf for sg in cohort.get_sequencing_groups()}
         not_found_gvcfs: list[str] = []
         for sgid, gvcf_path in gvcf_by_sgid.items():
             if gvcf_path is None:
-                logging.error(f'Joint genotyping: could not find GVCF for {sgid}')
+                logging.error(f'Stage {self.name} could not find GVCF for {sgid}')
                 not_found_gvcfs.append(sgid)
         if not_found_gvcfs:
-            raise WorkflowError(f'Joint genotyping: could not find {len(not_found_gvcfs)} GVCFs, exiting')
+            raise WorkflowError(
+                f'JointGenotyping requires a GVCF as input. Missing GVCF for {not_found_gvcfs}; run the genotype pipeline first.',
+            )
+        existing_gvcfs: dict[str, GvcfPath] = {
+            sgid: gvcf_path for sgid, gvcf_path in gvcf_by_sgid.items() if gvcf_path
+        }  # fixing linting error
 
         jobs = []
         vcf_path = self.expected_outputs(cohort)['vcf']
@@ -72,7 +74,7 @@ class JointGenotyping(CohortStage):
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
             tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
-            gvcf_by_sgid=gvcf_by_sgid,
+            gvcf_by_sgid=existing_gvcfs,
             tool=(
                 joint_genotyping.JointGenotyperTool.GnarlyGenotyper
                 if get_config()['workflow'].get('use_gnarly', False)

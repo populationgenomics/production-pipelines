@@ -3,9 +3,12 @@ Stage that generates a CRAM file.
 """
 
 import logging
+from enum import Enum
+from logging import config
+from pickle import MARK
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
@@ -18,7 +21,10 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(analysis_type='cram', analysis_keys=['cram'])
+@stage(
+    analysis_type='cram',
+    analysis_keys=['cram'],
+)
 class Align(SequencingGroupStage):
     """
     Align or re-align input data to produce a CRAM file

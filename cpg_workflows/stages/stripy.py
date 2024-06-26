@@ -11,12 +11,13 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
-from cpg_workflows.stages.align import Align
+from cpg_workflows.stages.alignment.align import Align
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    WorkflowError,
     stage,
 )
 
@@ -46,7 +47,6 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 
 
 @stage(
-    required_stages=Align,
     analysis_type='web',
     analysis_keys=[
         'stripy_html',
@@ -68,8 +68,14 @@ class Stripy(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
-        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
+        if not sequencing_group.cram:
+            raise WorkflowError(
+                f'Stripy requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
+            )
+        else:
+            assert isinstance(sequencing_group.cram, CramPath)
+            cram_path = sequencing_group.cram
+            crai_path = cram_path.index_path
 
         jobs = []
         j = stripy.stripy(

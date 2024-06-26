@@ -6,6 +6,7 @@ https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/M
 
 """
 
+import logging
 from functools import cache
 
 import hailtop.batch as hb
@@ -16,13 +17,13 @@ from cpg_utils.config import get_config, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import mito, picard, vep
-from cpg_workflows.stages.align import Align
-from cpg_workflows.stages.cram_qc import CramQC
+from cpg_workflows.stages.alignment.cram_qc import qc_functions
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    WorkflowError,
     stage,
 )
 
@@ -67,12 +68,19 @@ def get_control_region_intervals() -> hb.ResourceGroup:
     )
 
 
+def get_qc_output_path(sequencing_group: SequencingGroup, qc_key: str) -> Path | None:
+    for qc in qc_functions():
+        for key, out in qc.outs.items():
+            if key == qc_key and out:
+                return sequencing_group.dataset.prefix() / 'qc' / key / f'{sequencing_group.id}{out.suf}'
+    return None
+
+
 # alt_allele config from https://github.com/broadinstitute/gatk/blob/master/scripts/mitochondria_m2_wdl/AlignAndCall.wdl#L167
 MAX_ALT_ALLELE_COUNT = 4
 
 
 @stage(
-    required_stages=Align,
     analysis_type='mito-cram',
     analysis_keys=['non_shifted_cram'],
 )
@@ -132,6 +140,16 @@ class RealignMito(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+
+        if not sequencing_group.cram:
+            raise WorkflowError(
+                f'RealignMito requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
+            )
+        else:
+            assert isinstance(sequencing_group.cram, CramPath)
+            cram_path = sequencing_group.cram
+            crai_path = cram_path.index_path
+
         # Mitochondrial specific reference files.
         mito_ref = get_mito_references()
         shifted_mito_ref = get_mito_references(shifted=True)
@@ -140,8 +158,6 @@ class RealignMito(SequencingGroupStage):
         jobs = []
 
         # Extract reads mapped to chrM
-        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
-        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
         subset_bam_j = mito.subset_cram_to_chrM(
             b=get_batch(),
             cram_path=CramPath(cram_path, crai_path),
@@ -256,7 +272,7 @@ class RealignMito(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
-@stage(required_stages=[RealignMito, CramQC])
+@stage(required_stages=[RealignMito])
 class GenotypeMito(SequencingGroupStage):
     """
     Call SNVs in the mitochondrial genome of a single sequencing_group.
@@ -325,11 +341,14 @@ class GenotypeMito(SequencingGroupStage):
             crai=str(inputs.as_path(sequencing_group, RealignMito, 'shifted_cram')) + '.crai',
         )
         if get_config()['mito_snv']['use_verifybamid']:
-            verifybamid_output = get_batch().read_input(
-                str(inputs.as_path(sequencing_group, CramQC, 'verify_bamid')),
-            )
-        else:
-            verifybamid_output = None
+            verify_bamid_path = get_qc_output_path(sequencing_group, 'verify_bamid')
+            if verify_bamid_path and verify_bamid_path.exists():
+                verifybamid_output = get_batch().read_input(str(verify_bamid_path))
+            else:
+                verifybamid_output = None
+                logging.info(
+                    "No VerifyBamID output detected. Please run the alignment pipeline to generate verify_bamid output.",
+                )
 
         # Call variants on WT genome
         call_j = mito.mito_mutect2(

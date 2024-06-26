@@ -10,15 +10,15 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    Workflow,
+    WorkflowError,
     stage,
 )
 
-from .. import get_batch
-from .align import Align
+from ... import get_batch
 
 
 @stage(
-    required_stages=Align,
     analysis_type='gvcf',
     analysis_keys=['gvcf'],
 )
@@ -45,6 +45,10 @@ class Genotype(SequencingGroupStage):
         """
         Use function from the jobs module
         """
+        if not sequencing_group.cram:
+            raise WorkflowError(
+                f'Genotype requires a cram input. Missing CRAM for {sequencing_group.id}; run Alignment pipeline first.',
+            )
 
         jobs = genotype.genotype(
             b=get_batch(),

@@ -11,7 +11,7 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.alignment.cram_qc import CramMultiQC, CramQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -23,7 +23,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_1 import (
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample_2 import MtToEsSv
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
-from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
+from cpg_workflows.stages.genotyping.gvcf_qc import GvcfHappy, GvcfMultiQC, GvcfQC
 from cpg_workflows.stages.happy_validation import (
     ValidationHappyOnVcf,
     ValidationMtToVcf,
@@ -40,6 +40,8 @@ from cpg_workflows.stages.talos import CreateTalosHTML, GenerateSeqrFile, Valida
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'alignment': [CramQC],
+    'genotype': [GvcfQC, GvcfHappy],
     'talos': [ValidateMOI, CreateTalosHTML, GenerateSeqrFile],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'long_read_sv_annotation': [
@@ -60,7 +62,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         BamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf, ValidationParseHappy],
-    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample_1': [FilterBatch, GenotypeBatch],
     'gatk_sv_sandwich': [MergeBatchSites],  # stage to run between FilterBatch & GenotypeBatch

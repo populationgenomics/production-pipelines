@@ -3,20 +3,20 @@ import logging
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
     StageInput,
     StageOutput,
+    WorkflowError,
     get_workflow,
     stage,
 )
 
-from .genotype import Genotype
 
-
-@stage(required_stages=[Genotype])
+@stage
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if vds_version := get_config()['workflow'].get('vds_version'):
