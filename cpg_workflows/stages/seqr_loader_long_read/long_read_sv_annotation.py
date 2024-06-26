@@ -51,7 +51,7 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
     """
     return_dict: dict[str, str] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
-    for sg_id_section in analysis_results['data']['project']['sequencingGroups']:
+    for sg_id_section in analysis_results['project']['sequencingGroups']:
         for analysis in sg_id_section['analyses']:
             if analysis['output'].endswith('.SVs.phased.vcf.gz'):
                 return_dict[sg_id_section['id']] = analysis['output']
