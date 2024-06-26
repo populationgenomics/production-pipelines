@@ -1,5 +1,3 @@
 [workflow]
 name = 'gatk_sv'
-dataset_gcp_project = 'seqr-308602'
-dataset = 'seqr'
 status_reporter = 'metamist'

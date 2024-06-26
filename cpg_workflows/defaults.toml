@@ -117,6 +117,14 @@ delete_scratch_on_exit = false
 # Use additional storage in postproc_gvcf job for large gVCFs
 # postproc_gvcf_storage = 50
 
+# JointGenotyping GenomicsDBImport job overrides
+# genomicsdb_import_mem_gb = 32
+# genomicsdb_import_use_highmem = false
+
+# JointGenotyping GenotypeGVCFs job overrides
+# genotype_gvcfs_mem_gb = 15
+# genotype_gvcfs_use_highmem = false
+
 [mito_snv]
 # Example config for broad wdl found here:
 # https://raw.githubusercontent.com/broadinstitute/gatk/master/scripts/mitochondria_m2_wdl/ExampleInputsMitochondriaPipeline.json

@@ -7,6 +7,8 @@ import re
 
 from pytest_mock import MockFixture
 
+from cpg_workflows.inputs import Cohort, MultiCohort
+
 from . import set_config
 
 LOGGER = logging.getLogger(__name__)
@@ -290,12 +292,13 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
 
     caplog.set_level(logging.WARNING)
 
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup, Sex
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     assert cohort
+    assert isinstance(cohort, Cohort)
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 2
@@ -457,10 +460,10 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
 
     # from cpg_workflows.filetypes import BamPath
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import Sex
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     assert cohort
 
@@ -663,9 +666,9 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
         mock_get_sgs_with_mixed_reads,
     )
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 3
@@ -799,10 +802,10 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
         mock_get_sgs_with_mixed_reads,
     )
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import Sex
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     test_female = cohort.get_sequencing_groups()[0]
 
@@ -830,11 +833,12 @@ def test_custom_cohort(mocker: MockFixture, tmp_path, monkeypatch):
     # Patching the query function to mock the GraphQL query
     monkeypatch.setattr('cpg_workflows.metamist.query', mock_query)
 
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     assert cohort
+    assert isinstance(cohort, MultiCohort)
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 2

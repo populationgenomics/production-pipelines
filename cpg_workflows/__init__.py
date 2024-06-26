@@ -3,7 +3,7 @@ from cpg_utils.config import prepend_config_paths
 from cpg_utils.hail_batch import get_batch
 
 from .workflow import (
-    get_cohort,
+    get_multicohort,
     get_workflow,
 )
 

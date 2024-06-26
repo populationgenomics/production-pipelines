@@ -7,12 +7,7 @@ import pytest
 
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
-    get_fasta,
-    get_images,
-    get_references,
-    image_path,
-)
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_fasta, get_images, get_references, image_path
 
 from . import set_config
 

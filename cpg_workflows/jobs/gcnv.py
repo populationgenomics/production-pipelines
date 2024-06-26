@@ -322,9 +322,11 @@ def postprocess_calls(
     model_shard_args = ''
     calls_shard_args = ''
 
-    # forced ordering here just in case
+    # import with hail batch instead, then unpack in the container. No need to depend on a gcloud/gsutil install
+    # https://batch.hail.populationgenomics.org.au/batches/454143/jobs/1
     for name, path in [(shard, shard_paths[shard]) for shard in shard_basenames()]:
-        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
+        shard_tar = get_batch().read_input(str(path))
+        gcp_related_commands.append(f'tar -xzf {shard_tar} -C $BATCH_TMPDIR/inputs')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
 

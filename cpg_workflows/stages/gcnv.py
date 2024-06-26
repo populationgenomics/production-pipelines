@@ -9,7 +9,6 @@ from google.api_core.exceptions import PermissionDenied
 from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.inputs import get_cohort
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
@@ -82,8 +81,10 @@ class CollectReadCounts(SequencingGroupStage):
         if seqgroup.cram is None:
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
+        assert seqgroup.dataset.cohort
+
         jobs = gcnv.collect_read_counts(
-            intervals_path=inputs.as_path(get_cohort(), PrepareIntervals, 'preprocessed'),
+            intervals_path=inputs.as_path(seqgroup.dataset.cohort, PrepareIntervals, 'preprocessed'),
             cram_path=seqgroup.cram,
             job_attrs=self.get_job_attrs(seqgroup),
             output_base_path=seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
@@ -206,14 +207,15 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
-        determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
+        assert seqgroup.dataset.cohort
+        determine_ploidy = inputs.as_dict(seqgroup.dataset.cohort, DeterminePloidy)
 
         # pull the json file with the sgid ordering
-        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+        sgid_ordering = json.load(inputs.as_path(seqgroup.dataset.cohort, SetSGIDOrdering, 'sgid_order').open())
 
         jobs = gcnv.postprocess_calls(
             ploidy_calls_path=determine_ploidy['calls'],
-            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            shard_paths=inputs.as_dict(seqgroup.dataset.cohort, GermlineCNV),
             sample_index=sgid_ordering.index(seqgroup.id),
             job_attrs=self.get_job_attrs(seqgroup),
             output_prefix=str(self.prefix / seqgroup.id),
@@ -313,7 +315,7 @@ class GCNVJointSegmentation(CohortStage):
         trimmed_vcfs = inputs.as_dict(cohort, TrimOffSexChromosomes)
 
         # pull the json file with the sgid ordering
-        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+        sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
 
         # for each SGID, either get the sex chrom-trimmed one, or the default
         all_vcfs: list[str] = []
@@ -370,19 +372,20 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
+        assert sequencing_group.dataset.cohort
 
         # get the clustered VCF from the previous stage
-        joint_seg = inputs.as_dict(get_cohort(), GCNVJointSegmentation)
+        joint_seg = inputs.as_dict(sequencing_group.dataset.cohort, GCNVJointSegmentation)
 
-        determine_ploidy = inputs.as_dict(get_cohort(), DeterminePloidy)
+        determine_ploidy = inputs.as_dict(sequencing_group.dataset.cohort, DeterminePloidy)
         gcnv_call_inputs = inputs.as_dict(sequencing_group, GermlineCNVCalls)
 
         # pull the json file with the sgid ordering
-        sgid_ordering = json.load(inputs.as_path(get_cohort(), SetSGIDOrdering, 'sgid_order').open())
+        sgid_ordering = json.load(inputs.as_path(sequencing_group.dataset.cohort, SetSGIDOrdering, 'sgid_order').open())
 
         jobs = gcnv.postprocess_calls(
             ploidy_calls_path=determine_ploidy['calls'],
-            shard_paths=inputs.as_dict(get_cohort(), GermlineCNV),
+            shard_paths=inputs.as_dict(sequencing_group.dataset.cohort, GermlineCNV),
             sample_index=sgid_ordering.index(sequencing_group.id),
             job_attrs=self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),
@@ -674,6 +677,7 @@ class MtToEsCNV(DatasetStage):
                 job_name=job_name,
                 scopes=['cloud-platform'],
                 pyfiles=pyfiles,
+                depends_on=inputs.get_jobs(dataset),  # Do not remove, see production-pipelines/issues/791
             )
         j._preemptible = False
         j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}

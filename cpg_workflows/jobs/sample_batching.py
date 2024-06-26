@@ -3,12 +3,12 @@ extract from Broad sample batching script for GATK-SV
 """
 
 import json
-import logging
 
 import numpy as np
 import pandas as pd
 
 from cpg_utils import to_path
+from cpg_workflows.utils import get_logger
 
 SEX_VALS = {'male', 'female'}
 
@@ -42,6 +42,8 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         {
             batch_ID: {
                 'sequencing_groups': [sample1, sample2, ...],
+                'male': [sample1, sample3, ...],
+                'female': [sample1, sample3, ...],
                 'mf_ratio': float,
                 'size': int,
                 'coverage_medians': [float, float, ...],
@@ -58,10 +60,14 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
 
     # shortcut return if the total sequencing groups is a valid batch
     if min_batch_size <= n_sg <= max_batch_size:
-        logging.info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
+        get_logger().info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
         return [
             {
                 'sequencing_groups': md.ID.tolist(),
+                'male': md[~is_female].ID.to_list(),
+                'male_count': len(md[~is_female]),
+                'female': md[is_female].ID.to_list(),
+                'female_count': len(md[is_female]),
                 'mf_ratio': is_male.sum() / is_female.sum(),
                 'size': n_sg,
                 'coverage_medians': md.median_coverage.tolist(),
@@ -79,7 +85,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         n_per_batch = n_sg // cov_bins
     # endregion
 
-    logging.info(
+    get_logger().info(
         f"""
     Batching Specs:
     Total sequencing_groups: {n_sg}
@@ -94,6 +100,10 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         'female': md[is_female].sort_values(by='median_coverage'),
     }
 
+    get_logger().info('Sex distribution across all samples:')
+    for sex, entries in md_sex.items():
+        get_logger().info(f'{sex}: {len(entries)}')
+
     # array split each sex proportionally
     md_sex_cov = {sex: np.array_split(md_sex[sex], cov_bins) for sex in SEX_VALS}
 
@@ -101,11 +111,25 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
     batches = []
     for cov in range(cov_bins):
         sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])  # type: ignore
+        get_logger().info(
+            f"""
+        ---
+        Batch {cov}:
+        Samples: {len(sample_ids)}
+        Males: {len(md_sex_cov['male'][cov])}
+        Females: {len(md_sex_cov['female'][cov])}
+        ---
+        """,
+        )
         batches.append(
             {
                 'sequencing_groups': sample_ids.ID.tolist(),
                 'size': len(sample_ids),
-                'mf_ratio': len(md_sex_cov['male'][cov]) or 1 / len(md_sex_cov['female'][cov]) or 1,
+                'male': md_sex_cov['male'][cov].ID.tolist(),  # type: ignore
+                'male_count': len(md_sex_cov['male'][cov]),
+                'female': md_sex_cov['female'][cov].ID.tolist(),  # type: ignore
+                'female_count': len(md_sex_cov['female'][cov]),
+                'mf_ratio': (len(md_sex_cov['male'][cov]) or 1) / (len(md_sex_cov['female'][cov]) or 1),
                 'coverage_medians': sample_ids.median_coverage.tolist(),
             },
         )
@@ -136,7 +160,7 @@ def partition_batches(
     """
 
     # read in the metadata contents
-    logging.basicConfig(level=logging.INFO)
+    get_logger(__file__).info('Starting the batch creation process')
 
     # load in the metadata file
     md = pd.read_csv(metadata_file, sep='\t', low_memory=False)
@@ -154,7 +178,7 @@ def partition_batches(
     batches = batch_sgs(md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size)
 
     # write out the batches to GCP
-    logging.info(batches)
+    get_logger().info(batches)
 
     # write the batch JSON out to a file, inc. PCR state
     with to_path(output_json).open('w') as handle:

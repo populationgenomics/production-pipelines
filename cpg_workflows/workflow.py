@@ -28,9 +28,9 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
-from .inputs import get_cohort
+from .inputs import get_multicohort
 from .status import MetamistStatusReporter
-from .targets import Cohort, Dataset, SequencingGroup, Target
+from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
 from .utils import (
     ExpectedResultT,
     exists,
@@ -452,8 +452,16 @@ class Stage(Generic[TargetT], ABC):
         Can be a str, a Path object, or a dictionary of str/Path objects.
         """
 
+    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+        """
+        Queues jobs for each corresponding target, defined by Stage subclass.
+
+        Returns a dictionary of `StageOutput` objects indexed by target unique_id.
+        """
+        return {}
+
     @abstractmethod
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+    def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """
         Queues jobs for each corresponding target, defined by Stage subclass.
 
@@ -563,7 +571,7 @@ class Stage(Generic[TargetT], ABC):
                 project_name = target.dataset.name
             elif isinstance(target, Dataset):
                 project_name = target.name
-            elif isinstance(target, Cohort):
+            elif isinstance(target, (Cohort, MultiCohort)):
                 project_name = target.analysis_dataset.name
 
             assert isinstance(project_name, str)
@@ -877,7 +885,7 @@ class Workflow:
         if sequencing_type := get_config()['workflow'].get('sequencing_type'):
             description += f' [{sequencing_type}]'
         if not self.dry_run:
-            if ds_set := set(d.name for d in get_cohort().get_datasets()):
+            if ds_set := set(d.name for d in get_multicohort().get_datasets()):
                 description += ' ' + ', '.join(sorted(ds_set))
             reset_batch()
             get_batch().name = description
@@ -890,7 +898,7 @@ class Workflow:
 
     @property
     def output_version(self) -> str:
-        return self._output_version or get_cohort().alignment_inputs_hash()
+        return self._output_version or get_multicohort().alignment_inputs_hash()
 
     @property
     def analysis_prefix(self) -> Path:
@@ -912,7 +920,7 @@ class Workflow:
         """
         Prepare a unique path for the workflow with this name and this input data.
         """
-        return get_cohort().analysis_dataset.prefix(category=category) / self.name / self.output_version
+        return get_multicohort().analysis_dataset.prefix(category=category) / self.name / self.output_version
 
     def run(
         self,
@@ -1145,15 +1153,22 @@ class Workflow:
 
         # Round 6: actually adding jobs from the stages.
         if not self.dry_run:
-            cohort = get_cohort()  # Would communicate with metamist.
+            inputs = get_multicohort()  # Would communicate with metamist.
             for i, stg in enumerate(stages):
                 logging.info('*' * 60)
                 logging.info(f'Stage #{i + 1}: {stg}')
-                stg.output_by_target = stg.queue_for_cohort(cohort)
+                # NOTE: When manual dataset entry is deprecated, we can remove this
+                if isinstance(inputs, Cohort):
+                    stg.output_by_target = stg.deprecated_queue_for_cohort(inputs)
+                elif isinstance(inputs, MultiCohort):
+                    stg.output_by_target = stg.queue_for_multicohort(inputs)
+                else:
+                    raise WorkflowError(f'Unsupported input type: {inputs}')
                 if errors := self._process_stage_errors(stg.output_by_target):
                     raise WorkflowError(f'Stage {stg} failed to queue jobs with errors: ' + '\n'.join(errors))
 
                 logging.info('')
+
         else:
             self.queued_stages = [stg for stg in _stages_d.values() if not stg.skipped]
             logging.info(f'Queued stages: {self.queued_stages}')
@@ -1185,7 +1200,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug the stage into the workflow.
         """
@@ -1239,6 +1254,61 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
 
         return output_by_target
 
+    def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
+        """
+        Plug the stage into the workflow.
+        """
+        output_by_target: dict[str, StageOutput | None] = dict()
+
+        if not (cohorts := multicohort.get_cohorts()):
+            logging.warning(
+                f'{len(multicohort.get_cohorts())}/'
+                f'{len(multicohort.get_cohorts(only_active=False))} '
+                f'usable (active=True) cohorts found in the multicohort. Check that '
+                f'`workflow.input_cohorts` is provided, and not all cohorts are skipped ',
+            )
+            return output_by_target
+
+        for cohort in cohorts:
+            if not (datasets := cohort.get_datasets()):
+                logging.warning(
+                    f'{len(cohort.get_datasets())}/'
+                    f'{len(cohort.get_datasets(only_active=False))} '
+                    f'usable (active=True) datasets found in the cohort. Check that '
+                    f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and each cohort is populated in metamist.',
+                )
+                continue
+
+            for dataset in datasets:
+                if not dataset.get_sequencing_groups():
+                    logging.warning(
+                        f'{dataset}: '
+                        f'{len(dataset.get_sequencing_groups())}/'
+                        f'{len(dataset.get_sequencing_groups(only_active=False))} '
+                        f'usable (active=True) sequencing groups found. Check logs above for '
+                        f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
+                        f'via `workflow.skip_sgs` in config, or they all missing stage '
+                        f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
+                    )
+                    continue
+
+                logging.info(f'Dataset {dataset}:')
+                # collect all expected outputs across all samples
+                # find all directories which will be checked
+                # list outputs in advance
+                all_outputs: set[Path] = set()
+                for sequencing_group in dataset.get_sequencing_groups():
+                    all_outputs = path_walk(self.expected_outputs(sequencing_group), all_outputs)
+
+                # evaluate_stuff en masse
+                for sequencing_group in dataset.get_sequencing_groups():
+                    action = self._get_action(sequencing_group)
+                    output_by_target[sequencing_group.target_id] = self._queue_jobs_with_checks(
+                        sequencing_group,
+                        action,
+                    )
+        return output_by_target
+
 
 class DatasetStage(Stage, ABC):
     """
@@ -1258,7 +1328,7 @@ class DatasetStage(Stage, ABC):
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug the stage into the workflow.
         """
@@ -1276,6 +1346,18 @@ class DatasetStage(Stage, ABC):
             action = self._get_action(dataset)
             logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
+        return output_by_target
+
+    def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
+        """
+        Plug the stage into the workflow.
+        """
+        output_by_target: dict[str, StageOutput | None] = dict()
+        for cohort in multicohort.get_cohorts():
+            for dataset_i, dataset in enumerate(cohort.get_datasets()):
+                action = self._get_action(dataset)
+                logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
+                output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
         return output_by_target
 
 
@@ -1297,8 +1379,49 @@ class CohortStage(Stage, ABC):
         """
         pass
 
-    def queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
         """
         Plug the stage into the workflow.
         """
         return {cohort.target_id: self._queue_jobs_with_checks(cohort)}
+
+    def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
+        """
+        Plug the stage into the workflow.
+        """
+        output_by_target: dict[str, StageOutput | None] = dict()
+        for cohort in multicohort.get_cohorts():
+            action = self._get_action(cohort)
+            logging.info(f'{self.name}: {cohort} [{action.name}]')
+            output_by_target[cohort.target_id] = self._queue_jobs_with_checks(cohort, action)
+        return output_by_target
+
+
+class MultiCohortStage(Stage, ABC):
+    """
+    MultiCohort-level stage (all datasets of a workflow run).
+    """
+
+    @abstractmethod
+    def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
+        """
+        Override to declare expected output paths.
+        """
+        pass
+
+    @abstractmethod
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Override to add Hail Batch jobs.
+        """
+        pass
+
+    def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
+        """
+        Plug the stage into the workflow.
+        """
+        output_by_target: dict[str, StageOutput | None] = dict()
+        action = self._get_action(multicohort)
+        logging.info(f'{self.name}: {multicohort} [{action.name}]')
+        output_by_target[multicohort.target_id] = self._queue_jobs_with_checks(multicohort, action)
+        return output_by_target
