@@ -124,7 +124,7 @@ SEQR_LOADER_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'default
 
 
 def _mock_cohort():
-    from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
+    from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs, GvcfPath
     from cpg_workflows.targets import Cohort
 
     cohort = Cohort()
@@ -202,6 +202,10 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
     from cpg_workflows.stages.seqr_loader import MtToEs
     from cpg_workflows.workflow import get_workflow
+
+    for sequencing_group in get_multicohort().get_sequencing_groups():
+        sequencing_group.cram = sequencing_group.make_cram_path()
+        sequencing_group.gvcf = sequencing_group.make_gvcf_path()
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
