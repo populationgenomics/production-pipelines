@@ -461,8 +461,9 @@ def picard_extract_fastq(
     {bam_or_cram_group[ext]} {collate_out_path}
     """
     collate_j.command(command(collate_j_cmd, monitor_space=True))
+    collaged_bam = hb.ResourceFile(collate_out_path)
     extract_j_cmd = f"""
-    picard SamToFastq I={collate_out_path} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    picard SamToFastq I={collaged_bam} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
