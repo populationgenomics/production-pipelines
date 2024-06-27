@@ -118,7 +118,7 @@ def generate_annotated_data(vcf_in: str):
             --format vcf --compress_output bgzip \\
             --vcf \\
             -o {vep_job.vcf} \\ 
-            -i {bcftools_job.fragment} \\
+            -i {vcf['vcf.bgz']} \\
             --protein \\
             --species homo_sapiens \\ 
             --cache \\
@@ -137,6 +137,7 @@ def generate_annotated_data(vcf_in: str):
 
     # now merge them all
     # todo
+
     get_batch().run(wait=False)
 
 
