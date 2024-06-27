@@ -437,7 +437,7 @@ def _align_one(
 
 
 def picard_extract_fastq(
-    b,
+    b: hb.Batch,
     bam_or_cram_group: hb.ResourceGroup,
     ext: str = 'cram',
     job_attrs: dict | None = None,
@@ -460,12 +460,12 @@ def picard_extract_fastq(
     collate_out_path = dataset_path('picard_extract/collate.bam', 'tmp')
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group[ext]} {collate_j.collated_bam}
+    {bam_or_cram_group[ext]} $BATCH_TMPDIR/collate.bam
     """
     collate_j.collated_bam.add_extension('.bam')
     collate_j.command(command(collate_j_cmd, monitor_space=True))
     extract_j_cmd = f"""
-    picard SamToFastq I={collate_j.collated_bam} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    picard SamToFastq I=$BATCH_TMPDIR/collate.bam F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
