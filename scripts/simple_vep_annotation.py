@@ -72,7 +72,7 @@ def generate_annotated_data(vcf_in: str):
         get_batch().write_output(bcftools_job[chromosome], result_path.removesuffix('.vcf.bgz'))
 
         # and add to the sorted list for this batch
-        ordered_output_vcfs.append(bcftools_job[chromosome])
+        ordered_output_vcfs.append(bcftools_job[chromosome]['vcf.bgz'])  # type: ignore
 
     # new path, not in tmp
     vcf_outputs = output_path('annotated_vcf_fragments')
@@ -117,17 +117,18 @@ def generate_annotated_data(vcf_in: str):
             vep \\
             --format vcf --compress_output bgzip \\
             --vcf \\
-            -o {vep_job.vcf} \\ 
-            -i {vcf['vcf.bgz']} \\
+            -o {vep_job.vcf["vcf.bgz"]} \\ 
+            -i {vcf} \\
             --protein \\
             --species homo_sapiens \\ 
             --cache \\
             --offline \\
             --assembly GRCh38 \\
-            --dir_cache {vep_dir}/vep/ 
+            --dir_cache {vep_dir}/vep/  \\
             --fasta $FASTA
             """,
         )
+        vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')
 
         # this will be an intermediate
         get_batch().write_output(vep_job.vcf, result_path.removesuffix('.vcf.bgz'))
