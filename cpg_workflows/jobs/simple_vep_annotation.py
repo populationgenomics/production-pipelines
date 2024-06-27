@@ -20,8 +20,6 @@ from cpg_utils.hail_batch import get_batch
 
 from cpg_workflows.jobs.bcftools import naive_merge_vcfs
 
-
-
 CHROM_LIST: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
 
 
