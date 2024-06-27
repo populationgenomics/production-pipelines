@@ -7,6 +7,7 @@ import os.path
 from ctypes import alignment
 from enum import Enum
 from math import e
+from test.factories import dataset
 from textwrap import dedent
 from typing import cast
 from weakref import ref
@@ -15,7 +16,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import dataset_path, get_config, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import (
     AlignmentInput,
@@ -446,7 +447,7 @@ def picard_extract_fastq(
     """
     collate_j = b.new_job('Collate BAM', (job_attrs or {}) | dict(tool='samtools'))
     collate_j.image(image_path('samtools'))
-    extract_j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
+    extract_j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='picard'))
     extract_j.image(image_path('picard'))
     reference_path = fasta_res_group(b)['base']
     res = STANDARD.request_resources(ncpu=16)
@@ -454,14 +455,14 @@ def picard_extract_fastq(
         res.attach_disk_storage_gb = 700
     res.set_to_job(collate_j)
     res.set_to_job(extract_j)
-    tmp_prefix = '$BATCH_TMPDIR/collate.bam'
+    collate_out_path = dataset_path('picard_extract/collate.bam', 'tmp')
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group[ext]} {tmp_prefix}
+    {bam_or_cram_group[ext]} {collate_out_path}
     """
     collate_j.command(command(collate_j_cmd, monitor_space=True))
     extract_j_cmd = f"""
-    picard SamToFastq I={tmp_prefix} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    picard SamToFastq I={collate_out_path} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
