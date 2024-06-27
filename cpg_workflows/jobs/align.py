@@ -190,6 +190,7 @@ def align(
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
+            extract_picard=True,
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
@@ -317,6 +318,7 @@ def _align_one(
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
     sequencing_group_name: str,
+    extract_picard: bool = False,
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
     number_of_shards_for_realignment: int | None = None,
@@ -358,13 +360,15 @@ def _align_one(
     #   Replace process substitution with named-pipes (FIFO)
     #   This is named-pipe name -> command to populate it
     fifo_commands: dict[str, str] = {}
-
     if isinstance(alignment_input, CramPath | BamPath):
-        # Extract fastqs from CRAM/BAM
-        bam_or_cram_group = alignment_input.resource_group(b)
-        extract_fastq_j = extract_fastq(b, bam_or_cram_group)
-        fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
-
+        if extract_picard:
+            extract_j = picard_extract_fastq(b, alignment_input.resource_group(b))
+            fastq_pair = FastqPair(extract_j.fq1, extract_j.fq2).as_resources(b)
+        else:
+            # Extract fastqs from CRAM/BAM
+            bam_or_cram_group = alignment_input.resource_group(b)
+            extract_fastq_j = extract_fastq(b, bam_or_cram_group)
+            fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
         fastq_pair = alignment_input.as_resources(b)
@@ -429,6 +433,34 @@ def _align_one(
         # Now prepare command
         cmd = '\n'.join([sort_index_input_cmd, *fifo_pre, cmd, fifo_post])
     return j, cmd
+
+
+def picard_extract_fastq(b, bam_or_cram_group: hb.ResourceGroup, job_attrs: dict | None = None) -> Job:
+    """
+    Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
+    """
+    collate_j = b.new_job('Collate BAM', (job_attrs or {}) | dict(tool='samtools'))
+    collate_j.image(image_path('samtools'))
+    extract_j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
+    extract_j.image(image_path('picard'))
+    reference_path = fasta_res_group(b)['base']
+    res = STANDARD.request_resources(ncpu=16)
+    if get_config()['workflow']['sequencing_type'] == 'genome':
+        res.attach_disk_storage_gb = 700
+    res.set_to_job(collate_j)
+    res.set_to_job(extract_j)
+    collate_j_cmd = f"""
+    samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
+    {bam_or_cram_group['bam']} $BATCH_TMPDIR/collate.bam
+    """
+    collate_j.command(command(collate_j_cmd, monitor_space=True))
+    extract_j_cmd = f"""
+    picard SamToFastq I=$BATCH_TMPDIR/collate.bam F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
+    mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
+    """
+    extract_j.command(command(extract_j_cmd, monitor_space=True))
+    return extract_j
 
 
 def extract_fastq(
