@@ -435,7 +435,12 @@ def _align_one(
     return j, cmd
 
 
-def picard_extract_fastq(b, bam_or_cram_group: hb.ResourceGroup, job_attrs: dict | None = None) -> Job:
+def picard_extract_fastq(
+    b,
+    bam_or_cram_group: hb.ResourceGroup,
+    ext: str = 'cram',
+    job_attrs: dict | None = None,
+) -> Job:
     """
     Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
     """
@@ -449,13 +454,14 @@ def picard_extract_fastq(b, bam_or_cram_group: hb.ResourceGroup, job_attrs: dict
         res.attach_disk_storage_gb = 700
     res.set_to_job(collate_j)
     res.set_to_job(extract_j)
+    tmp_prefix = '$BATCH_TMPDIR/collate'
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group['bam']} $BATCH_TMPDIR/collate.bam
+    {bam_or_cram_group[ext]} {tmp_prefix} | \\
     """
     collate_j.command(command(collate_j_cmd, monitor_space=True))
     extract_j_cmd = f"""
-    picard SamToFastq I=$BATCH_TMPDIR/collate.bam F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    picard SamToFastq I={tmp_prefix} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
