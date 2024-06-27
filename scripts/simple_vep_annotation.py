@@ -8,6 +8,7 @@ Minimal annotation set to improve runtimes
 
 There are potentially other uses for a VCF -> VCF annotation, but I'm not sure what they'll be
 """
+import logging
 import os.path
 from argparse import ArgumentParser
 
@@ -41,6 +42,7 @@ def generate_annotated_data(vcf_in: str):
 
     # existing fragments
     existing_fragments = set(to_path(vcf_fragments_dir).glob('*'))
+    logging.info(f'Existing VCFs: {existing_fragments}')
 
     for chromosome in [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']:
 
@@ -49,6 +51,7 @@ def generate_annotated_data(vcf_in: str):
 
         # check if it exists
         if result_path in existing_fragments:
+            logging.info(f'{result_path} already exists')
             vcf_fragment = get_batch().read_input_group(**{
                 'vcf.bgz': result_path,
                 'vcf.bgz.tbi': f'{result_path}.tbi'
@@ -80,6 +83,8 @@ def generate_annotated_data(vcf_in: str):
     # existing outputs
     existing_outputs = set(to_path(vcf_outputs_dir).glob('*'))
 
+    logging.info(f'Existing annotated VCFs: {existing_outputs}')
+
     ordered_annotated: list = []
 
     # next, annotate!
@@ -89,6 +94,7 @@ def generate_annotated_data(vcf_in: str):
         result_path = os.path.join(vcf_outputs_dir, f'{chromosome}.vcf.bgz')
 
         if result_path in existing_outputs:
+            logging.info(f'{result_path} already exists')
             vcf_fragment = get_batch().read_input_group(**{
                 'vcf.bgz': result_path,
                 'vcf.bgz.tbi': f'{result_path}.tbi'
