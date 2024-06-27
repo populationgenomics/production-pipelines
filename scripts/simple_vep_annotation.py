@@ -37,15 +37,15 @@ def generate_annotated_data(vcf_in: str):
 
     # todo storage? VCF * 2.5
 
-    vcf_fragments = output_path('vcf_fragments', category='tmp')
+    vcf_fragments_dir = output_path('vcf_fragments', category='tmp')
 
     # existing fragments
-    existing_fragments = set(to_path(vcf_fragments).glob('*'))
+    existing_fragments = set(to_path(vcf_fragments_dir).glob('*'))
 
     for chromosome in [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']:
 
         # the name for this chunk of annotation
-        result_path = os.path.join(vcf_fragments, f'{chromosome}.vcf.bgz')
+        result_path = os.path.join(vcf_fragments_dir, f'{chromosome}.vcf.bgz')
 
         # check if it exists
         if result_path in existing_fragments:
@@ -75,18 +75,18 @@ def generate_annotated_data(vcf_in: str):
         ordered_output_vcfs.append(bcftools_job[chromosome]['vcf.bgz'])  # type: ignore
 
     # new path, not in tmp
-    vcf_outputs = output_path('annotated_vcf_fragments')
+    vcf_outputs_dir = output_path('annotated_vcf_fragments')
 
     # existing outputs
-    existing_outputs = set(to_path(vcf_outputs).glob('*'))
+    existing_outputs = set(to_path(vcf_outputs_dir).glob('*'))
 
     ordered_annotated: list = []
 
     # next, annotate!
-    for chromosome, vcf in zip([f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM'], vcf_fragments):
+    for chromosome, vcf in zip([f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM'], ordered_output_vcfs):
 
         # the name for this chunk of annotation
-        result_path = os.path.join(vcf_outputs, f'{chromosome}.vcf.bgz')
+        result_path = os.path.join(vcf_outputs_dir, f'{chromosome}.vcf.bgz')
 
         if result_path in existing_outputs:
             vcf_fragment = get_batch().read_input_group(**{
@@ -111,13 +111,13 @@ def generate_annotated_data(vcf_in: str):
         vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
         vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
 
-        vep_job.command(
-            f"""\
+        vep_job.command(  # type: ignore
+            f"""
             FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
             vep \\
             --format vcf --compress_output bgzip \\
             --vcf \\
-            -o {vep_job.vcf["vcf.bgz"]} \\ 
+            -o {vep_job.vcf["vcf.bgz"]} \\
             -i {vcf} \\
             --protein \\
             --species homo_sapiens \\ 
@@ -128,7 +128,7 @@ def generate_annotated_data(vcf_in: str):
             --fasta $FASTA
             """,
         )
-        vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')
+        vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')  # type: ignore
 
         # this will be an intermediate
         get_batch().write_output(vep_job.vcf, result_path.removesuffix('.vcf.bgz'))
