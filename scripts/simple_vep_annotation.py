@@ -117,23 +117,12 @@ def generate_annotated_data(vcf_in: str):
         vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
         vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
 
-        vep_job.command(  # type: ignore
-            f"""
-            FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \\
-            vep \\
-            --format vcf --vcf \\
-            --compress_output bgzip \\
-            --no_stats \\
-            --fork 4 \\
-            -o {vep_job.vcf["vcf.bgz"]} \\
-            -i {vcf} \\
-            --protein \\
-            --species homo_sapiens \\ 
-            --cache --offline \\
-            --assembly GRCh38 \\
-            --dir_cache {vep_dir}/vep/ \\
-            --fa $FASTA
-            """,
+        vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
+        vep_job.command(
+            f'vep --format vcf --vcf --compress_output bgzip --no_stats --fork 4 '
+            f'-o {vep_job.vcf["vcf.bgz"]} '  # type: ignore
+            f'-i {vcf} --protein --species homo_sapiens --cache --offline --assembly GRCh38 '
+            f'--dir_cache {vep_dir}/vep/ --fa ${{FASTA}}'
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')  # type: ignore
 
