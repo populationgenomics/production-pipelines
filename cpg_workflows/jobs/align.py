@@ -457,7 +457,7 @@ def picard_extract_fastq(
     tmp_prefix = '$BATCH_TMPDIR/collate.bam'
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group[ext]} {tmp_prefix} | \\
+    {bam_or_cram_group[ext]} {tmp_prefix}
     """
     collate_j.command(command(collate_j_cmd, monitor_space=True))
     extract_j_cmd = f"""
@@ -465,6 +465,7 @@ def picard_extract_fastq(
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
+    extract_j.depends_on(collate_j)
     extract_j.command(command(extract_j_cmd, monitor_space=True))
     return extract_j
 
