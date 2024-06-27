@@ -454,7 +454,7 @@ def picard_extract_fastq(
         res.attach_disk_storage_gb = 700
     res.set_to_job(collate_j)
     res.set_to_job(extract_j)
-    tmp_prefix = '$BATCH_TMPDIR/collate'
+    tmp_prefix = '$BATCH_TMPDIR/collate.bam'
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
