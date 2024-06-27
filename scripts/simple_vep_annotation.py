@@ -41,7 +41,7 @@ def generate_annotated_data(vcf_in: str):
     vcf_fragments_dir = output_path('vcf_fragments', category='tmp')
 
     # existing fragments
-    existing_fragments = set(to_path(vcf_fragments_dir).glob('*'))
+    existing_fragments = [str(each_path) for each_path in to_path(vcf_fragments_dir).glob('*')]
     logging.info(f'Existing VCFs: {existing_fragments}')
 
     for chromosome in [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']:
@@ -81,7 +81,7 @@ def generate_annotated_data(vcf_in: str):
     vcf_outputs_dir = output_path('annotated_vcf_fragments')
 
     # existing outputs
-    existing_outputs = set(to_path(vcf_outputs_dir).glob('*'))
+    existing_outputs = [str(each_path) for each_path in to_path(vcf_outputs_dir).glob('*')]
 
     logging.info(f'Existing annotated VCFs: {existing_outputs}')
 
