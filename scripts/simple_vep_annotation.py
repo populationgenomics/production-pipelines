@@ -16,13 +16,16 @@ from cpg_utils import to_path
 from cpg_utils.config import image_path, output_path, reference_path
 from cpg_utils.hail_batch import get_batch
 
+from cpg_workflows.jobs.bcftools import naive_merge_vcfs
 
-def generate_annotated_data(vcf_in: str):
+
+def generate_annotated_data(vcf_in: str, out_vcf: str):
     """
     if the annotated data Table doesn't exist, generate it
 
     Args:
         vcf_in (str): path to an input VCF file
+        out_vcf (str): path to final output
     """
 
     vcf_in_batch = get_batch().read_input_group(**{'vcf.bgz': vcf_in, 'vcf.bgz.tbi': f'{vcf_in}.tbi'})['vcf.bgz']
@@ -54,7 +57,7 @@ def generate_annotated_data(vcf_in: str):
             logging.info(f'{result_path} already exists')
             vcf_fragment = get_batch().read_input_group(**{
                 'vcf.bgz': result_path,
-                'vcf.bgz.tbi': f'{result_path}.tbi'
+                'vcf.bgz.tbi': f'{result_path}.tbi',
             })['vcf.bgz']
             ordered_output_vcfs.append(vcf_fragment)
             continue
@@ -66,7 +69,7 @@ def generate_annotated_data(vcf_in: str):
 
         # create a VCF fragment for this chromosome
         bcftools_job.command(
-            f'bcftools view -Oz -o {bcftools_job[chromosome]["vcf.bgz"]} -r {chromosome} {vcf_in_batch}'  # type: ignore
+            f'bcftools view -Oz -o {bcftools_job[chromosome]["vcf.bgz"]} -r {chromosome} {vcf_in_batch}',  # type: ignore
         )
         # index it
         bcftools_job.command(f'tabix {bcftools_job[chromosome]["vcf.bgz"]} ')  # type: ignore
@@ -97,7 +100,7 @@ def generate_annotated_data(vcf_in: str):
             logging.info(f'{result_path} already exists')
             vcf_fragment = get_batch().read_input_group(**{
                 'vcf.bgz': result_path,
-                'vcf.bgz.tbi': f'{result_path}.tbi'
+                'vcf.bgz.tbi': f'{result_path}.tbi',
             })['vcf.bgz']
             ordered_annotated.append(vcf_fragment)
             continue
@@ -119,21 +122,20 @@ def generate_annotated_data(vcf_in: str):
 
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
         vep_job.command(
-            f'vep --format vcf --vcf --compress_output bgzip --no_stats --fork 4 '
+            f'vep --format vcf --vcf --compress_output bgzip --no_stats --fork 4 --dir_cache {vep_dir}/vep/ '
             f'-o {vep_job.vcf["vcf.bgz"]} '  # type: ignore
-            f'-i {vcf} --protein --species homo_sapiens --cache --offline --assembly GRCh38 '
-            f'--dir_cache {vep_dir}/vep/ --fa ${{FASTA}}'
+            f'-i {vcf} --protein --species homo_sapiens --cache --offline --assembly GRCh38 --fa ${{FASTA}}',
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')  # type: ignore
 
         # this will be an intermediate
         get_batch().write_output(vep_job.vcf, result_path.removesuffix('.vcf.bgz'))
 
-        # # for reasons we need to send the remote paths
-        ordered_annotated.append(vep_job.vcf)
+        # keep a list of the in-batch VCF paths
+        ordered_annotated.append(vep_job.vcf["vcf.bgz"])  # type: ignore
 
     # now merge them all
-    # todo
+    naive_merge_vcfs(ordered_annotated, output_file=out_vcf, vcfs_localised=True)
 
     get_batch().run(wait=False)
 
@@ -142,6 +144,7 @@ if __name__ == '__main__':
     logging.basicConfig(level=logging.INFO)
     parser = ArgumentParser(description='Run a VCF-in, VCF-out annotation, fragmented by chromosome')
     parser.add_argument('-i', help='VCF in', required=True)
+    parser.add_argument('-o', help='VCF out', required=True)
     args = parser.parse_args()
 
-    generate_annotated_data(args.i)
+    generate_annotated_data(args.i, out_vcf=args.o)
