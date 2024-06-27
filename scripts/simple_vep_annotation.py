@@ -109,7 +109,7 @@ def generate_annotated_data(vcf_in: str):
         vep_job.declare_resource_group(vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         # configure the required resources
-        vep_job.image(image_path('vep_110')).cpu(1).memory('highmem')
+        vep_job.image(image_path('vep_110')).cpu(4).memory('highmem')
 
         # gcsfuse works only with the root bucket, without prefix:
         vep_mount_path = to_path(reference_path('vep_110_mount'))
@@ -119,19 +119,20 @@ def generate_annotated_data(vcf_in: str):
 
         vep_job.command(  # type: ignore
             f"""
-            FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
+            FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \\
             vep \\
-            --format vcf --compress_output bgzip \\
-            --vcf \\
+            --format vcf --vcf \\
+            --compress_output bgzip \\
+            --no_stats \\
+            --fork 4 \\
             -o {vep_job.vcf["vcf.bgz"]} \\
             -i {vcf} \\
             --protein \\
             --species homo_sapiens \\ 
-            --cache \\
-            --offline \\
+            --cache --offline \\
             --assembly GRCh38 \\
-            --dir_cache {vep_dir}/vep/  \\
-            --fasta $FASTA
+            --dir_cache {vep_dir}/vep/ \\
+            --fa $FASTA
             """,
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')  # type: ignore
@@ -149,6 +150,7 @@ def generate_annotated_data(vcf_in: str):
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     parser = ArgumentParser(description='Run a VCF-in, VCF-out annotation, fragmented by chromosome')
     parser.add_argument('-i', help='VCF in', required=True)
     args = parser.parse_args()
