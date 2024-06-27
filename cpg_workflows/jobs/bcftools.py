@@ -1,13 +1,17 @@
 """
 general tasks using bcftools in a pipeline context
 """
+from typing import TYPE_CHECKING
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
 
+if TYPE_CHECKING:
+    from hailtop.batch import ResourceFile
+
 
 def naive_merge_vcfs(
-    input_list: list[str],
+    input_list: list[str | ResourceFile],
     output_file: str,
     cpu: int = 4,
     memory: str = '16Gi',
@@ -60,6 +64,6 @@ def naive_merge_vcfs(
     merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
     # write the result out
-    get_batch().write_output(merge_job.output, output_file.removesuffix('vcf.bgz'))
+    get_batch().write_output(merge_job.output, output_file.removesuffix('.vcf.bgz'))
 
     return merge_job.output["vcf.bgz"]  # type: ignore
