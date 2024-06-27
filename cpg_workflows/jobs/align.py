@@ -459,8 +459,8 @@ def picard_extract_fastq(
     # write to cloud tmp directory
     collate_out_path = dataset_path('picard_extract/collate.bam', 'tmp')
     collate_j_cmd = f"""
-    samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group[ext]} {collate_j.collated_bam}
+    samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u \
+    -o {collate_j.collated_bam} {bam_or_cram_group[ext]}
     """
     collate_j.collated_bam.add_extension('.bam')
     collate_j.command(command(collate_j_cmd, monitor_space=True))
