@@ -9,6 +9,7 @@ Minimal annotation set to improve runtimes
 There are potentially other uses for a VCF -> VCF annotation, but I'm not sure what they'll be
 """
 import os.path
+from argparse import ArgumentParser
 
 from cpg_utils import to_path
 from cpg_utils.config import image_path, output_path, reference_path
@@ -136,3 +137,12 @@ def generate_annotated_data(vcf_in: str):
 
     # now merge them all
     # todo
+    get_batch().run(wait=False)
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Run a VCF-in, VCF-out annotation, fragmented by chromosome')
+    parser.add_argument('-i', help='VCF in', required=True)
+    args = parser.parse_args()
+
+    generate_annotated_data(args.i)
