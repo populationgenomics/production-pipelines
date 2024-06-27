@@ -17,7 +17,6 @@ from hailtop.batch import ResourceFile
 from cpg_utils import to_path
 from cpg_utils.config import image_path, output_path, reference_path
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.jobs.bcftools import naive_merge_vcfs
 
 CHROM_LIST: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
@@ -59,10 +58,12 @@ def split_vcf_by_chromosome(localised_vcf: ResourceFile, output_dir: str | None 
             # check if it exists already, if so read it in
             if result_path in existing_fragments:
                 logging.info(f'{result_path} already exists')
-                vcf_fragment = get_batch().read_input_group(**{
-                    'vcf.bgz': result_path,
-                    'vcf.bgz.tbi': f'{result_path}.tbi',
-                })['vcf.bgz']
+                vcf_fragment = get_batch().read_input_group(
+                    **{
+                        'vcf.bgz': result_path,
+                        'vcf.bgz.tbi': f'{result_path}.tbi',
+                    },
+                )['vcf.bgz']
                 ordered_output_vcfs.append(vcf_fragment)
                 continue
 
@@ -117,10 +118,12 @@ def annotate_localised_vcfs(vcf_list: list[ResourceFile], output_dir: str | None
             # do we already have it generated?
             if result_path in existing_outputs:
                 logging.info(f'{result_path} already exists')
-                vcf_fragment = get_batch().read_input_group(**{
-                    'vcf.bgz': result_path,
-                    'vcf.bgz.tbi': f'{result_path}.tbi',
-                })['vcf.bgz']
+                vcf_fragment = get_batch().read_input_group(
+                    **{
+                        'vcf.bgz': result_path,
+                        'vcf.bgz.tbi': f'{result_path}.tbi',
+                    },
+                )['vcf.bgz']
                 ordered_annotated.append(vcf_fragment)
                 continue
 

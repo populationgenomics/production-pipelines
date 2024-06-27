@@ -15,7 +15,7 @@ def naive_merge_vcfs(
     memory: str = '16Gi',
     storage: str = '50Gi',
     missing_to_ref: bool = False,
-    vcfs_localised: bool = False
+    vcfs_localised: bool = False,
 ):
     """
     a generic method for taking multiple vcfs, merging into a single vcf
