@@ -455,15 +455,16 @@ def picard_extract_fastq(
         res.attach_disk_storage_gb = 700
     res.set_to_job(collate_j)
     res.set_to_job(extract_j)
+    tmp_prefix = '$BATCH_TMPDIR/collate.bam'
+    # write to cloud tmp directory
     collate_out_path = dataset_path('picard_extract/collate.bam', 'tmp')
     collate_j_cmd = f"""
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
-    {bam_or_cram_group[ext]} {collate_out_path}
+    {bam_or_cram_group[ext]} {collate_j.collated_bam}
     """
     collate_j.command(command(collate_j_cmd, monitor_space=True))
-    collaged_bam = hb.ResourceFile(collate_out_path)
     extract_j_cmd = f"""
-    picard SamToFastq I={collaged_bam} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
+    picard SamToFastq I={collate_j.collated_bam} F=$BATCH_TMPDIR/R1.fq.gz F2=$BATCH_TMPDIR/R2.fq.gz
     mv $BATCH_TMPDIR/R1.fq.gz {extract_j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {extract_j.fq2}
     """
