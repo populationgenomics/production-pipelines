@@ -1,13 +1,11 @@
 """
 general tasks using bcftools in a pipeline context
 """
-from typing import TYPE_CHECKING
+
+from hailtop.batch import ResourceFile
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
-
-if TYPE_CHECKING:
-    from hailtop.batch import ResourceFile
 
 
 def naive_merge_vcfs(
