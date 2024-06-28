@@ -8,8 +8,8 @@ from hailtop.batch.job import BashJob
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
 
-
 # mypy: ignore_errors
+
 
 def naive_merge_vcfs(
     input_list: list[str | ResourceFile],

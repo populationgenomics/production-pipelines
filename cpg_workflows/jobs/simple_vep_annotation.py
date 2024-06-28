@@ -25,7 +25,11 @@ CHROM_LIST: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY
 
 # mypy: ignore_errors
 
-def split_vcf_by_chromosome(localised_vcf: ResourceFile, output_dir: str | None = None) -> tuple[list[ResourceFile], BashJob]:
+
+def split_vcf_by_chromosome(
+    localised_vcf: ResourceFile,
+    output_dir: str | None = None,
+) -> tuple[list[ResourceFile], BashJob]:
     """
     take a pre-localised file and split it into separate chromosomes
     Args:
@@ -93,7 +97,10 @@ def split_vcf_by_chromosome(localised_vcf: ResourceFile, output_dir: str | None 
     return ordered_output_vcfs, bcftools_job
 
 
-def annotate_localised_vcfs(vcf_list: list[ResourceFile], output_dir: str | None = None) -> tuple[list[ResourceFile], list[BashJob]]:
+def annotate_localised_vcfs(
+    vcf_list: list[ResourceFile],
+    output_dir: str | None = None,
+) -> tuple[list[ResourceFile], list[BashJob]]:
     """
     annotate each VCF fragment using VEP. Optionally attempt to resume from a folder, and write results to same
 

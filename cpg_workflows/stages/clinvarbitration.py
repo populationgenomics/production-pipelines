@@ -15,17 +15,15 @@ This takes ClinVar data:
 
 
 import logging
-
 from datetime import datetime
 from os.path import join
 
-from cpg_utils import to_path, Path
-from cpg_utils.config import image_path, config_retrieve
+from cpg_utils import Path, to_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job
 from cpg_workflows import get_batch
 from cpg_workflows.jobs.simple_vep_annotation import split_and_annotate_vcf
 from cpg_workflows.workflow import Cohort, CohortStage, StageInput, StageOutput, stage
-
 
 DATE_STRING: str = datetime.now().strftime('%y-%m')
 
@@ -36,7 +34,7 @@ class CopyLatestClinvarFiles(CohortStage):
         common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
         return {
             'submission_file': to_path(join(common_folder, 'submission_summary.txt.gz')),
-            'variant_file': to_path(join(common_folder, 'variant_summary.txt.gz'))
+            'variant_file': to_path(join(common_folder, 'variant_summary.txt.gz')),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -69,7 +67,7 @@ class GenerateNewClinvarSummary(CohortStage):
         common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
         return {
             'clinvar_decisions': join(common_folder, 'clinvar_decisions.ht'),
-            'snv_vcf': to_path(join(common_folder, 'pathogenic_snvs.vcf.bgz'))
+            'snv_vcf': to_path(join(common_folder, 'pathogenic_snvs.vcf.bgz')),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -83,7 +81,7 @@ class GenerateNewClinvarSummary(CohortStage):
                 'ht': '{root}.ht',
                 'vcf': '{root}.vcf.bgz',
                 'index': '{root}.vcf.bgz.tbi',
-            }
+            },
         )
 
         # get the expected outputs
@@ -107,6 +105,7 @@ class AnnotateClinvarDecisions(CohortStage):
     """
     take the vcf output from the clinvar stage, and apply VEP annotations
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
         return {
