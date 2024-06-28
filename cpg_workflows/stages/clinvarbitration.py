@@ -108,12 +108,12 @@ class AnnotateClinvarDecisions(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
-        input_vcf = str(inputs.as_path(cohort, GenerateNewClinvarSummary, 'snv_vcf'))
-
-        local_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': input_vcf + '.tbi'})['vcf.gz']
 
         # delegate the splitting, annotation, and re-merging to this existing method
-        _out_file, jobs = split_and_annotate_vcf(vcf_in=local_vcf, out_vcf=str(outputs['vcf']))
+        _out_file, jobs = split_and_annotate_vcf(
+            vcf_in=str(inputs.as_path(cohort, GenerateNewClinvarSummary, 'snv_vcf')),
+            out_vcf=str(outputs['vcf'])
+        )
 
         return self.make_outputs(target=cohort, jobs=jobs, data=outputs)
 
