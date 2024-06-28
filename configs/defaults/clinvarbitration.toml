@@ -1,3 +1,2 @@
 [workflow]
-# no arguments required at this time
-dummy = 'content'
+sequencing_type = 'genome'
