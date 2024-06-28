@@ -113,7 +113,7 @@ class AnnotateClinvarDecisions(CohortStage):
         # delegate the splitting, annotation, and re-merging to this existing method
         _out_file, jobs = split_and_annotate_vcf(
             vcf_in=str(inputs.as_path(cohort, GenerateNewClinvarSummary, 'snv_vcf')),
-            out_vcf=str(outputs['vcf'])
+            out_vcf=str(outputs['vcf']),
         )
 
         return self.make_outputs(target=cohort, jobs=jobs, data=outputs)
