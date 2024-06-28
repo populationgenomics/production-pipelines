@@ -143,14 +143,14 @@ class PM5TableGeneration(CohortStage):
         vcf = str(inputs.as_path(cohort, AnnotateClinvarDecisions, 'vcf'))
         annotated_vcf = get_batch().read_input_group(**{'vcf.gz': vcf, 'vcf.gz.tbi': vcf + '.tbi'})['vcf.gz']
 
-        clinvarbitrate_pm5.declare_resource_group(output={'ht': '{root}.ht', 'json': '{root}.json'})
-
-        clinvarbitrate_pm5.command(f'pm5_table -i {annotated_vcf} -o {clinvarbitrate_pm5.output}')
+        # using a declared resource group and only exporting part of it failed... not sure why
+        clinvarbitrate_pm5.command(f'pm5_table -i {annotated_vcf} -o output')
+        clinvarbitrate_pm5.command(f'mv output.json {clinvarbitrate_pm5.output}')
 
         # recursive copy of the HT
-        clinvarbitrate_pm5.command(f'gcloud storage cp -r {clinvarbitrate_pm5.output["ht"]} {outputs["clinvar_pm5"]}')
+        clinvarbitrate_pm5.command(f'gcloud storage cp -r output.ht {outputs["clinvar_pm5"]}')
 
         # also copy back the JSON file
-        get_batch().write_output(clinvarbitrate_pm5.output['json'], str(outputs['pm5_json']).removesuffix('.json'))
+        get_batch().write_output(clinvarbitrate_pm5.output, str(outputs['pm5_json']))
 
         return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate_pm5)
