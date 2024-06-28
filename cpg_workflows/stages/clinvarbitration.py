@@ -71,18 +71,12 @@ class GenerateNewClinvarSummary(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # declare a resouce group, but don't copy the whole thing back
         clinvarbitrate = get_batch().new_job('Run ClinvArbitration Summary')
         clinvarbitrate.image(image_path('clinvarbitration'))
         authenticate_cloud_credentials_in_job(clinvarbitrate)
 
-        clinvarbitrate.declare_resource_group(
-            output={
-                'ht': '{root}.ht',
-                'vcf': '{root}.vcf.bgz',
-                'index': '{root}.vcf.bgz.tbi',
-            },
-        )
+        # declare a resource group, leave the HT path implicit
+        clinvarbitrate.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         # get the expected outputs
         outputs = self.expected_outputs(cohort)
@@ -91,11 +85,10 @@ class GenerateNewClinvarSummary(CohortStage):
         sub_file = get_batch().read_input(str(inputs.as_path(cohort, CopyLatestClinvarFiles, 'submission_file')))
 
         clinvarbitrate.command(f'resummary -v {var_file} -s {sub_file} -o {clinvarbitrate.output} --minimal')
-        clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output["ht"]} {outputs["clinvar_decisions"]}')
+        clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output}.ht {outputs["clinvar_decisions"]}')
 
         # selectively copy back some outputs
-        get_batch().write_output(clinvarbitrate.output['vcf'], str(outputs['snv_vcf']))
-        get_batch().write_output(clinvarbitrate.output['index'], str(outputs['snv_vcf']) + '.tbi')
+        get_batch().write_output(clinvarbitrate.output, str(outputs['snv_vcf']).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate)
 
