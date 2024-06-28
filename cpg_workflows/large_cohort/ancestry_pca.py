@@ -66,15 +66,17 @@ def add_background(
                     hl.literal(populations_to_filter).contains(background_mt.superpopulation),
                 )
                 logging.info(f'Finished filtering background, kept samples that are {populations_to_filter}')
-            if relateds_to_drop := get_config()['large_cohort']['pca_background'][dataset].get(
+            if background_relateds_to_drop := get_config()['large_cohort']['pca_background'][dataset].get(
                 'background_relateds_to_drop',
                 False,
             ):
                 logging.info(
-                    f'Removing related samples from background dataset {dataset}. Background relateds to drop: {relateds_to_drop}',
+                    f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
                 )
-                relateds_to_drop_ht = hl.read_table(relateds_to_drop)
-                background_mt = background_mt.filter_cols(~hl.is_defined(relateds_to_drop_ht[background_mt.col_key]))
+                background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
+                background_mt = background_mt.filter_cols(
+                    ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
+                )
             else:
                 logging.info('No related samples to drop from background dataset')
         else:
