@@ -82,10 +82,18 @@ class GenerateNewClinvarSummary(CohortStage):
         # get the expected outputs
         outputs = self.expected_outputs(cohort)
 
+        if sites_to_blacklist := config_retrieve(['workflow', 'site_blacklist'], []):
+            blacklist_sites = ' '.join(f'"{site}"' for site in sites_to_blacklist)
+            blacklist_string = f' -b {blacklist_sites}'
+        else:
+            blacklist_string = ''
+
         var_file = get_batch().read_input(str(inputs.as_path(cohort, CopyLatestClinvarFiles, 'variant_file')))
         sub_file = get_batch().read_input(str(inputs.as_path(cohort, CopyLatestClinvarFiles, 'submission_file')))
 
-        clinvarbitrate.command(f'resummary -v {var_file} -s {sub_file} -o {clinvarbitrate.output} --minimal')
+        clinvarbitrate.command(
+            f'resummary -v {var_file} -s {sub_file} -o {clinvarbitrate.output} --minimal {blacklist_string}',
+        )
         clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output}.ht {outputs["clinvar_decisions"]}')
 
         # selectively copy back some outputs
