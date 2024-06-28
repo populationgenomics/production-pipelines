@@ -14,7 +14,6 @@ This takes ClinVar data:
 # mypy: ignore_errors
 
 
-import logging
 from datetime import datetime
 from os.path import join
 
@@ -42,6 +41,7 @@ class CopyLatestClinvarFiles(CohortStage):
         run a wget copy of the relevant files into GCP
         """
         bash_job = get_batch().new_bash_job('wget latest ClinVar raw files')
+        bash_job.image(config_retrieve(['workflow', 'driver_image']))
 
         directory = 'https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/'
         sub_file = 'submission_summary.txt.gz'
