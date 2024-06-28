@@ -94,8 +94,8 @@ class GenerateNewClinvarSummary(CohortStage):
         clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output["ht"]} {outputs["clinvar_decisions"]}')
 
         # selectively copy back some outputs
-        get_batch().write_output(clinvarbitrate.output['vcf'], str(outputs['vcf']))
-        get_batch().write_output(clinvarbitrate.output['index'], str(outputs['vcf']) + '.tbi')
+        get_batch().write_output(clinvarbitrate.output['vcf'], str(outputs['snv_vcf']))
+        get_batch().write_output(clinvarbitrate.output['index'], str(outputs['snv_vcf']) + '.tbi')
 
         return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate)
 
