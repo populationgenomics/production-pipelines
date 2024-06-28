@@ -3,10 +3,13 @@ general tasks using bcftools in a pipeline context
 """
 
 from hailtop.batch import ResourceFile
+from hailtop.batch.job import BashJob
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
 
+
+# mypy: ignore_errors
 
 def naive_merge_vcfs(
     input_list: list[str | ResourceFile],
@@ -16,7 +19,7 @@ def naive_merge_vcfs(
     storage: str = '50Gi',
     missing_to_ref: bool = False,
     vcfs_localised: bool = False,
-):
+) -> tuple[ResourceFile, BashJob]:
     """
     a generic method for taking multiple vcfs, merging into a single vcf
 
@@ -57,11 +60,11 @@ def naive_merge_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     merge_job.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""}',  # type: ignore
+        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""}',
     )
-    merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
+    merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')
 
     # write the result out
     get_batch().write_output(merge_job.output, output_file.removesuffix('.vcf.bgz'))
 
-    return merge_job.output["vcf.bgz"]  # type: ignore
+    return merge_job.output["vcf.bgz"], merge_job

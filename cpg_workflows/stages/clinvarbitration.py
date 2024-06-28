@@ -1,0 +1,164 @@
+"""
+Workflow stages for the ClinvArbitration process
+
+https://github.com/populationgenomics/ClinvArbitration
+
+This takes ClinVar data:
+- re-summarises the submitted evidence using new criteria to come to new conclusions
+- annotates the resultant VCF representation of the results
+- processes the annotated data to create a PM5 resource
+    - identify where a missense occurs at the same codon as known pathogenic missense
+    - this is used in the Talos pipeline
+"""
+
+# mypy: ignore_errors
+
+
+import logging
+
+from datetime import datetime
+from os.path import join
+
+from cpg_utils import to_path, Path
+from cpg_utils.config import image_path, config_retrieve
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job
+from cpg_workflows import get_batch
+from cpg_workflows.jobs.simple_vep_annotation import split_and_annotate_vcf
+from cpg_workflows.workflow import Cohort, CohortStage, StageInput, StageOutput, stage
+
+
+DATE_STRING: str = datetime.now().strftime('%y-%m')
+
+
+@stage
+class CopyLatestClinvarFiles(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        return {
+            'submission_file': to_path(join(common_folder, 'submission_summary.txt.gz')),
+            'variant_file': to_path(join(common_folder, 'variant_summary.txt.gz'))
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        run a wget copy of the relevant files into GCP
+        """
+        bash_job = get_batch().new_bash_job('wget latest ClinVar raw files')
+
+        directory = 'https://ftp.ncbi.nlm.nih.gov/pub/clinvar/tab_delimited/'
+        sub_file = 'submission_summary.txt.gz'
+        var_file = 'variant_summary.txt.gz'
+
+        bash_job.command(f'wget -q {directory}{sub_file} -O {bash_job.subs}')
+        bash_job.command(f'wget -q {directory}{var_file} -O {bash_job.vars}')
+
+        outputs = self.expected_outputs(cohort)
+
+        get_batch().write_output(bash_job.subs, str(outputs['submission_file']))
+        get_batch().write_output(bash_job.vars, str(outputs['variant_file']))
+
+        return self.make_outputs(data=outputs, jobs=bash_job, target=cohort)
+
+
+@stage(required_stages=CopyLatestClinvarFiles, analysis_type='custom', analysis_keys=['clinvar_decisions'])
+class GenerateNewClinvarSummary(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+        """
+        a couple of files and a HT as Paths
+        """
+        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        return {
+            'clinvar_decisions': join(common_folder, 'clinvar_decisions.ht'),
+            'snv_vcf': to_path(join(common_folder, 'pathogenic_snvs.vcf.bgz'))
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        # declare a resouce group, but don't copy the whole thing back
+        clinvarbitrate = get_batch().new_job('Run ClinvArbitration Summary')
+        clinvarbitrate.image(image_path('clinvarbitration'))
+        authenticate_cloud_credentials_in_job(clinvarbitrate)
+
+        clinvarbitrate.declare_resource_group(
+            output={
+                'ht': '{root}.ht',
+                'vcf': '{root}.vcf.bgz',
+                'index': '{root}.vcf.bgz.tbi',
+            }
+        )
+
+        # get the expected outputs
+        outputs = self.expected_outputs(cohort)
+
+        var_file = get_batch().read_input(str(inputs.as_path(cohort, CopyLatestClinvarFiles, 'variant_file')))
+        sub_file = get_batch().read_input(str(inputs.as_path(cohort, CopyLatestClinvarFiles, 'submission_file')))
+
+        clinvarbitrate.command(f'resummary -v {var_file} -s {sub_file} -o {clinvarbitrate.output} --minimal')
+        clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output["ht"]} {outputs["clinvar_decisions"]}')
+
+        # selectively copy back some outputs
+        get_batch().write_output(clinvarbitrate.output['vcf'], str(outputs['vcf']))
+        get_batch().write_output(clinvarbitrate.output['index'], str(outputs['vcf']) + '.tbi')
+
+        return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate)
+
+
+@stage(required_stages=GenerateNewClinvarSummary)
+class AnnotateClinvarDecisions(CohortStage):
+    """
+    take the vcf output from the clinvar stage, and apply VEP annotations
+    """
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        return {
+            'vcf': to_path(join(common_folder, 'annotated_snv.vcf.bgz')),
+            'index': to_path(join(common_folder, 'annotated_snv.vcf.bgz.tbi')),
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
+        input_vcf = str(inputs.as_path(cohort, AnnotateClinvarDecisions, 'snv_vcf'))
+
+        local_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': input_vcf + '.tbi'})['vcf.gz']
+
+        # delegate the splitting, annotation, and re-merging to this existing method
+        _out_file, jobs = split_and_annotate_vcf(vcf_in=local_vcf, out_vcf=str(outputs['vcf']))
+
+        return self.make_outputs(target=cohort, jobs=jobs, data=outputs)
+
+
+@stage(required_stages=AnnotateClinvarDecisions)
+class PM5TableGeneration(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        a single HT
+        """
+        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        return {
+            'clinvar_pm5': join(common_folder, 'clinvar_pm5.ht'),
+            'pm5_json': to_path(join(common_folder, 'clinvar_pm5.json')),
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # declare a resouce group, but don't copy the whole thing back
+        clinvarbitrate_pm5 = get_batch().new_job('Run ClinvArbitration PM5')
+        clinvarbitrate_pm5.image(image_path('clinvarbitration'))
+        authenticate_cloud_credentials_in_job(clinvarbitrate_pm5)
+
+        # get the expected outputs
+        outputs = self.expected_outputs(cohort)
+
+        vcf = str(inputs.as_path(cohort, AnnotateClinvarDecisions, 'vcf'))
+        annotated_vcf = get_batch().read_input_group(**{'vcf.gz': vcf, 'vcf.gz.tbi': vcf + '.tbi'})['vcf.gz']
+
+        clinvarbitrate_pm5.declare_resource_group(output={'ht': '{root}.ht', 'json': '{root}.json'})
+
+        clinvarbitrate_pm5.command(f'pm5_table -i {annotated_vcf} -o {clinvarbitrate_pm5.output}')
+
+        # recursive copy of the HT
+        clinvarbitrate_pm5.command(f'gcloud storage cp -r {clinvarbitrate_pm5.output["ht"]} {outputs["clinvar_pm5"]}')
+
+        # also copy back the JSON file
+        get_batch().write_output(clinvarbitrate_pm5.output['json'], str(outputs['json']))
+
+        return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate_pm5)
