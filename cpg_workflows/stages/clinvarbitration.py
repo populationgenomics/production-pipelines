@@ -108,7 +108,7 @@ class AnnotateClinvarDecisions(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
-        input_vcf = str(inputs.as_path(cohort, AnnotateClinvarDecisions, 'snv_vcf'))
+        input_vcf = str(inputs.as_path(cohort, GenerateNewClinvarSummary, 'snv_vcf'))
 
         local_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': input_vcf + '.tbi'})['vcf.gz']
 
