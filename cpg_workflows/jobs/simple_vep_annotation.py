@@ -104,6 +104,16 @@ def annotate_localised_vcfs(
     """
     annotate each VCF fragment using VEP. Optionally attempt to resume from a folder, and write results to same
 
+    I've stashed a tarball of the VEP 110 cache here: gs://cpg-common-test/references/vep_110_compressed.tar.gz
+    instead of enabling a cloud-fused annotation source, we could copy this into the VM, unpack, and go...
+
+    vep_110_tarball = get_batch().read_input('gs://cpg-common-test/references/vep_110_compressed.tar.gz')
+    job.command('tar -xzf compressed_vep.tar.gz ${{BATCH_TMPDIR}}/vep')
+    --dir_cache ${{BATCH_TMPDIR}}/vep --fa ${{BATCH_TMPDIR}}/vep/homo_sapiens/110/Homo_sapiens.GRCh38.dna.toplevel.fa.gz
+
+    For the clinvar use-case the runtime isn't enough to merit this optimisation, but for a genome-wide annotation in
+    a single VM, probably best to localise the files?
+
     Args:
         vcf_list ():
         output_dir ():
