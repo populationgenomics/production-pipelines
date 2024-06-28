@@ -151,6 +151,6 @@ class PM5TableGeneration(CohortStage):
         clinvarbitrate_pm5.command(f'gcloud storage cp -r {clinvarbitrate_pm5.output["ht"]} {outputs["clinvar_pm5"]}')
 
         # also copy back the JSON file
-        get_batch().write_output(clinvarbitrate_pm5.output['json'], str(outputs['pm5_json']))
+        get_batch().write_output(clinvarbitrate_pm5.output['json'], str(outputs['pm5_json']).removesuffix('.json'))
 
         return self.make_outputs(target=cohort, data=outputs, jobs=clinvarbitrate_pm5)
