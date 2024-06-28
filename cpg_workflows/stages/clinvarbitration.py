@@ -71,8 +71,9 @@ class GenerateNewClinvarSummary(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        # relatively RAM intensive, short running task
         clinvarbitrate = get_batch().new_job('Run ClinvArbitration Summary')
-        clinvarbitrate.image(image_path('clinvarbitration'))
+        clinvarbitrate.image(image_path('clinvarbitration')).memory('highmem').cpu('2')
         authenticate_cloud_credentials_in_job(clinvarbitrate)
 
         # declare a resource group, leave the HT path implicit
