@@ -91,6 +91,7 @@ def naive_merge_vcfs(
     Returns:
         the ResourceFile in-batch for the merged VCF
     """
+
     if vcfs_localised:
         batch_vcfs = input_list
     else:

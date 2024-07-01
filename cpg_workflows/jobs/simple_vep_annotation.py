@@ -83,13 +83,10 @@ def split_vcf_by_chromosome(
             **{chrom: {'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'}},
         )
 
-        # create a VCF fragment for this chromosome
+        # create a VCF fragment for this chromosome, and index the result
         bcftools_job.command(
-            f'bcftools view -Oz -o {bcftools_job[chrom]["vcf.bgz"]} -r {chrom} {localised_vcf}',
+            f'bcftools view -Oz --write-index -o {bcftools_job[chrom]["vcf.bgz"]} -r {chrom} {localised_vcf}',
         )
-
-        # index it
-        bcftools_job.command(f'tabix {bcftools_job[chrom]["vcf.bgz"]} ')
 
         if isinstance(output_dir, str):
             # write the fragment & index to GCP
