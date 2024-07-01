@@ -47,13 +47,14 @@ Generates:
     - Talos results JSON (metamist `aip-results` analysis)
     - Talos report HTML (metamist `aip-report` analysis)
 
-This will have to be run using Full permissions as we will need to reference
-data in test and main buckets.
+This will have to be run using Full permissions as we will need to reference data in test and main buckets.
 """
 
 from datetime import datetime
 from functools import lru_cache
 from os.path import join
+
+import toml
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
@@ -78,6 +79,8 @@ MTA_QUERY = gql(
     }
 """,
 )
+# used when building a runtime configuration
+SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
 
 
 @lru_cache(maxsize=None)
@@ -207,6 +210,57 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
 
 
 @stage
+class MakeRuntimeConfig(DatasetStage):
+    """
+    create a config file for this run,
+    this new config should include all elements specific to this Project and sequencing_type
+    this new unambiguous config file should be used in all jobs
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {'config': dataset.prefix() / DATED_FOLDER / 'config.toml'}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        # start off with a fresh config dictionary, including generic content
+        new_config: dict = {
+            'categories': config_retrieve(['categories']),
+            'panels': config_retrieve(['panels']),
+            'hail_labelling': config_retrieve(['hail_labelling']),
+            'moi_tests': config_retrieve(['moi_tests']),
+        }
+
+        # pull the content relevant to this cohort + sequencing type (mandatory in CPG)
+        seq_type = config_retrieve(['workflow', 'sequencing_type'])
+        dataset_conf = config_retrieve(['cohorts', dataset.name])
+        seq_type_conf = dataset_conf.get(seq_type, {})
+
+        # forbidden genes and forced panels
+        new_config['panels']['forbidden_genes'] = dataset_conf.get('forbidden', [])
+        new_config['panels']['forced_panels'] = dataset_conf.get('forced_panels', [])
+
+        # optionally, all SG IDs to remove from analysis
+        new_config['moi_tests']['solved_cases'] = dataset_conf.get('solved_cases', [])
+
+        # these attributes are present, or missing completely
+        if all(x in seq_type_conf for x in SEQR_KEYS):
+            for key in SEQR_KEYS:
+                if key in seq_type_conf:
+                    new_config['seqr'][key] = seq_type_conf[key]
+
+        # add a location for the run history files
+        if 'result_history' in seq_type_conf:
+            new_config['result_history'] = seq_type_conf['result_history']
+
+        expected_outputs = self.expected_outputs(dataset)
+
+        with expected_outputs['config'].open('w') as write_handle:
+            toml.dump(new_config, write_handle)
+
+        return self.make_outputs(target=dataset, data=expected_outputs)
+
+
+@stage
 class GeneratePED(DatasetStage):
     """
     this calls the script which reads pedigree data from metamist
@@ -227,7 +281,7 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        job.command(f'python3 talos/cpg_generate_pheno_ped.py {query_dataset} {job.output}')
+        job.command(f'generate_pedigree {query_dataset} {job.output}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -254,9 +308,7 @@ class GeneratePanelData(DatasetStage):
 
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
-        job.command(
-            'python3 talos/hpo_panel_match.py ' f'-i {local_ped!r} ' f'--hpo {hpo_file!r} ' f'--out {job.output}',
-        )
+        job.command(f'hpo_panel_match -i {local_ped} ' f'--hpo {hpo_file} ' f'--out {job.output}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -277,12 +329,12 @@ class QueryPanelapp(DatasetStage):
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
-            f'python3 talos/query_panelapp.py '
-            f'--panels {get_batch().read_input(str(hpo_panel_json))!r} '
+            'query_panelapp '
+            f'--panels {get_batch().read_input(str(hpo_panel_json))} '
             f'--out_path {job.output} '
             f'--dataset {dataset.name} ',
         )
-        get_batch().write_output(job.output, str(expected_out["panel_data"]))
+        get_batch().write_output(job.output, str(expected_out['panel_data']))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -341,12 +393,11 @@ class RunHailFiltering(DatasetStage):
         job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
 
         job.command(
-            f'python3 talos/hail_filter_and_label.py '
-            f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '
-            f'--panelapp {panelapp_json!r} '
-            f'--pedigree {local_ped!r} '
+            'hail_label '
+            f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--panelapp {panelapp_json} '
+            f'--pedigree {local_ped} '
             f'--vcf_out {job.output["vcf.bgz"]} '
-            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
             f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
         )
@@ -373,8 +424,6 @@ class RunHailSVFiltering(DatasetStage):
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
-
-        # peddy can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
         required_storage: int = config_retrieve(['hail', 'storage', 'sv'], 10)
@@ -390,11 +439,11 @@ class RunHailSVFiltering(DatasetStage):
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                f'python3 talos/hail_filter_sv.py '
-                f'--mt {sv_file!r} '
-                f'--panelapp {panelapp_json!r} '
-                f'--pedigree {local_ped!r} '
-                f'--vcf_out {job.output["vcf.bgz"]} ',
+                'hail_label_sv '
+                f'--mt {sv_file} '
+                f'--panelapp {panelapp_json} '
+                f'--pedigree {local_ped} '
+                f'--vcf_out {job.output["vcf.bgz"]} ',  # type: ignore
             )
             get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
             sv_jobs.append(job)
@@ -449,14 +498,14 @@ class ValidateMOI(DatasetStage):
         )['vcf.bgz']
 
         job.command(
-            f'python3 talos/validate_categories.py '
-            f'--labelled_vcf {labelled_vcf!r} '
-            f'--out_json {job.output!r} '
-            f'--panelapp {panel_input!r} '
-            f'--pedigree {pedigree!r} '
-            f'--input_path {input_path!r} '
-            f'--participant_panels {hpo_panels!r} '
-            f'--dataset {dataset.name!r} {sv_vcf_arg}',
+            'run_moi_tests '
+            f'--labelled_vcf {labelled_vcf} '
+            f'--out_json {job.output} '
+            f'--panelapp {panel_input} '
+            f'--pedigree {pedigree} '
+            f'--input_path {input_path} '
+            f'--participant_panels {hpo_panels} '
+            f'--dataset {dataset.name} {sv_vcf_arg}',
         )
         get_batch().write_output(job.output, str(self.expected_outputs(dataset)['summary_json']))
         expected_out = self.expected_outputs(dataset)
@@ -489,12 +538,12 @@ class CreateTalosHTML(DatasetStage):
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
         # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
-            f'python3 talos/html_builder.py '
-            f'--results {results_json!r} '
-            f'--panelapp {panel_input!r} '
-            f'--output {str(expected_out["results_html"])!r} '
-            f'--latest {str(expected_out["latest_html"])!r} '
-            f'--dataset {dataset.name!r} '
+            'build_html '
+            f'--results {results_json} '
+            f'--panelapp {panel_input} '
+            f'--dataset {dataset.name} '
+            f'--output {str(expected_out["results_html"])} '
+            f'--latest {str(expected_out["latest_html"])} '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
@@ -508,7 +557,6 @@ class CreateTalosHTML(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-# probably shouldn't be recorded as a custom type
 @stage(
     required_stages=ValidateMOI,
     analysis_keys=['seqr_file', 'seqr_pheno_file'],
@@ -546,8 +594,10 @@ class GenerateSeqrFile(DatasetStage):
         job.image(image_path('talos'))
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'python3 talos/minimise_output_for_seqr.py '
-            f'{input_localised} {job.out_json} {job.pheno_json} '
+            'generate_seqr_file '
+            f'{input_localised} '
+            f'{job.out_json} '
+            f'{job.pheno_json} '
             f'--external_map {lookup_in_batch}',
         )
 
