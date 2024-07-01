@@ -1,0 +1,7 @@
+[workflow]
+name = 'dev_worfklow'
+status_reporter = 'metamist'
+
+[hail]
+pool_label = 'large-cohort'
+delete_scratch_on_exit = false
