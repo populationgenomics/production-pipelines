@@ -25,6 +25,8 @@ callset_af_sv_dominant = 0.01
 # these categories don't reach the report without also having a gene-phenotype match
 # stripped down form, e.g. 'categoryboolean6' is '6'
 phenotype_match = ['6']
+## all these labels will be removed
+#ignore_categories = ['categoryboolean6']
 
 [hail_labelling]
 # variables for the hail operations, including CSQ sets and filter thresholds

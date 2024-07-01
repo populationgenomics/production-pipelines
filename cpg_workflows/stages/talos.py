@@ -238,6 +238,7 @@ class MakeRuntimeConfig(DatasetStage):
         # forbidden genes and forced panels
         new_config['panels']['forbidden_genes'] = dataset_conf.get('forbidden', [])
         new_config['panels']['forced_panels'] = dataset_conf.get('forced_panels', [])
+        new_config['panels']['blacklist'] = dataset_conf.get('blacklist', None)
 
         # optionally, all SG IDs to remove from analysis
         new_config['moi_tests']['solved_cases'] = dataset_conf.get('solved_cases', [])
@@ -246,7 +247,7 @@ class MakeRuntimeConfig(DatasetStage):
         if all(x in seq_type_conf for x in SEQR_KEYS):
             for key in SEQR_KEYS:
                 if key in seq_type_conf:
-                    new_config['seqr'][key] = seq_type_conf[key]
+                    new_config['report'][key] = seq_type_conf[key]
 
         # add a location for the run history files
         if 'result_history' in seq_type_conf:
@@ -260,7 +261,7 @@ class MakeRuntimeConfig(DatasetStage):
         return self.make_outputs(target=dataset, data=expected_outputs)
 
 
-@stage
+@stage(required_stages=[MakeRuntimeConfig])
 class GeneratePED(DatasetStage):
     """
     this calls the script which reads pedigree data from metamist
@@ -276,6 +277,12 @@ class GeneratePED(DatasetStage):
         """
         job = get_batch().new_job('Generate PED from Metamist')
         job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
+
         expected_out = self.expected_outputs(dataset)
         query_dataset = dataset.name
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
@@ -288,7 +295,7 @@ class GeneratePED(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=GeneratePED)
+@stage(required_stages=[GeneratePED, MakeRuntimeConfig])
 class GeneratePanelData(DatasetStage):
     """
     PythonJob to find HPO-matched panels
@@ -304,6 +311,11 @@ class GeneratePanelData(DatasetStage):
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
         job.cpu(0.25).memory('lowmem').image(image_path('talos'))
 
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
+
         expected_out = self.expected_outputs(dataset)
 
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
@@ -314,7 +326,7 @@ class GeneratePanelData(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=[GeneratePanelData])
+@stage(required_stages=[GeneratePanelData, MakeRuntimeConfig])
 class QueryPanelapp(DatasetStage):
     """
     query PanelApp for up-to-date gene lists
@@ -326,6 +338,12 @@ class QueryPanelapp(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
         job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
+
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
@@ -339,7 +357,7 @@ class QueryPanelapp(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=[QueryPanelapp, GeneratePED])
+@stage(required_stages=[QueryPanelapp, GeneratePED, MakeRuntimeConfig])
 class RunHailFiltering(DatasetStage):
     """
     hail job to filter & label the MT
@@ -354,6 +372,11 @@ class RunHailFiltering(DatasetStage):
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
         job.command('set -eux pipefail')
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one
         # Genomes are more like 500GB
@@ -406,7 +429,7 @@ class RunHailFiltering(DatasetStage):
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=[QueryPanelapp, GeneratePED])
+@stage(required_stages=[QueryPanelapp, GeneratePED, MakeRuntimeConfig])
 class RunHailSVFiltering(DatasetStage):
     """
     hail job to filter & label the SV MT
@@ -420,6 +443,8 @@ class RunHailSVFiltering(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
@@ -434,6 +459,9 @@ class RunHailSVFiltering(DatasetStage):
             # manually extract the VCF and index
             job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
             job.image(image_path('talos'))
+
+            # use the new config file
+            job.env(conf_in_batch, 'TALOS_CONFIG')
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
@@ -452,7 +480,7 @@ class RunHailSVFiltering(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering],
+    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering, MakeRuntimeConfig],
     analysis_type='aip-results',  # note - legacy analysis type
     analysis_keys=['summary_json'],
 )
@@ -467,6 +495,12 @@ class ValidateMOI(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
         job.cpu(2.0).memory('highmem').image(image_path('talos'))
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
+
         hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
@@ -513,7 +547,7 @@ class ValidateMOI(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering],
+    required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     tolerate_missing_output=True,
@@ -527,9 +561,12 @@ class CreateTalosHTML(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos HTML: {dataset.name}')
-        job.cpu(1.0)
-        job.memory('lowmem')
-        job.image(image_path('talos'))
+        job.image(image_path('talos')).memory('lowmem').cpu(1.0)
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
@@ -558,7 +595,7 @@ class CreateTalosHTML(DatasetStage):
 
 
 @stage(
-    required_stages=ValidateMOI,
+    required_stages=[ValidateMOI, MakeRuntimeConfig],
     analysis_keys=['seqr_file', 'seqr_pheno_file'],
     analysis_type='custom',
     tolerate_missing_output=True,
@@ -589,9 +626,13 @@ class GenerateSeqrFile(DatasetStage):
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'Talos Prep for Seqr: {dataset.name}')
-        job.cpu(1.0)
-        job.memory('lowmem')
-        job.image(image_path('talos'))
+        job.image(image_path('talos')).cpu(1.0).memory('lowmem')
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+        job.env(conf_in_batch, 'TALOS_CONFIG')
+
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
             'generate_seqr_file '
