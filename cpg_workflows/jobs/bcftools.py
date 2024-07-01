@@ -55,9 +55,10 @@ def naive_concat_vcfs(
     # -Oz: bgzip output
     # -o: output file
     # --threads: number of threads to use
-    # -n: concatenate without recompression
+    # --write-index: create tabix index
+    # -n: concatenate without recompression (not used, cannot be combined with --write-index)
     concat.command(
-        f'bcftools concat {" ".join(batch_vcfs)} -Oz -o {concat.output["vcf.bgz"]} --threads {cpu} -n --write-index',
+        f'bcftools concat {" ".join(batch_vcfs)} -Oz -o {concat.output["vcf.bgz"]} --threads {cpu} --write-index',
     )
 
     # write the result out
