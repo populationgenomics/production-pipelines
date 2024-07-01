@@ -8,13 +8,13 @@ status_reporter = 'metamist'
 #clinvar_decisions = "HailTable path to private ClinVar"
 #clinvar_pm5 = "HailTable path to ClinVar PM5"
 
-[panels]
+[GeneratePanelData]
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
 panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
 require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
 
-[moi_tests]
+[ValidateMOI]
 # thresholds for different filters during the MOI checks
 gnomad_dominant = 0.001
 gnomad_max_homs_dominant = 0
@@ -28,7 +28,7 @@ phenotype_match = ['6']
 ## all these labels will be removed
 #ignore_categories = ['categoryboolean6']
 
-[hail_labelling]
+[RunHailFiltering]
 # variables for the hail operations, including CSQ sets and filter thresholds
 ac_threshold = 0.01
 # for de novo testing, use HIGH consequence terms + these terms
@@ -49,12 +49,12 @@ spliceai = 0.5
 # for generating the VCF output - these are the fields pulled from the MT, in this order
 csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotype', 'exon', 'hgvsc', 'hgvsp', 'cdna_position', 'cds_position', 'protein_position', 'variant_class', 'ensp', 'lof', 'sift', 'polyphen', 'am_class', 'am_pathogenicity']
 
-[hail_labelling.cores]
+[RunHailFiltering.cores]
 # size of VM provisioned for Hail
 sv = 2
 small_variants = 8
 
-[hail_labelling.storage]
+[RunHailFiltering.storage]
 sv = 10
 exome = 50
 genome = 500

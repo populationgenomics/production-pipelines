@@ -40,6 +40,7 @@ Takes as input:
     - HPO.obo file (read from cpg-common reference location)
     - Seqr<->Internal ID mapping file (if appropriate, from Config)
 Generates:
+    - Config file for this run
     - PED file for this cohort (extended format, with additional columns for Ext. ID and HPO terms)
     - Latest panels found through HPO matches against this cohort
     - PanelApp results
@@ -194,7 +195,7 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
     get_logger().info(f'No forced {key} table available, trying default')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
-    for default_name in ['talos_clinvar', 'clinvarbitration', 'aip_clinvar']:
+    for default_name in ['clinvarbitration', 'aip_clinvar']:
         clinvar_table = join(
             config_retrieve(['storage', 'common', 'analysis']),
             default_name,
@@ -225,9 +226,9 @@ class MakeRuntimeConfig(DatasetStage):
         # start off with a fresh config dictionary, including generic content
         new_config: dict = {
             'categories': config_retrieve(['categories']),
-            'panels': config_retrieve(['panels']),
-            'hail_labelling': config_retrieve(['hail_labelling']),
-            'moi_tests': config_retrieve(['moi_tests']),
+            'GeneratePanelData': config_retrieve(['GeneratePanelData']),
+            'RunHailFiltering': config_retrieve(['RunHailFiltering']),
+            'ValidateMOI': config_retrieve(['ValidateMOI']),
         }
 
         # pull the content relevant to this cohort + sequencing type (mandatory in CPG)
@@ -236,18 +237,20 @@ class MakeRuntimeConfig(DatasetStage):
         seq_type_conf = dataset_conf.get(seq_type, {})
 
         # forbidden genes and forced panels
-        new_config['panels']['forbidden_genes'] = dataset_conf.get('forbidden', [])
-        new_config['panels']['forced_panels'] = dataset_conf.get('forced_panels', [])
-        new_config['panels']['blacklist'] = dataset_conf.get('blacklist', None)
+        new_config['GeneratePanelData']['forbidden_genes'] = dataset_conf.get('forbidden', [])
+        new_config['GeneratePanelData']['forced_panels'] = dataset_conf.get('forced_panels', [])
+        new_config['GeneratePanelData']['blacklist'] = dataset_conf.get('blacklist', None)
 
         # optionally, all SG IDs to remove from analysis
-        new_config['moi_tests']['solved_cases'] = dataset_conf.get('solved_cases', [])
+        new_config['ValidateMOI']['solved_cases'] = dataset_conf.get('solved_cases', [])
 
         # these attributes are present, or missing completely
         if all(x in seq_type_conf for x in SEQR_KEYS):
             for key in SEQR_KEYS:
                 if key in seq_type_conf:
-                    new_config['report'][key] = seq_type_conf[key]
+                    new_config['CreateTalosHTML'][key] = seq_type_conf[key]
+        if 'external_labels' in seq_type_conf:
+            new_config['CreateTalosHTML']['external_labels'] = seq_type_conf['external_labels']
 
         # add a location for the run history files
         if 'result_history' in seq_type_conf:
@@ -288,7 +291,7 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        job.command(f'generate_pedigree {query_dataset} {job.output}')
+        job.command(f'GeneratePED {query_dataset} {job.output}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -320,7 +323,7 @@ class GeneratePanelData(DatasetStage):
 
         hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
-        job.command(f'hpo_panel_match -i {local_ped} ' f'--hpo {hpo_file} ' f'--out {job.output}')
+        job.command(f'GeneratePanelData -i {local_ped} ' f'--hpo {hpo_file} ' f'--out {job.output}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -347,7 +350,7 @@ class QueryPanelapp(DatasetStage):
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
         job.command(
-            'query_panelapp '
+            'QueryPanelapp '
             f'--panels {get_batch().read_input(str(hpo_panel_json))} '
             f'--out_path {job.output} '
             f'--dataset {dataset.name} ',
@@ -416,7 +419,7 @@ class RunHailFiltering(DatasetStage):
         job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
 
         job.command(
-            'hail_label '
+            'RunHailFiltering '
             f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
@@ -430,7 +433,7 @@ class RunHailFiltering(DatasetStage):
 
 
 @stage(required_stages=[QueryPanelapp, GeneratePED, MakeRuntimeConfig])
-class RunHailSVFiltering(DatasetStage):
+class RunHailFilteringSV(DatasetStage):
     """
     hail job to filter & label the SV MT
     """
@@ -467,7 +470,7 @@ class RunHailSVFiltering(DatasetStage):
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
             job.command(
-                'hail_label_sv '
+                'RunHailFilteringSV '
                 f'--mt {sv_file} '
                 f'--panelapp {panelapp_json} '
                 f'--pedigree {local_ped} '
@@ -480,7 +483,7 @@ class RunHailSVFiltering(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailSVFiltering, MakeRuntimeConfig],
+    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailFilteringSV, MakeRuntimeConfig],
     analysis_type='aip-results',  # note - legacy analysis type
     analysis_keys=['summary_json'],
 )
@@ -512,7 +515,7 @@ class ValidateMOI(DatasetStage):
         sv_vcf_arg = ''
         if sv_paths_or_empty:
             # only go looking for inputs from prior stage where we expect to find them
-            hail_sv_inputs = inputs.as_dict(dataset, RunHailSVFiltering)
+            hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
             for sv_path, sv_file in query_for_sv_mt(dataset.name):
                 # bump input_path to contain both source files if appropriate
                 # this is a string written into the metadata
@@ -532,7 +535,7 @@ class ValidateMOI(DatasetStage):
         )['vcf.bgz']
 
         job.command(
-            'run_moi_tests '
+            'ValidateMOI '
             f'--labelled_vcf {labelled_vcf} '
             f'--out_json {job.output} '
             f'--panelapp {panel_input} '
@@ -575,7 +578,7 @@ class CreateTalosHTML(DatasetStage):
         # this will still try to write directly out - latest is optional, and splitting is arbitrary
         # Hail can't handle optional outputs being copied out AFAIK
         command_string = (
-            'build_html '
+            'CreateTalosHTML '
             f'--results {results_json} '
             f'--panelapp {panel_input} '
             f'--dataset {dataset.name} '
