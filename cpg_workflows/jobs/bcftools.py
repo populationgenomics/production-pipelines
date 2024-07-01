@@ -58,7 +58,7 @@ def naive_concat_vcfs(
     # --write-index: create tabix index
     # -n: concatenate without recompression (not used, cannot be combined with --write-index)
     concat.command(
-        f'bcftools concat {" ".join(batch_vcfs)} -Oz -o {concat.output["vcf.bgz"]} --threads {cpu} --write-index',
+        f'bcftools concat {" ".join(batch_vcfs)} -Oz -o {concat.output["vcf.bgz"]} --threads {cpu} --write-index=tbi',
     )
 
     # write the result out
@@ -118,7 +118,7 @@ def naive_merge_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     merge_job.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""} --write-index',
+        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""} --write-index=tbi',
     )
 
     # write the result out
