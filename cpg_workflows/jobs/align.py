@@ -191,7 +191,7 @@ def align(
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
-            extract_picard=get_config()['workflow'].get(['extract_picard'], False),
+            extract_picard=get_config()['workflow'].get('extract_picard', False),
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
