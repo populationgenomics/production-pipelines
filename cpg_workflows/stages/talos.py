@@ -354,9 +354,7 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'TALOS_CONFIG={conf_in_batch} QueryPanelapp '
-            f'--panels {get_batch().read_input(str(hpo_panel_json))} '
-            f'--out_path {job.output} '
-            f'--dataset {dataset.name} ',
+            f'--panels {get_batch().read_input(str(hpo_panel_json))} --out_path {job.output}'
         )
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
@@ -542,7 +540,7 @@ class ValidateMOI(DatasetStage):
             f'--pedigree {pedigree} '
             f'--input_path {input_path} '
             f'--participant_panels {hpo_panels} '
-            f'--dataset {dataset.name} {sv_vcf_arg}',
+            f'{sv_vcf_arg}',
         )
         get_batch().write_output(job.output, str(self.expected_outputs(dataset)['summary_json']))
         expected_out = self.expected_outputs(dataset)
@@ -580,7 +578,6 @@ class CreateTalosHTML(DatasetStage):
             f'TALOS_CONFIG={conf_in_batch} CreateTalosHTML '
             f'--results {results_json} '
             f'--panelapp {panel_input} '
-            f'--dataset {dataset.name} '
             f'--output {str(expected_out["results_html"])} '
             f'--latest {str(expected_out["latest_html"])} '
         )
