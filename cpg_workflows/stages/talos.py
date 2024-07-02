@@ -285,7 +285,7 @@ class GeneratePED(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         expected_out = self.expected_outputs(dataset)
         query_dataset = dataset.name
@@ -318,7 +318,7 @@ class GeneratePanelData(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         expected_out = self.expected_outputs(dataset)
 
@@ -346,7 +346,7 @@ class QueryPanelapp(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
@@ -380,7 +380,7 @@ class RunHailFiltering(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one
         # Genomes are more like 500GB
@@ -465,7 +465,7 @@ class RunHailFilteringSV(DatasetStage):
             job.image(image_path('talos'))
 
             # use the new config file
-            job.env(conf_in_batch, 'TALOS_CONFIG')
+            job.env('TALOS_CONFIG', conf_in_batch)
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
@@ -503,7 +503,7 @@ class ValidateMOI(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
@@ -570,7 +570,7 @@ class CreateTalosHTML(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
@@ -635,7 +635,7 @@ class GenerateSeqrFile(DatasetStage):
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
-        job.env(conf_in_batch, 'TALOS_CONFIG')
+        job.env('TALOS_CONFIG', conf_in_batch)
 
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
