@@ -366,9 +366,10 @@ def _align_one(
             assert (
                 alignment_input.reference_assembly
             ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
+            print(f'FOOBAR {type(alignment_input.reference_assembly)=}')
             reference_inp = b.read_input_group(
-                base=str(alignment_input.reference_assembly),
-                fai=str(alignment_input.reference_assembly) + '.fai',
+                base=alignment_input.reference_assembly,
+                fai=alignment_input.reference_assembly.with_suffix('.fa.fai'),
             ).base
             bazam_ref_cmd = f'-Dsamjdk.reference_fasta={reference_inp}'
             samtools_ref_cmd = f'--reference {reference_inp}'

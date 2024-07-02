@@ -1,0 +1,6 @@
+[workflow]
+name = 'mito'
+vep_version = '110'
+
+[references]
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"

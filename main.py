@@ -61,6 +61,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample_2': [MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
+    'mito': [MitoReport],
 }
 
 

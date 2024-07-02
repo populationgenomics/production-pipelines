@@ -739,10 +739,11 @@ def mitoreport(
     res.set_to_job(j)
 
     vcf = b.read_input_group(**{'vcf.gz': str(vcf_path)})
+    print(f'FOOBAR {type(cram_path)=}')
     cram = b.read_input_group(
         **{
-            'cram': str(cram_path),
-            'cram.crai': str(cram_path.with_suffix('.cram.crai')),
+            'cram': cram_path,
+            'cram.crai': cram_path.with_suffix('.cram.crai'),
         },
     )
 
