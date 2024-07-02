@@ -506,8 +506,6 @@ class ValidateMOI(DatasetStage):
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
-        input_path = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
-
         # If there are SV VCFs, read each one in and add to the arguments
         sv_paths_or_empty = query_for_sv_mt(dataset.name)
         sv_vcf_arg = ''
@@ -515,10 +513,6 @@ class ValidateMOI(DatasetStage):
             # only go looking for inputs from prior stage where we expect to find them
             hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
             for sv_path, sv_file in query_for_sv_mt(dataset.name):
-                # bump input_path to contain both source files if appropriate
-                # this is a string written into the metadata
-                input_path += f', {sv_path}'
-
                 labelled_sv_vcf = get_batch().read_input_group(
                     **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
                 )['vcf.bgz']
@@ -538,7 +532,6 @@ class ValidateMOI(DatasetStage):
             f'--out_json {job.output} '
             f'--panelapp {panel_input} '
             f'--pedigree {pedigree} '
-            f'--input_path {input_path} '
             f'--participant_panels {hpo_panels} '
             f'{sv_vcf_arg}',
         )
