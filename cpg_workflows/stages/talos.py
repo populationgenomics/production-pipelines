@@ -626,7 +626,7 @@ class GenerateSeqrFile(DatasetStage):
 
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(
-            f'TALOS_CONFIG={conf_in_batch} generate_seqr_file '
+            f'TALOS_CONFIG={conf_in_batch} GenerateSeqrFile '
             f'{input_localised} '
             f'{job.out_json} '
             f'{job.pheno_json} '
