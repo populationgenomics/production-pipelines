@@ -229,6 +229,7 @@ class MakeRuntimeConfig(DatasetStage):
             'GeneratePanelData': config_retrieve(['GeneratePanelData']),
             'RunHailFiltering': config_retrieve(['RunHailFiltering']),
             'ValidateMOI': config_retrieve(['ValidateMOI']),
+            'CreateTalosHTML': {}
         }
 
         # pull the content relevant to this cohort + sequencing type (mandatory in CPG)
