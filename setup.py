@@ -33,6 +33,7 @@ setup(
         'bokeh',
         'numpy',
         'click',
+        'toml',
     ],
     extras_require={
         'test': [
