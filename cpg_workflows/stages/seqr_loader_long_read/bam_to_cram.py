@@ -52,6 +52,7 @@ class BamToCram(SequencingGroupStage):
             extra_label='long_read',
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
+            reference_path=reference_path('broad/ref_fasta'),
         )
         b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
 
