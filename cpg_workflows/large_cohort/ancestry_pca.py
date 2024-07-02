@@ -16,6 +16,12 @@ MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
 
 
+def reorder_columns(ht: hl.Table, reference_table: hl.Table) -> hl.Table:
+    reference_fields = reference_table.sample_qc.dtype.fields
+    ordered_sample_qc = {field: ht.sample_qc[field] for field in reference_fields}
+    return ht.annotate(sample_qc=hl.struct(**ordered_sample_qc))
+
+
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
@@ -59,6 +65,7 @@ def add_background(
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
+            metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if populations_to_filter:
                 logging.info(f'Filtering background samples by {populations_to_filter}')
