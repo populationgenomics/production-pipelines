@@ -322,7 +322,7 @@ class GeneratePanelData(DatasetStage):
 
         expected_out = self.expected_outputs(dataset)
 
-        hpo_file = get_batch().read_input(config_retrieve(['workflow', 'obo_file']))
+        hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
         job.command(f'GeneratePanelData -i {local_ped} ' f'--hpo {hpo_file} ' f'--out {job.output}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
