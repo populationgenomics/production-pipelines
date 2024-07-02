@@ -17,7 +17,7 @@ def bam_to_cram(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
-    reference_path: Path | None = None,
+    reference_fasta_path: Path | None = None,
 ) -> tuple[Job, ResourceGroup]:
     """
     Convert a BAM file to a CRAM file.
@@ -35,13 +35,9 @@ def bam_to_cram(
     j.image(image_path('samtools'))
 
     # Get fasta file
-    fasta_path = reference_path
-    if not fasta_path:
-        fasta_path = config_retrieve(['references', 'star', 'fasta'])
-
     fasta = b.read_input_group(
-        fasta=fasta_path,
-        fasta_fai=f'{fasta_path}.fai',
+        fasta=reference_fasta_path,
+        fasta_fai=f'{reference_fasta_path}.fai',
     )
 
     # Set resource requirements
