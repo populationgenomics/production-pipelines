@@ -72,10 +72,5 @@ pm5 = 'ACMG PM5 - missense in same residue as known pathogenic'
 support = 'High in Silico Scores'
 sv1 = 'Predicted LOF SV'
 
-# per-cohort section
-#clinvar_filter = when running a clinvar re-summary, remove submissions by these sites. Default = no removal
-#cohort_panels = any panel IDs to be applied to this cohort, even if not otherwise phenotype-matched
-#gene_prior = if a specific gene list is to be used to determine Cat 2 (new gene-disease associations), provide the filepath here
-
-# this content is not stored in this repository due to data protection concerns.
+# cohort specific parts of the config are not stored in this repository due to data protection concerns.
 # Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration
