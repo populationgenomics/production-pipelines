@@ -191,7 +191,7 @@ def align(
             alignment_input=alignment_input,
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
-            extract_picard=True,
+            extract_picard=get_config()['workflow'].get(['extract_picard'], False),
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
@@ -268,6 +268,7 @@ def align(
 
     md_j = finalise_alignment(
         b=b,
+        sequencing_group=sequencing_group,
         align_cmd=align_cmd,
         stdout_is_sorted=stdout_is_sorted,
         j=merge_or_align_j,
@@ -523,6 +524,7 @@ def sort_cmd(requested_nthreads: int) -> str:
 
 def finalise_alignment(
     b: hb.Batch,
+    sequencing_group: SequencingGroup,
     align_cmd: str,
     stdout_is_sorted: bool,
     j: Job,
@@ -559,6 +561,15 @@ def finalise_alignment(
     )
 
     if output_path:
+        extract_picard = get_config()['workflow'].get('extract_picard', False)
+        if extract_picard:
+            output_path = CramPath(
+                Path(f'gs//cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}.cram'),
+            )
+        else:
+            output_path = CramPath(
+                Path(f'gs//cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}.cram'),
+            )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
             if out_markdup_metrics_path:
