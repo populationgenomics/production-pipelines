@@ -16,7 +16,7 @@ from cpg_utils.config import ConfigError, config_retrieve, image_path, reference
 from cpg_utils.cromwell import CromwellOutputType, run_cromwell_workflow_from_repo_and_get_outputs
 from cpg_utils.hail_batch import command, get_batch
 from cpg_workflows.batch import make_job_name
-from cpg_workflows.workflow import Cohort, Dataset
+from cpg_workflows.workflow import Cohort, Dataset, MultiCohort
 
 GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
 SV_CALLERS = ['manta', 'wham', 'scramble']
@@ -62,13 +62,6 @@ def create_polling_intervals() -> dict:
         if val := config_retrieve(['cromwell_polling_intervals', job_size.value], False):
             polling_interval_dict[job_size].update(val)
     return polling_interval_dict
-
-
-def _sv_batch_meta(output_path: str) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-batch-calls'}
 
 
 def _sv_individual_meta(output_path: str) -> dict[str, Any]:
@@ -279,7 +272,7 @@ def clean_ped_family_ids(ped_line: str) -> str:
     return '\t'.join(split_line) + '\n'
 
 
-def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
+def make_combined_ped(cohort: Cohort | MultiCohort, prefix: Path) -> Path:
     """
     Create cohort + ref panel PED.
     Concatenating all samples across all datasets with ref panel
