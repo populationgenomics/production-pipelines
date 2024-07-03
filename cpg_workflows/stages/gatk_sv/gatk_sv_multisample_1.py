@@ -534,6 +534,11 @@ class GenotypeBatch(CohortStage):
         filterbatch_d = inputs.as_dict(cohort, FilterBatch)
         batchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
 
+        # workaround for mypy - cohort.multicohort is MultiCohort | None, and we require not-None for the inputs call
+        this_multicohort = cohort.multicohort
+        assert this_multicohort is not None, f'Multicohort cannot be None'
+        mergebatch_d = inputs.as_dict(this_multicohort, MergeBatchSites)
+
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
             'n_per_split': 5000,
@@ -548,13 +553,11 @@ class GenotypeBatch(CohortStage):
             'rf_cutoffs': filterbatch_d['cutoffs'],
             'ref_dict': str(get_fasta().with_suffix('.dict')),
             'reference_build': 'hg38',
+            'batch_depth_vcf': filterbatch_d['filtered_depth_vcf'],
+            'batch_pesr_vcf': filterbatch_d['filtered_pesr_vcf'],
+            'cohort_depth_vcf': mergebatch_d['cohort_depth_vcf'],
+            'cohort_pesr_vcf': mergebatch_d['cohort_pesr_vcf'],
         }
-
-        # pull out the merged VCF from MergeBatchSites
-        # todo pull from previous stage, not config
-        for mode in ['pesr', 'depth']:
-            input_dict[f'batch_{mode}_vcf'] = filterbatch_d[f'filtered_{mode}_vcf']
-            input_dict[f'cohort_{mode}_vcf'] = config_retrieve(['workflow', f'cohort_{mode}_vcf'])
 
         input_dict |= get_images(
             [
