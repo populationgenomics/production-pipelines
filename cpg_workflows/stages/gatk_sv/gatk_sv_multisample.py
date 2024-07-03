@@ -1145,9 +1145,7 @@ class SpiceUpSVIDs(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        input_vcf = get_batch().read_input(
-            str(inputs.as_path(target=multicohort, stage=AnnotateVcfWithStrvctvre, key='strvctvre_vcf')),
-        )
+        input_vcf = get_batch().read_input(str(inputs.as_path(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')))
         expected_output = self.expected_outputs(multicohort)
 
         # update the IDs using a PythonJob
@@ -1176,11 +1174,7 @@ class SpiceUpSVIDs(MultiCohortStage):
 @stage(required_stages=SpiceUpSVIDs)
 class AnnotateCohortSv(MultiCohortStage):
     """
-    What do we want?! SV Data in Seqr!
-    When do we want it?! Now!
-
     First step to transform annotated SV callset data into a seqr ready format
-    Rearrange all the annotations
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
@@ -1236,11 +1230,7 @@ class AnnotateDatasetSv(DatasetStage):
         assert dataset.cohort
         assert dataset.cohort.multicohort
         mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
-        exclusion_file = inputs.as_path(
-            target=dataset.cohort.multicohort,
-            stage=CombineExclusionLists,
-            key='exclusion_list',
-        )
+        exclusion_file = inputs.as_path(dataset.cohort.multicohort, stage=CombineExclusionLists, key='exclusion_list')
 
         outputs = self.expected_outputs(dataset)
 
