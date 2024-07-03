@@ -1153,7 +1153,12 @@ class SpiceUpSVIDs(MultiCohortStage):
         # update the IDs using a PythonJob
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
-        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, bool(query_for_spicy_vcf(cohort.analysis_dataset.name)))
+        pyjob.call(
+            rename_sv_ids,
+            input_vcf,
+            pyjob.output,
+            bool(query_for_spicy_vcf(multicohort.analysis_dataset.name)),
+        )
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
@@ -1228,12 +1233,13 @@ class AnnotateDatasetSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
+        assert dataset.cohort
         assert dataset.cohort.multicohort
         mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
         exclusion_file = inputs.as_path(
             target=dataset.cohort.multicohort,
             stage=CombineExclusionLists,
-            key='exclusion_list'
+            key='exclusion_list',
         )
 
         outputs = self.expected_outputs(dataset)
