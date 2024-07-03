@@ -229,7 +229,7 @@ class MakeRuntimeConfig(DatasetStage):
             'GeneratePanelData': config_retrieve(['GeneratePanelData']),
             'RunHailFiltering': config_retrieve(['RunHailFiltering']),
             'ValidateMOI': config_retrieve(['ValidateMOI']),
-            'CreateTalosHTML': {}
+            'CreateTalosHTML': {},
         }
 
         # pull the content relevant to this cohort + sequencing type (mandatory in CPG)
@@ -326,7 +326,7 @@ class GeneratePanelData(DatasetStage):
             f'TALOS_CONFIG={conf_in_batch} GeneratePanelData '
             f'-i {local_ped} '
             f'--hpo {hpo_file} '
-            f'--out {job.output}'
+            f'--out {job.output}',
         )
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
@@ -354,7 +354,8 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(
             f'TALOS_CONFIG={conf_in_batch} QueryPanelapp '
-            f'--panels {get_batch().read_input(str(hpo_panel_json))} --out_path {job.output}'
+            f'--panels {get_batch().read_input(str(hpo_panel_json))} '
+            f'--out_path {job.output}',
         )
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
@@ -482,7 +483,14 @@ class RunHailFilteringSV(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, GeneratePanelData, QueryPanelapp, RunHailFiltering, RunHailFilteringSV, MakeRuntimeConfig],
+    required_stages=[
+        GeneratePED,
+        GeneratePanelData,
+        QueryPanelapp,
+        RunHailFiltering,
+        RunHailFilteringSV,
+        MakeRuntimeConfig,
+    ],
     analysis_type='aip-results',  # note - legacy analysis type
     analysis_keys=['summary_json'],
 )
