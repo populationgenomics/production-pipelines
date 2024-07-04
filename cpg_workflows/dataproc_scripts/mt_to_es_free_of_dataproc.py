@@ -10,6 +10,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import init_batch
 
 
 # make encoded values as human-readable as possible
@@ -118,7 +119,7 @@ class ElasticsearchClient:
         # check connection
         logging.info(self.es.info())
 
-    def create_or_update_mapping(self, index_name, elasticsearch_schema, num_shards=1, _meta=None, create_only=False):
+    def create_mapping(self, index_name, elasticsearch_schema, num_shards=1, _meta=None):
         """Calls es.indices.create or es.indices.put_mapping to create or update an elasticsearch index mapping.
 
         Args:
@@ -127,12 +128,9 @@ class ElasticsearchClient:
             num_shards (int): how many shards the index will contain
             _meta (dict): optional _meta info for this index
                 (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-meta-field.html)
-            create_only (bool): only allow index creation, throws an error if index already exists
         """
 
-        index_mapping = {
-            'properties': elasticsearch_schema,
-        }
+        index_mapping = {'properties': elasticsearch_schema}
 
         if _meta:
             logging.info(f'==> index _meta: {_meta}')
@@ -154,13 +152,6 @@ class ElasticsearchClient:
             logging.info('==> creating elasticsearch index {}'.format(index_name))
 
             self.es.indices.create(index=index_name, body=body)
-        else:
-            if create_only:
-                raise ValueError('Index {} already exists'.format(index_name))
-
-            logging.info(f'==> updating elasticsearch index {index_name}. New schema:\n{elasticsearch_schema}')
-
-            self.es.indices.put_mapping(index=index_name, body=index_mapping)
 
     def export_table_to_elasticsearch(self, table, **kwargs):
         """Override to adjust for ES V7."""
@@ -212,7 +203,7 @@ class ElasticsearchClient:
 
         _meta = struct_to_dict(hl.eval(table.globals))
 
-        self.create_or_update_mapping(index_name, elasticsearch_schema, num_shards=kwargs['num_shards'], _meta=_meta)
+        self.create_mapping(index_name, elasticsearch_schema, num_shards=kwargs['num_shards'], _meta=_meta)
 
         hl.export_elasticsearch(
             table, self._host, int(self._port), index_name, '', 5000, es_config
@@ -226,6 +217,9 @@ def main(password: str, mt_path: str, es_index: str, done_path: str):
     port = config_retrieve(['elasticsearch', 'port'])
     username = config_retrieve(['elasticsearch', 'username'])
     print(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
+
+    # start a hail batch - this was hl.init('GRCh38') in Dataproc, but we won't have the related data networked as-local
+    init_batch()
 
     mt = hl.read_matrix_table(mt_path)
 
