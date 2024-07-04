@@ -9,7 +9,7 @@ from cpg_utils import Path, dataproc, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import get_config, image_path
 from cpg_utils.hail_batch import query_command
-from src.cpg_workflows.jobs.seqr_loader import (
+from cpg_workflows.jobs.seqr_loader import (
     annotate_dataset_jobs,
     cohort_to_vcf_job,
 )

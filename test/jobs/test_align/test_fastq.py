@@ -4,7 +4,6 @@ alignment input.
 """
 
 import re
-from calendar import c
 from pathlib import Path
 from typing import Optional
 
@@ -12,8 +11,7 @@ import pytest
 from pytest_mock import MockFixture
 
 from cpg_utils.config import ConfigError
-from cpg_workflows.filetypes import CramPath
-from src.cpg_workflows.jobs.align import (
+from cpg_workflows.jobs.align import (
     Aligner,
     MarkDupTool,
     MissingAlignmentInputException,

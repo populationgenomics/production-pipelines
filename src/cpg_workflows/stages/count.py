@@ -4,12 +4,9 @@ Count RNA seq reads mapping to genes and/or transcripts using featureCounts.
 
 from cpg_utils import Path
 from cpg_workflows import get_batch
-from cpg_workflows.filetypes import (
-    BamPath,
-    CramPath,
-)
+from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import count
-from src.cpg_workflows.stages.trim_align import TrimAlignRNA
+from cpg_workflows.stages.trim_align import TrimAlignRNA
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -19,9 +16,7 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(
-    required_stages=TrimAlignRNA,
-)
+@stage(required_stages=TrimAlignRNA)
 class Count(SequencingGroupStage):
     """
     Count reads with featureCounts.
