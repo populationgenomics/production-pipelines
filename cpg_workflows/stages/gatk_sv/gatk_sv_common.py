@@ -207,9 +207,9 @@ def add_gatk_sv_jobs(
         out_path = expected_out_dict[key]
         if isinstance(resource, list):
             for source, dest in zip(resource, out_path):
-                cmds.append(f'gsutil cp "$(cat {source})" "{dest}"')
+                cmds.append(f'gcloud storage cp "$(cat {source})" "{dest}"')
         else:
-            cmds.append(f'gsutil cp "$(cat {resource})" "{out_path}"')
+            cmds.append(f'gcloud storage cp "$(cat {resource})" "{out_path}"')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
 
