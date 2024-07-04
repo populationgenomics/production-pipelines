@@ -15,6 +15,7 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     j = b.new_job('subset_tob_cram')
     j.image(image_path('samtools'))
     j.cpu(2)
+    j.storage(150)
     j.memory('standard')
     input_cram = b.read_input(input_cram_path)
     ref_path = b.read_input(
