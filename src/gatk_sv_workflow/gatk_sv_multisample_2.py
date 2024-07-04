@@ -14,9 +14,9 @@ from cpg_utils import Path, dataproc, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
-from cpg_workflows.jobs.gatk_sv import rename_sv_ids
+from gatk_sv_workflow.gatk_sv_jobs import rename_sv_ids
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+from gatk_sv_workflow.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
     add_gatk_sv_jobs,

@@ -11,7 +11,7 @@ import logging
 import pandas as pd
 
 from cpg_utils import to_path
-from cpg_utils.config import dataset_path, get_config, output_path
+from cpg_utils.config import dataset_path, get_config
 from cpg_workflows import get_batch, get_multicohort
 
 # benchmark matrix:
@@ -37,8 +37,8 @@ def main():
             out_vds_path = out_prefix / label / 'combined.vds'
             sequencing_group_ids = get_multicohort().get_sequencing_group_ids()[:n_sequencing_groups]
 
-            from cpg_workflows.large_cohort.combiner import run
-            from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+            from src.cpg_workflows.large_cohort import run
+            from src.cpg_workflows.large_cohort import dataproc_job
 
             dataproc_job(
                 job_name=f'Combine {n_sequencing_groups} GVCFs on {n_workers} workers',

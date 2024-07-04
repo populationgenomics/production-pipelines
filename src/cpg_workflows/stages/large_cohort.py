@@ -29,7 +29,7 @@ class Combiner(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
-        from cpg_workflows.large_cohort import combiner
+        from src.cpg_workflows.large_cohort import combiner
 
         j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
@@ -72,7 +72,7 @@ class SampleQC(CohortStage):
         return sample_qc_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import sample_qc
+        from src.cpg_workflows.large_cohort import sample_qc
 
         j = get_batch().new_job(
             'Sample QC',
@@ -105,7 +105,7 @@ class DenseSubset(CohortStage):
         return dense_subset_path
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import dense_subset
+        from src.cpg_workflows.large_cohort import dense_subset
 
         j = get_batch().new_job(
             'Dense Subset',
@@ -145,8 +145,8 @@ class Relatedness(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.relatedness import run
+        from src.cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from src.cpg_workflows.large_cohort import run
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -175,8 +175,8 @@ class Ancestry(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.ancestry_pca import run
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from src.cpg_workflows.large_cohort import run
+        from src.cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -227,8 +227,8 @@ class AncestryPlots(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.ancestry_plots import run
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from src.cpg_workflows.large_cohort import run
+        from src.cpg_workflows.large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,
@@ -264,7 +264,7 @@ class MakeSiteOnlyVcf(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import site_only_vcf
+        from src.cpg_workflows.large_cohort import site_only_vcf
 
         j = get_batch().new_job(
             'MakeSiteOnlyVcf',
@@ -319,7 +319,7 @@ class LoadVqsr(CohortStage):
         return get_workflow().prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import load_vqsr
+        from src.cpg_workflows.large_cohort import load_vqsr
 
         j = get_batch().new_job(
             'LoadVqsr',
@@ -346,7 +346,7 @@ class Frequencies(CohortStage):
         return get_workflow().prefix / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import frequencies
+        from src.cpg_workflows.large_cohort import frequencies
 
         j = get_batch().new_job(
             'Frequencies',

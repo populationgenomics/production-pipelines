@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from cpg_workflows.jobs.gatk_sv import rename_sv_ids
+from gatk_sv_workflow.gatk_sv_jobs import rename_sv_ids
 
 
 def write_zippy_bits(tmp_path: Path, lines: list[str], header: list[str] | None = None) -> Path:

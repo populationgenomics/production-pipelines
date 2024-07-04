@@ -9,7 +9,7 @@ from cpg_workflows.filetypes import (
     CramPath,
 )
 from cpg_workflows.jobs import fraser
-from cpg_workflows.stages.trim_align import TrimAlignRNA
+from src.cpg_workflows.stages.trim_align import TrimAlignRNA
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,

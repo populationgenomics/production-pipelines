@@ -15,7 +15,7 @@ from cpg_utils.hail_batch import get_batch
 @click.command()
 def main(vds_path, sample_id_file_path):
     from cpg_workflows.dataproc_scripts.pca_runner import pca_runner
-    from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+    from src.cpg_workflows.large_cohort import dataproc_job
 
     dataproc_job(
         function=pca_runner,

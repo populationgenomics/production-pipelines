@@ -10,7 +10,7 @@ import pytest
 from pytest_mock import MockFixture
 
 from cpg_workflows.filetypes import BamPath, CramPath
-from cpg_workflows.jobs.align import (
+from src.cpg_workflows.jobs.align import (
     Aligner,
     MarkDupTool,
     MissingAlignmentInputException,

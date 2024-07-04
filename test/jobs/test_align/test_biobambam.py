@@ -11,7 +11,7 @@ import pytest
 from pytest_mock import MockFixture
 
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.jobs.align import MarkDupTool, align
+from src.cpg_workflows.jobs.align import MarkDupTool, align
 
 from ...factories.config import PipelineConfig
 from ..helpers import get_command_str

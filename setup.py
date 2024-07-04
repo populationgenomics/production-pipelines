@@ -11,7 +11,8 @@ setup(
     long_description_content_type='text/markdown',
     url='https://github.com/populationgenomics/production-pipelines',
     license='MIT',
-    packages=find_packages(),
+    packages=find_packages('src'),
+    package_dir={'': 'src'},
     install_requires=[
         'cpg-utils>=5.0.4',
         'cyvcf2==0.30.18',

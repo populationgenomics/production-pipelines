@@ -8,7 +8,6 @@ import cpg_utils.config
 import cpg_workflows.batch
 import cpg_workflows.inputs
 import cpg_workflows.metamist
-import cpg_workflows.stages.gatk_sv
 import cpg_workflows.workflow
 
 
