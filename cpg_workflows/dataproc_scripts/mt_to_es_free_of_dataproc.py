@@ -1,0 +1,302 @@
+import logging
+import math
+from argparse import ArgumentParser
+from io import StringIO
+from sys import exit
+
+import elasticsearch
+import hail as hl
+
+from cpg_utils import to_path
+from cpg_utils.cloud import read_secret
+from cpg_utils.config import config_retrieve
+
+
+# make encoded values as human-readable as possible
+ES_FIELD_NAME_ESCAPE_CHAR = '$'
+ES_FIELD_NAME_BAD_LEADING_CHARS = {'_', '-', '+', ES_FIELD_NAME_ESCAPE_CHAR}
+ES_FIELD_NAME_SPECIAL_CHAR_MAP = {
+    '.': '_$dot$_',
+    ',': '_$comma$_',
+    '#': '_$hash$_',
+    '*': '_$star$_',
+    '(': '_$lp$_',
+    ')': '_$rp$_',
+    '[': '_$lsb$_',
+    ']': '_$rsb$_',
+    '{': '_$lcb$_',
+    '}': '_$rcb$_',
+}
+
+HAIL_TYPE_TO_ES_TYPE_MAPPING = {
+    hl.tint: "integer",
+    hl.tint32: "integer",
+    hl.tint64: "long",
+    hl.tfloat: "double",
+    hl.tfloat32: "float",
+    hl.tfloat64: "double",
+    hl.tstr: "keyword",
+    hl.tbool: "boolean",
+}
+
+
+# https://hail.is/docs/devel/types.html
+# https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
+def _elasticsearch_mapping_for_type(dtype):
+    if isinstance(dtype, hl.tstruct):
+        return {"properties": {field: _elasticsearch_mapping_for_type(dtype[field]) for field in dtype.fields}}
+    if isinstance(dtype, (hl.tarray, hl.tset)):
+        element_mapping = _elasticsearch_mapping_for_type(dtype.element_type)
+        if isinstance(dtype.element_type, hl.tstruct):
+            element_mapping["type"] = "nested"
+        return element_mapping
+    if isinstance(dtype, hl.tlocus):
+        return {"type": "object", "properties": {"contig": {"type": "keyword"}, "position": {"type": "integer"}}}
+    if dtype in HAIL_TYPE_TO_ES_TYPE_MAPPING:
+        return {"type": HAIL_TYPE_TO_ES_TYPE_MAPPING[dtype]}
+
+    # tdict, ttuple, tlocus, tinterval, tcall
+    raise NotImplementedError
+
+
+def encode_field_name(s):
+    """Encodes arbitrary string into an elasticsearch field name
+
+    See:
+    https://discuss.elastic.co/t/special-characters-in-field-names/10658/2
+    https://discuss.elastic.co/t/illegal-characters-in-elasticsearch-field-names/17196/2
+    """
+    field_name = StringIO()
+    for i, c in enumerate(s):
+        if c == ES_FIELD_NAME_ESCAPE_CHAR:
+            field_name.write(2*ES_FIELD_NAME_ESCAPE_CHAR)
+        elif c in ES_FIELD_NAME_SPECIAL_CHAR_MAP:
+            field_name.write(ES_FIELD_NAME_SPECIAL_CHAR_MAP[c])  # encode the char
+        else:
+            field_name.write(c)  # write out the char as is
+
+    field_name = field_name.getvalue()
+
+    # escape 1st char if necessary
+    if any(field_name.startswith(c) for c in ES_FIELD_NAME_BAD_LEADING_CHARS):
+        return ES_FIELD_NAME_ESCAPE_CHAR + field_name
+    else:
+        return field_name
+
+
+def struct_to_dict(struct):
+    return {k: dict(struct_to_dict(v)) if isinstance(v, hl.utils.Struct) else v for k, v in struct.items()}
+
+
+class ElasticsearchClient:
+    """
+    The Broad's seqr-loading-pipelines pins the Elasticsearch client to v7. We use v8,
+    so we are overriding the class to adjust for Elasticsearch v8.
+    """
+
+    # noinspection PyMissingConstructor
+    def __init__(self, host: str, port: str, es_username: str, es_password: str):
+        """
+        Overriding base __init__: the difference with v7 is that in v8,
+        elasticsearch.Elasticsearch constructor takes one URL string, in contrast
+        with v7 which takes "host" and "port" strings separately. Note that we are
+        not calling the base init, which would fail on v8. Instead, we are completely
+        overriding init.
+        """
+        self._host = host
+        self._port = port
+        self._es_username = es_username
+        self._es_password = es_password
+
+        auth = (self._es_username, self._es_password) if self._es_password else None
+
+        if not host.startswith('http://') or not host.startswith('https://'):
+            host = f'https://{host}'
+        _host = f'{host}:{port}'
+        self.es = elasticsearch.Elasticsearch(_host, basic_auth=auth)
+
+        # check connection
+        logging.info(self.es.info())
+
+    def create_or_update_mapping(self, index_name, elasticsearch_schema, num_shards=1, _meta=None, create_only=False):
+        """Calls es.indices.create or es.indices.put_mapping to create or update an elasticsearch index mapping.
+
+        Args:
+            index_name (str): elasticsearch index mapping
+            elasticsearch_schema (dict): elasticsearch mapping "properties" dictionary
+            num_shards (int): how many shards the index will contain
+            _meta (dict): optional _meta info for this index
+                (see https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-meta-field.html)
+            create_only (bool): only allow index creation, throws an error if index already exists
+        """
+
+        index_mapping = {
+            'properties': elasticsearch_schema,
+        }
+
+        if _meta:
+            logging.info(f'==> index _meta: {_meta}')
+            index_mapping['_meta'] = _meta
+
+        if not self.es.indices.exists(index=index_name):
+            body = {
+                'mappings': index_mapping,
+                'settings': {
+                    'number_of_shards': num_shards,
+                    'number_of_replicas': 0,
+                    'index.mapping.total_fields.limit': 10000,
+                    'index.refresh_interval': -1,
+                    'index.codec': 'best_compression',  # halves disk usage, no difference in query times
+                }
+            }
+
+            logging.info(f'create_mapping - elasticsearch schema: \n{elasticsearch_schema}')
+            logging.info('==> creating elasticsearch index {}'.format(index_name))
+
+            self.es.indices.create(index=index_name, body=body)
+        else:
+            if create_only:
+                raise ValueError('Index {} already exists'.format(index_name))
+
+            logging.info(f'==> updating elasticsearch index {index_name}. New schema:\n{elasticsearch_schema}')
+
+            self.es.indices.put_mapping(index=index_name, body=index_mapping)
+
+    def export_table_to_elasticsearch(self, table, **kwargs):
+        """Override to adjust for ES V7."""
+
+        # Copied from older hail_scripts/v02/utils/elasticsearch_client.py:
+        # https://github.com/populationgenomics/hail-elasticsearch-pipelines/blob/main/hail_scripts/v02/utils/elasticsearch_client.py#L128-L133
+        # that's before elasticsearch in upstream seqr-loading-pipelines was pinned to v7.
+        # Without this config, ES API errors with the following:
+        # > Cannot detect ES version - typically this happens if the network/Elasticsearch
+        # cluster is not accessible or when targeting a WAN/Cloud instance without the
+        # proper setting 'es.nodes.wan.only'
+        es_config = kwargs.get('elasticsearch_config', {})
+        es_config.update(
+            {
+                'es.net.ssl': 'true',
+                'es.nodes.wan.only': 'true',
+                'es.net.http.auth.user': self._es_username,
+                'es.net.http.auth.pass': self._es_password,
+            }
+        )
+        es_config['es.write.operation'] = 'index'
+        # encode any special chars in column names
+        rename_dict = {}
+        for field_name in table.row_value.dtype.fields:
+            encoded_name = field_name
+
+            # optionally replace . with _ in a non-reversible way
+            encoded_name = encoded_name.replace(".", '_')
+
+            # replace all other special chars with an encoding that's uglier, but reversible
+            encoded_name = encode_field_name(encoded_name)
+
+            if encoded_name != field_name:
+                rename_dict[field_name] = encoded_name
+
+        for original_name, encoded_name in rename_dict.items():
+            logging.info(f'Encoding column name {original_name} to {encoded_name}')
+
+        table = table.rename(rename_dict)
+
+        # create elasticsearch index with fields that match the ones in the table
+        elasticsearch_schema = _elasticsearch_mapping_for_type(table.key_by().row_value.dtype)["properties"]
+
+        index_name = kwargs['index_name']
+        assert index_name
+
+        if self.es.indices.exists(index=index_name):
+            self.es.indices.delete(index=index_name)
+
+        _meta = struct_to_dict(hl.eval(table.globals))
+
+        self.create_or_update_mapping(index_name, elasticsearch_schema, num_shards=kwargs['num_shards'], _meta=_meta)
+
+        hl.export_elasticsearch(
+            table, self._host, int(self._port), index_name, '', 5000, es_config
+        )
+        self.es.indices.forcemerge(index=index_name, request_timeout=60)
+
+
+def main(password: str, mt_path: str, es_index: str, done_path: str):
+
+    host = config_retrieve(['elasticsearch', 'host'])
+    port = config_retrieve(['elasticsearch', 'port'])
+    username = config_retrieve(['elasticsearch', 'username'])
+    print(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
+
+    mt = hl.read_matrix_table(mt_path)
+
+    logging.info('Getting rows and exporting to the ES')
+    # get the rows, flattened, stripped of key and VEP annotations
+    row_ht = elasticsearch_row(mt)
+
+    es_shards = _mt_num_shards(mt)
+
+    es = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
+    es.export_table_to_elasticsearch(row_ht, index_name=es_index, num_shards=es_shards, write_null_values=True)
+
+    _cleanup(es, es_index, es_shards)
+    with to_path(done_path).open('w') as f:
+        f.write('done')
+
+
+def elasticsearch_row(mt: hl.MatrixTable):
+    """
+    Prepares the mt for export.
+    - Flattens nested structs
+    - drops locus and alleles key
+    Borrowed from:
+    https://github.com/broadinstitute/hail-elasticsearch-pipelines/blob/main/luigi_pipeline/lib/model/seqr_mt_schema.py
+    """
+    # Converts a mt to the row equivalent.
+    table = mt.rows()
+    if 'vep' in table.row:
+        table = mt.drop('vep')
+    key = table.key
+    # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
+    flat_table = table.flatten()
+    # When flattening, the table is unkeyed, which causes problems because our row keys should not
+    # be normal fields. We can also re-key, but I believe this is computational?
+    # PS: row key is often locus and allele, but does not have to be
+    flat_table = flat_table.drop(*key)
+    flat_table.describe()
+    return flat_table
+
+
+def _mt_num_shards(mt):
+    """
+    Calculate the number of shards from the number of variants and sequencing groups.
+    """
+    denominator = 1.4 * 10**9
+    calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
+    return calculated_num_shards
+
+
+def _cleanup(es, es_index, es_shards):
+    # Current disk configuration requires the previous index to be deleted prior to large indices, ~1TB, transferring off loading nodes
+    if es_shards < 25:
+        es.wait_for_shard_transfer(es_index)
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Argument Parser for the ES generation script')
+    parser.add_argument('--mt_path', help='MT path name', required=True)
+    parser.add_argument('--index', help='ES index name', required=True)
+    parser.add_argument('--flag', help='ES index "DONE" file path')
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+
+    es_password: str | None = read_secret(
+        project_id=config_retrieve(['elasticsearch', 'password_project_id'], ''),
+        secret_name=config_retrieve(['elasticsearch', 'password_secret_id'], ''),
+    )
+
+    # no password, but we fail gracefully
+    if es_password is None:
+        logging.warning(f'No permission to access ES password, skipping creation of {args.index}')
+        exit(0)
+
+    main(password=es_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag)
