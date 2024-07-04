@@ -1,0 +1,28 @@
+import click
+
+from cpg_utils.hail_batch import get_batch, get_config
+
+
+@click.command()
+@click.option('--input_cram_path', required=True, type=str)
+@click.option('--output_cram_path', required=True, type=str)
+@click.option('--chr_num', required=True, type=int)
+def main(input_cram_path: str, output_cram_path: str, chr_num: int):
+    """
+    Subset a CRAM file to a single chromosome.
+    """
+    b = get_batch('subset_tob_cram')
+    j = b.new_job('subset_tob_cram')
+    j.image('samtools')
+    j.memory('high_mem')
+    input_cram = b.read_input(input_cram_path)
+    ref_path = b.read_input(
+        'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta',
+    )
+
+    subset_cmd = f"""
+    samtools view -T {ref_path} -C -o {j.output_cram} {input_cram} chr{chr_num}
+    """
+    j.command(subset_cmd)
+    b.write_output(j.output_cram, output_cram_path)
+    b.run(wait=False)
