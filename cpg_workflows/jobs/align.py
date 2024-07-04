@@ -87,7 +87,11 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
                 path,
                 reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
             )
-
+    if get_config()['workflow'].get('realign_from_cram', False):
+        logging.info('Realigning from CRAM')
+        if (cram := sequencing_group.make_cram_path()).exists():
+            logging.info(f'Realigning from CRAM {cram}')
+            alignment_input = cram
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
