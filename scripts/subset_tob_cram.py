@@ -1,6 +1,6 @@
 import click
 
-from cpg_utils.hail_batch import get_batch, get_config
+from cpg_utils.hail_batch import Batch, command, get_batch, get_config, image_path
 
 
 @click.command()
@@ -13,7 +13,7 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     """
     b = get_batch('subset_tob_cram')
     j = b.new_job('subset_tob_cram')
-    j.image('samtools')
+    j.image(image_path('samtools'))
     j.memory('high_mem')
     input_cram = b.read_input(input_cram_path)
     ref_path = b.read_input(
@@ -23,6 +23,6 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     subset_cmd = f"""
     samtools view -T {ref_path} -C -o {j.output_cram} {input_cram} {chr}
     """
-    j.command(subset_cmd)
+    j.command(command(subset_cmd))
     b.write_output(j.output_cram, output_cram_path)
     b.run(wait=False)
