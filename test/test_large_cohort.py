@@ -12,15 +12,12 @@ from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
 from cpg_utils.hail_batch import start_query_context
 from cpg_workflows.filetypes import GvcfPath
-from src.cpg_workflows.large_cohort import (
-    ancestry_pca,
+from large_cohort import (
     ancestry_plots,
     combiner,
-    dense_subset,
     relatedness,
-    sample_qc,
-    site_only_vcf,
 )
+from large_cohort import ancestry_pca, sample_qc, dense_subset, site_only_vcf
 from cpg_workflows.targets import Cohort
 
 from . import set_config

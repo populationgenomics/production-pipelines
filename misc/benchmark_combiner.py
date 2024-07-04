@@ -37,8 +37,8 @@ def main():
             out_vds_path = out_prefix / label / 'combined.vds'
             sequencing_group_ids = get_multicohort().get_sequencing_group_ids()[:n_sequencing_groups]
 
-            from src.cpg_workflows.large_cohort import run
-            from src.cpg_workflows.large_cohort import dataproc_job
+            from large_cohort import run
+            from large_cohort import dataproc_job
 
             dataproc_job(
                 job_name=f'Combine {n_sequencing_groups} GVCFs on {n_workers} workers',
