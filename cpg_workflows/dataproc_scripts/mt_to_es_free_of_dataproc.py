@@ -61,7 +61,8 @@ def _elasticsearch_mapping_for_type(dtype):
 
 
 def encode_field_name(s):
-    """Encodes arbitrary string into an elasticsearch field name
+    """
+    Encodes arbitrary string into an elasticsearch field name
 
     See:
     https://discuss.elastic.co/t/special-characters-in-field-names/10658/2
@@ -90,19 +91,11 @@ def struct_to_dict(struct):
 
 
 class ElasticsearchClient:
-    """
-    The Broad's seqr-loading-pipelines pins the Elasticsearch client to v7. We use v8,
-    so we are overriding the class to adjust for Elasticsearch v8.
-    """
 
-    # noinspection PyMissingConstructor
     def __init__(self, host: str, port: str, es_username: str, es_password: str):
         """
-        Overriding base __init__: the difference with v7 is that in v8,
-        elasticsearch.Elasticsearch constructor takes one URL string, in contrast
-        with v7 which takes "host" and "port" strings separately. Note that we are
-        not calling the base init, which would fail on v8. Instead, we are completely
-        overriding init.
+        This is a complete stripping of the ES Client in Hail Batch, which is thin-ish wrapper around a pile of
+        hail methods
         """
         self._host = host
         self._port = port
@@ -154,15 +147,6 @@ class ElasticsearchClient:
             self.es.indices.create(index=index_name, body=body)
 
     def export_table_to_elasticsearch(self, table, **kwargs):
-        """Override to adjust for ES V7."""
-
-        # Copied from older hail_scripts/v02/utils/elasticsearch_client.py:
-        # https://github.com/populationgenomics/hail-elasticsearch-pipelines/blob/main/hail_scripts/v02/utils/elasticsearch_client.py#L128-L133
-        # that's before elasticsearch in upstream seqr-loading-pipelines was pinned to v7.
-        # Without this config, ES API errors with the following:
-        # > Cannot detect ES version - typically this happens if the network/Elasticsearch
-        # cluster is not accessible or when targeting a WAN/Cloud instance without the
-        # proper setting 'es.nodes.wan.only'
         es_config = kwargs.get('elasticsearch_config', {})
         es_config.update(
             {
@@ -270,7 +254,8 @@ def _mt_num_shards(mt):
 
 
 def _cleanup(es, es_index, es_shards):
-    # Current disk configuration requires the previous index to be deleted prior to large indices, ~1TB, transferring off loading nodes
+    # Current disk configuration requires the previous index to be deleted prior to large indices,
+    # ~1TB, transferring off loading nodes
     if es_shards < 25:
         es.wait_for_shard_transfer(es_index)
 
@@ -283,14 +268,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
 
-    es_password: str | None = read_secret(
+    elasticsearch_password: str | None = read_secret(
         project_id=config_retrieve(['elasticsearch', 'password_project_id'], ''),
         secret_name=config_retrieve(['elasticsearch', 'password_secret_id'], ''),
     )
 
     # no password, but we fail gracefully
-    if es_password is None:
+    if elasticsearch_password is None:
         logging.warning(f'No permission to access ES password, skipping creation of {args.index}')
         exit(0)
 
-    main(password=es_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag)
+    main(password=elasticsearch_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag)
