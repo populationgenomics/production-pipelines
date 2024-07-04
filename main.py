@@ -18,7 +18,7 @@ from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
 from gatk_sv_workflow.gatk_sv_multisample_1 import FilterBatch, GenotypeBatch, MergeBatchSites
 from gatk_sv_workflow.gatk_sv_multisample_2 import MtToEsSv
-from gatk_sv_workflow.gatk_sv import CreateSampleBatches
+from gatk_sv_workflow.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf, ValidationParseHappy
