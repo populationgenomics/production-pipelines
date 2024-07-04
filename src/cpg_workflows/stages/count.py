@@ -7,13 +7,7 @@ from cpg_workflows import get_batch
 from cpg_workflows.filetypes import BamPath, CramPath
 from cpg_workflows.jobs import count
 from cpg_workflows.stages.trim_align import TrimAlignRNA
-from cpg_workflows.workflow import (
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.workflow import SequencingGroup, SequencingGroupStage, StageInput, StageOutput, stage
 
 
 @stage(required_stages=TrimAlignRNA)
