@@ -8,14 +8,6 @@ from functools import cache
 from os.path import join
 from typing import Any
 
-from google.api_core.exceptions import PermissionDenied
-
-from cpg_utils import Path, dataproc, to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, try_get_ar_guid
-from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
-from cpg_workflows.jobs import ploidy_table_from_ped
-from gatk_sv_workflow.gatk_sv_jobs import rename_sv_ids
-from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from gatk_sv_workflow.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
@@ -26,6 +18,14 @@ from gatk_sv_workflow.gatk_sv_common import (
     make_combined_ped,
     queue_annotate_sv_jobs,
 )
+from gatk_sv_workflow.gatk_sv_jobs import rename_sv_ids
+from google.api_core.exceptions import PermissionDenied
+
+from cpg_utils import Path, dataproc, to_path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, try_get_ar_guid
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
+from cpg_workflows.jobs import ploidy_table_from_ped
+from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (

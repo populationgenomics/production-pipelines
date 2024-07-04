@@ -4,6 +4,7 @@ Stages that implement GATK-gCNV.
 
 import json
 
+from gatk_sv_workflow.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, dataproc, to_path
@@ -11,7 +12,6 @@ from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_pat
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
-from gatk_sv_workflow.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.utils import get_logger

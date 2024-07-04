@@ -7,18 +7,19 @@ import os
 
 import click
 import coloredlogs
+from clinvarbitration_workflow.clinvarbitration import AnnotateClinvarDecisions, PM5TableGeneration
+from gatk_sv_workflow.gatk_sv_multisample_1 import FilterBatch, GenotypeBatch, MergeBatchSites
+from gatk_sv_workflow.gatk_sv_multisample_2 import MtToEsSv
+from gatk_sv_workflow.gatk_sv_single_sample import CreateSampleBatches
+from talos.talos import CreateTalosHTML, GenerateSeqrFile, ValidateMOI
 
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from clinvarbitration_workflow.clinvarbitration import AnnotateClinvarDecisions, PM5TableGeneration
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
-from gatk_sv_workflow.gatk_sv_multisample_1 import FilterBatch, GenotypeBatch, MergeBatchSites
-from gatk_sv_workflow.gatk_sv_multisample_2 import MtToEsSv
-from gatk_sv_workflow.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf, ValidationParseHappy
@@ -29,7 +30,6 @@ from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import AnnotateLongReadSVs, ReFormatPacBioSVs
 from cpg_workflows.stages.stripy import Stripy
-from talos.talos import CreateTalosHTML, GenerateSeqrFile, ValidateMOI
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {

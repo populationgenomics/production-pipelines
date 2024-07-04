@@ -4,11 +4,12 @@ Workflow for finding long-read SV files, updating file contents, merging, and an
 
 from functools import cache
 
+from gatk_sv_workflow.gatk_sv_common import queue_annotate_sv_jobs
+
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import seqr_loader_long_read
-from gatk_sv_workflow.gatk_sv_common import queue_annotate_sv_jobs
 from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     Cohort,

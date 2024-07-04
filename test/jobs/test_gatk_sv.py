@@ -2,7 +2,6 @@ import gzip
 from pathlib import Path
 
 import pytest
-
 from gatk_sv_workflow.gatk_sv_jobs import rename_sv_ids
 
 

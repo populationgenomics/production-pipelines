@@ -145,8 +145,8 @@ class Relatedness(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from large_cohort.dataproc_utils import dataproc_job
         from large_cohort import run
+        from large_cohort.dataproc_utils import dataproc_job
 
         j = dataproc_job(
             job_name=self.__class__.__name__,

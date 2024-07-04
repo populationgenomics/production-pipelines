@@ -14,8 +14,9 @@ from cpg_utils.hail_batch import get_batch
 @click.option('--sample-id-file-path', help='Path to the sample id file', default=None)
 @click.command()
 def main(vds_path, sample_id_file_path):
-    from cpg_workflows.dataproc_scripts.pca_runner import pca_runner
     from large_cohort import dataproc_job
+
+    from cpg_workflows.dataproc_scripts.pca_runner import pca_runner
 
     dataproc_job(
         function=pca_runner,
