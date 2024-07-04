@@ -42,8 +42,9 @@ def dataproc_job(
     """
     Submit script as a dataproc job.
     """
+    from large_cohort import dataproc_script
+
     import cpg_workflows
-    from cpg_workflows.large_cohort import dataproc_script
 
     package_path = to_path(cpg_workflows.__file__).parent
     script_path = to_path(dataproc_script.__file__)

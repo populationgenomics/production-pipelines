@@ -9,13 +9,7 @@ from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import align
 from cpg_workflows.jobs.align import MissingAlignmentInputException
-from cpg_workflows.workflow import (
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.workflow import SequencingGroup, SequencingGroupStage, StageInput, StageOutput, stage
 
 
 @stage(analysis_type='cram', analysis_keys=['cram'])

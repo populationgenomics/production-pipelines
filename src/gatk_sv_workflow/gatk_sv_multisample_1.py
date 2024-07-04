@@ -8,9 +8,7 @@ across batches between FilterBatch and GenotypeBatch
 
 from typing import Any
 
-from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
+from gatk_sv_workflow.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
     _sv_batch_meta,
@@ -21,6 +19,9 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_references,
     make_combined_ped,
 )
+
+from cpg_utils import Path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
