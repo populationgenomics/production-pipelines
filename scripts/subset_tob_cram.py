@@ -26,3 +26,7 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     j.command(command(subset_cmd))
     b.write_output(j.output_cram, output_cram_path)
     b.run(wait=False)
+
+
+if __name__ == "__main__":
+    main()
