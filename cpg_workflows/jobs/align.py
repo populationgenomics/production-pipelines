@@ -124,10 +124,15 @@ def subset_cram(
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
     ref_path = fasta_res_group(b)['base']
-
+    subset_cram_j.declare_resource_group(
+        cram_output={
+            'cram': '{root}.cram',
+            'crai': '{root}.cram.crai',
+        },
+    )
     subset_cmd = f"""
-    samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {bam_or_cram_group['cram']} {chr} && \
-    samtools index {subset_cram_j.output_cram} {subset_cram_j.output_crai}
+    samtools view -T {ref_path} -C -o {subset_cram_j.cram_output['cram']} {bam_or_cram_group['cram']} {chr} && \
+    samtools index {subset_cram_j.cram_output['cram']} {subset_cram_j.cram_output['crai']}
     """
     # subset_cram_j.output_cram.add_extension('.cram')
     # subset_cram_j.output_crai.add_extension('.crai')
@@ -212,6 +217,7 @@ def align(
         logging.info(f'Aligning {alignment_input}. Either Fastq, Bam, or Cram. Not Sharded')
         if isinstance(alignment_input, BamPath | CramPath):
             assert alignment_input.index_path, alignment_input
+            logging.info(alignment_input.index_path, alignment_input)
             bam_or_cram_group = alignment_input.resource_group(b)
             subset_cram_j = subset_cram(
                 b,
