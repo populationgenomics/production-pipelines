@@ -25,7 +25,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_logger, ExpectedResultT
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -89,7 +89,34 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
     return spice_by_date[sorted(spice_by_date)[-1]]
 
 
-@stage
+@stage(analysis_keys=['cohort_ped'], analysis_type='custom')
+class MakeCohortCombinedPed(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {'cohort_ped': self.prefix / 'combined_pedigree.ped'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(cohort)
+        # write the pedigree, if it doesn't already exist
+        if not to_path(output['cohort_ped']).exists():
+            make_combined_ped(cohort, self.prefix)
+
+        return self.make_outputs(target=cohort, data=output)
+
+
+@stage(analysis_keys=['multicohort_ped'], analysis_type='custom')
+class MakeMultiCohortCombinedPed(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'multicohort_ped': self.prefix / 'combined_pedigree.ped'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(multicohort)
+        # write the pedigree, if it doesn't already exist
+        if not to_path(output['multicohort_ped']).exists():
+            make_combined_ped(multicohort, self.prefix)
+
+        return self.make_outputs(target=multicohort, data=output)
+
+@stage(required_stages=[MakeCohortCombinedPed])
 class GatherBatchEvidence(CohortStage):
     """
     This is the first Stage in the multisample GATK-SV workflow, running on a
@@ -159,11 +186,12 @@ class GatherBatchEvidence(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
         sequencing_groups = cohort.get_sequencing_groups(only_active=True)
+        pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
             'samples': [sg.id for sg in sequencing_groups],
-            'ped_file': str(make_combined_ped(cohort, self.prefix)),
+            'ped_file': str(pedigree_input),
             'counts': [
                 str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.coverage_counts.tsv.gz')
                 for sequencing_group in sequencing_groups
@@ -241,7 +269,7 @@ class GatherBatchEvidence(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=GatherBatchEvidence)
+@stage(required_stages=[MakeCohortCombinedPed, GatherBatchEvidence])
 class ClusterBatch(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#clusterbatch
@@ -251,7 +279,6 @@ class ClusterBatch(CohortStage):
         """
         * Clustered SV VCFs
         * Clustered depth-only call VCF
-        * Metrics - never run
         """
 
         ending_by_key = {}
@@ -263,17 +290,17 @@ class ClusterBatch(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
-        Inputs:
         Standardized call VCFs (GatherBatchEvidence)
         Depth-only (DEL/DUP) calls (GatherBatchEvidence)
         """
         batch_evidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
+        pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
-            'ped_file': str(make_combined_ped(cohort, self.prefix)),
+            'ped_file': str(pedigree_input),
             'depth_exclude_overlap_fraction': 0.5,
             'depth_interval_overlap': 0.8,
             'depth_clustering_algorithm': 'SINGLE_LINKAGE',
@@ -322,7 +349,7 @@ class ClusterBatch(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[ClusterBatch, GatherBatchEvidence])
+@stage(required_stages=[MakeCohortCombinedPed, ClusterBatch, GatherBatchEvidence])
 class GenerateBatchMetrics(CohortStage):
     """
     Generates variant metrics for filtering.
@@ -341,6 +368,7 @@ class GenerateBatchMetrics(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
         gatherbatchevidence_d = inputs.as_dict(cohort, GatherBatchEvidence)
+        pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
@@ -354,7 +382,7 @@ class GenerateBatchMetrics(CohortStage):
             'PE_split_size': 10000,
             'SR_split_size': 1000,
             'common_cnv_size_cutoff': 5000,
-            'ped_file': make_combined_ped(cohort, self.prefix),
+            'ped_file': str(pedigree_input),
             'ref_dict': str(get_fasta().with_suffix('.dict')),
         }
 
@@ -398,7 +426,7 @@ class GenerateBatchMetrics(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[GenerateBatchMetrics, ClusterBatch])
+@stage(required_stages=[MakeCohortCombinedPed, GenerateBatchMetrics, ClusterBatch])
 class FilterBatch(CohortStage):
     """
     Filters poor quality variants and filters outlier samples.
@@ -443,10 +471,11 @@ class FilterBatch(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         metrics_d = inputs.as_dict(cohort, GenerateBatchMetrics)
         clusterbatch_d = inputs.as_dict(cohort, ClusterBatch)
+        pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
             'batch': get_workflow().output_version,
-            'ped_file': make_combined_ped(cohort, self.prefix),
+            'ped_file': str(pedigree_input),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
             'outlier_cutoff_nIQR': '6',
@@ -511,7 +540,7 @@ class MergeBatchSites(MultiCohortStage):
         pesr_vcfs = [filter_batch_outputs[cohort.name]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
         depth_vcfs = [filter_batch_outputs[cohort.name]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
-        input_dict: dict[str, Any] = {'cohort': multicohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
+        input_dict: dict = {'cohort': multicohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(multicohort)
 
@@ -664,7 +693,7 @@ class GenotypeBatch(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[GatherBatchEvidence, GenotypeBatch, FilterBatch])
+@stage(required_stages=[MakeMultiCohortCombinedPed, GatherBatchEvidence, GenotypeBatch, FilterBatch])
 class MakeCohortVcf(MultiCohortStage):
     """
     Combines variants across multiple batches, resolves complex variants, re-genotypes,
@@ -690,6 +719,7 @@ class MakeCohortVcf(MultiCohortStage):
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
         filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
 
         # get the names of all contained cohorts
         all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
@@ -709,7 +739,7 @@ class MakeCohortVcf(MultiCohortStage):
         input_dict: dict[str, Any] = {
             'cohort_name': multicohort.name,
             'batches': all_batch_names,
-            'ped_file': make_combined_ped(multicohort, self.prefix),
+            'ped_file': str(pedigree_input),
             'ref_dict': str(get_fasta().with_suffix('.dict')),
             'chr_x': 'chrX',
             'chr_y': 'chrY',
@@ -774,7 +804,7 @@ class MakeCohortVcf(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=MakeCohortVcf)
+@stage(required_stages=[MakeMultiCohortCombinedPed, MakeCohortVcf])
 class FormatVcfForGatk(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
@@ -784,10 +814,11 @@ class FormatVcfForGatk(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
         input_dict: dict[str, Any] = {
             'prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, MakeCohortVcf)['vcf'],
-            'ped_file': make_combined_ped(multicohort, self.prefix),
+            'ped_file': str(pedigree_input),
         }
         input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker'])
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
@@ -805,7 +836,7 @@ class FormatVcfForGatk(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=[ClusterBatch, MakeCohortVcf])
+@stage(required_stages=[MakeMultiCohortCombinedPed, ClusterBatch, MakeCohortVcf])
 class JoinRawCalls(MultiCohortStage):
     """
     Joins all individually clustered caller results
@@ -818,10 +849,11 @@ class JoinRawCalls(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
         input_dict: dict[str, Any] = {
             'FormatVcfForGatk.formatter_args': '--fix-end',
             'prefix': multicohort.name,
-            'ped_file': make_combined_ped(multicohort, self.prefix),
+            'ped_file': str(pedigree_input),
             'reference_fasta': get_fasta(),
             'reference_fasta_fai': str(get_fasta()) + '.fai',
             'reference_dict': str(get_fasta().with_suffix('.dict')),
@@ -896,7 +928,7 @@ class SVConcordance(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=SVConcordance)
+@stage(required_stages=[MakeMultiCohortCombinedPed, SVConcordance])
 class GeneratePloidyTable(MultiCohortStage):
     """
     Quick PythonJob to generate a ploidy table
@@ -912,16 +944,17 @@ class GeneratePloidyTable(MultiCohortStage):
         return {'ploidy_table': self.prefix / 'ploidy_table.txt'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+
         py_job = get_batch().new_python_job('create_ploidy_table')
         py_job.image(config_retrieve(['workflow', 'driver_image']))
 
-        ped_path = make_combined_ped(multicohort, self.prefix)
         contig_path = get_references(['primary_contigs_list'])['primary_contigs_list']
 
         expected_d = self.expected_outputs(multicohort)
         py_job.call(
             ploidy_table_from_ped.generate_ploidy_table,
-            ped_path,
+            str(pedigree_input),
             contig_path,
             expected_d['ploidy_table'],
         )
@@ -929,7 +962,7 @@ class GeneratePloidyTable(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=py_job)
 
 
-@stage(required_stages=[GeneratePloidyTable, SVConcordance])
+@stage(required_stages=[MakeMultiCohortCombinedPed, GeneratePloidyTable, SVConcordance])
 class FilterGenotypes(MultiCohortStage):
     """
     Steps required to post-filter called genotypes
@@ -948,11 +981,12 @@ class FilterGenotypes(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
         input_dict = {
             'output_prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(multicohort, GeneratePloidyTable)['ploidy_table'],
-            'ped_file': make_combined_ped(multicohort, self.prefix),
+            'ped_file': str(pedigree_input),
             'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.3),
             'recalibrate_gq_args': config_retrieve(['references', 'gatk_sv', 'recalibrate_gq_args']),
             'sl_filter_args': config_retrieve(['references', 'gatk_sv', 'sl_filter_args']),
