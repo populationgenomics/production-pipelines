@@ -25,11 +25,11 @@ def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr
 
     subset_cmd = f"""
     samtools view -T {ref_path} -C -o {j.output_cram} {input_cram['cram']} {chr} && \
-    samtools index {j.output_cram} {j.output_cram}.crai
+    samtools index {j.output_cram} {j.output_crai}
     """
     j.command(command(subset_cmd))
     b.write_output(j.output_cram, output_cram_path)
-    b.write_output(j.output_cram + '.crai', output_crai_path)
+    b.write_output(j.output_crai, output_crai_path)
     b.run(wait=False)
 
 
