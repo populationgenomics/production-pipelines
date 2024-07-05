@@ -17,7 +17,7 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     j.cpu(2)
     j.storage('150G')
     j.memory('standard')
-    input_cram = b.read_input(input_cram_path)
+    input_cram = b.read_input_group(**{'cram': input_cram_path, 'crai': input_cram_path + '.crai'})
     ref_path = b.read_input(
         'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta',
     )
