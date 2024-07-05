@@ -132,7 +132,7 @@ def subset_cram(
     """
     subset_cram_j.command(command(subset_cmd))
 
-    return
+    return subset_cram_j
 
 
 def align(
