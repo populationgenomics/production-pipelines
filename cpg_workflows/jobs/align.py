@@ -129,8 +129,8 @@ def subset_cram(
     samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {bam_or_cram_group['cram']} {chr} && \
     samtools index {subset_cram_j.output_cram} {subset_cram_j.output_crai}
     """
-    subset_cram_j.output_cram.add_extension('.cram')
-    subset_cram_j.output_crai.add_extension('.crai')
+    # subset_cram_j.output_cram.add_extension('.cram')
+    # subset_cram_j.output_crai.add_extension('.crai')
     subset_cram_j.command(command(subset_cmd))
 
     return subset_cram_j
@@ -218,7 +218,10 @@ def align(
                 bam_or_cram_group,
                 'chr21',
             )
-            alignment_input = CramPath(subset_cram_j.output_cram, subset_cram_j.output_crai).resource_group(b)
+            alignment_input = CramPath(
+                subset_cram_j.output_cram.add_extension('.cram'),
+                subset_cram_j.output_crai.add_extension('.cram.crai'),
+            ).resource_group(b)
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
