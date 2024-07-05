@@ -218,7 +218,6 @@ def align(
                 alignment_input,
                 'chr21',
             )
-            logging.info(f'Subsetted cram: {subset_cram_j}')
             alignment_input = CramPath(subset_cram_j.output_cram, subset_cram_j.output_crai).resource_group(b)
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
