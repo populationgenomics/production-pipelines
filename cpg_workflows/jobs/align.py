@@ -130,6 +130,8 @@ def subset_cram(
     samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {input_cram['cram']} {chr} && \
     samtools index {subset_cram_j.output_cram} {subset_cram_j.output_crai}
     """
+    subset_cram_j.output_cram.add_extension('.cram')
+    subset_cram_j.output_crai.add_extension('.crai')
     subset_cram_j.command(command(subset_cmd))
 
     return subset_cram_j
