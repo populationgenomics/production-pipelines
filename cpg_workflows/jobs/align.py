@@ -185,6 +185,7 @@ def align(
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
+        logging.info(f'Aligning {alignment_input}. Either Fastq, Bam, or Cram. Not Sharded')
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
@@ -199,10 +200,12 @@ def align(
         stdout_is_sorted = False
         output_fmt = 'sam'
         jobs.append(align_j)
+        logging.info(f'Alinging single job: {align_j}. No need to merge')
         merge_or_align_j = align_j
 
     else:  # Aligning in parallel and merging afterwards
         if sharded_fq:  # Aligning each lane separately, merging after
+            logging.info(f'Aligning {alignment_input} fastq pairs. Sharded')
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
             for pair in fastq_pairs:
@@ -222,10 +225,9 @@ def align(
                 sorted_bams.append(j.sorted_bam)
                 sharded_align_jobs.append(j)
 
-        else:  # sharded_bazam:  # Using BAZAM to shard CRAM
-            # assert realignment_shards_num, realignment_shards_num
+        else:
             assert isinstance(alignment_input, CramPath | BamPath)
-            # for shard_number in range(realignment_shards_num):
+            logging.info(f'Aligning {alignment_input} BAM or CRAM. Not Sharded')
             j, cmd = _align_one(
                 b=b,
                 job_name=base_job_name,
@@ -234,8 +236,6 @@ def align(
                 job_attrs=job_attrs,
                 aligner=aligner,
                 requested_nthreads=requested_nthreads,
-                # number_of_shards_for_realignment=realignment_shards_num,
-                # shard_number=shard_number,
                 should_sort=True,
             )
             # Sorting with samtools, but not adding deduplication yet, because we
@@ -364,10 +364,12 @@ def _align_one(
     fifo_commands: dict[str, str] = {}
     if isinstance(alignment_input, CramPath | BamPath):
         if extract_picard:
+            logging.info("Using Picard to extract FASTQs from CRAM/BAM")
             extract_j = picard_extract_fastq(b, alignment_input.resource_group(b))
             fastq_pair = FastqPair(extract_j.fq1, extract_j.fq2).as_resources(b)
         else:
             # Extract fastqs from CRAM/BAM
+            logging.info("Using samtools to extract FASTQs from CRAM/BAM")
             bam_or_cram_group = alignment_input.resource_group(b)
             extract_fastq_j = extract_fastq(b, bam_or_cram_group)
             fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
