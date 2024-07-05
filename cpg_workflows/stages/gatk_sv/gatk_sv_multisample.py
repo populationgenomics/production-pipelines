@@ -25,7 +25,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.utils import get_logger, ExpectedResultT
+from cpg_workflows.utils import ExpectedResultT, get_logger
 from cpg_workflows.workflow import (
     Cohort,
     CohortStage,
@@ -115,6 +115,7 @@ class MakeMultiCohortCombinedPed(MultiCohortStage):
             make_combined_ped(multicohort, self.prefix)
 
         return self.make_outputs(target=multicohort, data=output)
+
 
 @stage(required_stages=[MakeCohortCombinedPed])
 class GatherBatchEvidence(CohortStage):
