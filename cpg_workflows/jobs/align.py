@@ -214,8 +214,10 @@ def align(
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
-        logging.info(f'Aligning {alignment_input}. Either Fastq, Bam, or Cram. Not Sharded')
         if isinstance(alignment_input, BamPath | CramPath):
+            logging.info(
+                f'Aligning {alignment_input} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
+            )
             assert alignment_input.index_path, alignment_input
             logging.info(alignment_input.index_path, alignment_input)
             bam_or_cram_group = alignment_input.resource_group(b)
