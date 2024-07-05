@@ -124,15 +124,17 @@ def subset_cram(
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
     ref_path = fasta_res_group(b)['base']
-    subset_cram_j.declare_resource_group(
-        cram_output={
-            'cram': '{root}.cram',
-            'crai': '{root}.cram.crai',
-        },
-    )
+    # subset_cram_j.declare_resource_group(
+    #     cram_output={
+    #         'cram': '{root}.cram',
+    #         'crai': '{root}.cram.crai',
+    #     },
+    # )
     subset_cmd = f"""
-    samtools view -T {ref_path} -C -o {subset_cram_j.cram_output['cram']} {bam_or_cram_group['cram']} {chr} && \
-    samtools index {subset_cram_j.cram_output['cram']} {subset_cram_j.cram_output['crai']}
+    samtools view -T {ref_path} -C -o $BATCH_TMPDIR/chr21.cram {bam_or_cram_group['cram']} {chr} && \
+    samtools index {subset_cram_j.cram_output['cram']} $BATCH_TMPDIR/chr21.cram.crai
+    mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output}
+    mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.crai_output}
     """
     # subset_cram_j.output_cram.add_extension('.cram')
     # subset_cram_j.output_crai.add_extension('.crai')
@@ -226,8 +228,8 @@ def align(
                 'chr21',
             )
             alignment_input = CramPath(
-                subset_cram_j.cram_output['cram'],
-                subset_cram_j.cram_output['crai'],
+                subset_cram_j.cram_output,
+                subset_cram_j.crai_output,
             ).resource_group(b)
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
