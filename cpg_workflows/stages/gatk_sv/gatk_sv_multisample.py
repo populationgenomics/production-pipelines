@@ -507,7 +507,7 @@ class MergeBatchSites(MultiCohortStage):
         """
 
         # take from previous per-cohort outputs
-        filter_batch_outputs = inputs.as_path_dict_by_target(FilterBatch)
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
         pesr_vcfs = [filter_batch_outputs[cohort.name]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
         depth_vcfs = [filter_batch_outputs[cohort.name]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
@@ -551,7 +551,7 @@ class CombineExclusionLists(MultiCohortStage):
         queue job to combine exclusion lists
         """
 
-        filter_batch_outputs = inputs.as_path_dict_by_target(FilterBatch)
+        filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
         all_filter_lists = [
             str(filter_batch_outputs[cohort.name]['outlier_samples_excluded_file'])
             for cohort in multicohort.get_cohorts()
@@ -687,9 +687,9 @@ class MakeCohortVcf(MultiCohortStage):
         Instead of taking a direct dependency on the previous stage,
         we use the output hash to find all the previous batches
         """
-        gatherbatchevidence_outputs = inputs.as_path_dict_by_target(GatherBatchEvidence)
-        genotypebatch_outputs = inputs.as_path_dict_by_target(GenotypeBatch)
-        filterbatch_outputs = inputs.as_path_dict_by_target(FilterBatch)
+        gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
+        genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
+        filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
 
         # get the names of all contained cohorts
         all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
@@ -830,7 +830,7 @@ class JoinRawCalls(MultiCohortStage):
         input_dict |= get_references([{'contig_list': 'primary_contigs_list'}])
 
         # add all clustered _caller_ files, plus indices
-        clusterbatch_outputs = inputs.as_path_dict_by_target(ClusterBatch)
+        clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatch)
 
         # get the names of all contained cohorts
         all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
