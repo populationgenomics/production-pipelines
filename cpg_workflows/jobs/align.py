@@ -123,11 +123,10 @@ def subset_cram(
     subset_cram_j.cpu(2)
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
-    input_cram = b.read_input_group(**{'cram': bam_or_cram_group['cram'], 'crai': bam_or_cram_group['crai']})
     ref_path = fasta_res_group(b)['base']
 
     subset_cmd = f"""
-    samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {input_cram['cram']} {chr} && \
+    samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {bam_or_cram_group['cram']} {chr} && \
     samtools index {subset_cram_j.output_cram} {subset_cram_j.output_crai}
     """
     subset_cram_j.output_cram.add_extension('.cram')
