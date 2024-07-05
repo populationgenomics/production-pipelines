@@ -219,7 +219,6 @@ def align(
                 f'Aligning {alignment_input} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
             )
             assert alignment_input.index_path, alignment_input
-            logging.info(alignment_input.index_path, alignment_input)
             bam_or_cram_group = alignment_input.resource_group(b)
             subset_cram_j = subset_cram(
                 b,
@@ -227,8 +226,8 @@ def align(
                 'chr21',
             )
             alignment_input = CramPath(
-                subset_cram_j.output_cram.add_extension('.cram'),
-                subset_cram_j.output_crai.add_extension('.cram.crai'),
+                subset_cram_j.cram_output['cram'],
+                subset_cram_j.cram_output['crai'],
             ).resource_group(b)
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
