@@ -132,7 +132,7 @@ def subset_cram(
     # )
     subset_cmd = f"""
     samtools view -T {ref_path} -C -o $BATCH_TMPDIR/chr21.cram {bam_or_cram_group['cram']} {chr} && \
-    samtools index {subset_cram_j.cram_output['cram']} $BATCH_TMPDIR/chr21.cram.crai
+    samtools index {subset_cram_j.cram_output} $BATCH_TMPDIR/chr21.cram.crai
     mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output}
     mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.crai_output}
     """
