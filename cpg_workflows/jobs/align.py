@@ -112,6 +112,29 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     return alignment_input
 
 
+def subset_cram(
+    b: hb.Batch,
+    input_cram_path: str | Path,
+    chr: str,
+) -> Job:
+
+    subset_cram_j = b.new_job('subset_tob_cram')
+    subset_cram_j.image(image_path('samtools'))
+    subset_cram_j.cpu(2)
+    subset_cram_j.storage('150G')
+    subset_cram_j.memory('standard')
+    input_cram = b.read_input_group(**{'cram': input_cram_path, 'crai': input_cram_path + '.crai'})
+    ref_path = fasta_res_group(b)['base']
+
+    subset_cmd = f"""
+    samtools view -T {ref_path} -C -o {subset_cram_j.output_cram} {input_cram['cram']} {chr} && \
+    samtools index {subset_cram_j.output_cram} {subset_cram_j.output_crai}
+    """
+    subset_cram_j.command(command(subset_cmd))
+
+    return
+
+
 def align(
     b,
     sequencing_group: SequencingGroup,
@@ -186,6 +209,16 @@ def align(
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         logging.info(f'Aligning {alignment_input}. Either Fastq, Bam, or Cram. Not Sharded')
+        if isinstance(alignment_input, BamPath | CramPath):
+            assert alignment_input.index_path, alignment_input
+            subset_cram_j = subset_cram(
+                b,
+                alignment_input.path,
+                'chr21',
+            )
+            logging.info(f'Subsetted cram: {subset_cram_j.output_cram}')
+            alignment_input = CramPath(subset_cram_j.output_cram, subset_cram_j.output_crai).resource_group(b)
+            assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
@@ -566,11 +599,11 @@ def finalise_alignment(
         extract_picard = get_config()['workflow'].get('extract_picard', False)
         if extract_picard:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}.cram',
+                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_chr21.cram',
             )
         else:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}.cram',
+                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_chr21.cram',
             )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
