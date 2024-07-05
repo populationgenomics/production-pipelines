@@ -222,7 +222,7 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'sgid_batches.json'}
+        return {'batch_json': self.analysis_prefix / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """

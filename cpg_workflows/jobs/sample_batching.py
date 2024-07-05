@@ -13,7 +13,7 @@ from cpg_workflows.utils import get_logger
 SEX_VALS = {'male', 'female'}
 
 
-def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
+def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> list[dict]:
     """
     Batch sequencing groups by coverage, and chrX ploidy
 
