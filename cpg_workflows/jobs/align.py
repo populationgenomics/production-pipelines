@@ -114,7 +114,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
 
 def subset_cram(
     b: hb.Batch,
-    input_cram_path: str | Path,
+    input_cram_path: CramPath,
     chr: str,
 ) -> Job:
 
@@ -123,7 +123,7 @@ def subset_cram(
     subset_cram_j.cpu(2)
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
-    input_cram = b.read_input_group(**{'cram': input_cram_path, 'crai': input_cram_path + '.crai'})
+    input_cram = b.read_input_group(**{'cram': input_cram_path.path, 'crai': input_cram_path.index_path})
     ref_path = fasta_res_group(b)['base']
 
     subset_cmd = f"""
