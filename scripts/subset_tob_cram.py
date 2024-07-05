@@ -23,7 +23,7 @@ def main(input_cram_path: str, output_cram_path: str, chr: str):
     )
 
     subset_cmd = f"""
-    samtools view -T {ref_path} -C -o {j.output_cram} {input_cram} {chr}
+    samtools view -T {ref_path} -C -o {j.output_cram} {input_cram['cram']} {chr}
     """
     j.command(command(subset_cmd))
     b.write_output(j.output_cram, output_cram_path)
