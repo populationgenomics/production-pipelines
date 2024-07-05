@@ -114,7 +114,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
 
 def subset_cram(
     b: hb.Batch,
-    input_cram_path: CramPath,
+    alignment_input: CramPath | BamPath,
     chr: str,
 ) -> Job:
 
@@ -123,7 +123,7 @@ def subset_cram(
     subset_cram_j.cpu(2)
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
-    input_cram = b.read_input_group(**{'cram': input_cram_path.path, 'crai': input_cram_path.index_path})
+    input_cram = b.read_input_group(**{'cram': alignment_input.path, 'crai': alignment_input.index_path})
     ref_path = fasta_res_group(b)['base']
 
     subset_cmd = f"""
@@ -213,7 +213,7 @@ def align(
             assert alignment_input.index_path, alignment_input
             subset_cram_j = subset_cram(
                 b,
-                alignment_input.path,
+                alignment_input,
                 'chr21',
             )
             logging.info(f'Subsetted cram: {subset_cram_j.output_cram}')
