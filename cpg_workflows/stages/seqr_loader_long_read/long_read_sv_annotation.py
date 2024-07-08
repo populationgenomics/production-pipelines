@@ -94,7 +94,13 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
         py_job = get_batch().new_python_job(f'Convert {lr_sv_vcf} prior to annotation')
         py_job.storage('10Gi')
-        py_job.call(seqr_loader_long_read.modify_sniffles_vcf, local_vcf, py_job.output)
+        py_job.call(
+            seqr_loader_long_read.modify_sniffles_vcf,
+            local_vcf,
+            py_job.output,
+            sequencing_group.external_id,
+            sequencing_group.id,
+        )
 
         # block-gzip and index that result
         tabix_job = get_batch().new_job(
