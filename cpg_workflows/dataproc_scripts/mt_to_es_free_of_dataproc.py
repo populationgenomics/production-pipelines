@@ -5,13 +5,13 @@ from io import StringIO
 from sys import exit
 
 import elasticsearch
+
 import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
-
 
 # make encoded values as human-readable as possible
 ES_FIELD_NAME_ESCAPE_CHAR = '$'
@@ -71,7 +71,7 @@ def encode_field_name(s):
     field_name = StringIO()
     for i, c in enumerate(s):
         if c == ES_FIELD_NAME_ESCAPE_CHAR:
-            field_name.write(2*ES_FIELD_NAME_ESCAPE_CHAR)
+            field_name.write(2 * ES_FIELD_NAME_ESCAPE_CHAR)
         elif c in ES_FIELD_NAME_SPECIAL_CHAR_MAP:
             field_name.write(ES_FIELD_NAME_SPECIAL_CHAR_MAP[c])  # encode the char
         else:
@@ -138,7 +138,7 @@ class ElasticsearchClient:
                     'index.mapping.total_fields.limit': 10000,
                     'index.refresh_interval': -1,
                     'index.codec': 'best_compression',  # halves disk usage, no difference in query times
-                }
+                },
             }
 
             logging.info(f'create_mapping - elasticsearch schema: \n{elasticsearch_schema}')
@@ -154,7 +154,7 @@ class ElasticsearchClient:
                 'es.nodes.wan.only': 'true',
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
-            }
+            },
         )
         es_config['es.write.operation'] = 'index'
         # encode any special chars in column names
@@ -189,9 +189,7 @@ class ElasticsearchClient:
 
         self.create_mapping(index_name, elasticsearch_schema, num_shards=kwargs['num_shards'], _meta=_meta)
 
-        hl.export_elasticsearch(
-            table, self._host, int(self._port), index_name, '', 5000, es_config
-        )
+        hl.export_elasticsearch(table, self._host, int(self._port), index_name, '', 5000, es_config)
         self.es.indices.forcemerge(index=index_name, request_timeout=60)
 
 
