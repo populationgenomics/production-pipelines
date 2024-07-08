@@ -137,7 +137,6 @@ def subset_cram(
     samtools index $BATCH_TMPDIR/chr21.cram $BATCH_TMPDIR/chr21.cram.crai
     mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output.cram}
     mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.cram_output.crai}
-    echo {subset_cram_j.cram_output}
     """
 
     # subset_cram_j.output_cram.add_extension('.cram')
@@ -145,8 +144,8 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        b.write_output(subset_cram_j.cram_output.cram, f'{output_bucket}/subset/{chr}.cram')
-        b.write_output(subset_cram_j.cram_output.crai, f'{output_bucket}/subset/{chr}.cram.crai')
+        b.write_output(subset_cram_j.cram_output, op(f'subset/{chr}', 'tmp'))
+
     return subset_cram_j
 
 
