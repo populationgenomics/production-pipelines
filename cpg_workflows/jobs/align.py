@@ -129,18 +129,13 @@ def subset_cram(
     subset_cram_j.declare_resource_group(
         cram_output={
             'cram': '{root}.cram',
-            'crai': '{root}.cram.crai',
+            'cram.crai': '{root}.cram.crai',
         },
     )
     subset_cmd = f"""
-    samtools view -T {ref_path} -C -o $BATCH_TMPDIR/chr21.cram {bam_or_cram_group['cram']} {chr} && \
-    samtools index $BATCH_TMPDIR/chr21.cram $BATCH_TMPDIR/chr21.cram.crai
-    mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output.cram}
-    mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.cram_output.crai}
+    samtools view -T {ref_path} -C -o {subset_cram_j.cram_output.cram} {bam_or_cram_group['cram']} {chr} && \
+    samtools index {subset_cram_j.cram_output.cram}
     """
-
-    # subset_cram_j.output_cram.add_extension('.cram')
-    # subset_cram_j.output_crai.add_extension('.crai')
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
@@ -219,6 +214,7 @@ def align(
     sorted_bams = []
 
     if not sharded:  # Just running one alignment job
+        subset_cram_j = None
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
@@ -233,8 +229,7 @@ def align(
                 'chr21',
                 'tmp',
             )
-            alignment_input.path = op('subset/chr21.cram', 'tmp')
-            alignment_input.index_path = op('subset/chr21.cram.crai', 'tmp')
+            alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
             logging.info(
                 f'Alignment input: {alignment_input} \
                 with path {alignment_input.path} and index {alignment_input.index_path}',
@@ -243,14 +238,17 @@ def align(
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
-            alignment_input=alignment_input,
+            alignment_input=alignment_input,  # type: ignore[arg-type]
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
             extract_picard=get_config()['workflow'].get('extract_picard', False),
             job_attrs=job_attrs,
             aligner=aligner,
             should_sort=False,
+            subset_cram_j=subset_cram_j,
         )
+        if subset_cram_j:
+            align_j.depends_on(subset_cram_j)
         stdout_is_sorted = False
         output_fmt = 'sam'
         jobs.append(align_j)
@@ -380,6 +378,7 @@ def _align_one(
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
     should_sort: bool = False,
+    subset_cram_j: Job | None = None,
 ) -> tuple[Job, str]:
     """
     Creates a job that (re)aligns reads to hg38. Returns the job object and a command
@@ -389,7 +388,6 @@ def _align_one(
     Note: When this function is called within the align function, DRAGMAP is used as the default
     tool.
     """
-
     if number_of_shards_for_realignment is not None:
         assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
 
@@ -420,12 +418,16 @@ def _align_one(
         if extract_picard:
             logging.info("Using Picard to extract FASTQs from CRAM/BAM")
             extract_j = picard_extract_fastq(b, alignment_input.resource_group(b))
+            if subset_cram_j:
+                extract_j.depends_on(subset_cram_j)
             fastq_pair = FastqPair(extract_j.fq1, extract_j.fq2).as_resources(b)
         else:
             # Extract fastqs from CRAM/BAM
             logging.info("Using samtools to extract FASTQs from CRAM/BAM")
             bam_or_cram_group = alignment_input.resource_group(b)
             extract_fastq_j = extract_fastq(b, bam_or_cram_group)
+            if subset_cram_j:
+                extract_fastq_j.depends_on(subset_cram_j)
             fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
