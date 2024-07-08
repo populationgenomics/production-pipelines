@@ -138,11 +138,13 @@ def subset_cram(
     mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output.cram}
     mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.cram_output.crai}
     """
-    if output_bucket:
-        b.write_output(subset_cram_j.cram_output, op(f'subset/{chr}', 'tmp'))
+
     # subset_cram_j.output_cram.add_extension('.cram')
     # subset_cram_j.output_crai.add_extension('.crai')
     subset_cram_j.command(command(subset_cmd))
+
+    if output_bucket:
+        b.write_output(subset_cram_j.cram_output, op(f'subset/{chr}', 'tmp'))
 
     return subset_cram_j
 
