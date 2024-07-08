@@ -134,7 +134,7 @@ def subset_cram(
     )
     subset_cmd = f"""
     samtools view -T {ref_path} -C -o $BATCH_TMPDIR/chr21.cram {bam_or_cram_group['cram']} {chr} && \
-    samtools index {subset_cram_j.cram_output} $BATCH_TMPDIR/chr21.cram.crai
+    samtools index {subset_cram_j.cram_output.cram} $BATCH_TMPDIR/chr21.cram.crai
     mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output.cram}
     mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.cram_output.crai}
     """
@@ -252,7 +252,7 @@ def align(
         stdout_is_sorted = False
         output_fmt = 'sam'
         jobs.append(align_j)
-        logging.info(f'Alinging single job: {align_j}. No need to merge')
+        logging.info('Aligning single job. No need to merge')
         merge_or_align_j = align_j
 
     else:  # Aligning in parallel and merging afterwards
