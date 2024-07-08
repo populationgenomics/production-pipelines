@@ -219,21 +219,22 @@ def align(
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         if isinstance(alignment_input, BamPath | CramPath):
-            logging.info(
-                f'Aligning {alignment_input.path} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
-            )
-            bam_or_cram_group = alignment_input.resource_group(b)
-            subset_cram_j = subset_cram(
-                b,
-                bam_or_cram_group,
-                'chr21',
-                'tmp',
-            )
-            alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
-            logging.info(
-                f'Alignment input: {alignment_input} \
-                with path {alignment_input.path} and index {alignment_input.index_path}',
-            )
+            # logging.info(
+            #     f'Aligning {alignment_input.path} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
+            # )
+            # bam_or_cram_group = alignment_input.resource_group(b)
+            # subset_cram_j = subset_cram(
+            #     b,
+            #     bam_or_cram_group,
+            #     'chr21',
+            #     'tmp',
+            # )
+            # alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
+            # logging.info(
+            #     f'Alignment input: {alignment_input} \
+            #     with path {alignment_input.path} and index {alignment_input.index_path}',
+            # )
+            logging.info(f'subset_cram_j: {subset_cram_j}')
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
