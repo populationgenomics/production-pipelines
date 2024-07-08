@@ -145,10 +145,8 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        subset_path = f'subset/{chr}'
-        logging.info(f"Writing output to {subset_cram_j.cram_output} to {op(subset_path, 'tmp')}")
-        b.write_output(subset_cram_j.cram_output, op(f'subset/{chr}', 'tmp'))
-
+        b.write_output(subset_cram_j.cram_output.cram, f'{output_bucket}/subset/{chr}.cram')
+        b.write_output(subset_cram_j.cram_output.crai, f'{output_bucket}/subset/{chr}.cram.crai')
     return subset_cram_j
 
 
