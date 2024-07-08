@@ -231,8 +231,8 @@ def align(
                 'chr21',
                 'tmp',
             )
-            alignment_input.path = op('chr21.cram', 'tmp')
-            alignment_input.index_path = op('chr21.cram.crai', 'tmp')
+            alignment_input.path = op('subset/chr21.cram', 'tmp')
+            alignment_input.index_path = op('subset/chr21.cram.crai', 'tmp')
             logging.info(
                 f'Alignment input: {alignment_input} \
                 with path {alignment_input.path} and index {alignment_input.index_path}',
