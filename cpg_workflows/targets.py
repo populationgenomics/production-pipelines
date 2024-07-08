@@ -195,6 +195,27 @@ class MultiCohort(Target):
             'cohorts': [c.name for c in self.get_cohorts()],
         }
 
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
+        """
+        Create a PED file for all samples in the whole MultiCohort
+        Duplication of the Cohort method
+        PED is written with no header line to be strict specification compliant
+        """
+        datas = []
+        for sequencing_group in self.get_sequencing_groups():
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
+        if not datas:
+            raise ValueError(f'No pedigree data found for {self.name}')
+        df = pd.DataFrame(datas)
+
+        if out_path is None:
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+
+        if not get_config()['workflow'].get('dry_run', False):
+            with out_path.open('w') as fp:
+                df.to_csv(fp, sep='\t', index=False, header=False)
+        return out_path
+
 
 class Cohort(Target):
     """
