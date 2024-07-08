@@ -18,6 +18,7 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import dataset_path, get_config, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
+from cpg_utils.hail_batch import output_path as op
 from cpg_workflows.filetypes import (
     AlignmentInput,
     BamPath,
@@ -116,6 +117,7 @@ def subset_cram(
     b: hb.Batch,
     bam_or_cram_group: hb.ResourceGroup,
     chr: str,
+    output_bucket: str = 'tmp',
 ) -> Job:
 
     subset_cram_j = b.new_job('subset_tob_cram')
@@ -136,6 +138,9 @@ def subset_cram(
     mv $BATCH_TMPDIR/chr21.cram {subset_cram_j.cram_output.cram}
     mv $BATCH_TMPDIR/chr21.cram.crai {subset_cram_j.cram_output.crai}
     """
+    if output_bucket:
+        b.write_output(subset_cram_j.cram_output.cram, op('chr21.cram', 'tmp'))
+        b.write_output(subset_cram_j.cram_output.crai, op('chr21.cram.crai', 'tmp'))
     # subset_cram_j.output_cram.add_extension('.cram')
     # subset_cram_j.output_crai.add_extension('.crai')
     subset_cram_j.command(command(subset_cmd))
@@ -225,9 +230,14 @@ def align(
                 b,
                 bam_or_cram_group,
                 'chr21',
+                'tmp',
             )
-            alignment_input.path = subset_cram_j.cram_output.cram
-            alignment_input.index_path = subset_cram_j.cram_output.crai
+            alignment_input.path = op('chr21.cram', 'tmp')
+            alignment_input.index_path = op('chr21.cram.crai', 'tmp')
+            logging.info(
+                f'Alignment input: {alignment_input} \
+                with path {alignment_input.path} and index {alignment_input.index_path}',
+            )
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
