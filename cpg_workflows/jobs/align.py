@@ -226,10 +226,8 @@ def align(
                 bam_or_cram_group,
                 'chr21',
             )
-            alignment_input = CramPath(
-                subset_cram_j.cram_output.cram,
-                subset_cram_j.cram_output.crai,
-            ).resource_group(b)
+            alignment_input.path = subset_cram_j.cram_output.cram
+            alignment_input.index_path = subset_cram_j.cram_output.crai
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
