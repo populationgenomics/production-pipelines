@@ -200,7 +200,7 @@ def main(password: str, mt_path: str, es_index: str, done_path: str):
     host = config_retrieve(['elasticsearch', 'host'])
     port = config_retrieve(['elasticsearch', 'port'])
     username = config_retrieve(['elasticsearch', 'username'])
-    print(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
+    logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
     # start a hail batch - this was hl.init('GRCh38') in Dataproc, but we won't have the related data networked as-local
     init_batch()
@@ -208,15 +208,21 @@ def main(password: str, mt_path: str, es_index: str, done_path: str):
     mt = hl.read_matrix_table(mt_path)
 
     logging.info('Getting rows and exporting to the ES')
+
     # get the rows, flattened, stripped of key and VEP annotations
     row_ht = elasticsearch_row(mt)
 
     es_shards = _mt_num_shards(mt)
 
-    es = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
-    es.export_table_to_elasticsearch(row_ht, index_name=es_index, num_shards=es_shards, write_null_values=True)
+    es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
-    _cleanup(es, es_index, es_shards)
+    # delete the index if it exists already
+    if es_client.es.indices.exists(index=es_index):
+        es_client.es.indices.delete(index=es_index)
+
+    es_client.export_table_to_elasticsearch(row_ht, index_name=es_index, num_shards=es_shards, write_null_values=True)
+
+    _cleanup(es_client, es_index, es_shards)
     with to_path(done_path).open('w') as f:
         f.write('done')
 
