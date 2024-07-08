@@ -424,6 +424,7 @@ def _align_one(
         else:
             # Extract fastqs from CRAM/BAM
             logging.info("Using samtools to extract FASTQs from CRAM/BAM")
+            logging.info(f"Alignment input: {alignment_input.path} {alignment_input.index_path}")
             bam_or_cram_group = alignment_input.resource_group(b)
             extract_fastq_j = extract_fastq(b, bam_or_cram_group)
             if subset_cram_j:
