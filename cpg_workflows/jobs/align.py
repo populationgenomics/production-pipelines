@@ -556,17 +556,22 @@ def extract_fastq(
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
     -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
-    -0 /dev/null -s /dev/null -n
+    -0 $BATCH_TMPDIR/r1_r2_flags.fq.gz -s $BATCH_TMPDIR/singletons.fq.gz -n
     # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/R1.fq.gz {j.fq1}
     mv $BATCH_TMPDIR/R2.fq.gz {j.fq2}
+    mv $BATCH_TMPDIR/r1_r2_flags.fq.gz {j.r1_r2_flags}
+    mv $BATCH_TMPDIR/singletons.fq.gz {j.singletons}
     """
     j.command(command(cmd, monitor_space=True))
     if output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
         b.write_output(j.fq1, str(output_fq1))
         b.write_output(j.fq2, str(output_fq2))
+
+    b.write_output(j.r1_r2_flags, op('r1_r2_flags', 'tmp'))
+    b.write_output(j.singletons, op('singletons', 'tmp'))
     return j
 
 
