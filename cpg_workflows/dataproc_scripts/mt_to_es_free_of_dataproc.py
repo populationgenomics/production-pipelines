@@ -11,7 +11,6 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve
-from cpg_utils.hail_batch import init_batch
 
 # make encoded values as human-readable as possible
 ES_FIELD_NAME_ESCAPE_CHAR = '$'
@@ -201,7 +200,7 @@ def main(password: str, mt_path: str, es_index: str, done_path: str):
     logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
     # start a hail batch - this was hl.init('GRCh38') in Dataproc, but we won't have the related data networked as-local
-    init_batch()
+    hl.init(default_reference='GRCh38')
 
     mt = hl.read_matrix_table(mt_path)
 
