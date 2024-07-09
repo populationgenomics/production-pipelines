@@ -36,9 +36,12 @@ class JointGenotyping(CohortStage):
             # writing into perm location for late debugging
             # convert to str to avoid checking existence
             'tmp_prefix': str(self.prefix / 'tmp'),
-            'vcf': to_path(self.prefix / 'full.vcf.gz'),
-            'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
+            'vcf': self.prefix / 'full.vcf.gz',
+            'siteonly': self.prefix / 'siteonly.vcf.gz',
             'siteonly_part_pattern': str(self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'),
+            'siteonly_split_part_pattern': str(
+                self.prefix / 'siteonly_split_parts' / 'part{idx}.vcf.gz'
+            ),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -62,8 +65,10 @@ class JointGenotyping(CohortStage):
         vcf_path = self.expected_outputs(cohort)['vcf']
         siteonly_vcf_path = self.expected_outputs(cohort)['siteonly']
         scatter_count = joint_calling_scatter_count(len(cohort.get_sequencing_groups()))
+
+        # vcf fragments, multiallelic variants split, stripped of genotypes
         out_siteonly_vcf_part_paths = [
-            to_path(self.expected_outputs(cohort)['siteonly_part_pattern'].format(idx=idx))
+            to_path(self.expected_outputs(cohort)['siteonly_split_part_pattern'].format(idx=idx))
             for idx in range(scatter_count)
         ]
 
@@ -71,7 +76,8 @@ class JointGenotyping(CohortStage):
             b=get_batch(),
             out_vcf_path=vcf_path,
             out_siteonly_vcf_path=siteonly_vcf_path,
-            tmp_bucket=to_path(self.expected_outputs(cohort)['tmp_prefix']),
+            out_split_sitesonly_vcf_part_paths=out_split_vcf_part_paths,
+            tmp_bucket=self.prefix / 'tmp',
             gvcf_by_sgid=gvcf_by_sgid,
             tool=(
                 joint_genotyping.JointGenotyperTool.GnarlyGenotyper
@@ -82,7 +88,6 @@ class JointGenotyping(CohortStage):
             exclude_intervals_path=get_config()['workflow'].get('exclude_intervals_path'),
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
-            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
         )
         jobs.extend(jc_jobs)
         for job in jobs:
