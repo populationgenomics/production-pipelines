@@ -39,9 +39,7 @@ class JointGenotyping(CohortStage):
             'vcf': self.prefix / 'full.vcf.gz',
             'siteonly': self.prefix / 'siteonly.vcf.gz',
             'siteonly_part_pattern': str(self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'),
-            'siteonly_split_part_pattern': str(
-                self.prefix / 'siteonly_split_parts' / 'part{idx}.vcf.gz'
-            ),
+            'siteonly_split_part_pattern': str(self.prefix / 'siteonly_split_parts' / 'part{idx}.vcf.gz'),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:

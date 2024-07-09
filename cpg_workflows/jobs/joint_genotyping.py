@@ -14,11 +14,10 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch
 from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
-from cpg_workflows.utils import can_reuse
-
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
+from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
+from cpg_workflows.utils import can_reuse
 
 
 class JointGenotyperTool(Enum):
@@ -141,9 +140,7 @@ def make_joint_genotyping_jobs(
             split_jc_vcf_path = out_split_vcf_part_paths[idx]
         else:
             split_jc_vcf_path = (
-                (tmp_bucket / 'split' / 'parts' / f'part{idx + 1}.vcf.gz')
-                if scatter_count > 1
-                else out_vcf_path
+                (tmp_bucket / 'split' / 'parts' / f'part{idx + 1}.vcf.gz') if scatter_count > 1 else out_vcf_path
             )
 
         jc_vcf_j, jc_vcf = _add_joint_genotyper_job(
@@ -555,7 +552,7 @@ def add_make_sitesonly_job(
 
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
-    j = b.new_job(job_name, job_attrs)
+    j = get_batch().new_job(job_name, job_attrs)
     j.image(image_path('gatk'))
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
@@ -596,7 +593,7 @@ def add_split_multiallelics_job(
             **{
                 'vcf.gz': str(output_vcf_path),
                 'vcf.gz.tbi': str(output_vcf_path) + '.tbi',
-            }
+            },
         )
 
     j = get_batch().new_job('SplitMultiAllelics', job_attrs or {} | {'tool': 'bcftools norm'})
@@ -617,8 +614,8 @@ def add_split_multiallelics_job(
             f"""
         bcftools norm -m -any -N {input_vcf['vcf.gz']} | bcftools sort -Oz -o {j.output_vcf['vcf.gz']}
         tabix {j.output_vcf['vcf.gz']}
-        """
-        )
+        """,
+        ),
     )
 
     if output_vcf_path:
