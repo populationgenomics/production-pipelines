@@ -200,8 +200,7 @@ def main(password: str, mt_path: str, es_index: str, done_path: str):
     logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
     # start a hail batch - this was hl.init('GRCh38') in Dataproc, but we won't have the related data networked as-local
-    hl.init(default_reference='GRCh38',
-            billing_project=config_retrieve(['hail', 'billing_project']))
+    hl.context.init_spark(default_reference='GRCh38')
 
     mt = hl.read_matrix_table(mt_path)
 
