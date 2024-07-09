@@ -2,7 +2,6 @@
 Helpers to communicate with the metamist database.
 """
 
-import json
 import logging
 import pprint
 import traceback
@@ -11,10 +10,8 @@ from enum import Enum
 from typing import Any, Callable, Optional
 
 from tenacity import (
-    RetryError,
     retry,
     retry_if_exception_type,
-    retry_if_not_exception_type,
     stop_after_attempt,
     wait_exponential,
 )
