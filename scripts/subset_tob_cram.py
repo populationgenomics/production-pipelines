@@ -8,7 +8,8 @@ from cpg_utils.hail_batch import Batch, command, get_batch, get_config, image_pa
 @click.option('--output_cram_path', required=True, type=str)
 @click.option('--output_crai_path', required=True, type=str)
 @click.option('--chr', required=True, type=str)
-def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr: str):
+@click.option('--nagim', is_flag=True)
+def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr: str, nagim: bool):
     """
     Subset a CRAM file to a single chromosome.
     """
@@ -19,9 +20,12 @@ def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr
     j.storage('150G')
     j.memory('standard')
     input_cram = b.read_input_group(**{'cram': input_cram_path, 'crai': input_cram_path + '.crai'})
-    ref_path = b.read_input(
-        'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta',
-    )
+    if nagim:
+        ref_path = b.read_input('gs://gcp-public-data--broad-references/hg38/v0/Homo_sapiens_assembly38.fasta')
+    else:
+        ref_path = b.read_input(
+            'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta',
+        )
 
     subset_cmd = f"""
     samtools view -T {ref_path} -C -o {j.output_cram} {input_cram['cram']} {chr} && \
