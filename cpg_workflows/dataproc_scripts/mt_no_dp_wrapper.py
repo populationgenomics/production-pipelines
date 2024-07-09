@@ -22,9 +22,7 @@ def main():
     # localise the MT
     mt_name = args.mt_path.split('/')[-1]
     job.command(f'gcloud --no-user-output-enabled storage cp -r {args.mt_path} $BATCH_TMPDIR')
-    job.command(
-        f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {args.index} --flag {args.flag} --cpu {ncpu}',
-    )
+    job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {args.index} --flag {args.flag}')
     get_batch().run(wait=False)
 
 

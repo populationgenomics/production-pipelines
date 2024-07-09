@@ -221,7 +221,6 @@ def main():
     parser.add_argument('--mt_path', help='MT path name', required=True)
     parser.add_argument('--index', help='ES index name', required=True)
     parser.add_argument('--flag', help='ES index "DONE" file path')
-    parser.add_argument('--cpu', help='number of available cores', default=4, type=int)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
 
@@ -241,7 +240,8 @@ def main():
     username = config_retrieve(['elasticsearch', 'username'])
     logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
-    hl.context.init_spark(master=f'local[{args.cpu}]', quiet=True)
+    ncpu = config_retrieve(['workflow', 'ncpu'], 4)
+    hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
     hl.default_reference('GRCh38')
 
     mt = hl.read_matrix_table(args.mt_path)
