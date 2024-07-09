@@ -279,7 +279,7 @@ def elasticsearch_row(mt: hl.MatrixTable):
     # Converts a mt to the row equivalent.
     table = mt.rows()
     if 'vep' in table.row:
-        table = mt.drop('vep')
+        table = table.drop('vep')
     key = table.key
     # Converts nested structs into one field, e.g. {a: {b: 1}} => a.b: 1
     flat_table = table.flatten()
