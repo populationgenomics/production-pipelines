@@ -101,7 +101,17 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
     if get_config()['workflow'].get('realign_nagim_cram', False):
         logging.info('Realigning from Nagim CRAM')
         logging.info(f'sequencing_group assays: {sequencing_group.assays}')
-        raise WorkflowError
+        reads_location = sequencing_group.assays['sequencing'][0].meta['reads'][0]['location']
+        reference_assembly_location = sequencing_group.assays['sequencing'][0].meta['reference_assembly']['location']
+        logging.info(
+            f'reads_location: {reads_location} \
+            reference_assembly_location: {reference_assembly_location}',
+        )
+        alignment_input = CramPath(
+            reads_location,
+            reference_assembly=reference_assembly_location,
+        )
+        logging.info(f'Alignment_input: {alignment_input} and index: {alignment_input.index_path}')
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
@@ -144,7 +154,7 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        b.write_output(subset_cram_j.cram_output, op(f'subset/{chr}', 'tmp'))
+        b.write_output(subset_cram_j.cram_output, op(f'nagim_subset/{chr}', 'tmp'))
 
     return subset_cram_j
 
@@ -234,7 +244,7 @@ def align(
                 'chr21',
                 'tmp',
             )
-            alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
+            alignment_input = CramPath(op('nagim_subset/chr21.cram', 'tmp'), op('nagim_subset/chr21.cram.crai', 'tmp'))
             logging.info(
                 f'Alignment input: {alignment_input} \
                 with path {alignment_input.path} and index {alignment_input.index_path}',
@@ -435,8 +445,8 @@ def _align_one(
             extract_fastq_j = extract_fastq(
                 b,
                 bam_or_cram_group,
-                output_fq1=op('R1.fq.gz', 'tmp'),
-                output_fq2=op('R2.fq.gz', 'tmp'),
+                output_fq1=op('nagim_subset/R1.fq.gz', 'tmp'),
+                output_fq2=op('nagim_subset/R2.fq.gz', 'tmp'),
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
