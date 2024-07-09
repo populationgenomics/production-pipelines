@@ -249,7 +249,11 @@ def align(
                 'chr21',
                 'tmp',
             )
-            alignment_input = CramPath(op('nagim_subset/chr21.cram', 'tmp'), op('nagim_subset/chr21.cram.crai', 'tmp'))
+            alignment_input = CramPath(
+                op('nagim_subset/chr21.cram', 'tmp'),
+                op('nagim_subset/chr21.cram.crai', 'tmp'),
+                reference_assembly=alignment_input.reference_assembly,
+            )
             logging.info(
                 f'Alignment input: {alignment_input} \
                 with path {alignment_input.path} and index {alignment_input.index_path}',
@@ -450,6 +454,7 @@ def _align_one(
             extract_fastq_j = extract_fastq(
                 b,
                 bam_or_cram_group,
+                alignment_input,
                 output_fq1=op('nagim_subset/R1.fq.gz', 'tmp'),
                 output_fq2=op('nagim_subset/R2.fq.gz', 'tmp'),
             )
@@ -559,6 +564,7 @@ def picard_extract_fastq(
 def extract_fastq(
     b,
     bam_or_cram_group: hb.ResourceGroup,
+    alignment_input: FastqPair | CramPath | BamPath,
     ext: str = 'cram',
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
@@ -570,7 +576,10 @@ def extract_fastq(
     j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
     j.image(image_path('samtools'))
     # TODO: add ability to detect reference used in current BAM/CRAM and provide error handling
-    reference_path = fasta_res_group(b)['base']
+    if isinstance(alignment_input, CramPath | BamPath):
+        reference_path = b.read_input(alignment_input.reference_assembly)
+    else:
+        reference_path = fasta_res_group(b)['base']
     res = STANDARD.request_resources(ncpu=16)
     if get_config()['workflow']['sequencing_type'] == 'genome':
         res.attach_disk_storage_gb = 700
