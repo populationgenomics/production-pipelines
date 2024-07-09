@@ -233,17 +233,12 @@ def main():
     es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
     # delete the index if it exists already
-    if es_client.es.indices.exists(index=args.es_index):
-        es_client.es.indices.delete(index=args.es_index)
+    if es_client.es.indices.exists(index=args.index):
+        es_client.es.indices.delete(index=args.index)
 
-    es_client.export_table_to_elasticsearch(
-        row_ht,
-        index_name=args.es_index,
-        num_shards=es_shards,
-        write_null_values=True,
-    )
+    es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards, write_null_values=True)
 
-    _cleanup(es_client, args.es_index, es_shards)
+    _cleanup(es_client, args.index, es_shards)
     with to_path(args.flag).open('w') as f:
         f.write('done')
 
