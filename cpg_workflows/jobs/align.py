@@ -29,6 +29,7 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse
+from cpg_workflows.workflow import WorkflowError
 
 from . import picard
 
@@ -97,6 +98,10 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
         if (cram := sequencing_group.make_cram_path()).exists():
             logging.info(f'Realigning from CRAM {cram}')
             alignment_input = cram
+    if get_config()['workflow'].get('realign_nagim_cram', False):
+        logging.info('Realigning from Nagim CRAM')
+        logging.info(f'sequencing_group assays: {sequencing_group.assays}')
+        raise WorkflowError
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
