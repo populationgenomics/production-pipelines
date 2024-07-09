@@ -8,7 +8,7 @@ from cpg_utils.hail_batch import Batch, command, get_batch, get_config, image_pa
 @click.option('--output_cram_path', required=True, type=str)
 @click.option('--output_crai_path', required=True, type=str)
 @click.option('--chr', required=True, type=str)
-def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr: str, nagim: bool):
+def main(input_cram_path: str, output_cram_path: str, output_crai_path: str, chr: str):
     """
     Subset a CRAM file to a single chromosome.
     """
