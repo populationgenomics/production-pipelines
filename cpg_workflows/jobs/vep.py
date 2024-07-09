@@ -7,32 +7,32 @@ import logging
 from typing import Literal
 
 import hailtop.batch as hb
-from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, image_path, reference_path
-from cpg_utils.hail_batch import query_command
-from cpg_workflows.jobs.picard import get_intervals
-from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.query_modules import vep
 from cpg_workflows.utils import can_reuse
 
 
 def add_vep_jobs(
-    b: Batch,
-    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
-    scatter_count: int,
-    input_siteonly_vcf_part_paths: list[Path] | None = None,
-    out_path: Path | None = None,
+    input_vcf_paths: list[Path],
+    out_path: Path,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Runs VEP on provided VCF. Writes a VCF into `out_path` by default,
     unless `out_path` ends with ".ht", in which case writes a Hail table.
+
+    Changed structure - this no longer does interval splitting on an input file, if you want a divided VCF, do that
+    elsewhere. The pipeline uses this in one way - pass a list of sub-VCFs, annotate each, re-join.
+    In production there's no need for this to also know how to split
     """
     to_hail_table = out_path and out_path.suffix == '.ht'
+
     if not to_hail_table:
         assert str(out_path).endswith('.vcf.gz'), out_path
 
@@ -40,98 +40,59 @@ def add_vep_jobs(
         return []
 
     jobs: list[Job] = []
-    siteonly_vcf = b.read_input_group(
-        **{
-            'vcf.gz': str(input_siteonly_vcf_path),
-            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        },
-    )
 
-    input_vcf_parts: list[hb.ResourceGroup] = []
-    if input_siteonly_vcf_part_paths:
-        assert len(input_siteonly_vcf_part_paths) == scatter_count
-        for path in input_siteonly_vcf_part_paths:
-            input_vcf_parts.append(b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}))
-
-    # If there is only one partition, we don't need to split the VCF
-    elif scatter_count == 1:
-        input_vcf_parts.append(siteonly_vcf)
-
-    else:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            job_attrs=job_attrs,
-            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
-
-        # Splitting variant calling by intervals
-        for idx in range(scatter_count):
-            subset_j = subset_vcf(
-                b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            jobs.append(subset_j)
-            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-            input_vcf_parts.append(subset_j.output_vcf)
+    input_vcf_parts: list[hb.ResourceGroup] = [
+        get_batch().read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'})
+        for path in input_vcf_paths
+    ]
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
     result_part_paths = []
-    for idx, resource in enumerate(input_vcf_parts):
+    for idx, resource in enumerate(input_vcf_parts, 1):
         if to_hail_table:
-            result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
+            result_part_path = result_parts_bucket / f'part{idx}.jsonl'
         else:
-            result_part_path = result_parts_bucket / f'part{idx + 1}.vcf.gz'
+            result_part_path = result_parts_bucket / f'part{idx}.vcf.gz'
         result_part_paths.append(result_part_path)
         if can_reuse(result_part_path):
             continue
 
-        # noinspection PyTypeChecker
         vep_one_job = vep_one(
-            b,
             vcf=resource['vcf.gz'],
             out_format='json' if to_hail_table else 'vcf',
             out_path=result_part_paths[idx],
-            job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
+            job_attrs=(job_attrs or {}) | dict(part=f'{idx}'),
         )
         if vep_one_job:
             jobs.append(vep_one_job)
 
     if to_hail_table:
         j = gather_vep_json_to_ht(
-            b=b,
             vep_results_paths=result_part_paths,
             out_path=out_path,
             job_attrs=job_attrs,
-            depends_on=jobs,
         )
-        gather_jobs = [j]
-    elif scatter_count != 1:
-        assert len(result_part_paths) == scatter_count
+        if jobs:
+            j.depends_on(*jobs)
+        jobs.append(j)
+
+    elif len(result_part_paths) != 1:
         gather_jobs = gather_vcfs(
-            b=b,
+            b=get_batch(),
             input_vcfs=result_part_paths,
             out_vcf_path=out_path,
         )
-    else:
-        print('no need to merge VCF results')
-        gather_jobs = []
-    for j in gather_jobs:
-        j.depends_on(*jobs)
-        jobs.append(j)
+        if gather_jobs and jobs:
+            for j in gather_jobs:
+                j.depends_on(*jobs)
+        jobs.extend(gather_jobs)
     return jobs
 
 
 def gather_vep_json_to_ht(
-    b: Batch,
     vep_results_paths: list[Path],
     out_path: Path,
     job_attrs: dict | None = None,
-    depends_on: list[hb.job.Job] | None = None,
 ) -> Job:
     """
     Parse results from VEP with annotations formatted in JSON,
@@ -140,7 +101,7 @@ def gather_vep_json_to_ht(
 
     vep_version = get_config()['workflow']['vep_version']
 
-    j = b.new_job('VEP', job_attrs)
+    j = get_batch().new_job('VEP', job_attrs)
     j.image(image_path('cpg_workflows'))
     j.command(
         query_command(
@@ -156,7 +117,6 @@ def gather_vep_json_to_ht(
 
 
 def vep_one(
-    b: Batch,
     vcf: Path | hb.ResourceFile,
     out_path: Path | None = None,
     out_format: Literal['vcf', 'json'] = 'vcf',
@@ -178,7 +138,7 @@ def vep_one(
     assert all([vep_image, vep_mount_path])
     logging.info(f'Using VEP {vep_version}')
 
-    j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
+    j = get_batch().new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
     j.image(vep_image)
     splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
 
@@ -187,7 +147,7 @@ def vep_one(
     j.memory('16Gi').storage('15Gi').cpu(1)
 
     if not isinstance(vcf, hb.ResourceFile):
-        vcf = b.read_input(str(vcf))
+        vcf = get_batch().read_input(str(vcf))
 
     if out_format == 'vcf':
         j.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -252,6 +212,6 @@ def vep_one(
     j.command(cmd)
 
     if out_path:
-        b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
+        get_batch().write_output(j.output, str(out_path).replace('.vcf.gz', ''))
 
     return j

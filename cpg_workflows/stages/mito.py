@@ -492,7 +492,6 @@ class MitoReport(SequencingGroupStage):
         jobs = []
 
         vep_j = vep.vep_one(
-            get_batch(),
             vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
             out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
             out_format='vcf',
