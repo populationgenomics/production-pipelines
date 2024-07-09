@@ -8,13 +8,7 @@ from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import bam_to_cram
-from cpg_workflows.workflow import (
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.workflow import SequencingGroup, SequencingGroupStage, StageInput, StageOutput, stage
 
 
 def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
@@ -44,10 +38,7 @@ class BamToCram(SequencingGroupStage):
         else:
             cram_path = make_long_read_cram_path(sequencing_group)
 
-        return {
-            'cram': cram_path.path,
-            'cram.crai': cram_path.index_path,
-        }
+        return {'cram': cram_path.path, 'cram.crai': cram_path.index_path}
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
@@ -61,11 +52,8 @@ class BamToCram(SequencingGroupStage):
             extra_label='long_read',
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
+            reference_fasta_path=reference_path('broad/ref_fasta'),
         )
         b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
 
-        return self.make_outputs(
-            sequencing_group,
-            data=self.expected_outputs(sequencing_group),
-            jobs=[job],
-        )
+        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[job])

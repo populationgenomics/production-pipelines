@@ -11,13 +11,13 @@ filter to retain only active SG IDs, then re-batch cleanly.
 
 
 import json
-import logging
 from argparse import ArgumentParser
 
 import pandas as pd
 
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
+from cpg_workflows.utils import get_logger
 from metamist.graphql import gql, query
 
 FIND_ACTIVE_SGS = gql(
@@ -53,23 +53,26 @@ def collect_all_sgids(projects: list[str]) -> list[str]:
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    get_logger(__file__).info('Starting the re-batching process')
     parser = ArgumentParser()
     parser.add_argument('-i', help='Path to the QC tables', nargs='+', required=True)
     parser.add_argument('-p', help='Names of all relevant projects', nargs='+', required=True)
     parser.add_argument('-o', help='Where to write the output', required=True)
+    parser.add_argument('--min', help='Min Batch Size', type=int, default=200)
+    parser.add_argument('--max', help='Max Batch Size', type=int, default=300)
     args, unknown = parser.parse_known_args()
 
     if unknown:
         raise ValueError(f'Unrecognised arguments: {unknown}')
 
     assert args.p and args.i
-    logging.info(f'Collecting all active SG IDs for {args.p}')
+    get_logger().info(f'Collecting all active SG IDs for {args.p}')
     all_sg_ids = collect_all_sgids(args.p)
+    get_logger().info(f'Identified {len(all_sg_ids)} active SG IDs')
 
     dataframes = []
     for each in args.i:
-        logging.info(f'Loading {each}')
+        get_logger().info(f'Loading {each}')
         this_df = pd.read_csv(each, sep='\t', low_memory=False)
         this_df.columns = [x.replace('#', '') for x in this_df.columns]  # type: ignore
 
@@ -83,7 +86,7 @@ if __name__ == '__main__':
         raise ValueError('No samples found in the QC tables')
 
     # now make some batches
-    batches = batch_sgs(one_big_df, min_batch_size=200, max_batch_size=300)
+    batches = batch_sgs(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
 
     with to_path(args.o).open('w') as f:
         f.write(json.dumps(batches, indent=4))

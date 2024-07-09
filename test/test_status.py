@@ -70,7 +70,7 @@ def _common(mocker, tmp_path):
         ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
         return c
 
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_create_cohort)
 
 
 def test_status_reporter(mocker: MockFixture, tmp_path):
@@ -78,7 +78,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
 
     from cpg_utils.config import dataset_path
     from cpg_utils.hail_batch import get_batch, reset_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -129,7 +129,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     print(get_batch().job_by_tool['metamist'])
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
     # 2 jobs per sequencing group (2 analysis outputs)
-    assert get_batch().job_by_tool['metamist']['job_n'] == len(get_cohort().get_sequencing_groups()) * 2
+    assert get_batch().job_by_tool['metamist']['job_n'] == len(get_multicohort().get_sequencing_groups()) * 2
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:

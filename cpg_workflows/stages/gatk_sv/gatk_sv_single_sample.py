@@ -12,7 +12,6 @@ from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
-    _sv_individual_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
@@ -29,11 +28,7 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(
-    analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS],
-    analysis_type='sv',
-    update_analysis_meta=_sv_individual_meta,
-)
+@stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
@@ -227,7 +222,7 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.prefix / 'sgid_batches.json'}
+        return {'batch_json': self.analysis_prefix / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """

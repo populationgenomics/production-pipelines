@@ -129,7 +129,7 @@ class TestAllLargeCohortMethods:
         )
 
         mocker.patch(
-            'cpg_workflows.inputs.create_cohort',
+            'cpg_workflows.inputs.deprecated_create_cohort',
             lambda: _mock_cohort(conf.workflow.dataset),
         )
         # skip can_reuse, implicit skip of existence checks
@@ -189,6 +189,7 @@ class TestAllLargeCohortMethods:
             eigenvalues_ht_path=eigenvalues_ht_path,
             loadings_ht_path=loadings_ht_path,
             inferred_pop_ht_path=inferred_pop_ht_path,
+            relateds_to_drop_ht_path=relateds_to_drop_ht_path,
         )
 
         siteonly_vcf_path = res_pref / 'siteonly.vcf.bgz'

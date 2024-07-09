@@ -201,7 +201,7 @@ class Ancestry(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=[SampleQC, Ancestry])
+@stage(required_stages=[SampleQC, Ancestry, Relatedness])
 class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -243,6 +243,11 @@ class AncestryPlots(CohortStage):
                     cohort,
                     Ancestry,
                     key='inferred_pop',
+                ),
+                relateds_to_drop_ht_path=inputs.as_path(
+                    cohort,
+                    Relatedness,
+                    key='relateds_to_drop',
                 ),
             ),
             depends_on=inputs.get_jobs(cohort),

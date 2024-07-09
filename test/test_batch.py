@@ -72,7 +72,7 @@ def mock_create_analysis(_, project, analysis) -> int:
     return 1  # metamist "analysis" entry ID
 
 
-def mock_create_cohort() -> Cohort:
+def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
     ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
@@ -113,7 +113,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
 
     from cpg_utils.config import dataset_path
     from cpg_utils.hail_batch import get_batch, reset_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -160,7 +160,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
             return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), [j])
 
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)
 
     set_config(config, tmp_path / 'config.toml')
 
@@ -172,7 +172,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         print(b.attributes)
         print(b.name)
     # Check that the correct number of jobs were created
-    assert len(get_batch()._jobs) == len(get_cohort().get_sequencing_groups()) * len(workflow_stages) * 2
+    assert len(get_batch()._jobs) == len(get_multicohort().get_sequencing_groups()) * len(workflow_stages) * 2
     # 2 jobs per stage, assumes no nested workflow stages
     # ((1 per SG * 2 SG) * 2 workflow stages) * 2 (1 job per stage, 1 result registration)
 
@@ -203,7 +203,7 @@ def test_attributes(mocker: MockFixture, tmp_path):
         # test job name
         assert job.name
         assert job.name.startswith(
-            f'{get_cohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}',
+            f'{get_multicohort().get_datasets()[0].name}/{job.attributes["sequencing_group"]}/{job.attributes["participant_id"]}',
         )
 
     # Check that the job_by_stage and job_by_tool dicts are correct

@@ -37,6 +37,14 @@ write_vcf = ["udn-aus"]
 # defaults in code are 40 for genomes, none for exomes
 #haplotypecaller_storage = 80
 
+# JointGenotyping GenomicsDBImport job overrides
+# genomicsdb_import_mem_gb = 32
+# genomicsdb_import_use_highmem = false
+
+# JointGenotyping GenotypeGVCFs job overrides
+# genotype_gvcfs_mem_gb = 15
+# genotype_gvcfs_use_highmem = false
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
