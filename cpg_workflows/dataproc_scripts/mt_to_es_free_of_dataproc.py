@@ -192,17 +192,36 @@ class ElasticsearchClient:
         self.es.indices.forcemerge(index=index_name, request_timeout=60)
 
 
-def main(password: str, mt_path: str, es_index: str, done_path: str, ncpu: int):
+def main():
+
+    parser = ArgumentParser(description='Argument Parser for the ES generation script')
+    parser.add_argument('--mt_path', help='MT path name', required=True)
+    parser.add_argument('--index', help='ES index name', required=True)
+    parser.add_argument('--flag', help='ES index "DONE" file path')
+    parser.add_argument('--cpu', help='number of available cores', default=4, type=int)
+    args = parser.parse_args()
+    logging.basicConfig(level=logging.INFO)
+
+    password: str | None = read_secret(
+        project_id=config_retrieve(['elasticsearch', 'password_project_id'], ''),
+        secret_name=config_retrieve(['elasticsearch', 'password_secret_id'], ''),
+        fail_gracefully=True,
+    )
+
+    # no password, but we fail gracefully
+    if password is None:
+        logging.warning(f'No permission to access ES password, skipping creation of {args.index}')
+        exit(0)
 
     host = config_retrieve(['elasticsearch', 'host'])
     port = config_retrieve(['elasticsearch', 'port'])
     username = config_retrieve(['elasticsearch', 'username'])
     logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
-    hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
+    hl.context.init_spark(master=f'local[{args.cpu}]', quiet=True)
     hl.default_reference('GRCh38')
 
-    mt = hl.read_matrix_table(mt_path)
+    mt = hl.read_matrix_table(args.mt_path)
 
     logging.info('Getting rows and exporting to the ES')
 
@@ -214,13 +233,18 @@ def main(password: str, mt_path: str, es_index: str, done_path: str, ncpu: int):
     es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
     # delete the index if it exists already
-    if es_client.es.indices.exists(index=es_index):
-        es_client.es.indices.delete(index=es_index)
+    if es_client.es.indices.exists(index=args.es_index):
+        es_client.es.indices.delete(index=args.es_index)
 
-    es_client.export_table_to_elasticsearch(row_ht, index_name=es_index, num_shards=es_shards, write_null_values=True)
+    es_client.export_table_to_elasticsearch(
+        row_ht,
+        index_name=args.es_index,
+        num_shards=es_shards,
+        write_null_values=True,
+    )
 
-    _cleanup(es_client, es_index, es_shards)
-    with to_path(done_path).open('w') as f:
+    _cleanup(es_client, args.es_index, es_shards)
+    with to_path(args.flag).open('w') as f:
         f.write('done')
 
 
@@ -264,22 +288,4 @@ def _cleanup(es, es_index, es_shards):
 
 
 if __name__ == '__main__':
-    parser = ArgumentParser(description='Argument Parser for the ES generation script')
-    parser.add_argument('--mt_path', help='MT path name', required=True)
-    parser.add_argument('--index', help='ES index name', required=True)
-    parser.add_argument('--flag', help='ES index "DONE" file path')
-    parser.add_argument('--cpu', help='number of available cores', default=4, type=int)
-    args = parser.parse_args()
-    logging.basicConfig(level=logging.INFO)
-
-    elasticsearch_password: str | None = read_secret(
-        project_id=config_retrieve(['elasticsearch', 'password_project_id'], ''),
-        secret_name=config_retrieve(['elasticsearch', 'password_secret_id'], ''),
-    )
-
-    # no password, but we fail gracefully
-    if elasticsearch_password is None:
-        logging.warning(f'No permission to access ES password, skipping creation of {args.index}')
-        exit(0)
-
-    main(password=elasticsearch_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag, ncpu=args.cpu)
+    main()
