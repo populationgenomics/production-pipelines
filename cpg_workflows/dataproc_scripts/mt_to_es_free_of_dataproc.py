@@ -3,6 +3,7 @@ import math
 from argparse import ArgumentParser
 from io import StringIO
 from sys import exit
+import time
 
 import elasticsearch
 
@@ -38,6 +39,9 @@ HAIL_TYPE_TO_ES_TYPE_MAPPING = {
     hl.tstr: "keyword",
     hl.tbool: "boolean",
 }
+
+# used in wait_for_shard_transfer
+LOADING_NODES_NAME = 'elasticsearch-es-data-loading*'
 
 
 # https://hail.is/docs/devel/types.html
@@ -110,6 +114,21 @@ class ElasticsearchClient:
 
         # check connection
         logging.info(self.es.info())
+
+    def wait_for_shard_transfer(self, index_name, num_attempts=1000):
+        """
+        Wait for shards to move off of the loading nodes before connecting to seqr
+        """
+        for i in range(num_attempts):
+            shards = self.es.cat.shards(index=index_name)
+            if LOADING_NODES_NAME not in shards:
+                logging.warning("Shards are on {}".format(shards))
+                return
+            logging.warning("Waiting for {} shards to transfer off the es-data-loading nodes: \n{}".format(
+                len(shards.strip().split("\n")), shards))
+            time.sleep(5)
+
+        raise Exception('Shards did not transfer off loading nodes')
 
     def create_mapping(self, index_name, elasticsearch_schema, num_shards=1, _meta=None):
         """Calls es.indices.create or es.indices.put_mapping to create or update an elasticsearch index mapping.
@@ -238,7 +257,9 @@ def main():
 
     es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards, write_null_values=True)
 
-    _cleanup(es_client, args.index, es_shards)
+    if es_shards < 25:
+        es_client.wait_for_shard_transfer(args.index)
+
     with to_path(args.flag).open('w') as f:
         f.write('done')
 
@@ -273,13 +294,6 @@ def _mt_num_shards(mt):
     denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
     return calculated_num_shards
-
-
-def _cleanup(es, es_index, es_shards):
-    # Current disk configuration requires the previous index to be deleted prior to large indices,
-    # ~1TB, transferring off loading nodes
-    if es_shards < 25:
-        es.wait_for_shard_transfer(es_index)
 
 
 if __name__ == '__main__':
