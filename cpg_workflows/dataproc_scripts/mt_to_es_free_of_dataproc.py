@@ -126,7 +126,8 @@ class ElasticsearchClient:
                 return
             logging.warning(
                 "Waiting for {} shards to transfer off the es-data-loading nodes: \n{}".format(
-                    len(shards.strip().split("\n")), shards,
+                    len(shards.strip().split("\n")),
+                    shards,
                 ),
             )
             time.sleep(5)
