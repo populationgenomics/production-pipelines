@@ -406,18 +406,16 @@ class RunHailFiltering(DatasetStage):
         clinvar_name = clinvar_decisions.split('/')[-1]
 
         # localise the clinvar decisions table
-        job.command(
-            f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} . && cd -',
-        )
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
 
         # find, localise, and use the clinvar PM5 table
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
-        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {pm5} . && cd -')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
-        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
 
         job.command(
             f'TALOS_CONFIG={conf_in_batch} RunHailFiltering '
@@ -468,10 +466,10 @@ class RunHailFilteringSV(DatasetStage):
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
             job.command(
                 f'TALOS_CONFIG={conf_in_batch} RunHailFilteringSV '
-                f'--mt {sv_file} '
+                f'--mt "${{BATCH_TMPDIR}}/{sv_file}" '
                 f'--panelapp {panelapp_json} '
                 f'--pedigree {local_ped} '
                 f'--vcf_out {job.output["vcf.bgz"]} ',  # type: ignore
