@@ -427,7 +427,12 @@ def _align_one(
             logging.info("Using samtools to extract FASTQs from CRAM/BAM")
             logging.info(f"Alignment input: {alignment_input.path} {alignment_input.index_path}")
             bam_or_cram_group = alignment_input.resource_group(b)
-            extract_fastq_j = extract_fastq(b, bam_or_cram_group)
+            extract_fastq_j = extract_fastq(
+                b,
+                bam_or_cram_group,
+                output_fq1=op('R1.fq.gz', 'tmp'),
+                output_fq2=op('R2.fq.gz', 'tmp'),
+            )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
             fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
@@ -568,8 +573,6 @@ def extract_fastq(
         b.write_output(j.fq1, str(output_fq1))
         b.write_output(j.fq2, str(output_fq2))
 
-    b.write_output(j.r1_r2_flags, op('r1_r2_flags', 'tmp'))
-    b.write_output(j.singletons, op('singletons', 'tmp'))
     return j
 
 
