@@ -131,6 +131,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
 def subset_cram(
     b: hb.Batch,
     bam_or_cram_group: hb.ResourceGroup,
+    alignment_input: FastqPair | CramPath | BamPath,
     chr: str,
     output_bucket: str = 'tmp',
 ) -> Job:
@@ -140,7 +141,10 @@ def subset_cram(
     subset_cram_j.cpu(2)
     subset_cram_j.storage('150G')
     subset_cram_j.memory('standard')
-    ref_path = fasta_res_group(b)['base']
+    if isinstance(alignment_input, FastqPair):
+        ref_path = fasta_res_group(b)['base']
+    if isinstance(alignment_input, CramPath | BamPath):
+        ref_path = b.read_input(alignment_input.reference_assembly)
     subset_cram_j.declare_resource_group(
         cram_output={
             'cram': '{root}.cram',
@@ -241,6 +245,7 @@ def align(
             subset_cram_j = subset_cram(
                 b,
                 bam_or_cram_group,
+                alignment_input,
                 'chr21',
                 'tmp',
             )
