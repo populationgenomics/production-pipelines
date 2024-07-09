@@ -219,21 +219,21 @@ def align(
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         if isinstance(alignment_input, BamPath | CramPath):
-            # logging.info(
-            #     f'Aligning {alignment_input.path} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
-            # )
-            # bam_or_cram_group = alignment_input.resource_group(b)
-            # subset_cram_j = subset_cram(
-            #     b,
-            #     bam_or_cram_group,
-            #     'chr21',
-            #     'tmp',
-            # )
-            # alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
-            # logging.info(
-            #     f'Alignment input: {alignment_input} \
-            #     with path {alignment_input.path} and index {alignment_input.index_path}',
-            # )
+            logging.info(
+                f'Aligning {alignment_input.path} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
+            )
+            bam_or_cram_group = alignment_input.resource_group(b)
+            subset_cram_j = subset_cram(
+                b,
+                bam_or_cram_group,
+                'chr21',
+                'tmp',
+            )
+            alignment_input = CramPath(op('subset/chr21.cram', 'tmp'), op('subset/chr21.cram.crai', 'tmp'))
+            logging.info(
+                f'Alignment input: {alignment_input} \
+                with path {alignment_input.path} and index {alignment_input.index_path}',
+            )
             logging.info(f'subset_cram_j: {subset_cram_j}')
             assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
@@ -626,15 +626,15 @@ def finalise_alignment(
     )
 
     if output_path:
-        # extract_picard = get_config()['workflow'].get('extract_picard', False)
-        # if extract_picard:
-        #     output_path = CramPath(
-        #         f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_chr21.cram',
-        #     )
-        # else:
-        #     output_path = CramPath(
-        #         f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_chr21.cram',
-        #     )
+        extract_picard = get_config()['workflow'].get('extract_picard', False)
+        if extract_picard:
+            output_path = CramPath(
+                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_chr21.cram',
+            )
+        else:
+            output_path = CramPath(
+                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_chr21.cram',
+            )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
             if out_markdup_metrics_path:
