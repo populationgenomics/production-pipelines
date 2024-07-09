@@ -109,6 +109,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
         )
         alignment_input = CramPath(
             reads_location,
+            index_path=reads_location + '.crai',
             reference_assembly=reference_assembly_location,
         )
         logging.info(f'Alignment_input: {alignment_input} and index: {alignment_input.index_path}')
