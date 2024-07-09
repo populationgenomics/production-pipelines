@@ -133,6 +133,7 @@ def subset_cram(
     b: hb.Batch,
     bam_or_cram_group: hb.ResourceGroup,
     alignment_input: FastqPair | CramPath | BamPath,
+    sequencing_group: SequencingGroup,
     chr: str,
     output_bucket: str = 'tmp',
 ) -> Job:
@@ -161,7 +162,7 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        b.write_output(subset_cram_j.cram_output, op(f'nagim_subset/{chr}', 'tmp'))
+        b.write_output(subset_cram_j.cram_output, op(f'nagim_subset/{sequencing_group.id}_{chr}', 'tmp'))
 
     return subset_cram_j
 
@@ -249,12 +250,13 @@ def align(
                 b,
                 bam_or_cram_group,
                 alignment_input,
+                sequencing_group,
                 'chr21',
                 'tmp',
             )
             alignment_input = CramPath(
-                op('nagim_subset/chr21.cram', 'tmp'),
-                op('nagim_subset/chr21.cram.crai', 'tmp'),
+                op(f'nagim_subset/{sequencing_group.id}_chr21.cram', 'tmp'),
+                op(f'nagim_subset/{sequencing_group.id}_chr21.cram.crai', 'tmp'),
                 reference_assembly=alignment_input.reference_assembly,
             )
             logging.info(
@@ -458,8 +460,8 @@ def _align_one(
                 b,
                 bam_or_cram_group,
                 alignment_input,
-                output_fq1=op('nagim_subset/R1.fq.gz', 'tmp'),
-                output_fq2=op('nagim_subset/R2.fq.gz', 'tmp'),
+                output_fq1=op(f'nagim_subset/{sequencing_group_name}_R1.fq.gz', 'tmp'),
+                output_fq2=op(f'nagim_subset/{sequencing_group_name}_R2.fq.gz', 'tmp'),
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
