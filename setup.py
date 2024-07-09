@@ -61,6 +61,8 @@ setup(
         'console_scripts': [
             # script for modifying the content of a sniffles VCF, used in Long-Read SV pipeline
             'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
+            # for use in translating a MatrixTable to an ES index, first localising the MT
+            'mt_to_es = cpg_workflows.dataproc_scripts.mt_to_es_free_of_dataproc:main',
         ],
     },
 )

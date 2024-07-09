@@ -192,15 +192,15 @@ class ElasticsearchClient:
         self.es.indices.forcemerge(index=index_name, request_timeout=60)
 
 
-def main(password: str, mt_path: str, es_index: str, done_path: str):
+def main(password: str, mt_path: str, es_index: str, done_path: str, ncpu: int):
 
     host = config_retrieve(['elasticsearch', 'host'])
     port = config_retrieve(['elasticsearch', 'port'])
     username = config_retrieve(['elasticsearch', 'username'])
     logging.info(f'Connecting to ElasticSearch: host="{host}", port="{port}", user="{username}"')
 
-    # start a hail batch - this was hl.init('GRCh38') in Dataproc, but we won't have the related data networked as-local
-    hl.context.init_spark(default_reference='GRCh38')
+    hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
+    hl.default_reference('GRCh38')
 
     mt = hl.read_matrix_table(mt_path)
 
@@ -268,6 +268,7 @@ if __name__ == '__main__':
     parser.add_argument('--mt_path', help='MT path name', required=True)
     parser.add_argument('--index', help='ES index name', required=True)
     parser.add_argument('--flag', help='ES index "DONE" file path')
+    parser.add_argument('--cpu', help='number of available cores', default=4, type=int)
     args = parser.parse_args()
     logging.basicConfig(level=logging.INFO)
 
@@ -281,4 +282,4 @@ if __name__ == '__main__':
         logging.warning(f'No permission to access ES password, skipping creation of {args.index}')
         exit(0)
 
-    main(password=elasticsearch_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag)
+    main(password=elasticsearch_password, mt_path=args.mt_path, es_index=args.index, done_path=args.flag, ncpu=args.cpu)
