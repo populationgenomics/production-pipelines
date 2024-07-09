@@ -135,7 +135,7 @@ def subset_cram(
     chr: str,
     output_bucket: str = 'tmp',
 ) -> Job:
-
+    logging.info(f'alignment_input: {type(alignment_input)}')
     subset_cram_j = b.new_job('subset_tob_cram')
     subset_cram_j.image(image_path('samtools'))
     subset_cram_j.cpu(2)
@@ -143,8 +143,10 @@ def subset_cram(
     subset_cram_j.memory('standard')
     if isinstance(alignment_input, FastqPair):
         ref_path = fasta_res_group(b)['base']
+        logging.info(f'Reference path: {ref_path}')
     if isinstance(alignment_input, CramPath | BamPath):
         ref_path = b.read_input(alignment_input.reference_assembly)
+        logging.info(f'Reference path: {ref_path}')
     subset_cram_j.declare_resource_group(
         cram_output={
             'cram': '{root}.cram',
