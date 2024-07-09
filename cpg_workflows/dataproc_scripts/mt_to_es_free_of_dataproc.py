@@ -1,9 +1,9 @@
 import logging
 import math
+import time
 from argparse import ArgumentParser
 from io import StringIO
 from sys import exit
-import time
 
 import elasticsearch
 
@@ -124,8 +124,11 @@ class ElasticsearchClient:
             if LOADING_NODES_NAME not in shards:
                 logging.warning("Shards are on {}".format(shards))
                 return
-            logging.warning("Waiting for {} shards to transfer off the es-data-loading nodes: \n{}".format(
-                len(shards.strip().split("\n")), shards))
+            logging.warning(
+                "Waiting for {} shards to transfer off the es-data-loading nodes: \n{}".format(
+                    len(shards.strip().split("\n")), shards,
+                ),
+            )
             time.sleep(5)
 
         raise Exception('Shards did not transfer off loading nodes')
