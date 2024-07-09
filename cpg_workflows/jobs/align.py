@@ -629,11 +629,11 @@ def finalise_alignment(
         extract_picard = get_config()['workflow'].get('extract_picard', False)
         if extract_picard:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_chr21.cram',
+                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_nagim_chr21.cram',
             )
         else:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_chr21.cram',
+                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_nagim_chr21.cram',
             )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
