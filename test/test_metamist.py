@@ -124,6 +124,18 @@ def mock_aapi_update_analysis_timeout(*args, **kwargs):
     return True
 
 
+def mock_aapi_update_analysis_timeout_fails(*args, **kwargs):
+    """
+    Mock function for AnalysisApi.update_analysis time out.
+    This function will simulate metamist downtime by raising a timeout error
+    """
+    raise ServiceException(
+        status=504,
+        reason='Gateway Timeout',
+        http_resp=None,
+    )
+
+
 def mock_query_get_sg_entries_query_returns_empty_data(*args, **kwargs):
     """
     Mock function for AnalysisApi.query(GET_SEQUENCING_GROUPS_QUERY) as sucess.
@@ -262,6 +274,7 @@ class TestMetamist:
                 'sequencingGroups': [],
             },
         )
+        initial_status = AnalysisStatus.parse('in-progress')
         status_to_be_set = AnalysisStatus.parse('completed')
 
         # test error in API call
@@ -273,11 +286,27 @@ class TestMetamist:
             analysis,
             status_to_be_set,
         )
-        # TODO fix implementation
+        # TODO fix implementation, keep the assert below commented out for the original behavior
         # assert analysis.status != status_to_be_set
 
-        # test timout in API call
+        # test API call with Timeout error for more than 3 times
+        # reset status to in-progress
+        analysis.status = initial_status
+        mocker.patch(
+            'cpg_workflows.metamist.AnalysisApi.update_analysis',
+            side_effect=mock_aapi_update_analysis_timeout_fails,
+        )
+        metamist.update_analysis(
+            analysis,
+            status_to_be_set,
+        )
+        # TODO fix implementation, keep the assert below commented out for the original behavior
+        # assert analysis.status != status_to_be_set
+
+        # test timeout in API call, first 2x timeout, then success
         timeout_counter.reset()
+        # reset status to in-progress
+        analysis.status = initial_status
         mocker.patch(
             'cpg_workflows.metamist.AnalysisApi.update_analysis',
             side_effect=mock_aapi_update_analysis_timeout,
@@ -289,6 +318,8 @@ class TestMetamist:
         assert analysis.status == status_to_be_set
 
         # test success
+        # reset status to in-progress
+        analysis.status = initial_status
         mocker.patch(
             'cpg_workflows.metamist.AnalysisApi.update_analysis',
             mock_aapi_update_analysis_ok,

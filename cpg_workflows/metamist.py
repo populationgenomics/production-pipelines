@@ -2,6 +2,7 @@
 Helpers to communicate with the metamist database.
 """
 
+import json
 import logging
 import pprint
 import traceback
@@ -10,6 +11,7 @@ from enum import Enum
 from typing import Any, Callable, Optional
 
 from tenacity import (
+    RetryError,
     retry,
     retry_if_exception_type,
     retry_if_not_exception_type,
@@ -269,25 +271,45 @@ class Metamist:
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
         retry=retry_if_exception_type(ServiceException),
         reraise=True,
     )
-    def make_aapi_call(self, api_func: Callable, **kwargv: Any):
+    def make_retry_aapi_call(self, api_func: Callable, **kwargv: Any):
         """
-        Make a generic API call to self.aapi.
-        TODO:
-        try 3 times, wait 1, 2, 4 seconds?
-        retry only if ServiceException is thrown
+        Make a generic API call to self.aapi with retries.
+        Retry only if ServiceException is thrown
+
+        TODO: How many retries?
+        e.g. try 3 times, wait 2^3: 8, 16, 24 seconds
         """
         try:
             return api_func(**kwargv)
         except ServiceException:
-            traceback.print_exc()
-            # if we raise here, the retry decorator will catch it
+            # raise here so the retry occurs
+            logging.warning(
+                f'Retrying {api_func} ...',
+            )
             raise
-        except ApiException:
+
+    def make_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi.
+        This is a wrapper around retry of API call to handle exceptions and logging.
+        """
+        try:
+            return self.make_retry_aapi_call(api_func, **kwargv)
+        except (ServiceException, ApiException) as e:
+            # Metamist API failed even after retries
+            # log the error and continue
             traceback.print_exc()
+            logging.error(
+                f'Error: {e} Call {api_func} failed with payload:\n{str(kwargv)}',
+            )
+        # TODO: discuss should we catch all here as well?
+        # except Exception as e:
+        #     # Other exceptions?
+
         return None
 
     def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
@@ -346,7 +368,8 @@ class Metamist:
                 status=models.AnalysisStatus(status.value),
             ),
         )
-        # should this be set when the API call fails?
+        # Keeping this as is for compatibility with the existing code
+        # However this should only be set after the API call is successful
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
