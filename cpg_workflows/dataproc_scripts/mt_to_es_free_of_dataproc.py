@@ -1,7 +1,8 @@
 """
 I've peppered this with references to the original source code I'm borrowing/stealing from
 
-1 major source:
+major sources:
+https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/hail_elasticsearch_client.py
 https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py
 """
 
@@ -20,6 +21,7 @@ from cpg_utils import to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve
 
+# CONSTANTS stolen from https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_utils.py#L13
 # make encoded values as human-readable as possible
 ES_FIELD_NAME_ESCAPE_CHAR = '$'
 ES_FIELD_NAME_BAD_LEADING_CHARS = {'_', '-', '+', ES_FIELD_NAME_ESCAPE_CHAR}
@@ -48,12 +50,16 @@ HAIL_TYPE_TO_ES_TYPE_MAPPING = {
 }
 
 # used in wait_for_shard_transfer
+# stolen from https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_client_v7.py#L20
 LOADING_NODES_NAME = 'elasticsearch-es-data-loading*'
 
 
 # https://hail.is/docs/devel/types.html
 # https://www.elastic.co/guide/en/elasticsearch/reference/current/mapping-types.html
 def _elasticsearch_mapping_for_type(dtype):
+    """
+    https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_utils.py#L53
+    """
     if isinstance(dtype, hl.tstruct):
         return {"properties": {field: _elasticsearch_mapping_for_type(dtype[field]) for field in dtype.fields}}
     if isinstance(dtype, (hl.tarray, hl.tset)):
@@ -73,6 +79,7 @@ def _elasticsearch_mapping_for_type(dtype):
 def encode_field_name(s):
     """
     Encodes arbitrary string into an elasticsearch field name
+    https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_utils.py#L123
 
     See:
     https://discuss.elastic.co/t/special-characters-in-field-names/10658/2
@@ -97,10 +104,16 @@ def encode_field_name(s):
 
 
 def struct_to_dict(struct):
+    """
+    https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/hail_elasticsearch_client.py#L21
+    """
     return {k: dict(struct_to_dict(v)) if isinstance(v, hl.utils.Struct) else v for k, v in struct.items()}
 
 
 class ElasticsearchClient:
+    """
+    Clone of https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/hail_elasticsearch_client.py#L25
+    """
 
     def __init__(self, host: str, port: str, es_username: str, es_password: str):
         """
@@ -125,7 +138,7 @@ class ElasticsearchClient:
     def wait_for_shard_transfer(self, index_name, num_attempts=1000):
         """
         Wait for shards to move off of the loading nodes before connecting to seqr
-        https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L266
+        https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_client_v7.py#L134
         """
         for i in range(num_attempts):
             shards = self.es.cat.shards(index=index_name)
@@ -143,7 +156,10 @@ class ElasticsearchClient:
         raise Exception('Shards did not transfer off loading nodes')
 
     def create_mapping(self, index_name, elasticsearch_schema, num_shards=1, _meta=None):
-        """Calls es.indices.create or es.indices.put_mapping to create or update an elasticsearch index mapping.
+        """
+        Calls es.indices.create to create an elasticsearch index mapping.
+        I've removed the alternate code paths for 'update' - we don't use it
+        https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_client_v7.py#L62
 
         Args:
             index_name (str): elasticsearch index mapping
@@ -267,8 +283,14 @@ def main():
     if es_client.es.indices.exists(index=args.index):
         es_client.es.indices.delete(index=args.index)
 
+    # todo why don't we do this https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L256
     es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards, write_null_values=True)
 
+    # todo find out if there's a reason we don't run this line
+    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L267
+    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_client_v7.py#L116
+
+    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L266
     if es_shards < 25:
         es_client.wait_for_shard_transfer(args.index)
 
