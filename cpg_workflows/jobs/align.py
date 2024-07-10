@@ -162,7 +162,10 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        b.write_output(subset_cram_j.cram_output, op(f'nagim_subset/{sequencing_group.id}_{chr}', 'tmp'))
+        b.write_output(
+            subset_cram_j.cram_output,
+            op(f'nagim_subset/all_reads/all_reads/{sequencing_group.id}_{chr}', 'tmp'),
+        )
 
     return subset_cram_j
 
@@ -255,8 +258,8 @@ def align(
                 'tmp',
             )
             alignment_input = CramPath(
-                op(f'nagim_subset/{sequencing_group.id}_chr21.cram', 'tmp'),
-                op(f'nagim_subset/{sequencing_group.id}_chr21.cram.crai', 'tmp'),
+                op(f'nagim_subset/all_reads/{sequencing_group.id}_chr21.cram', 'tmp'),
+                op(f'nagim_subset/all_reads/{sequencing_group.id}_chr21.cram.crai', 'tmp'),
                 reference_assembly=alignment_input.reference_assembly,
             )
             logging.info(
@@ -462,21 +465,24 @@ def _align_one(
                 alignment_input,
                 output_fq1=op(f'nagim_subset/{sequencing_group_name}_R1.fq.gz', 'tmp'),
                 output_fq2=op(f'nagim_subset/{sequencing_group_name}_R2.fq.gz', 'tmp'),
+                interleaved=True,
+                interleave_path=op(f'nagim_subset/all_reads/{sequencing_group_name}_interleaved.fq.gz', 'tmp'),
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
-            fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
+            interleaved_fastq = b.read_input(extract_fastq_j.all_reads)
+            # fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
         fastq_pair = alignment_input.as_resources(b)
 
+    interleave_param = '$BATCH_TMPDIR/all_reads.fq.gz'
     r1_param = '$BATCH_TMPDIR/R1.fq.gz'
     r2_param = '$BATCH_TMPDIR/R2.fq.gz'
     # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
     prepare_fastq_cmd = dedent(
         f"""\
-    mv {fastq_pair.r1} {r1_param}
-    mv {fastq_pair.r2} {r2_param}
+    mv {interleaved_fastq} {interleave_param}
     """,
     )
 
@@ -484,7 +490,8 @@ def _align_one(
     dragmap_index = b.read_input_group(
         **{k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k) for k in DRAGMAP_INDEX_FILES},
     )
-    input_params = f'-1 {r1_param} -2 {r2_param}'
+    # input_params = f'-1 {r1_param} -2 {r2_param}'
+    input_params = f'--interleaved=1 -i {interleave_param}'
     # TODO: consider reverting to use of all threads if node capacity
     # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
     cmd = f"""\
@@ -574,6 +581,8 @@ def extract_fastq(
     job_attrs: dict | None = None,
     output_fq1: str | Path | None = None,
     output_fq2: str | Path | None = None,
+    interleaved: bool = False,
+    interleave_path: str | Path | None = None,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
@@ -594,15 +603,15 @@ def extract_fastq(
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
-    -1 $BATCH_TMPDIR/R1.fq.gz -2 $BATCH_TMPDIR/R2.fq.gz \
-    -0 /dev/null -s /dev/null -n
+    -0 /dev/null -s /dev/null -n > $BATCH_TMPDIR/all_reads.fq.gz
     # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
-    mv $BATCH_TMPDIR/R1.fq.gz {j.fq1}
-    mv $BATCH_TMPDIR/R2.fq.gz {j.fq2}
+    mv $BATCH_TMPDIR/all_reads.fq.gz {j.all_reads}
     """
     j.command(command(cmd, monitor_space=True))
-    if output_fq1 or output_fq2:
+    if interleaved:
+        b.write_output(j.all_reads, str(interleave_path))
+    else:  # output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
         b.write_output(j.fq1, str(output_fq1))
         b.write_output(j.fq2, str(output_fq2))
@@ -664,11 +673,11 @@ def finalise_alignment(
         extract_picard = get_config()['workflow'].get('extract_picard', False)
         if extract_picard:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_nagim_chr21.cram',
+                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_nagim_chr21_all_reads.cram',
             )
         else:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_nagim_chr21.cram',
+                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_nagim_chr21_all_reads.cram',
             )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
