@@ -162,6 +162,7 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
+        logging.info(f'Writing output to {op(f"nagim_subset/all_reads/all_reads/{sequencing_group.id}_{chr}", "tmp")}')
         b.write_output(
             subset_cram_j.cram_output,
             op(f'nagim_subset/all_reads/all_reads/{sequencing_group.id}_{chr}', 'tmp'),
@@ -463,8 +464,8 @@ def _align_one(
                 b,
                 bam_or_cram_group,
                 alignment_input,
-                output_fq1=op(f'nagim_subset/{sequencing_group_name}_R1.fq.gz', 'tmp'),
-                output_fq2=op(f'nagim_subset/{sequencing_group_name}_R2.fq.gz', 'tmp'),
+                # output_fq1=op(f'nagim_subset/{sequencing_group_name}_R1.fq.gz', 'tmp'),
+                # output_fq2=op(f'nagim_subset/{sequencing_group_name}_R2.fq.gz', 'tmp'),
                 interleaved=True,
                 interleave_path=op(f'nagim_subset/all_reads/{sequencing_group_name}_interleaved.fq.gz', 'tmp'),
             )
@@ -610,6 +611,7 @@ def extract_fastq(
     """
     j.command(command(cmd, monitor_space=True))
     if interleaved:
+        logging.info(f'Interleaved: {interleave_path}')
         b.write_output(j.all_reads, str(interleave_path))
     else:  # output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
