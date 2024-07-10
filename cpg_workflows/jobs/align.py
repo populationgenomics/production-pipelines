@@ -162,10 +162,10 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        logging.info(f'Writing output to {op(f"nagim_subset/all_reads/all_reads/{sequencing_group.id}_{chr}", "tmp")}')
+        logging.info(f'Writing output to {op(f"nagim_subset/all_reads/{sequencing_group.id}_{chr}", "tmp")}')
         b.write_output(
             subset_cram_j.cram_output,
-            op(f'nagim_subset/all_reads/all_reads/{sequencing_group.id}_{chr}', 'tmp'),
+            op(f'nagim_subset/all_reads/{sequencing_group.id}_{chr}', 'tmp'),
         )
 
     return subset_cram_j
