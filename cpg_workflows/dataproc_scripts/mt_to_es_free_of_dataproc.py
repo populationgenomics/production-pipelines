@@ -1,3 +1,10 @@
+"""
+I've peppered this with references to the original source code I'm borrowing/stealing from
+
+1 major source:
+https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py
+"""
+
 import logging
 import math
 import time
@@ -118,6 +125,7 @@ class ElasticsearchClient:
     def wait_for_shard_transfer(self, index_name, num_attempts=1000):
         """
         Wait for shards to move off of the loading nodes before connecting to seqr
+        https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L266
         """
         for i in range(num_attempts):
             shards = self.es.cat.shards(index=index_name)
@@ -294,6 +302,7 @@ def elasticsearch_row(mt: hl.MatrixTable):
 def _mt_num_shards(mt):
     """
     Calculate the number of shards from the number of variants and sequencing groups.
+    https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L273
     """
     denominator = 1.4 * 10**9
     calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
