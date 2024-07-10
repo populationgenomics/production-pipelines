@@ -1,7 +1,5 @@
 FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
-RUN pip install --no-install-compiled --upgrade -r requirements.txt
-
 # Install metamist from the specified commit URL
 RUN git clone https://github.com/populationgenomics/metamist.git \
   && cd metamist \
