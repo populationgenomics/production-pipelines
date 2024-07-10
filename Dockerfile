@@ -1,6 +1,12 @@
 FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
-RUN pip install metamist
+# Install metamist from the specified commit URL
+RUN git clone https://github.com/populationgenomics/metamist.git \
+  && cd metamist \
+  && git checkout 679defc3232a351160c9af3eb6504c4d3d7676bb \
+  && pip install .
+
+# Copy other files as usual
 COPY README.md .
 COPY setup.py .
 COPY cpg_workflows cpg_workflows
