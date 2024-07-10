@@ -1,6 +1,6 @@
 FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
-Install metamist from the specified commit URL
+# Install metamist from the specified commit URL
 RUN git clone https://github.com/populationgenomics/metamist.git \
   && cd metamist \
   && python regenerate_api.py \
