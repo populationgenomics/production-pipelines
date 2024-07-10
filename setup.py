@@ -16,7 +16,7 @@ setup(
         'cpg-utils>=5.0.4',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        'hail==0.2.130',  # Pin Hail at CPG's installed version
+        'hail==0.2.132',  # Pin Hail at CPG's installed version
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
         'grpcio-status>=1.62',  # Avoid dependency resolution backtracking
