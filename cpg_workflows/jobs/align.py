@@ -471,7 +471,7 @@ def _align_one(
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
-            interleaved_fastq = b.read_input(extract_fastq_j.all_reads)
+            interleaved_fastq = extract_fastq_j.all_reads
             # fastq_pair = FastqPair(extract_fastq_j.fq1, extract_fastq_j.fq2).as_resources(b)
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
