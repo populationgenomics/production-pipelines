@@ -13,6 +13,7 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.clinvarbitration import AnnotateClinvarDecisions, PM5TableGeneration
 from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.example_stage import ExampleStage1, ExampleStage2
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -58,6 +59,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
+    'test_workflow': [ExampleStage1, ExampleStage2],
 }
 
 

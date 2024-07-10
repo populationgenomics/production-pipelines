@@ -1,0 +1,6 @@
+[workflow]
+name = 'test_workflow'
+status_reporter = 'metamist'
+
+[hail]
+delete_scratch_on_exit = false
