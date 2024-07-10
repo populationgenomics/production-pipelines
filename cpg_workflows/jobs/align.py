@@ -603,7 +603,7 @@ def extract_fastq(
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
-    -0 /dev/null -s /dev/null -n > $BATCH_TMPDIR/all_reads.fq.gz
+    -0 /dev/null -n > $BATCH_TMPDIR/all_reads.fq.gz
     # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/all_reads.fq.gz {j.all_reads}
