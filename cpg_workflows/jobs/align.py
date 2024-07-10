@@ -492,7 +492,7 @@ def _align_one(
         **{k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k) for k in DRAGMAP_INDEX_FILES},
     )
     # input_params = f'-1 {r1_param} -2 {r2_param}'
-    input_params = f'--interleaved=1 {interleave_param}'
+    input_params = f'--interleaved=1 -1 {interleave_param}'
     # TODO: consider reverting to use of all threads if node capacity
     # issue is resolved: https://hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/Job.20becomes.20unresponsive
     cmd = f"""\
