@@ -13,8 +13,8 @@ def main():
 
     job = get_batch().new_job(f'Generate {args.index} from {args.mt_path}')
     job.image(config_retrieve(['workflow', 'driver_image']))
-    job.storage(config_retrieve(['workflow', 'storage_requirement'], '10Gi'))
-    job.memory(config_retrieve(['workflow', 'memory_requirement'], 'highmem'))
+    job.storage(config_retrieve(['workflow', 'storage_requirement'], '40Gi'))
+    job.memory(config_retrieve(['workflow', 'memory_requirement'], 'lowmem'))
 
     ncpu = config_retrieve(['workflow', 'ncpu'], 4)
     job.cpu(ncpu)
