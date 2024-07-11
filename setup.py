@@ -19,13 +19,13 @@ setup(
         'hail==0.2.132',  # Pin Hail at CPG's installed version
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
-        'grpcio-status>=1.62',  # Avoid dependency resolution backtracking
+        'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
         'onnx',
         'onnxruntime',
         'skl2onnx',
         'metamist>=6.9.0',
         'pandas',
-        'peddy',
+        'peddy>=0.4.8',  # Avoid 0.4.7, which is incompatible
         'fsspec',
         'slack_sdk',
         'elasticsearch==8.*',
