@@ -114,7 +114,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')  # type: ignore
 
         # write from temp storage into GCP
-        get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('vcf.bgz'))
+        get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(target=sequencing_group, jobs=[py_job, tabix_job], data=expected_outputs)
 
@@ -169,7 +169,7 @@ class MergeLongReadSVs(CohortStage):
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
         # write the result out
-        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('vcf.bgz'))  # type: ignore
+        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('.vcf.bgz'))  # type: ignore
 
         return self.make_outputs(cohort, data=outputs, jobs=merge_job)
 
