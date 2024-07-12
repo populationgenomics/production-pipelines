@@ -2,9 +2,9 @@
 Metamist wrapper to report analysis progress.
 """
 
+import os
 from abc import ABC, abstractmethod
 from typing import Callable
-import os
 
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
@@ -91,9 +91,7 @@ def complete_analysis_job(
         traceback.print_exc()
         raise
     else:
-        print(
-            f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}'
-        )
+        print(f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}')
         return
 
 
@@ -161,9 +159,7 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
-        py_job = b.new_python_job(
-            f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'}
-        )
+        py_job = b.new_python_job(f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'})
         if sm_env := os.environ.get('SM_ENVIRONMENT'):
             py_job.env('SM_ENVIRONMENT', sm_env)
 
