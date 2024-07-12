@@ -1,3 +1,4 @@
+import logging
 from argparse import ArgumentParser
 
 from cpg_utils.config import config_retrieve
@@ -10,6 +11,11 @@ def main():
     parser.add_argument('--index', help='ES index name', required=True)
     parser.add_argument('--flag', help='ES index "DONE" file path')
     args = parser.parse_args()
+
+    if not args.index.islower():
+        lower_index = args.index.lower()
+        logging.info(f'ES Index name must be lower case ({args.index}), changing to {lower_index}')
+        args.index = lower_index
 
     job = get_batch().new_job(f'Generate {args.index} from {args.mt_path}')
     job.image(config_retrieve(['workflow', 'driver_image']))
