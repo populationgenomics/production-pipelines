@@ -5,20 +5,12 @@ Workflow for finding long-read SV files, updating file contents, merging, and an
 from functools import cache
 
 from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, image_path, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import seqr_loader_long_read
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs
-from cpg_workflows.utils import ExpectedResultT
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
 VCF_QUERY = gql(
@@ -94,12 +86,19 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
         py_job = get_batch().new_python_job(f'Convert {lr_sv_vcf} prior to annotation')
         py_job.storage('10Gi')
+
+        # mandatory argument
+        ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
+        fasta = get_batch().read_input_group(fa=ref_fasta, fai=f'{ref_fasta}.fai')
+
         py_job.call(
             seqr_loader_long_read.modify_sniffles_vcf,
             local_vcf,
             py_job.output,
             sequencing_group.external_id,
             sequencing_group.id,
+            fasta.fa,
+            fasta.fai
         )
 
         # block-gzip and index that result
@@ -125,7 +124,7 @@ class MergeLongReadSVs(CohortStage):
     find all the amended VCFs, and do a naive merge into one huge VCF
     """
 
-    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'vcf': self.prefix / 'merged_reformatted_svs.vcf.bgz',
             'index': self.prefix / 'merged_reformatted_svs.vcf.bgz.tbi',
