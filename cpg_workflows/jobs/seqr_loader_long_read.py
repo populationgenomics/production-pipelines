@@ -31,8 +31,8 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str):
             # for non-header lines, split on tabs
             l_split = line.split('\t')
 
-            # reduce the massive REF alleles to a single base
-            l_split[3] = l_split[3][0]
+            # reduce the massive REF alleles to a single symbolic base
+            l_split[3] = 'N'
 
             # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
             info_dict: dict[str, str] = {}
