@@ -1,10 +1,10 @@
-def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str):
+def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str, fa: str, fa_fai: str):
     """
     to be run as a PythonJob - scrolls through the VCF and performs a few updates:
 
     - replaces the External Sample ID with the internal CPG identifier
     - replaces the ALT allele with a symbolic "<TYPE>", derived from the SVTYPE INFO field
-    - reduces the massive REF String to only the base at the variant position
+    - swaps out the REF (huge for deletions, a symbolic "N" for insertions) with the ref base
 
     rebuilds the VCF following those edits, and writes the compressed data back out
 
@@ -13,8 +13,23 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str):
         file_out (str): local batch output path, same VCF with INFO/ALT alterations
         ext_id (str): external ID to replace (if found)
         int_id (str): CPG ID, required inside the reformatted VCF
+        fa (str): path to a reference FastA file
+        fa_fai (str): path to the index
     """
     import gzip
+
+    import hail as hl
+
+    # initiate a batch
+    hl.init()
+    # set the default reference
+    hl.default_reference('GRCh38')
+
+    # create a ReferenceGenome object
+    rg_38 = hl.ReferenceGenome('GRCh38')
+
+    # add the sequence
+    rg_38.add_sequence(fasta_file=fa, index_file=fa_fai)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
@@ -31,8 +46,8 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str):
             # for non-header lines, split on tabs
             l_split = line.split('\t')
 
-            # reduce the massive REF alleles to a single base
-            l_split[3] = l_split[3][0]
+            # set the reference allele to be the correct reference base
+            l_split[3] = hl.eval(hl.get_sequence(l_split[0], int(l_split[1]), reference_genome=rg_38))
 
             # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
             info_dict: dict[str, str] = {}
