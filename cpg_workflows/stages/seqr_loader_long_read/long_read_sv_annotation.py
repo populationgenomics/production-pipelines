@@ -169,7 +169,7 @@ class MergeLongReadSVs(CohortStage):
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
         # write the result out
-        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('.vcf.bgz'))  # type: ignore
+        get_batch().write_output(merge_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))  # type: ignore
 
         return self.make_outputs(cohort, data=outputs, jobs=merge_job)
 
