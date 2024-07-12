@@ -98,14 +98,11 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             sequencing_group.external_id,
             sequencing_group.id,
             fasta.fa,
-            fasta.fai
+            fasta.fai,
         )
 
         # block-gzip and index that result
-        tabix_job = get_batch().new_job(
-            name=f'BGZipping and Indexing for {sequencing_group.id}',
-            attributes={'tool': 'bcftools'},
-        )
+        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sequencing_group.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
