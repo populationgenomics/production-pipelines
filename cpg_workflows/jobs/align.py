@@ -473,6 +473,7 @@ def _align_one(
                     f'nagim_subset/all_reads_and_discarded/{sequencing_group_name}_interleaved.fq.gz',
                     'tmp',
                 ),
+                sequencing_group=sequencing_group_name,
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
@@ -589,6 +590,7 @@ def extract_fastq(
     output_fq2: str | Path | None = None,
     interleaved: bool = False,
     interleave_path: str | Path | None = None,
+    sequencing_group: str | None = None,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
@@ -621,7 +623,7 @@ def extract_fastq(
         b.write_output(j.all_reads, str(interleave_path))
         b.write_output(
             j.discarded,
-            str(op('nagim_subset/all_reads_and_discarded/discarded.fq', 'tmp')),
+            str(op(f'nagim_subset/all_reads_and_discarded/{sequencing_group}_discarded.fq', 'tmp')),
         )
     else:  # output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
