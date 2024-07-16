@@ -1,0 +1,3 @@
+[workflow]
+name = 'hello_name'
+sequencing_type = 'genome'
