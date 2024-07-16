@@ -90,7 +90,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
         fasta = get_batch().read_input_group(fa=ref_fasta, fai=f'{ref_fasta}.fai')
 
-        # the console entrypoint for the sniffles modifier script has only existed since 1.25.12, requires >=1.25.12
+        # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
         modifier_job.command(
             f'modify_sniffles '
             f'--vcf_in {local_vcf} '
