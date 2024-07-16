@@ -424,7 +424,8 @@ class RunHailFiltering(DatasetStage):
             f'--pedigree {local_ped} '
             f'--vcf_out {job.output["vcf.bgz"]} '
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
-            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
+            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
+            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" ',
         )
         get_batch().write_output(job.output, str(expected_out["labelled_vcf"]).removesuffix('.vcf.bgz'))
 
