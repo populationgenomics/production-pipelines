@@ -7,7 +7,6 @@ from functools import cache
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs import seqr_loader_long_read
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, stage
@@ -84,21 +83,22 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         lr_sv_vcf: str = query_result[sequencing_group.id]
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        py_job = get_batch().new_python_job(f'Convert {lr_sv_vcf} prior to annotation')
-        py_job.storage('10Gi')
+        modifier_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
+        modifier_job.storage('10Gi')
 
         # mandatory argument
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
         fasta = get_batch().read_input_group(fa=ref_fasta, fai=f'{ref_fasta}.fai')
 
-        py_job.call(
-            seqr_loader_long_read.modify_sniffles_vcf,
-            local_vcf,
-            py_job.output,
-            sequencing_group.external_id,
-            sequencing_group.id,
-            fasta.fa,
-            fasta.fai,
+        # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
+        modifier_job.command(
+            f'modify_sniffles '
+            f'--vcf_in {local_vcf} '
+            f'--vcf_out {modifier_job.output} '
+            f'--ext_id {sequencing_group.external_id} '
+            f'--int_id {sequencing_group.id} '
+            f'--fa {fasta.fa} '
+            f'--fai {fasta.fai} ',
         )
 
         # block-gzip and index that result
@@ -106,13 +106,13 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {py_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')  # type: ignore
-        tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')  # type: ignore
+        tabix_job.command(f'bcftools view {modifier_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
         get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(target=sequencing_group, jobs=[py_job, tabix_job], data=expected_outputs)
+        return self.make_outputs(target=sequencing_group, jobs=[modifier_job, tabix_job], data=expected_outputs)
 
 
 @stage(required_stages=ReFormatPacBioSVs)

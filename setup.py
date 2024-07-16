@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.25.12',
+    version='1.25.13',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -57,4 +57,10 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
     ],
+    entry_points={
+        'console_scripts': [
+            # script for modifying the content of a sniffles VCF, used in Long-Read SV pipeline
+            'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
+        ],
+    },
 )
