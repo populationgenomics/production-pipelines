@@ -279,7 +279,7 @@ def main():
     # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L273
     # the denominator in this calculation used to be  1.4 * 10 ** 9, resulting in ~65GB shards
     # it's been reduced to give us more shards, closer to the optimum range 10-50GB
-    es_shards = math.ceil((mt.count_rows() * mt.count_cols()) / 10 ** 9)
+    es_shards = math.ceil((mt.count_rows() * mt.count_cols()) / 10**9)
 
     es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
