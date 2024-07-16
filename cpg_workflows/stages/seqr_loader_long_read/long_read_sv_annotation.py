@@ -85,6 +85,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
         modifier_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
         modifier_job.storage('10Gi')
+        modifier_job.image(config_retrieve(['workflow', 'driver_image']))
 
         # mandatory argument
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
