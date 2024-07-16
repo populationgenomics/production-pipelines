@@ -162,12 +162,10 @@ def subset_cram(
     subset_cram_j.command(command(subset_cmd))
 
     if output_bucket:
-        logging.info(
-            f'Writing output to {op(f"nagim_subset/all_reads_and_discarded/{sequencing_group.id}_{chr}", "tmp")}',
-        )
+        logging.info(f'Writing output to {op(f"nagim_subset/all_reads/{sequencing_group.id}_{chr}", "tmp")}')
         b.write_output(
             subset_cram_j.cram_output,
-            op(f'nagim_subset/all_reads_and_discarded/{sequencing_group.id}_{chr}', 'tmp'),
+            op(f'nagim_subset/all_reads/{sequencing_group.id}_{chr}', 'tmp'),
         )
 
     return subset_cram_j
@@ -261,8 +259,8 @@ def align(
                 'tmp',
             )
             alignment_input = CramPath(
-                op(f'nagim_subset/all_reads_and_discarded/{sequencing_group.id}_chr21.cram', 'tmp'),
-                op(f'nagim_subset/all_reads_and_discarded/{sequencing_group.id}_chr21.cram.crai', 'tmp'),
+                op(f'nagim_subset/all_reads/{sequencing_group.id}_chr21.cram', 'tmp'),
+                op(f'nagim_subset/all_reads/{sequencing_group.id}_chr21.cram.crai', 'tmp'),
                 reference_assembly=alignment_input.reference_assembly,
             )
             logging.info(
@@ -469,11 +467,7 @@ def _align_one(
                 # output_fq1=op(f'nagim_subset/{sequencing_group_name}_R1.fq.gz', 'tmp'),
                 # output_fq2=op(f'nagim_subset/{sequencing_group_name}_R2.fq.gz', 'tmp'),
                 interleaved=True,
-                interleave_path=op(
-                    f'nagim_subset/all_reads_and_discarded/{sequencing_group_name}_interleaved.fq.gz',
-                    'tmp',
-                ),
-                sequencing_group=sequencing_group_name,
+                interleave_path=op(f'nagim_subset/all_reads/{sequencing_group_name}_interleaved.fq.gz', 'tmp'),
             )
             if subset_cram_j:
                 extract_fastq_j.depends_on(subset_cram_j)
@@ -590,7 +584,6 @@ def extract_fastq(
     output_fq2: str | Path | None = None,
     interleaved: bool = False,
     interleave_path: str | Path | None = None,
-    sequencing_group: str | None = None,
 ) -> Job:
     """
     Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
@@ -611,20 +604,15 @@ def extract_fastq(
     samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
-    -0 $BATCH_TMPDIR/discarded.fq -n | gzip > $BATCH_TMPDIR/all_reads.fq.gz
+    -0 /dev/null -n | gzip > $BATCH_TMPDIR/all_reads.fq.gz
     # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/all_reads.fq.gz {j.all_reads}
-    mv $BATCH_TMPDIR/discarded.fq {j.discarded}
     """
     j.command(command(cmd, monitor_space=True))
     if interleaved:
         logging.info(f'Interleaved: {interleave_path}')
         b.write_output(j.all_reads, str(interleave_path))
-        b.write_output(
-            j.discarded,
-            str(op(f'nagim_subset/all_reads_and_discarded/{sequencing_group}_discarded.fq', 'tmp')),
-        )
     else:  # output_fq1 or output_fq2:
         assert output_fq1 and output_fq2, (output_fq1, output_fq2)
         b.write_output(j.fq1, str(output_fq1))
@@ -687,11 +675,11 @@ def finalise_alignment(
         extract_picard = get_config()['workflow'].get('extract_picard', False)
         if extract_picard:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_nagim_chr21_all_reads_and_discarded.cram',
+                f'gs://cpg-tob-wgs-test/cram/picard_extracted_{sequencing_group.id}_nagim_chr21_all_reads.cram',
             )
         else:
             output_path = CramPath(
-                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_nagim_chr21_all_reads_and_discarded.cram',
+                f'gs://cpg-tob-wgs-test/cram/samtools_extracted_{sequencing_group.id}_nagim_chr21_all_reads.cram',
             )
         if md_j is not None:
             b.write_output(md_j.output_cram, str(output_path.path.with_suffix('')))
