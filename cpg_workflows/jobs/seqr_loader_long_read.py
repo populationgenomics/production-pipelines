@@ -18,8 +18,9 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str, f
     """
     import gzip
 
-    from cpg_utils.hail_batch import init_batch
     import hail as hl
+
+    from cpg_utils.hail_batch import init_batch
 
     # initiate a batch - must be a service backend in a PythonJob?
     init_batch()
