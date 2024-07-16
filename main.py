@@ -63,40 +63,40 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
 }
 
 
-@click.command(no_args_is_help=True)
-@click.argument('workflow', required=False)
-@click.option(
-    '--config',
-    'config_paths',
-    multiple=True,
-    help='Add configuration files to the files specified $CPG_CONFIG_PATH.'
-    'Configs are merged left to right, meaning the rightmost file has the'
-    'highest priority.',
-)
-@click.option(
-    '--list-workflows',
-    'list_workflows',
-    is_flag=True,
-    help='Only list possible values for WORKFLOW (and available last stages)',
-)
-@click.option(
-    '--list-last-stages',
-    'list_last_stages',
-    is_flag=True,
-    help='Only list possible end stages for a workflow, that can be specified with `workflow/last_stages` in config',
-)
-@click.option(
-    '--dry-run',
-    'dry_run',
-    is_flag=True,
-    help='Dry run: do not actually communicate with Metamist or Hail Batch, '
-    'instead only print a final config and stages to be run',
-)
-@click.option(
-    '--verbose',
-    'verbose',
-    is_flag=True,
-)
+#@click.command(no_args_is_help=True)
+#@click.argument('workflow', required=False)
+#@click.option(
+#    '--config',
+#    'config_paths',
+#    multiple=True,
+#    help='Add configuration files to the files specified $CPG_CONFIG_PATH.'
+#    'Configs are merged left to right, meaning the rightmost file has the'
+#    'highest priority.',
+#)
+#@click.option(
+#    '--list-workflows',
+#    'list_workflows',
+#    is_flag=True,
+#    help='Only list possible values for WORKFLOW (and available last stages)',
+#)
+#@click.option(
+#    '--list-last-stages',
+#    'list_last_stages',
+#    is_flag=True,
+#    help='Only list possible end stages for a workflow, that can be specified with `workflow/last_stages` in config',
+#)
+#@click.option(
+#    '--dry-run',
+#    'dry_run',
+#    is_flag=True,
+#    help='Dry run: do not actually communicate with Metamist or Hail Batch, '
+#    'instead only print a final config and stages to be run',
+#)
+#@click.option(
+#    '--verbose',
+#    'verbose',
+#    is_flag=True,
+#)
 def main(
     workflow: str,
     config_paths: list[str],
@@ -139,10 +139,12 @@ def main(
     # Inserting after the "defaults" config, but before user configs:
     set_config_paths(config_paths[:1] + [str(wfl_conf_path)] + config_paths[1:])
 
+    print('Calling run_workflow')
     run_workflow(stages=WORKFLOWS[workflow], dry_run=dry_run)
+    print('Done run_workflow')
 
 
 if __name__ == '__main__':
     print('Calling main')
-    main()
+    main('hello', [], False, False, False, True)
     print('Done called main')
