@@ -83,7 +83,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         lr_sv_vcf: str = query_result[sequencing_group.id]
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        modifier_job = get_batch().new_python_job(f'Convert {lr_sv_vcf} prior to annotation')
+        modifier_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
         modifier_job.storage('10Gi')
 
         # mandatory argument
