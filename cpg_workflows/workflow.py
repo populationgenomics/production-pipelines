@@ -939,7 +939,7 @@ class Workflow:
 
         if not self.dry_run:
             print(f'Calling get_batch.run with {wait=}')
-            get_batch().run(wait=wait)
+            get_batch().run(wait=wait, verbose=True)
             print(f'Done called get_batch.run with {wait=}')
 
     @staticmethod
