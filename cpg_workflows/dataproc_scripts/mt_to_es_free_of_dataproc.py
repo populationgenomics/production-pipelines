@@ -275,7 +275,11 @@ def main():
     # get the rows, flattened, stripped of key and VEP annotations
     row_ht = elasticsearch_row(mt)
 
-    es_shards = _mt_num_shards(mt)
+    # Calculate the number of shards from the number of variants and sequencing groups.
+    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L273
+    # the denominator in this calculation used to be  1.4 * 10 ** 9, resulting in ~65GB shards
+    # it's been reduced to give us more shards, closer to the optimum range 10-50GB
+    es_shards = math.ceil((mt.count_rows() * mt.count_cols()) / 10 ** 9)
 
     es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
@@ -319,16 +323,6 @@ def elasticsearch_row(mt: hl.MatrixTable):
     flat_table = flat_table.drop(*key)
     flat_table.describe()
     return flat_table
-
-
-def _mt_num_shards(mt):
-    """
-    Calculate the number of shards from the number of variants and sequencing groups.
-    https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L273
-    """
-    denominator = 1.4 * 10**9
-    calculated_num_shards = math.ceil((mt.count_rows() * mt.count_cols()) / denominator)
-    return calculated_num_shards
 
 
 if __name__ == '__main__':
