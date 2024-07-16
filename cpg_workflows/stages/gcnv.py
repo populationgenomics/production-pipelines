@@ -620,8 +620,21 @@ class MtToEsCNV(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        """ """
+        """
+        Freshly liberated from the clutches of DataProc
+        Uses the script cpg_workflows/dataproc_scripts/mt_to_es_free_of_dataproc.py
+        The script was registered in setup.py with a console entrypoint
+        This requires a code version >= 1.25.14 in the worker job image to operate
 
+        gCNV indexes have never been spotted over a GB in the wild, so we use minimum storage
+
+        Args:
+            dataset (Dataset):
+            inputs ():
+        """
+
+        # try to generate a password here - we'll find out inside the script anyway, but
+        # by that point we'd already have localised the MT, wasting time and money
         try:
             _es_password_string = es_password()
         except PermissionDenied:
