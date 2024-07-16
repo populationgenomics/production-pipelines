@@ -57,4 +57,10 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
     ],
+    entry_points={
+        'console_scripts': [
+            # script for modifying the content of a sniffles VCF, used in Long-Read SV pipeline
+            'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
+        ],
+    },
 )
