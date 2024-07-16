@@ -272,7 +272,10 @@ class MtToEs(DatasetStage):
 
         job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
 
-        required_storage = tshirt_mt_sizing(sequencing_type=config_retrieve(['workflow', 'sequencing_type']) ,cohort_size=len(dataset.get_sequencing_group_ids()))
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(dataset.get_sequencing_group_ids())
+        )
 
         job.cpu(4).storage(required_storage).memory('lowmem')
 
