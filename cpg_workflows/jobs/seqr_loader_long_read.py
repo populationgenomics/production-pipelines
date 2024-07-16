@@ -25,10 +25,10 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str, f
     # initiate a batch - must be a service backend in a PythonJob?
     init_batch()
 
-    # create a ReferenceGenome object
-    rg_38 = hl.ReferenceGenome('GRCh38')
+    # use the existing GRCh38 reference hail knows about
+    rg_38 = hl.get_reference('GRCh38')
 
-    # add the sequence
+    # add the sequence to pull from
     rg_38.add_sequence(fasta_file=fa, index_file=fa_fai)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
