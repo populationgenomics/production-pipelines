@@ -8,10 +8,10 @@ def cli_main():
     parser = ArgumentParser(description='CLI for the Sniffles VCF modification script')
     parser.add_argument('--vcf_in', help='Path to a localised VCF, this will be modified', required=True)
     parser.add_argument('--vcf_out', help='Path to an output location for the modified VCF', required=True)
-    parser.add_argument('--ext_id', help='Path to the Sample ID in the input VCF', default=None)
-    parser.add_argument('--int_id', help='Path to the Sample ID we want in the output VCF', default=None)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
     parser.add_argument('--fai', help='Path to a FASTA.fai sequence index file for GRCh38', required=True)
+    parser.add_argument('--ext_id', help='Path to the Sample ID in the input VCF', default=None)
+    parser.add_argument('--int_id', help='Path to the Sample ID we want in the output VCF', default=None)
     args, unknown = parser.parse_known_args()
 
     if unknown:
@@ -20,10 +20,10 @@ def cli_main():
     modify_sniffles_vcf(
         file_in=args.vcf_in,
         file_out=args.vcf_out,
-        ext_id=args.ext_id,
-        int_id=args.int_id,
         fa=args.fa,
         fa_fai=args.fai,
+        ext_id=args.ext_id,
+        int_id=args.int_id,
     )
 
 
