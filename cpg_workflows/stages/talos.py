@@ -587,9 +587,6 @@ class CreateTalosHTML(DatasetStage):
 
         job.command(command_string)
 
-        # this + copy_common_env (called by default) should be enough to write using cloudpathlib
-        authenticate_cloud_credentials_in_job(job)
-
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
