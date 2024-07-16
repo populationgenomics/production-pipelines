@@ -1314,7 +1314,7 @@ class MtToEsSv(DatasetStage):
         # try to generate a password here - we'll find out inside the script anyway, but
         # by that point we'd already have localised the MT, wasting time and money
         try:
-            es_password_string = es_password()
+            _es_password_string = es_password()
         except PermissionDenied:
             get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
             return self.make_outputs(dataset)
@@ -1330,8 +1330,8 @@ class MtToEsSv(DatasetStage):
         mt_name = mt_path.split('/')[-1]
 
         # get the expected outputs as Strings
-        index_name = str(outputs["index_name"])
-        flag_name = str(outputs["done_flag"])
+        index_name = str(outputs['index_name'])
+        flag_name = str(outputs['done_flag'])
 
         job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
         # set all job attributes in one bash
@@ -1343,4 +1343,4 @@ class MtToEsSv(DatasetStage):
         # run the export from the localised MT - this job writes no new data, just transforms and exports over network
         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
 
-        return self.make_outputs(dataset, data=index_name, jobs=j)
+        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
