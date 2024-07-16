@@ -6,18 +6,17 @@ import json
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, dataproc, to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, reference_path, try_get_ar_guid
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
-    Dataset,
     DatasetStage,
     SequencingGroupStage,
     StageInput,
@@ -621,9 +620,7 @@ class MtToEsCNV(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        """
-        Uses analysis-runner's dataproc helper to run a hail query script
-        """
+        """ """
 
         try:
             _es_password_string = es_password()
