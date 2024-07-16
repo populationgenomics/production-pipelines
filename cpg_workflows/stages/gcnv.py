@@ -7,7 +7,7 @@ import json
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, dataproc, to_path
-from cpg_utils.config import AR_GUID_NAME, get_config, image_path, reference_path, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, get_config, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs import gcnv
 from cpg_workflows.query_modules import seqr_loader_cnv
@@ -614,8 +614,7 @@ class MtToEsCNV(DatasetStage):
         """
         Expected to generate a Seqr index, which is not a file
         """
-        sequencing_type = get_config()['workflow']['sequencing_type']
-        index_name = f'{dataset.name}-{sequencing_type}-gCNV-{get_workflow().run_timestamp}'.lower()
+        index_name = f'{dataset.name}-exome-gCNV-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
@@ -627,7 +626,7 @@ class MtToEsCNV(DatasetStage):
         """
 
         try:
-            es_password_string = es_password()
+            _es_password_string = es_password()
         except PermissionDenied:
             get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
             return self.make_outputs(dataset)
@@ -635,50 +634,26 @@ class MtToEsCNV(DatasetStage):
             get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt')
-        index_name = self.expected_outputs(dataset)['index_name']
-        done_flag_path = self.expected_outputs(dataset)['done_flag']
+        # get the absolute path to the MT
+        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetCNV, key='mt'))
+        # and just the name, used after localisation
+        mt_name = mt_path.split('/')[-1]
 
-        # transformation is the same, just use the same methods file?
-        script = (
-            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
-            f'--mt-path {dataset_mt_path} '
-            f'--es-index {index_name} '
-            f'--done-flag-path {done_flag_path} '
-            f'--es-password {es_password_string}'
-        )
-        pyfiles = ['seqr-loading-pipelines/hail_scripts']
-        job_name = f'{dataset.name}: create ES index'
+        outputs = self.expected_outputs(dataset)
 
-        if cluster_id := get_config()['hail'].get('dataproc', {}).get('cluster_id'):
-            # noinspection PyProtectedMember
-            j = dataproc._add_submit_job(
-                batch=get_batch(),
-                cluster_id=cluster_id,
-                script=script,
-                pyfiles=pyfiles,
-                job_name=job_name,
-                region='australia-southeast1',
-            )
-        else:
-            j = dataproc.hail_dataproc_job(
-                get_batch(),
-                script,
-                max_age='48h',
-                packages=[
-                    'cpg_workflows',
-                    'elasticsearch==8.*',
-                    'google',
-                    'fsspec',
-                    'gcloud',
-                ],
-                num_workers=2,
-                num_secondary_workers=0,
-                job_name=job_name,
-                scopes=['cloud-platform'],
-                pyfiles=pyfiles,
-                depends_on=inputs.get_jobs(dataset),  # Do not remove, see production-pipelines/issues/791
-            )
-        j._preemptible = False
-        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
-        return self.make_outputs(dataset, data=index_name, jobs=j)
+        # get the expected outputs as Strings
+        index_name = str(outputs['index_name'])
+        flag_name = str(outputs['done_flag'])
+
+        job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
+
+        # set all job attributes in one bash
+        job.cpu(4).memory('lowmem').storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
+
+        # localise the MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
+
+        # run the export from the localised MT - this job writes no new data, just transforms and exports over network
+        job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
+
+        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
