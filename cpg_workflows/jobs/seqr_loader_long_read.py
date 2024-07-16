@@ -20,10 +20,10 @@ def modify_sniffles_vcf(file_in: str, file_out: str, ext_id: str, int_id: str, f
 
     import hail as hl
 
-    # initiate a batch
-    hl.init()
-    # set the default reference
-    hl.default_reference('GRCh38')
+    from cpg_utils.hail_batch import init_batch
+
+    # initiate a batch - must be a service backend in a PythonJob?
+    init_batch()
 
     # create a ReferenceGenome object
     rg_38 = hl.ReferenceGenome('GRCh38')
