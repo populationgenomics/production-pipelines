@@ -938,7 +938,9 @@ class Workflow:
         self.set_stages(_stages)
 
         if not self.dry_run:
+            print(f'Calling get_batch.run with {wait=}')
             get_batch().run(wait=wait)
+            print(f'Done called get_batch.run with {wait=}')
 
     @staticmethod
     def _process_first_last_stages(
