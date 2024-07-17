@@ -106,12 +106,18 @@ def flag_related(
             ht=sample_qc_ht,
         ).checkpoint(str(rankings_ht_path), overwrite=True)
 
-    try:
-        filtered_samples = hl.literal(rank_ht.aggregate(hl.agg.filter(rank_ht.filtered, hl.agg.collect(rank_ht.s))))
-    except hl.ExpressionException:
-        # Hail doesn't handle it with `aggregate` when none of
-        # the samples is 'filtered'
-        filtered_samples = hl.empty_array(hl.tstr)
+    # Remove only related individuals from the PCA, or related individuals AND
+    # samples that did not meet sample QC thresholds
+    remove_failed_qc_samples = get_config()['large_cohort']['remove_failed_qc_pca']
+    if remove_failed_qc_samples == True:
+        try:
+            filtered_samples = hl.literal(rank_ht.aggregate(hl.agg.filter(rank_ht.filtered, hl.agg.collect(rank_ht.s))))
+        except hl.ExpressionException:
+            # Hail doesn't handle it with `aggregate` when none of
+            # the samples is 'filtered'
+            filtered_samples = hl.empty_array(hl.tstr)
+    else:
+        filtered_samples = None
 
     to_drop_ht = compute_related_samples_to_drop(
         relatedness_ht,
