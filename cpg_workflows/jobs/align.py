@@ -161,7 +161,6 @@ def align(
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
     aligner: Aligner | str = Aligner.DRAGMAP,
-    markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
@@ -389,6 +388,7 @@ def _align_one(
     #   Replace process substitution with named-pipes (FIFO)
     #   This is named-pipe name -> command to populate it
     fifo_commands: dict[str, str] = {}
+    use_interleaved = False
     if isinstance(alignment_input, CramPath | BamPath):
         if extract_reads:
             logging.info("Using samtools to extract FASTQs from CRAM/BAM")
@@ -407,11 +407,11 @@ def _align_one(
             mv {interleaved_fastq} {interleave_param}
             """,
             )
+            use_interleaved = True
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
         fastq_pair = alignment_input.as_resources(b)
 
-        use_interleaved = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
         # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
