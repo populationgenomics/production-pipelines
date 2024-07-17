@@ -210,12 +210,6 @@ def align(
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
-        if isinstance(alignment_input, BamPath | CramPath):
-            logging.info(
-                f'Aligning {alignment_input.path} with index {alignment_input.index_path}. Either Fastq, Bam, or Cram. Not Sharded',
-            )
-            bam_or_cram_group = alignment_input.resource_group(b)
-            assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
@@ -239,7 +233,7 @@ def align(
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
             for pair in fastq_pairs:
-                # bwa-mem or dragmap command, but without sorting and deduplication:
+                # dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_job_name,
@@ -349,8 +343,6 @@ def _align_one(
     sequencing_group_name: str,
     job_attrs: dict | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
-    number_of_shards_for_realignment: int | None = None,
-    shard_number: int | None = None,
     should_sort: bool = False,
     extract_reads: bool = False,
 ) -> tuple[Job, str]:
@@ -362,12 +354,6 @@ def _align_one(
     Note: When this function is called within the align function, DRAGMAP is used as the default
     tool.
     """
-    if number_of_shards_for_realignment is not None:
-        assert number_of_shards_for_realignment > 1, number_of_shards_for_realignment
-
-    job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
-    if shard_number is not None and number_of_shards_for_realignment is not None:
-        job_name = f'{job_name} {shard_number + 1}/{number_of_shards_for_realignment} '
     job_name = f'{job_name} {alignment_input}'
     j = b.new_job(job_name, job_attrs)
 
