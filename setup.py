@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.25.4',
+    version='1.25.14',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -16,16 +16,16 @@ setup(
         'cpg-utils>=5.0.4',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        'hail==0.2.130',  # Pin Hail at CPG's installed version
+        'hail==0.2.132',  # Pin Hail at CPG's installed version
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
-        'grpcio-status>=1.62',  # Avoid dependency resolution backtracking
+        'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
         'onnx',
         'onnxruntime',
         'skl2onnx',
         'metamist>=6.9.0',
         'pandas',
-        'peddy',
+        'peddy>=0.4.8',  # Avoid 0.4.7, which is incompatible
         'fsspec',
         'slack_sdk',
         'elasticsearch==8.*',
@@ -33,6 +33,7 @@ setup(
         'bokeh',
         'numpy',
         'click',
+        'toml',
     ],
     extras_require={
         'test': [
@@ -56,4 +57,10 @@ setup(
         'Topic :: Scientific/Engineering',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
     ],
+    entry_points={
+        'console_scripts': [
+            # script for modifying the content of a sniffles VCF, used in Long-Read SV pipeline
+            'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
+        ],
+    },
 )

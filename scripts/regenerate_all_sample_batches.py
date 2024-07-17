@@ -58,6 +58,8 @@ if __name__ == '__main__':
     parser.add_argument('-i', help='Path to the QC tables', nargs='+', required=True)
     parser.add_argument('-p', help='Names of all relevant projects', nargs='+', required=True)
     parser.add_argument('-o', help='Where to write the output', required=True)
+    parser.add_argument('--min', help='Min Batch Size', type=int, default=200)
+    parser.add_argument('--max', help='Max Batch Size', type=int, default=300)
     args, unknown = parser.parse_known_args()
 
     if unknown:
@@ -84,7 +86,7 @@ if __name__ == '__main__':
         raise ValueError('No samples found in the QC tables')
 
     # now make some batches
-    batches = batch_sgs(one_big_df, min_batch_size=200, max_batch_size=300)
+    batches = batch_sgs(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
 
     with to_path(args.o).open('w') as f:
         f.write(json.dumps(batches, indent=4))

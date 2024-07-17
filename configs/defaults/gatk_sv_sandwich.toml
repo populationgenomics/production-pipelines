@@ -1,3 +1,0 @@
-[workflow]
-name = 'gatk_sv'
-status_reporter = 'metamist'

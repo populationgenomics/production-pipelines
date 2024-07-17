@@ -5,20 +5,11 @@ Workflow for finding long-read SV files, updating file contents, merging, and an
 from functools import cache
 
 from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, image_path, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs import seqr_loader_long_read
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs
-from cpg_workflows.utils import ExpectedResultT
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
 VCF_QUERY = gql(
@@ -69,8 +60,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_svs.vcf.bgz',
-            'index': self.prefix / f'{sequencing_group.id}_reformatted_svs.vcf.bgz.tbi',
+            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz',
+            'index': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -92,25 +83,37 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         lr_sv_vcf: str = query_result[sequencing_group.id]
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        py_job = get_batch().new_python_job(f'Convert {lr_sv_vcf} prior to annotation')
-        py_job.storage('10Gi')
-        py_job.call(seqr_loader_long_read.modify_sniffles_vcf, local_vcf, py_job.output)
+        modifier_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
+        modifier_job.storage('10Gi')
+        modifier_job.image(config_retrieve(['workflow', 'driver_image']))
+
+        # mandatory argument
+        ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
+        fasta = get_batch().read_input_group(fa=ref_fasta, fai=f'{ref_fasta}.fai')
+
+        # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
+        modifier_job.command(
+            f'modify_sniffles '
+            f'--vcf_in {local_vcf} '
+            f'--vcf_out {modifier_job.output} '
+            f'--ext_id {sequencing_group.external_id} '
+            f'--int_id {sequencing_group.id} '
+            f'--fa {fasta.fa} '
+            f'--fai {fasta.fai} ',
+        )
 
         # block-gzip and index that result
-        tabix_job = get_batch().new_job(
-            name=f'BGZipping and Indexing for {sequencing_group.id}',
-            attributes={'tool': 'bcftools'},
-        )
+        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sequencing_group.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {py_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')  # type: ignore
-        tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')  # type: ignore
+        tabix_job.command(f'bcftools view {modifier_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
-        get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('vcf.bgz'))
+        get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(target=sequencing_group, jobs=[py_job, tabix_job], data=expected_outputs)
+        return self.make_outputs(target=sequencing_group, jobs=[modifier_job, tabix_job], data=expected_outputs)
 
 
 @stage(required_stages=ReFormatPacBioSVs)
@@ -119,7 +122,7 @@ class MergeLongReadSVs(CohortStage):
     find all the amended VCFs, and do a naive merge into one huge VCF
     """
 
-    def expected_outputs(self, cohort: Cohort) -> ExpectedResultT:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'vcf': self.prefix / 'merged_reformatted_svs.vcf.bgz',
             'index': self.prefix / 'merged_reformatted_svs.vcf.bgz.tbi',
@@ -163,7 +166,7 @@ class MergeLongReadSVs(CohortStage):
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
         # write the result out
-        get_batch().write_output(merge_job.output, outputs['vcf'].removesuffix('vcf.bgz'))  # type: ignore
+        get_batch().write_output(merge_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))  # type: ignore
 
         return self.make_outputs(cohort, data=outputs, jobs=merge_job)
 
