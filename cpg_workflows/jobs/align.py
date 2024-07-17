@@ -33,8 +33,6 @@ from cpg_workflows.workflow import WorkflowError
 
 from . import picard
 
-BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
-BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
 DRAGMAP_INDEX_FILES = ['hash_table.cfg.bin', 'hash_table.cmp', 'reference.bin']
 
 
@@ -43,8 +41,6 @@ class Aligner(Enum):
     Tool that performs the alignment. Value must be the name of the executable.
     """
 
-    BWA = 'bwa'
-    BWAMEM2 = 'bwa-mem2'
     DRAGMAP = 'dragmap'
 
 
@@ -400,7 +396,7 @@ def _align_one(
 
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
-        # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
+        # Need file names to end with ".gz" for DRAGMAP to parse correctly:
         prepare_fastq_cmd = dedent(
             f"""\
         mv {fastq_pair.r1} {r1_param}
