@@ -291,7 +291,9 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        job.command(f'TALOS_CONFIG={conf_in_batch} GeneratePED {query_dataset} {job.output}')
+        # mandatory argument
+        seq_type = config_retrieve(['workflow', 'sequencing_type'])
+        job.command(f'TALOS_CONFIG={conf_in_batch} GeneratePED {query_dataset} {job.output} {seq_type}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
