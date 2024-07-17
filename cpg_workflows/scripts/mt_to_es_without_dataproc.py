@@ -194,12 +194,14 @@ class ElasticsearchClient:
 
     def export_table_to_elasticsearch(self, table, **kwargs):
         es_config = kwargs.get('elasticsearch_config', {})
+        # to remove the write-null-values behaviour, remove the es.spark.dataframe.write.null entry
         es_config.update(
             {
                 'es.net.ssl': 'true',
                 'es.nodes.wan.only': 'true',
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
+                'es.spark.dataframe.write.null': 'true'
             },
         )
         es_config['es.write.operation'] = 'index'
@@ -288,7 +290,7 @@ def main():
         es_client.es.indices.delete(index=args.index)
 
     # todo why don't we do this https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L256
-    es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards, write_null_values=True)
+    es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards)
 
     # todo find out if there's a reason we don't run this line
     # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L267
