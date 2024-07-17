@@ -386,7 +386,7 @@ class RunHailFiltering(DatasetStage):
         # Genomes are more like 500GB
         required_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-            cohort_size=len(dataset.get_sequencing_group_ids())
+            cohort_size=len(dataset.get_sequencing_group_ids()),
         )
         required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
         job.cpu(required_cpu).storage(required_storage).memory('highmem')

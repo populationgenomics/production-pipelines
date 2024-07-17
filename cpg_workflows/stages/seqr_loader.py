@@ -7,10 +7,10 @@ from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, dataproc, to_path
+from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import get_config, image_path, config_retrieve
-from cpg_utils.hail_batch import query_command, get_batch
+from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_job
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Cohort, Dataset
@@ -274,7 +274,7 @@ class MtToEs(DatasetStage):
 
         required_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-            cohort_size=len(dataset.get_sequencing_group_ids())
+            cohort_size=len(dataset.get_sequencing_group_ids()),
         )
 
         job.cpu(4).storage(required_storage).memory('lowmem')
