@@ -161,7 +161,7 @@ class MergeLongReadSVs(CohortStage):
         # -0: compression level
         merge_job.command(
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m all -0',  # type: ignore
+            f'{merge_job.output["vcf.bgz"]} --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
