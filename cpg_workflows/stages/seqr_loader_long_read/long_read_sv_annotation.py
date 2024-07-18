@@ -60,8 +60,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz',
-            'index': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz.tbi',
+            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz',
+            'index': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
