@@ -60,8 +60,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz',
-            'index': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz.tbi',
+            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz',
+            'index': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -161,7 +161,7 @@ class MergeLongReadSVs(CohortStage):
         # -0: compression level
         merge_job.command(
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m all -0',  # type: ignore
+            f'{merge_job.output["vcf.bgz"]} --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 

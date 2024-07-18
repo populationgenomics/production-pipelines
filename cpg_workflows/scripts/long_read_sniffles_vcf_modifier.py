@@ -67,7 +67,9 @@ def modify_sniffles_vcf(
             # alter the sample line in the header
             if line.startswith('#'):
                 if line.startswith('#CHR') and (ext_id and int_id):
-                    line.replace(ext_id, int_id)
+                    line = line.replace(ext_id, int_id)
+                    print('Modified header line')
+                    print(line)
 
                 f_out.write(line)
                 continue
