@@ -125,12 +125,10 @@ class ElasticsearchClient:
         self._es_username = es_username
         self._es_password = es_password
 
-        auth = (self._es_username, self._es_password) if self._es_password else None
-
         if not host.startswith('http://') or not host.startswith('https://'):
             host = f'https://{host}'
         _host = f'{host}:{port}'
-        self.es = elasticsearch.Elasticsearch(_host, basic_auth=auth)
+        self.es = elasticsearch.Elasticsearch(_host, basic_auth=(self._es_username, self._es_password))
 
         # check connection
         logging.info(self.es.info())
@@ -201,7 +199,8 @@ class ElasticsearchClient:
                 'es.nodes.wan.only': 'true',
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
-                'es.spark.dataframe.write.null': 'true'
+                'es.spark.dataframe.write.null': 'true',
+                # 'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
             },
         )
         es_config['es.write.operation'] = 'index'
@@ -281,11 +280,12 @@ def main():
     # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L273
     # the denominator in this calculation used to be  1.4 * 10 ** 9, resulting in ~65GB shards
     # it's been reduced to give us more shards, closer to the optimum range 10-50GB
-    es_shards = math.ceil((mt.count_rows() * mt.count_cols()) / 10**9)
+    # there's a huge inflation (3-4x) between the MT size on disk and the ES Index size, maybe this wasn't factored in?
+    es_shards = math.ceil((mt.count_rows() * mt.count_cols()) / (10**9 / 2))
 
     es_client = ElasticsearchClient(host=host, port=port, es_username=username, es_password=password)
 
-    # delete the index if it exists already
+    # delete the index if it exists already - we shouldn't be doing this
     if es_client.es.indices.exists(index=args.index):
         es_client.es.indices.delete(index=args.index)
 
