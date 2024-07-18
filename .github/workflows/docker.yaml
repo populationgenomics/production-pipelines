@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.25.15
+  VERSION: 1.25.16
 
 jobs:
   docker:
@@ -31,19 +31,19 @@ jobs:
       DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
       DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
+        uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "gh-images-deployer@cpg-common.iam.gserviceaccount.com"
 
       - name: set up gcloud sdk
-        uses: google-github-actions/setup-gcloud@v1
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: cpg-common
 
