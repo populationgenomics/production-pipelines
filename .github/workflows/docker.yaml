@@ -18,8 +18,10 @@ env:
   VERSION: 1.25.15
 
 jobs:
-  docker:
+  docker-production:
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
+    environment: production
     defaults:
       run:
         shell: bash -l {0}
@@ -28,16 +30,15 @@ jobs:
       BUILDKIT_PROGRESS: plain
       CLOUDSDK_CORE_DISABLE_PROMPTS: 1
       IMAGE_NAME: cpg_workflows
-      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
       DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           submodules: recursive
 
       - id: "google-cloud-auth"
         name: "Authenticate to Google Cloud"
-        uses: "google-github-actions/auth@v1"
+        uses: "google-github-actions/auth@v2"
         with:
           workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
           service_account: "gh-images-deployer@cpg-common.iam.gserviceaccount.com"
@@ -63,8 +64,45 @@ jobs:
           docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
           docker push $DOCKER_MAIN/$IMAGE_NAME:latest
 
+  docker-dev:
+    if: github.ref_name != 'main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    environment: dev
+    defaults:
+      run:
+        shell: bash -l {0}
+    env:
+      DOCKER_BUILDKIT: 1
+      BUILDKIT_PROGRESS: plain
+      CLOUDSDK_CORE_DISABLE_PROMPTS: 1
+      IMAGE_NAME: cpg_workflows
+      DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - id: "google-cloud-auth"
+        name: "Authenticate to Google Cloud"
+        uses: "google-github-actions/auth@v2"
+        with:
+          workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "gh-images-dev-deployer@cpg-common.iam.gserviceaccount.com"
+
+      - name: set up gcloud sdk
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          project_id: cpg-common
+
+      - name: gcloud docker auth
+        run: |
+          gcloud auth configure-docker australia-southeast1-docker.pkg.dev
+
+      - name: build
+        run: |
+          docker build . -f Dockerfile --tag $IMAGE_NAME:${{ github.sha }}
+
       - name: manually triggered build
-        if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}
         run: |
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
           docker push $DOCKER_DEV/$IMAGE_NAME:${{github.event.inputs.tag}}
