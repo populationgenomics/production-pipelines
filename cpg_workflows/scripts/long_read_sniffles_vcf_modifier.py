@@ -60,8 +60,9 @@ def modify_sniffles_vcf(
 
         for index, line in enumerate(f):
 
-            if index % 100 == 0:
-                print(f'line {index}')
+            if index % 10000 == 0:
+                print(f'Lines processed: {index}')
+
             # alter the sample line in the header
             if line.startswith('#'):
                 if line.startswith('#CHR') and (ext_id and int_id):
