@@ -64,9 +64,13 @@ def _get_cram_reference_from_version(cram_version) -> str:
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
         return cram_version_map[cram_version]
-    raise ValueError(
-        f'Unrecognised cram_version: "{cram_version}", expected one of: {", ".join(cram_version_map.keys())}',
+    error_message = (
+        f'Unrecognised cram_version: "{cram_version}", expected one of: '
+        f'{", ".join(cram_version_map.keys())}. If realigning from base cram ensure '
+        '["workflow"]["realign_from_cram"]["new_version"] is also set and matches the following: '
+        '["workflow"]["cram_version_reference"]'
     )
+    raise ValueError(error_message)
 
 
 class MissingAlignmentInputException(Exception):
