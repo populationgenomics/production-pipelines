@@ -80,20 +80,25 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
-    if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
-        if (
-            path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
-        ).exists():
-            logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
-            alignment_input = CramPath(
-                path,
-                reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
-            )
-    if get_config()['workflow'].get('realign_from_cram', False):
-        logging.info('Realigning from CRAM')
-        if (cram := sequencing_group.make_cram_path()).exists():
-            logging.info(f'Realigning from CRAM {cram}')
-            alignment_input = cram
+    if realign_from_cram := get_config()['workflow'].get('realign_from_cram', {}):
+        if realign_cram_ver := realign_from_cram.get('version'):
+            if (
+                path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
+            ).exists():
+                logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
+                alignment_input = CramPath(
+                    path,
+                    reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
+                )
+        else:
+            # If no version is specified, use the base CRAM to realign from
+            if (path := (sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram')).exists():
+                new_cram_ver = realign_from_cram.get('new_version')
+                logging.info(
+                    f'Realigning from CRAM {path} \
+                    New version of CRAM will be created at {sequencing_group.dataset.prefix()} / cram / {new_cram_ver} / {sequencing_group.id}.cram',
+                )
+                alignment_input = CramPath(path)  # Uses the default reference assembly
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
@@ -285,6 +290,13 @@ def align(
         jobs.append(merge_j)
         merge_or_align_j = merge_j
         stdout_is_sorted = True
+
+    if new_cram_version := get_config()['workflow']['realign_from_cram']['new_version']:
+        # If realigning from CRAM, save the new CRAM to the new version directory
+        output_path = CramPath(
+            sequencing_group.dataset.prefix() / 'cram' / new_cram_version / f'{sequencing_group.id}.cram',
+            reference_assembly=_get_cram_reference_from_version(new_cram_version),
+        )
 
     md_j = finalise_alignment(
         b=b,
