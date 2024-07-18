@@ -26,6 +26,7 @@ setup(
         'metamist>=6.9.0',
         'pandas',
         'peddy>=0.4.8',  # Avoid 0.4.7, which is incompatible
+        'pyfaidx>=0.8.1.1',
         'fsspec',
         'slack_sdk',
         'elasticsearch==8.*',

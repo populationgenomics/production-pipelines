@@ -1,7 +1,7 @@
 import gzip
 from argparse import ArgumentParser
 
-import hail as hl
+from pyfaidx import Fasta
 
 
 def cli_main():
@@ -53,19 +53,15 @@ def modify_sniffles_vcf(
         int_id (str): CPG ID, required inside the reformatted VCF
     """
 
-    # initialise a local hail runtime
-    hl.context.init_local(default_reference='GRCh38')
-
-    # use the existing GRCh38 reference hail knows about
-    rg_38 = hl.get_reference('GRCh38')
-
-    # add the sequence to pull from
-    rg_38.add_sequence(fasta_file=fa, index_file=fa_fai)
+    fasta_client = Fasta(filename=fa, indexname=fa_fai, as_raw=True)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
 
-        for line in f:
+        for index, line in enumerate(f):
+
+            if index % 100 == 0:
+                print(f'line {index}')
             # alter the sample line in the header
             if line.startswith('#'):
                 if line.startswith('#CHR') and (ext_id and int_id):
@@ -78,7 +74,14 @@ def modify_sniffles_vcf(
             l_split = line.split('\t')
 
             # set the reference allele to be the correct reference base
-            l_split[3] = hl.eval(hl.get_sequence(l_split[0], int(l_split[1]), reference_genome=rg_38))
+            new_base = fasta_client.get_seq(l_split[0], int(l_split[1]), int(l_split[1]))
+
+            # a quick check, if we can
+            if l_split[3] != 'N':
+                assert new_base == l_split[3][0], f'Discrepancy between faidx and Sniffles: {new_base}, {l_split[3]}'
+
+            # replace the REF String
+            l_split[3] = new_base
 
             # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
             info_dict: dict[str, str] = {}
