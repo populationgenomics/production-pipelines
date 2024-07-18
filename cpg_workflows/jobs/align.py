@@ -50,16 +50,12 @@ class MarkDupTool(Enum):
     """
 
     PICARD = 'picard'
-    BIOBAMBAM = 'biobambam'
-    NO_MARKDUP = 'no_markdup'
 
 
 def _get_cram_reference_from_version(cram_version) -> str:
     """
     Get the reference used for the specific cram_version,
-    so that Bazam is able to correctly decompress the reads.
-    Note: Bazam is a tool that can output FASTQ in a form that
-    can stream directly into common aligners such as BWA
+    so that `samtools fastq` correctly extracts reads.
     """
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
