@@ -57,7 +57,7 @@ def _get_cram_reference_from_version(cram_version) -> str:
     Get the reference used for the specific cram_version,
     so that `samtools fastq` correctly extracts reads.
     """
-    cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
+    cram_version_map = get_config()['workflow'].get('align', {}).get('cram_version_reference', {})
     if cram_version in cram_version_map:
         return cram_version_map[cram_version]
     error_message = (
@@ -80,7 +80,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
-    if realign_from_cram := get_config()['workflow'].get('realign_from_cram', {}):
+    if realign_from_cram := get_config()['workflow']['align'].get('align', {}).get('realign_from_cram', {}):
         if realign_cram_ver := realign_from_cram.get('version'):
             if (
                 path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
@@ -105,7 +105,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPat
             + (f': {alignment_input}' if alignment_input else ''),
         )
 
-    if get_config()['workflow'].get('check_inputs', True):
+    if get_config()['workflow']['align'].get('check_inputs', True):
         if not alignment_input.exists():
             raise MissingAlignmentInputException(
                 f'Alignment inputs for sequencing group {sequencing_group} do not exist '
@@ -291,7 +291,7 @@ def align(
         merge_or_align_j = merge_j
         stdout_is_sorted = True
 
-    if new_cram_version := get_config()['workflow']['realign_from_cram']['new_version']:
+    if new_cram_version := get_config()['workflow'].get('align', {})['align']['realign_from_cram']['new_version']:
         # If realigning from CRAM, save the new CRAM to the new version directory
         output_path = CramPath(
             sequencing_group.dataset.prefix() / 'cram' / new_cram_version / f'{sequencing_group.id}.cram',
@@ -324,7 +324,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
     storage_gb = None  # avoid attaching extra disk by default
 
     try:
-        storage_gb = get_config()['workflow']['resources']['Align']['storage_gb']
+        storage_gb = get_config()['workflow'].get('align', {})['resources']['Align']['storage_gb']
     except KeyError:
         pass
     else:
@@ -333,7 +333,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
     # Taking a full instance without attached by default:
     storage_gb = STANDARD.calc_instance_disk_gb()
-    if get_config()['workflow']['sequencing_type'] == 'genome':
+    if get_config()['workflow'].get('align', {})['sequencing_type'] == 'genome':
         # More disk is needed for FASTQ or BAM inputs than for realignment from CRAM
         if isinstance(alignment_input, FastqPair | FastqPairs | BamPath):
             storage_gb = 400
@@ -489,7 +489,7 @@ def extract_fastq(
     else:
         reference_path = fasta_res_group(b)['base']
     res = STANDARD.request_resources(ncpu=16)
-    if get_config()['workflow']['sequencing_type'] == 'genome':
+    if get_config()['workflow'].get('align', {})['sequencing_type'] == 'genome':
         res.attach_disk_storage_gb = 700
     res.set_to_job(j)
     tmp_prefix = '$BATCH_TMPDIR/collate'
