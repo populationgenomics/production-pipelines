@@ -53,6 +53,7 @@ def modify_sniffles_vcf(
         int_id (str): CPG ID, required inside the reformatted VCF
     """
 
+    # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
     fasta_client = Fasta(filename=fa, indexname=fa_fai, as_raw=True)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
