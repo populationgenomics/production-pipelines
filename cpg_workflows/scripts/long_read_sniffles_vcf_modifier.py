@@ -96,6 +96,11 @@ def modify_sniffles_vcf(
 
             # replace the alt with a symbolic String
             l_split[4] = f'<{info_dict["SVTYPE"]}>'
+
+            # replace the UID with something meaningful: type_chrom_pos_end
+            # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
+            l_split[2] = f'{info_dict["SVTYPE"]}_{l_split[0]}_{l_split[1]}_{info_dict["END"]}'
+
             # rebuild the string and write as output
             f_out.write('\t'.join(l_split))
 
