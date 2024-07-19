@@ -414,6 +414,21 @@ class Stage(Generic[TargetT], ABC):
     def analysis_prefix(self) -> Path:
         return get_workflow().analysis_prefix / self.name
 
+    def get_stage_cohort_prefix(self, cohort: Cohort, category: str | None = None) -> Path:
+        """
+        Takes a cohort as an argument, calls through to the Workflow cohort_prefix method
+        Result in the form PROJECT_BUCKET / WORKFLOW_NAME / COHORT_ID / STAGE_NAME
+        e.g. "gs://cpg-project-main/seqr_loader/COH123/MyStage"
+
+        Args:
+            cohort (Cohort): we pull the analysis dataset and name from this Cohort
+            category (str | none): main, tmp, test, analysis, web
+
+        Returns:
+            Path
+        """
+        return get_workflow().cohort_prefix(cohort, category=category) / self.name
+
     def __str__(self):
         res = f'{self._name}'
         if self.skipped:
@@ -924,7 +939,16 @@ class Workflow:
 
     def cohort_prefix(self, cohort: Cohort, category: str | None = None) -> Path:
         """
-        Prepare a unique path specific to the cohort
+        Takes a cohort and category as an argument, calls through to the Workflow cohort_prefix method
+        Result in the form PROJECT_BUCKET / WORKFLOW_NAME / COHORT_ID
+        e.g. "gs://cpg-project-main/seqr_loader/COH123", or "gs://cpg-project-main-analysis/seqr_loader/COH123"
+
+        Args:
+            cohort (Cohort): we pull the analysis dataset and name from this Cohort
+            category (str | None): sub-bucket for this project
+
+        Returns:
+            Path
         """
         return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.name
 

@@ -25,8 +25,8 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
-from cpg_workflows.utils import get_logger
 from cpg_workflows.targets import Cohort, Dataset, MultiCohort
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     DatasetStage,
@@ -90,13 +90,13 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
 @stage(analysis_keys=['cohort_ped'], analysis_type='custom')
 class MakeCohortCombinedPed(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'cohort_ped': get_workflow().cohort_prefix(cohort) / 'combined_pedigree.ped'}
+        return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'combined_pedigree.ped'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(cohort)
         # write the pedigree, if it doesn't already exist
         if not to_path(output['cohort_ped']).exists():
-            make_combined_ped(cohort, get_workflow().cohort_prefix(cohort))
+            make_combined_ped(cohort, self.get_stage_cohort_prefix(cohort))
 
         return self.make_outputs(target=cohort, data=output)
 
@@ -180,7 +180,7 @@ class GatherBatchEvidence(CohortStage):
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
 
-        return {key: get_workflow().cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
@@ -285,7 +285,7 @@ class ClusterBatch(CohortStage):
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
             ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
-        return {key: get_workflow().cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -360,8 +360,8 @@ class GenerateBatchMetrics(CohortStage):
         """
 
         return {
-            'metrics': get_workflow().cohort_prefix(cohort) / 'metrics.tsv',
-            'metrics_common': get_workflow().cohort_prefix(cohort) / 'metrics_common.tsv',
+            'metrics': self.get_stage_cohort_prefix(cohort) / 'metrics.tsv',
+            'metrics_common': self.get_stage_cohort_prefix(cohort) / 'metrics_common.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -462,9 +462,9 @@ class FilterBatch(CohortStage):
         d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
             if isinstance(ending, str):
-                d[key] = get_workflow().cohort_prefix(cohort) / ending
+                d[key] = self.get_stage_cohort_prefix(cohort) / ending
             elif isinstance(ending, list):
-                d[key] = [get_workflow().cohort_prefix(cohort) / e for e in ending]
+                d[key] = [self.get_stage_cohort_prefix(cohort) / e for e in ending]
         return d
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -632,7 +632,7 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: get_workflow().cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
