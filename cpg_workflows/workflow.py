@@ -922,6 +922,12 @@ class Workflow:
         """
         return get_multicohort().analysis_dataset.prefix(category=category) / self.name / self.output_version
 
+    def cohort_prefix(self, cohort: Cohort, category: str | None = None) -> Path:
+        """
+        Prepare a unique path specific to the cohort
+        """
+        return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.name
+
     def run(
         self,
         stages: list[StageDecorator] | None = None,

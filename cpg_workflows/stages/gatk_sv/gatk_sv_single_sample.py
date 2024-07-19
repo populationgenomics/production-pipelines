@@ -17,15 +17,8 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
 )
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
 
 @stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
@@ -166,7 +159,7 @@ class EvidenceQC(CohortStage):
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        return {key: self.prefix / fname for key, fname in fname_by_key.items()}
+        return {key: get_workflow().cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
@@ -222,7 +215,7 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.analysis_prefix / 'sgid_batches.json'}
+        return {'batch_json': get_workflow().cohort_prefix(cohort) / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
