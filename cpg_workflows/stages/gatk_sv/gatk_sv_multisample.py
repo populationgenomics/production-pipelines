@@ -720,7 +720,7 @@ class MakeCohortVcf(MultiCohortStage):
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
         filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         # get the names of all contained cohorts
         all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
@@ -815,7 +815,7 @@ class FormatVcfForGatk(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
             'prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, MakeCohortVcf)['vcf'],
@@ -850,7 +850,7 @@ class JoinRawCalls(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
             'FormatVcfForGatk.formatter_args': '--fix-end',
             'prefix': multicohort.name,
@@ -945,7 +945,7 @@ class GeneratePloidyTable(MultiCohortStage):
         return {'ploidy_table': self.prefix / 'ploidy_table.txt'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         py_job = get_batch().new_python_job('create_ploidy_table')
         py_job.image(config_retrieve(['workflow', 'driver_image']))
@@ -982,7 +982,7 @@ class FilterGenotypes(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict = {
             'output_prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
