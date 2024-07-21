@@ -10,15 +10,18 @@ highmem_workers = true
 # The parameter value should correspond to CRAM version.
 # For example, to realign from CRAM version 'v0', ensure the following configuration is set:
 # ["workflow"]["align"]["realign_from_cram"]["version"] = "v0"
+# E.g.
+# [align.realign_from_cram]
+# version = "v0"
 # This will use the CRAM file located at gs://<dataset-prefix>/cram/v0/<SequencingGroupID>.cram
-# and realign it using the reference specified in ["workflow"]["align"]["cram_version_reference"]["v0"].
-# If ["workflow"]["align"]["realign_from_cram"]["new_version"] is set, a new CRAM file will be created
-# at gs://<dataset-prefix>/cram/<new_version>/<SequencingGroupID>.cram after realignment.
-# Ensure the correct reference is configured for the new version in ["workflow"]["align"]["cram_version_reference"].
+# and realign it using the reference specified in ["workflow"]["align"]["realign_from_cram"][<new_version_id>].
+# A new CRAM file will be created at gs://<dataset-prefix>/cram/<new_version_id>/<SequencingGroupID>.cram after realignment.
+# Ensure the correct reference is configured for the current version of the cram in ["workflow"]["align"]["realign_from_cram"]["cram_version_map"]
+# as well as the new version.
 # [align.realign_from_cram]
 # version = 'v1'
 # new_version = 'v2'
-# [align.cram_version_reference]
+# [align.realign_from_cram.cram_version_map]
 # v1 = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 # v2 = 'gs://<path-to-new/updated/alternative-reference'
 

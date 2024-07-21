@@ -5,10 +5,10 @@ Stage that generates a CRAM file.
 import logging
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import align
-from cpg_workflows.jobs.align import MissingAlignmentInputException
+from cpg_workflows.jobs.align import MissingAlignmentInputException, RealignmentOptions
 from cpg_workflows.workflow import (
     SequencingGroup,
     SequencingGroupStage,
@@ -38,6 +38,13 @@ class Align(SequencingGroupStage):
             'crai': cram_path.index_path,
         }
 
+    @staticmethod
+    def get_realignment_options_from_config() -> RealignmentOptions | None:
+        realignment_options_d = config_retrieve(['workflow', 'align', 'realign_from_cram'], {})
+        if not realignment_options_d:
+            return None
+        return RealignmentOptions(**realignment_options_d)
+
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         Using the "align" function implemented in the `jobs` module.
@@ -64,6 +71,7 @@ class Align(SequencingGroupStage):
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
                 out_markdup_metrics_path=markdup_metrics_path,
+                realignment_options=self.get_realignment_options_from_config(),
             )
             return self.make_outputs(
                 sequencing_group,

@@ -5,7 +5,9 @@ FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 import logging
 import os.path
 from ctypes import alignment
+from dataclasses import dataclass
 from enum import Enum
+from hmac import new
 from math import e
 from test.factories import dataset
 from textwrap import dedent
@@ -52,19 +54,27 @@ class MarkDupTool(Enum):
     PICARD = 'picard'
 
 
-def _get_cram_reference_from_version(cram_version) -> str:
+@dataclass
+class RealignmentOptions:
+    version: str
+    new_version: str
+    cram_version_map: dict[str, str]
+
+
+def _get_cram_reference_from_version(cram_version: str, realign_from_cram_options: RealignmentOptions) -> str:
     """
     Get the reference used for the specific cram_version,
     so that `samtools fastq` correctly extracts reads.
     """
-    cram_version_map = get_config()['workflow'].get('align', {}).get('cram_version_reference', {})
-    if cram_version in cram_version_map:
-        return cram_version_map[cram_version]
+    if not realign_from_cram_options.cram_version_map:
+        raise ValueError('No cram_version_map found in realign_from_cram_options. Make sure to set it in the config.')
+    if cram_version in realign_from_cram_options.cram_version_map:
+        return realign_from_cram_options.cram_version_map[cram_version]
     error_message = (
         f'Unrecognised cram_version: "{cram_version}", expected one of: '
-        f'{", ".join(cram_version_map.keys())}. If realigning from base cram ensure '
-        '["workflow"]["realign_from_cram"]["new_version"] is also set and matches the following: '
-        '["workflow"]["cram_version_reference"]'
+        f'{", ".join(realign_from_cram_options.cram_version_map.keys())}. If realigning from base cram ensure '
+        '["workflow"]["align"]["realign_from_cram"]["new_version"] is also set and matches the following: '
+        '["workflow"]["align"]["realign_from_cram"]["cram_version_map"]'
     )
     raise ValueError(error_message)
 
@@ -75,30 +85,52 @@ class MissingAlignmentInputException(Exception):
     pass
 
 
-def _get_alignment_input(sequencing_group: SequencingGroup) -> CramPath | BamPath | AlignmentInput:
+def _get_realignment_input(
+    sequencing_group: SequencingGroup,
+    realign_from_cram_options: RealignmentOptions,
+) -> CramPath | None:
+
+    realign_cram_ver = realign_from_cram_options.version
+    if realign_cram_ver:
+        path = sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram'
+        if path.exists():
+            logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
+            return CramPath(
+                path,
+                reference_assembly=_get_cram_reference_from_version(realign_cram_ver, realign_from_cram_options),
+            )
+
+    # If no version is specified, use the base CRAM to realign from
+    existing_path = sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'
+    if path := existing_path.exists():
+        new_cram_ver = realign_from_cram_options.new_version
+        logging.info(
+            f'Realigning from CRAM {path} \
+            New version of CRAM will be created at {sequencing_group.dataset.prefix()} / cram / {new_cram_ver} / {sequencing_group.id}.cram',
+        )
+        return CramPath(path)  # Uses the default reference assembly
+
+    # what to do if we didn't find the old cram?
+    raise MissingAlignmentInputException(
+        f'Could not find an old cram to realign for sequencing group {sequencing_group}',
+    )
+
+
+def _get_alignment_input(
+    sequencing_group: SequencingGroup,
+    realignment_options: RealignmentOptions | None,
+) -> CramPath | BamPath | AlignmentInput:
+    # get config parameters at the start
+    # realign from cram path - make new function to generate these
     """Given a sequencing group, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
     sequencing_type = get_config()['workflow']['sequencing_type']
     alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
-    if realign_from_cram := get_config()['workflow']['align'].get('align', {}).get('realign_from_cram', {}):
-        if realign_cram_ver := realign_from_cram.get('version'):
-            if (
-                path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
-            ).exists():
-                logging.info(f'Realigning from {realign_cram_ver} CRAM {path}')
-                alignment_input = CramPath(
-                    path,
-                    reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
-                )
-        else:
-            # If no version is specified, use the base CRAM to realign from
-            if (path := (sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram')).exists():
-                new_cram_ver = realign_from_cram.get('new_version')
-                logging.info(
-                    f'Realigning from CRAM {path} \
-                    New version of CRAM will be created at {sequencing_group.dataset.prefix()} / cram / {new_cram_ver} / {sequencing_group.id}.cram',
-                )
-                alignment_input = CramPath(path)  # Uses the default reference assembly
+
+    # realignment from an old cram
+    if realignment_options:
+        alignment_input = _get_realignment_input(sequencing_group, realignment_options)
+
     if not alignment_input:
         raise MissingAlignmentInputException(
             f'No alignment inputs found for sequencing group {sequencing_group}'
@@ -161,10 +193,10 @@ def align(
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
-    aligner: Aligner | str = Aligner.DRAGMAP,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
+    realignment_options: RealignmentOptions | None = None,
 ) -> list[Job]:
     """
     - if the input is 1 fastq pair, submits one alignment job.
@@ -182,9 +214,6 @@ def align(
     - nthreads can be set for smaller test runs on toy instance, so the job
     doesn't take entire 32-cpu/64-threaded instance.
     """
-    if isinstance(aligner, str):
-        aligner = Aligner[aligner.upper()]
-
     if output_path and can_reuse(output_path.path, overwrite):
         return []
 
@@ -192,7 +221,10 @@ def align(
     # based on the [storage.<dataqset>] config key, ignoring the sequencing_group's
     # alignment input. The `index_path` attribute is set to `None` on this new instance
     # so `sharded_bazam` will be False. Not sure if this is a bug or intended behaviour?
-    alignment_input = _get_alignment_input(sequencing_group)
+    alignment_input = _get_alignment_input(
+        sequencing_group,
+        realignment_options=realignment_options,
+    )
 
     base_job_name = 'Align'
     if extra_label:
@@ -218,7 +250,6 @@ def align(
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
             job_attrs=job_attrs,
-            aligner=aligner,
             should_sort=False,
             extract_reads=True,
         )
@@ -242,7 +273,6 @@ def align(
                     requested_nthreads=requested_nthreads,
                     sequencing_group_name=sequencing_group.id,
                     job_attrs=job_attrs,
-                    aligner=aligner,
                     should_sort=True,
                 )
                 assert isinstance(j, Job)
@@ -259,7 +289,6 @@ def align(
                 alignment_input=alignment_input,
                 sequencing_group_name=sequencing_group.id,
                 job_attrs=job_attrs,
-                aligner=aligner,
                 requested_nthreads=requested_nthreads,
                 should_sort=True,
             )
@@ -291,11 +320,15 @@ def align(
         merge_or_align_j = merge_j
         stdout_is_sorted = True
 
-    if new_cram_version := get_config()['workflow'].get('align', {})['align']['realign_from_cram']['new_version']:
+    if realignment_options:
         # If realigning from CRAM, save the new CRAM to the new version directory
+        new_cram_version = realignment_options.new_version
         output_path = CramPath(
             sequencing_group.dataset.prefix() / 'cram' / new_cram_version / f'{sequencing_group.id}.cram',
-            reference_assembly=_get_cram_reference_from_version(new_cram_version),
+            reference_assembly=_get_cram_reference_from_version(
+                cram_version=new_cram_version,
+                realign_from_cram_options=realignment_options,
+            ),
         )
 
     md_j = finalise_alignment(
@@ -350,7 +383,6 @@ def _align_one(
     requested_nthreads: int,
     sequencing_group_name: str,
     job_attrs: dict | None = None,
-    aligner: Aligner = Aligner.DRAGMAP,
     should_sort: bool = False,
     extract_reads: bool = False,
 ) -> tuple[Job, str]:
@@ -432,9 +464,6 @@ def _align_one(
         --RGID {sequencing_group_name} --RGSM {sequencing_group_name} \\
         --num-threads {nthreads - 1}
     """
-
-    if aligner is not Aligner.DRAGMAP:
-        raise ValueError(f'Unsupported aligner: {aligner.value}')
 
     # prepare command for adding sort on the end
     cmd = dedent(cmd).strip()
