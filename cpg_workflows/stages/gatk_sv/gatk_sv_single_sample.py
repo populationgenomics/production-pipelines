@@ -134,7 +134,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=GatherSampleEvidence)
+@stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
 class EvidenceQC(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
