@@ -99,7 +99,7 @@ def modify_sniffles_vcf(
             l_split[4] = f'<{info_dict["SVTYPE"]}>'
 
             # breakends (BND) aren't annotated with an END or SVLEN
-            end_position = position + int(info_dict.get('END', 0))
+            end_position = int(info_dict.get('END', position))
 
             # replace the UID with something meaningful: type_chrom_pos_end
             # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
