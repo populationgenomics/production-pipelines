@@ -159,7 +159,7 @@ class EvidenceQC(CohortStage):
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        return {key: get_workflow().cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
@@ -214,7 +214,7 @@ class CreateSampleBatches(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': get_workflow().cohort_prefix(cohort) / 'sgid_batches.json'}
+        return {'batch_json': self.get_stage_cohort_prefix(cohort) / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
