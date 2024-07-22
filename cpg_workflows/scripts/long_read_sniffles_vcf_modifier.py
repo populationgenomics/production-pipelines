@@ -67,6 +67,7 @@ def modify_sniffles_vcf(
             # alter the sample line in the header
             if line.startswith('#'):
                 if line.startswith('#CHR') and (ext_id and int_id):
+                    print(line)
                     line = line.replace(ext_id, int_id)
                     print('Modified header line')
                     print(line)
@@ -102,8 +103,12 @@ def modify_sniffles_vcf(
             # replace the alt with a symbolic String
             l_split[4] = f'<{sv_type}>'
 
-            # breakends (BND) aren't annotated with an END or SVLEN so we use an identical position for both ends
-            end_position = info_dict.get('END', position)
+            # breakends (BND) aren't annotated with an END or SVLEN, so we use the CHR2 value
+            if 'END' in info_dict:
+                end_position = info_dict['END']
+            else:
+                # No END in INFO, using CHR2
+                end_position = info_dict['CHR2']
 
             # replace the UID with something meaningful: type_chrom_pos_end
             # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
