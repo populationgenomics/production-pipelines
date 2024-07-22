@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.25.14',
+    version='1.25.18',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -26,6 +26,7 @@ setup(
         'metamist>=6.9.0',
         'pandas',
         'peddy>=0.4.8',  # Avoid 0.4.7, which is incompatible
+        'pyfaidx>=0.8.1.1',
         'fsspec',
         'slack_sdk',
         'elasticsearch==8.*',

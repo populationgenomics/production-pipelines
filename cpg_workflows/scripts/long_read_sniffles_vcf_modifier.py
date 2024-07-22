@@ -1,7 +1,7 @@
 import gzip
 from argparse import ArgumentParser
 
-import hail as hl
+from pyfaidx import Fasta
 
 
 def cli_main():
@@ -53,23 +53,23 @@ def modify_sniffles_vcf(
         int_id (str): CPG ID, required inside the reformatted VCF
     """
 
-    # initialise a local hail runtime
-    hl.context.init_local(default_reference='GRCh38')
-
-    # use the existing GRCh38 reference hail knows about
-    rg_38 = hl.get_reference('GRCh38')
-
-    # add the sequence to pull from
-    rg_38.add_sequence(fasta_file=fa, index_file=fa_fai)
+    # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
+    fasta_client = Fasta(filename=fa, indexname=fa_fai, as_raw=True)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
 
-        for line in f:
+        for index, line in enumerate(f):
+
+            if index % 10000 == 0:
+                print(f'Lines processed: {index}')
+
             # alter the sample line in the header
             if line.startswith('#'):
                 if line.startswith('#CHR') and (ext_id and int_id):
-                    line.replace(ext_id, int_id)
+                    line = line.replace(ext_id, int_id)
+                    print('Modified header line')
+                    print(line)
 
                 f_out.write(line)
                 continue
@@ -78,7 +78,14 @@ def modify_sniffles_vcf(
             l_split = line.split('\t')
 
             # set the reference allele to be the correct reference base
-            l_split[3] = hl.eval(hl.get_sequence(l_split[0], int(l_split[1]), reference_genome=rg_38))
+            new_base = fasta_client.get_seq(l_split[0], int(l_split[1]), int(l_split[1]))
+
+            # a quick check, if we can
+            if l_split[3] != 'N':
+                assert new_base == l_split[3][0], f'Discrepancy between faidx and Sniffles: {new_base}, {l_split[3]}'
+
+            # replace the REF String
+            l_split[3] = new_base
 
             # e.g. AN_Orig=61;END=56855888;SVTYPE=DUP
             info_dict: dict[str, str] = {}
@@ -89,6 +96,11 @@ def modify_sniffles_vcf(
 
             # replace the alt with a symbolic String
             l_split[4] = f'<{info_dict["SVTYPE"]}>'
+
+            # replace the UID with something meaningful: type_chrom_pos_end
+            # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
+            l_split[2] = f'{info_dict["SVTYPE"]}_{l_split[0]}_{l_split[1]}_{info_dict["END"]}'
+
             # rebuild the string and write as output
             f_out.write('\t'.join(l_split))
 

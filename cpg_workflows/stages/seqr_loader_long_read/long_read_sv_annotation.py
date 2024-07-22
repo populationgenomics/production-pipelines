@@ -50,7 +50,7 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
     return return_dict
 
 
-@stage(analysis_keys=['vcf'], analysis_type='custom')
+@stage(analysis_keys=['vcf'])
 class ReFormatPacBioSVs(SequencingGroupStage):
     """
     take each of the long-read SV VCFs, and re-format the contents
@@ -60,8 +60,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         return {
-            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz',
-            'index': self.prefix / f'{sequencing_group.id}_reformatted_lr_svs.vcf.bgz.tbi',
+            'vcf': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz',
+            'index': self.prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -135,7 +135,7 @@ class MergeLongReadSVs(CohortStage):
 
         outputs = self.expected_outputs(cohort)
 
-        # do a slapdash bcftools merge on all input files...
+        # do a bcftools merge on all input files
         modified_vcfs = inputs.as_dict_by_target(ReFormatPacBioSVs)
 
         batch_vcfs = [
@@ -143,7 +143,6 @@ class MergeLongReadSVs(CohortStage):
             for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in cohort.get_sequencing_group_ids()]
         ]
 
-        # just gonna create a job and commands here... this could be in a jobs file, but... shrug
         merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
         merge_job.image(image=image_path('bcftools'))
 
@@ -161,7 +160,7 @@ class MergeLongReadSVs(CohortStage):
         # -0: compression level
         merge_job.command(
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m all -0',  # type: ignore
+            f'{merge_job.output["vcf.bgz"]} --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
 
@@ -171,7 +170,7 @@ class MergeLongReadSVs(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=merge_job)
 
 
-@stage(required_stages=MergeLongReadSVs, analysis_type='custom', analysis_keys=['annotated_vcf'])
+@stage(required_stages=MergeLongReadSVs, analysis_type='vcf', analysis_keys=['annotated_vcf'])
 class AnnotateLongReadSVs(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
