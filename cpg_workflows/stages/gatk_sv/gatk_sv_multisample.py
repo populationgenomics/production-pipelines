@@ -90,7 +90,7 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
 @stage(analysis_keys=['cohort_ped'], analysis_type='custom')
 class MakeCohortCombinedPed(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'combined_pedigree.ped'}
+        return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'ped_with_ref_panel.ped'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(cohort)
@@ -104,7 +104,7 @@ class MakeCohortCombinedPed(CohortStage):
 @stage(analysis_keys=['multicohort_ped'], analysis_type='custom')
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'multicohort_ped': self.prefix / 'combined_pedigree.ped'}
+        return {'multicohort_ped': self.prefix / 'ped_with_ref_panel.ped'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(multicohort)
