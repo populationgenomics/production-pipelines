@@ -17,15 +17,8 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
 )
-from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    stage,
-)
+from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
 
 @stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
@@ -141,7 +134,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=GatherSampleEvidence)
+@stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
 class EvidenceQC(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
@@ -166,7 +159,7 @@ class EvidenceQC(CohortStage):
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        return {key: self.prefix / fname for key, fname in fname_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
@@ -217,12 +210,11 @@ class CreateSampleBatches(CohortStage):
     then run separately for each sub-batch, with the active SGs controlled via the
     config contents.
 
-    When we move to custom cohorts, the output of this stage will be used as input
-    when generating a custom Metamist cohort per sub-batch.
+    The output of this stage is used to generate custom cohorts
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.analysis_prefix / 'sgid_batches.json'}
+        return {'batch_json': self.get_stage_cohort_prefix(cohort) / 'sgid_batches.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """

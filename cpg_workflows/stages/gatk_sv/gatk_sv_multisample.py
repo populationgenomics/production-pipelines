@@ -25,13 +25,11 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
+from cpg_workflows.targets import Cohort, Dataset, MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
-    Cohort,
     CohortStage,
-    Dataset,
     DatasetStage,
-    MultiCohort,
     MultiCohortStage,
     StageInput,
     StageOutput,
@@ -92,13 +90,13 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
 @stage(analysis_keys=['cohort_ped'], analysis_type='custom')
 class MakeCohortCombinedPed(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'cohort_ped': self.prefix / 'combined_pedigree.ped'}
+        return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'combined_pedigree.ped'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(cohort)
         # write the pedigree, if it doesn't already exist
         if not to_path(output['cohort_ped']).exists():
-            make_combined_ped(cohort, self.prefix)
+            make_combined_ped(cohort, self.get_stage_cohort_prefix(cohort))
 
         return self.make_outputs(target=cohort, data=output)
 
@@ -182,7 +180,7 @@ class GatherBatchEvidence(CohortStage):
         for caller in SV_CALLERS:
             ending_by_key[f'std_{caller}_vcf_tar'] = f'{caller}.tar.gz'
 
-        return {key: self.prefix / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """Add jobs to Batch"""
@@ -287,7 +285,7 @@ class ClusterBatch(CohortStage):
         for caller in SV_CALLERS + ['depth']:
             ending_by_key[f'clustered_{caller}_vcf'] = f'clustered-{caller}.vcf.gz'
             ending_by_key[f'clustered_{caller}_vcf_index'] = f'clustered-{caller}.vcf.gz.tbi'
-        return {key: self.prefix / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -362,8 +360,8 @@ class GenerateBatchMetrics(CohortStage):
         """
 
         return {
-            'metrics': self.prefix / 'metrics.tsv',
-            'metrics_common': self.prefix / 'metrics_common.tsv',
+            'metrics': self.get_stage_cohort_prefix(cohort) / 'metrics.tsv',
+            'metrics_common': self.get_stage_cohort_prefix(cohort) / 'metrics_common.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -464,9 +462,9 @@ class FilterBatch(CohortStage):
         d: dict[str, Path | list[Path]] = {}
         for key, ending in ending_by_key.items():
             if isinstance(ending, str):
-                d[key] = self.prefix / ending
+                d[key] = self.get_stage_cohort_prefix(cohort) / ending
             elif isinstance(ending, list):
-                d[key] = [self.prefix / e for e in ending]
+                d[key] = [self.get_stage_cohort_prefix(cohort) / e for e in ending]
         return d
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -634,7 +632,7 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.prefix / fname for key, fname in ending_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
@@ -720,7 +718,7 @@ class MakeCohortVcf(MultiCohortStage):
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
         filterbatch_outputs = inputs.as_dict_by_target(FilterBatch)
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         # get the names of all contained cohorts
         all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
@@ -815,7 +813,7 @@ class FormatVcfForGatk(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
             'prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, MakeCohortVcf)['vcf'],
@@ -850,7 +848,7 @@ class JoinRawCalls(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
             'FormatVcfForGatk.formatter_args': '--fix-end',
             'prefix': multicohort.name,
@@ -945,7 +943,7 @@ class GeneratePloidyTable(MultiCohortStage):
         return {'ploidy_table': self.prefix / 'ploidy_table.txt'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         py_job = get_batch().new_python_job('create_ploidy_table')
         py_job.image(config_retrieve(['workflow', 'driver_image']))
@@ -982,7 +980,7 @@ class FilterGenotypes(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='cohort_ped')
+        pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict = {
             'output_prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
