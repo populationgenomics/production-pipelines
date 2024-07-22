@@ -725,7 +725,7 @@ class MakeCohortVcf(MultiCohortStage):
 
         pesr_vcfs = [genotypebatch_outputs[cohort]['genotyped_pesr_vcf'] for cohort in all_batch_names]
         depth_vcfs = [genotypebatch_outputs[cohort]['genotyped_depth_vcf'] for cohort in all_batch_names]
-        sr_pass = [genotypebatch_outputs[cohort]['sr_bothsides_pass'] for cohort in all_batch_names]
+        sr_pass = [genotypebatch_outputs[cohort]['sr_bothside_pass'] for cohort in all_batch_names]
         sr_fail = [genotypebatch_outputs[cohort]['sr_background_fail'] for cohort in all_batch_names]
         depth_depth_cutoff = [
             genotypebatch_outputs[cohort]['trained_genotype_depth_depth_sepcutoff'] for cohort in all_batch_names
