@@ -106,9 +106,11 @@ def modify_sniffles_vcf(
             # breakends (BND) aren't annotated with an END or SVLEN, so we use the CHR2 value
             if 'END' in info_dict:
                 end_position = info_dict['END']
-            else:
+            elif 'CHR2' in info_dict:
                 # No END in INFO, using CHR2
                 end_position = info_dict['CHR2']
+            else:
+                end_position = str(position)
 
             # replace the UID with something meaningful: type_chrom_pos_end
             # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
