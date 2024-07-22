@@ -78,7 +78,9 @@ def modify_sniffles_vcf(
             l_split = line.split('\t')
 
             # set the reference allele to be the correct reference base
-            new_base = fasta_client.get_seq(l_split[0], int(l_split[1]), int(l_split[1]))
+            chrom = l_split[0]
+            position = int(l_split[1])
+            new_base = fasta_client.get_seq(chrom, position, position)
 
             # a quick check, if we can
             if l_split[3] != 'N':
@@ -94,12 +96,18 @@ def modify_sniffles_vcf(
                     key, value = entry.split('=')
                     info_dict[key] = value
 
+            # get the SVTYPE, always present
+            sv_type = info_dict['SVTYPE']
+
             # replace the alt with a symbolic String
-            l_split[4] = f'<{info_dict["SVTYPE"]}>'
+            l_split[4] = f'<{sv_type}>'
+
+            # breakends (BND) aren't annotated with an END or SVLEN so we use an identical position for both ends
+            end_position = info_dict.get('END', position)
 
             # replace the UID with something meaningful: type_chrom_pos_end
             # this is required as GATK-SV's annotation module sorts on ID, not on anything useful
-            l_split[2] = f'{info_dict["SVTYPE"]}_{l_split[0]}_{l_split[1]}_{info_dict["END"]}'
+            l_split[2] = f'{sv_type}_{chrom}_{position}_{end_position}'
 
             # rebuild the string and write as output
             f_out.write('\t'.join(l_split))
