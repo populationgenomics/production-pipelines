@@ -210,8 +210,7 @@ class CreateSampleBatches(CohortStage):
     then run separately for each sub-batch, with the active SGs controlled via the
     config contents.
 
-    When we move to custom cohorts, the output of this stage will be used as input
-    when generating a custom Metamist cohort per sub-batch.
+    The output of this stage is used to generate custom cohorts
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
