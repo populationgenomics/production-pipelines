@@ -22,6 +22,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_ref_panel,
     get_references,
     make_combined_ped,
+    queue_annotate_strvctvre_job,
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
@@ -1122,17 +1123,6 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
-
-        strv_job.image(image_path('strvctvre'))
-        config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi')
-        strv_job.storage(config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi'))
-        strv_job.memory(config_retrieve(['resource_overrides', self.name, 'memory'], '16Gi'))
-
-        strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
-        assert isinstance(strvctvre_phylop, str)
-
-        phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(multicohort, AnnotateVcf)
         expected_d = self.expected_outputs(multicohort)
@@ -1143,21 +1133,9 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
             vcf_index=str(input_dict['annotated_vcf_index']),
         )['vcf']
 
-        strv_job.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+        strvctvre_job = queue_annotate_strvctvre_job(input_vcf, str(expected_d['strvctvre_vcf']), self.get_job_attrs())
 
-        # run strvctvre
-        strv_job.command(
-            f'python StrVCTVRE.py -i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '  # type: ignore
-            f'-f vcf -p {phylop_in_batch}',
-        )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
-
-        get_batch().write_output(strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', ''))
-        return self.make_outputs(multicohort, data=expected_d, jobs=strv_job)
-
-
-# insert spicy-naming here instead
+        return self.make_outputs(multicohort, data=expected_d, jobs=strvctvre_job)
 
 
 @stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv', analysis_keys=['new_id_vcf'])
