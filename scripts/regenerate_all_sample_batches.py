@@ -16,9 +16,9 @@ from argparse import ArgumentParser
 import pandas as pd
 
 from cpg_utils import to_path
-from cpg_workflows.jobs.sample_batching import batch_sgs, batch_sgs_with_families_and_sg_meta
+from cpg_workflows.jobs.sample_batching import batch_sgs, batch_sgs_by_library
 from cpg_workflows.utils import get_logger
-from metamist.apis import FamilyApi, ParticipantApi
+from metamist.apis import FamilyApi
 from metamist.graphql import gql, query
 
 FIND_ACTIVE_SGS = gql(
@@ -32,6 +32,24 @@ query FindActiveSGs($project: String!) {
   }
 }
 """,
+)
+
+SG_PARTICIPANTS_QUERY = gql(
+    """
+    query FindSGParticipants($project: String!) {
+        project(name: $project) {
+            sequencingGroups {
+                id
+                sample {
+                    participant {
+                        id
+                        externalId
+                    }
+                }
+            }
+        }
+    }
+    """,
 )
 
 
@@ -57,6 +75,25 @@ def parse_sg_meta(df: pd.DataFrame, sg_meta: dict[str, dict[str, str]]) -> pd.Da
     return df
 
 
+def get_sg_participants(project: str) -> list[dict]:
+    """
+    Get the participant ID for each SG using GraphQL
+
+    Args:
+        project (str): the project to collect samples for
+
+    Returns:
+        a list of dictionaries with the SG ID and the participant ID
+    """
+    response = query(SG_PARTICIPANTS_QUERY, {'project': project})
+    return [
+        {
+            sg['id']: sg['sample']['participant']['externalId'],
+        }
+        for sg in response['project']['sequencingGroups']
+    ]
+
+
 def get_sg_families(projects: list[str]) -> dict[str, int]:
     """
     Get the family ID for each SG, by first getting the participant ID, then getting the
@@ -71,24 +108,18 @@ def get_sg_families(projects: list[str]) -> dict[str, int]:
     sg_families: dict[str, int] = {}
     participant_families: dict[str, int] = {}
     sg_participants: dict[str, str] = {}
-    fapi = FamilyApi()
-    papi = ParticipantApi()
+    family_api = FamilyApi()
     for project in projects:
-        sg_participants.update(
-            {
-                x[0]: x[1]
-                for x in papi.get_external_participant_id_to_sequencing_group_id(project=project, flip_columns=True)
-            },
-        )
+        sg_participants.update({x['id']: x['externalId'] for x in get_sg_participants(project)})
         participant_families.update(
             {
                 x['individual_id']: int(x['family_id'])
-                for x in fapi.get_pedigree(project=project, replace_with_family_external_ids=False)
+                for x in family_api.get_pedigree(project=project, replace_with_family_external_ids=False)
             },
         )
 
     for sg, participant in sg_participants.items():
-        sg_families[sg] = participant_families[participant]
+        sg_families[sg] = participant_families.get(participant, -1)
     return sg_families
 
 
@@ -155,8 +186,8 @@ if __name__ == '__main__':
         raise ValueError('No samples found in the QC tables')
 
     # now make some batches
-    if args.family and args.meta:
-        batches = batch_sgs_with_families_and_sg_meta(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
+    if args.meta:
+        batches = batch_sgs_by_library(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
     else:
         batches = batch_sgs(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
 
