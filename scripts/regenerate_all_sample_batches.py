@@ -18,6 +18,7 @@ import pandas as pd
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
 from cpg_workflows.utils import get_logger
+from metamist.apis import FamilyApi, ParticipantApi
 from metamist.graphql import gql, query
 
 FIND_ACTIVE_SGS = gql(
@@ -56,6 +57,41 @@ def parse_sg_meta(df: pd.DataFrame, sg_meta: dict[str, dict[str, str]]) -> pd.Da
     return df
 
 
+def get_sg_families(projects: list[str]) -> dict[str, int]:
+    """
+    Get the family ID for each SG, by first getting the participant ID, then getting the
+    pedigree for the project and mapping the participant ID to the family ID
+
+    Args:
+        projects (list[str]): all the projects
+
+    Returns:
+        a dictionary of SG ID to internal family ID
+    """
+    sg_families: dict[str, int] = {}
+    participant_families: dict[str, int] = {}
+    sg_participants: dict[str, str] = {}
+    fapi = FamilyApi()
+    papi = ParticipantApi()
+    for project in projects:
+        sg_participants.update(
+            {
+                x[0]: x[1]
+                for x in papi.get_external_participant_id_to_sequencing_group_id(project=project, flip_columns=True)
+            },
+        )
+        participant_families.update(
+            {
+                x['individual_id']: int(x['family_id'])
+                for x in fapi.get_pedigree(project=project, replace_with_family_external_ids=False)
+            },
+        )
+
+    for sg, participant in sg_participants.items():
+        sg_families[sg] = participant_families[participant]
+    return sg_families
+
+
 def collect_all_sgids(projects: list[str]) -> tuple[list[str], dict[str, dict[str, str]]]:
     """
     Collect all active SG IDs for a project
@@ -83,6 +119,7 @@ if __name__ == '__main__':
     parser.add_argument('-p', help='Names of all relevant projects', nargs='+', required=True)
     parser.add_argument('-o', help='Where to write the output', required=True)
     parser.add_argument('--meta', help='Add the sg meta fields to the output', default=False, action='store_true')
+    parser.add_argument('--family', help='Get family ID for each SG', default=False, action='store_true')
     parser.add_argument('--min', help='Min Batch Size', type=int, default=200)
     parser.add_argument('--max', help='Max Batch Size', type=int, default=300)
     args, unknown = parser.parse_known_args()
@@ -94,6 +131,9 @@ if __name__ == '__main__':
     get_logger().info(f'Collecting all active SG IDs for {args.p}')
     all_sg_ids, all_sg_meta = collect_all_sgids(args.p)
     get_logger().info(f'Identified {len(all_sg_ids)} active SG IDs')
+    if args.family:
+        get_logger().info('Collecting family IDs for each SG')
+        sg_families = get_sg_families(args.p)
 
     dataframes = []
     for each in args.i:
@@ -105,6 +145,8 @@ if __name__ == '__main__':
         this_df = this_df.query('ID in @all_sg_ids')
         if args.meta:
             this_df = parse_sg_meta(this_df, all_sg_meta)
+        if args.family:
+            this_df['family'] = this_df['ID'].map(lambda x: sg_families[x])
         dataframes.append(this_df)
 
     one_big_df = pd.concat(dataframes).drop_duplicates()
