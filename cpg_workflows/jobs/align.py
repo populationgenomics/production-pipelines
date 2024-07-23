@@ -37,6 +37,9 @@ from . import picard
 
 DRAGMAP_INDEX_FILES = ['hash_table.cfg.bin', 'hash_table.cmp', 'reference.bin']
 
+# If value in realignment options of config parameter is set to 'default', the default CRAM will be used
+DEFAULT_CRAM_VER = 'default'
+
 
 class Aligner(Enum):
     """
@@ -56,9 +59,9 @@ class MarkDupTool(Enum):
 
 @dataclass
 class RealignmentOptions:
-    version: str
     new_version: str
     cram_version_map: dict[str, str]
+    version: str
 
 
 def _get_cram_reference_from_version(cram_version: str, realign_from_cram_options: RealignmentOptions) -> str:
@@ -91,6 +94,17 @@ def _get_realignment_input(
 ) -> CramPath | None:
 
     realign_cram_ver = realign_from_cram_options.version
+    # If no version is specified, use the default CRAM to realign from
+    if realign_cram_ver == DEFAULT_CRAM_VER:
+        existing_path = sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'
+        if existing_path.exists():
+            new_cram_ver = realign_from_cram_options.new_version
+            logging.info(
+                f'Realigning from CRAM {existing_path} \
+                New version of CRAM will be created at {sequencing_group.dataset.prefix()} / cram / {new_cram_ver} / {sequencing_group.id}.cram',
+            )
+            return CramPath(existing_path)  # Uses the default reference assembly
+
     if realign_cram_ver:
         path = sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram'
         if path.exists():
@@ -99,16 +113,6 @@ def _get_realignment_input(
                 path,
                 reference_assembly=_get_cram_reference_from_version(realign_cram_ver, realign_from_cram_options),
             )
-
-    # If no version is specified, use the base CRAM to realign from
-    existing_path = sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'
-    if path := existing_path.exists():
-        new_cram_ver = realign_from_cram_options.new_version
-        logging.info(
-            f'Realigning from CRAM {path} \
-            New version of CRAM will be created at {sequencing_group.dataset.prefix()} / cram / {new_cram_ver} / {sequencing_group.id}.cram',
-        )
-        return CramPath(path)  # Uses the default reference assembly
 
     # what to do if we didn't find the old cram?
     raise MissingAlignmentInputException(
