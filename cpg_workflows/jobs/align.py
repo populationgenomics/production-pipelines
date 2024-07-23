@@ -27,8 +27,6 @@ from cpg_workflows.utils import can_reuse
 
 from . import picard
 
-BWA_INDEX_EXTS = ['sa', 'amb', 'bwt', 'ann', 'pac', 'alt']
-BWAMEM2_INDEX_EXTS = ['0123', 'amb', 'bwt.2bit.64', 'ann', 'pac', 'alt']
 DRAGMAP_INDEX_FILES = ['hash_table.cfg.bin', 'hash_table.cmp', 'reference.bin']
 
 
@@ -37,8 +35,6 @@ class Aligner(Enum):
     Tool that performs the alignment. Value must be the name of the executable.
     """
 
-    BWA = 'bwa'
-    BWAMEM2 = 'bwa-mem2'
     DRAGMAP = 'dragmap'
 
 
@@ -57,7 +53,7 @@ def _get_cram_reference_from_version(cram_version) -> str:
     Get the reference used for the specific cram_version,
     so that Bazam is able to correctly decompress the reads.
     Note: Bazam is a tool that can output FASTQ in a form that
-    can stream directly into common aligners such as BWA
+    can stream directly into common aligners
     """
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
@@ -123,8 +119,6 @@ def align(
     then submits a separate merge job.
 
     - if the input is a cram/bam
-        - for bwa or bwa-mem2, stream bazam -> bwa.
-
         - if number_of_shards_for_realignment is > 1, use bazam to shard inputs
         and align in parallel, then merge result together.
 
@@ -194,7 +188,7 @@ def align(
             # running alignment for each fastq pair in parallel
             fastq_pairs = cast(FastqPairs, alignment_input)
             for pair in fastq_pairs:
-                # bwa-mem or dragmap command, but without sorting and deduplication:
+                # dragmap command, but without sorting and deduplication:
                 j, cmd = _align_one(
                     b=b,
                     job_name=base_job_name,
@@ -308,7 +302,7 @@ def _align_one(
     requested_nthreads: int,
     sequencing_group_name: str,
     job_attrs: dict | None = None,
-    aligner: Aligner = Aligner.BWA,
+    aligner: Aligner = Aligner.DRAGMAP,
     number_of_shards_for_realignment: int | None = None,
     shard_number: int | None = None,
     should_sort: bool = False,
@@ -415,7 +409,7 @@ def _align_one(
         use_bazam = False
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
         r2_param = '$BATCH_TMPDIR/R2.fq.gz'
-        # Need file names to end with ".gz" for BWA or DRAGMAP to parse correctly:
+        # Need file names to end with ".gz" for DRAGMAP to parse correctly:
         prepare_fastq_cmd = dedent(
             f"""\
         mv {fastq_pair.r1} {r1_param}
@@ -423,31 +417,7 @@ def _align_one(
         """,
         )
 
-    if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
-        if aligner == Aligner.BWAMEM2:
-            tool_name = 'bwa-mem2'
-            j.image(image_path('bwamem2'))
-            index_exts = BWAMEM2_INDEX_EXTS
-        else:
-            tool_name = 'bwa'
-            j.image(image_path('bwa'))
-            index_exts = BWA_INDEX_EXTS
-        bwa_reference = fasta_res_group(b, index_exts)
-        rg_line = f'@RG\\tID:{sequencing_group_name}\\tSM:{sequencing_group_name}'
-        # BWA command options:
-        # -K   process INT input bases in each batch regardless of nThreads (for reproducibility)
-        # -p   smart pairing (ignoring in2.fq)
-        # -t16 threads
-        # -Y   use soft clipping for supplementary alignments
-        # -R   read group header line such as '@RG\tID:foo\tSM:bar'
-        cmd = f"""\
-        {prepare_fastq_cmd}
-        {tool_name} mem -K 100000000 \\
-        {'-p' if use_bazam else ''} -t{nthreads - 1} -Y -R '{rg_line}' \\
-        {bwa_reference.base} {r1_param} {r2_param}
-        """
-
-    elif aligner == Aligner.DRAGMAP:
+    if aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
             **{
