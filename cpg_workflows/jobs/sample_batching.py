@@ -41,7 +41,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         Each batch self-documents its size and male/female ratio
         {
             batch_ID: {
-                'batch_size': int,
+                'size': int,
                 'male_count': int,
                 'female_count': int,
                 'mf_ratio': float,
@@ -67,7 +67,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         get_logger().info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
         return [
             {
-                'batch_size': n_sg,
+                'size': n_sg,
                 'male_count': len(md[~is_female]),
                 'female_count': len(md[is_female]),
                 'mf_ratio': is_male.sum() / is_female.sum(),
@@ -129,7 +129,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         )
         batches.append(
             {
-                'batch_size': len(sample_ids),
+                'size': len(sample_ids),
                 'male_count': len(md_sex_cov['male'][cov]),
                 'female_count': len(md_sex_cov['female'][cov]),
                 'mf_ratio': (len(md_sex_cov['male'][cov]) or 1) / (len(md_sex_cov['female'][cov]) or 1),
