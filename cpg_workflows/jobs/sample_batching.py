@@ -137,6 +137,99 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
     return batches
 
 
+def batch_sgs_with_families_and_sg_meta(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> list[dict]:
+    """
+    Batch sequencing groups by coverage, chrX ploidy, family ID, sequencing library, and facility
+
+    Args:
+        md (pd.DataFrame): DataFrame of metadata
+        min_batch_size (int): minimum batch size
+        max_batch_size (int): maximum batch size
+
+    Returns:
+        A list of batches, each with sequencing_groups and additional information
+    """
+    # Split SGs based on >= 2 copies of chrX vs. < 2 copies
+    is_female = md.chrX_CopyNumber_rounded >= 2
+    is_male = md.chrX_CopyNumber_rounded == 1
+
+    # Group samples by family ID
+    family_groups = md.groupby('family')
+
+    # Create initial batches based on families
+    initial_batches = []
+    for _, family_df in family_groups:
+        initial_batches.append(
+            {
+                'sequencing_groups': family_df.ID.tolist(),
+                'male': family_df[~is_female].ID.tolist(),
+                'female': family_df[is_female].ID.tolist(),
+                'library': family_df['library'].iloc[0],
+                'facility': family_df['facility'].iloc[0],
+                'coverage_medians': family_df.median_coverage.tolist(),
+            },
+        )
+
+    # Sort initial batches by size (descending) to process larger families first
+    initial_batches.sort(key=lambda x: len(x['sequencing_groups']), reverse=True)
+
+    # Function to merge compatible batches
+    def merge_batches(batch1, batch2):
+        return {
+            'sequencing_groups': batch1['sequencing_groups'] + batch2['sequencing_groups'],
+            'male': batch1['male'] + batch2['male'],
+            'female': batch1['female'] + batch2['female'],
+            'library': batch1['library'] if batch1['library'] == batch2['library'] else None,
+            'facility': batch1['facility'] if batch1['facility'] == batch2['facility'] else None,
+            'coverage_medians': batch1['coverage_medians'] + batch2['coverage_medians'],
+        }
+
+    # Merge batches based on compatibility and size constraints
+    final_batches: list[dict] = []
+    for batch in initial_batches:
+        merged = False
+        for i, existing_batch in enumerate(final_batches):
+            if (
+                len(existing_batch['sequencing_groups']) + len(batch['sequencing_groups']) <= max_batch_size
+                and (
+                    existing_batch['library'] == batch['library']
+                    or existing_batch['library'] is None
+                    or batch['library'] is None
+                )
+                and (
+                    existing_batch['facility'] == batch['facility']
+                    or existing_batch['facility'] is None
+                    or batch['facility'] is None
+                )
+            ):
+                final_batches[i] = merge_batches(existing_batch, batch)
+                merged = True
+                break
+        if not merged:
+            final_batches.append(batch)
+
+    # If there are still too many small batches, merge them further
+    while len(final_batches) > 1 and any(len(b['sequencing_groups']) < min_batch_size for b in final_batches):
+        final_batches.sort(key=lambda x: len(x['sequencing_groups']))
+        smallest = final_batches.pop(0)
+        for i, batch in enumerate(final_batches):
+            if len(batch['sequencing_groups']) + len(smallest['sequencing_groups']) <= max_batch_size:
+                final_batches[i] = merge_batches(batch, smallest)
+                break
+        else:
+            final_batches.append(smallest)
+
+    # Calculate final batch statistics
+    for i, batch in enumerate(final_batches):
+        batch['batch_ID'] = i
+        batch['size'] = len(batch['sequencing_groups'])
+        batch['male_count'] = len(batch['male'])
+        batch['female_count'] = len(batch['female'])
+        batch['mf_ratio'] = (batch['male_count'] or 1) / (batch['female_count'] or 1)
+
+    return final_batches
+
+
 def partition_batches(
     metadata_file: str,
     sample_ids: list[str],

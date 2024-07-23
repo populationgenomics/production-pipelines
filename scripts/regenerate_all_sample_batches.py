@@ -16,7 +16,7 @@ from argparse import ArgumentParser
 import pandas as pd
 
 from cpg_utils import to_path
-from cpg_workflows.jobs.sample_batching import batch_sgs
+from cpg_workflows.jobs.sample_batching import batch_sgs, batch_sgs_with_families_and_sg_meta
 from cpg_workflows.utils import get_logger
 from metamist.apis import FamilyApi, ParticipantApi
 from metamist.graphql import gql, query
@@ -155,7 +155,10 @@ if __name__ == '__main__':
         raise ValueError('No samples found in the QC tables')
 
     # now make some batches
-    batches = batch_sgs(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
+    if args.family and args.meta:
+        batches = batch_sgs_with_families_and_sg_meta(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
+    else:
+        batches = batch_sgs(one_big_df, min_batch_size=args.min, max_batch_size=args.max)
 
     with to_path(args.o).open('w') as f:
         f.write(json.dumps(batches, indent=4))
