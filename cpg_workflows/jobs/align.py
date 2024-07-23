@@ -110,6 +110,7 @@ def align(
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
+    markdup_tool: MarkDupTool = MarkDupTool.PICARD,
     extra_label: str | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
@@ -129,7 +130,9 @@ def align(
         - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
         because dragmap can't read streamed files from bazam.
 
-    - markdup tool: picard deduplication is submitted in a separate job.
+    - if the markdup tool:
+        - is biobambam2, deduplication and alignment/merging are submitted within the same job.
+        - is picard, deduplication is submitted in a separate job.
 
     - nthreads can be set for smaller test runs on toy instance, so the job
     doesn't take entire 32-cpu/64-threaded instance.
@@ -257,6 +260,7 @@ def align(
         j=merge_or_align_j,
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
+        markdup_tool=markdup_tool,
         output_path=output_path,
         out_markdup_metrics_path=out_markdup_metrics_path,
         overwrite=overwrite,
@@ -555,6 +559,7 @@ def finalise_alignment(
     stdout_is_sorted: bool,
     j: Job,
     requested_nthreads: int,
+    markdup_tool: MarkDupTool,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
     out_markdup_metrics_path: Path | None = None,
@@ -577,12 +582,13 @@ def finalise_alignment(
     j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
     assert isinstance(j.sorted_bam, hb.ResourceFile)
-    md_j = picard.markdup(
-        b,
-        j.sorted_bam,
-        job_attrs=job_attrs,
-        overwrite=overwrite,
-    )
+    if markdup_tool == MarkDupTool.PICARD:
+        md_j = picard.markdup(
+            b,
+            j.sorted_bam,
+            job_attrs=job_attrs,
+            overwrite=overwrite,
+        )
 
     if output_path:
         if md_j is not None:
