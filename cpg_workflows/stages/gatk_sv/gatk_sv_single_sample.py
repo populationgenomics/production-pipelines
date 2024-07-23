@@ -235,11 +235,10 @@ class CreateSampleBatches(MultiCohortStage):
         if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
             raise RuntimeError('This workflow is not intended for Exome data')
 
-        sequencing_groups = [
-            sequencing_group.id
-            for cohort in multicohort.get_cohorts()
-            for sequencing_group in cohort.get_sequencing_groups()
-        ]
+        sequencing_groups = {
+            sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
+        }
+
         qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
         # get those settings
         min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)

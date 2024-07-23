@@ -172,9 +172,29 @@ def batch_sgs_by_library(md: pd.DataFrame, min_batch_size: int, max_batch_size: 
     return batches
 
 
+def add_sg_meta_fields(sg_df: pd.DataFrame, sg_meta: dict[str, dict]) -> pd.DataFrame:
+    """
+    Adds the sg meta fields 'library' and 'facility' to the DataFrame
+
+    Args:
+        sg_df (pd.DataFrame): DataFrame of sequencing groups
+        sg_meta (dict[str, dict]): meta dict keyed by SG ID
+
+    Returns:
+        pd.DataFrame: DataFrame with the sg_meta fields parsed and added
+    """
+    sg_df['library'] = sg_df['ID'].map(
+        lambda x: sg_meta[x].get('library_type', sg_meta[x].get('sequencing_library', 'unknown')),
+    )
+    sg_df['facility'] = sg_df['ID'].map(
+        lambda x: sg_meta[x].get('facility', sg_meta[x].get('sequencing_facility', 'unknown')),
+    )
+    return sg_df
+
+
 def partition_batches(
     metadata_files: list[str],
-    sample_ids: list[str],
+    sequencing_groups: dict[str, dict],
     output_json: str,
     min_batch_size: int,
     max_batch_size: int,
@@ -188,7 +208,7 @@ def partition_batches(
 
     Args:
         metadata_files (list[str]): paths to the metadata files
-        sample_ids (list[str]): sample IDs to consider
+        sequencing_groups (dict[str, dict]): all SGs in scope with their meta
         output_json (str): location to write the batch result
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
@@ -202,7 +222,9 @@ def partition_batches(
     md.columns = [x.replace('#', '') for x in md.columns]  # type: ignore
 
     # filter to the PCR-state SGs we're interested in
+    sample_ids = list(sequencing_groups.keys())
     md = md.query('ID in @sample_ids')
+    md = add_sg_meta_fields(md, sequencing_groups)
 
     # check that we have enough samples to batch
     # should have already been checked prior to Stage starting
