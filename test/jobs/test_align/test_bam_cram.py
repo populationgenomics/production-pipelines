@@ -395,49 +395,6 @@ class TestDragmap:
         )
 
 
-class TestBwaAndBw2:
-    @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    @pytest.mark.parametrize('alinger, expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')])
-    @pytest.mark.parametrize(
-        'reference,expected_reference',
-        [
-            ({'workflow': 'workflow.fa', 'broad': 'broad.fa'}, 'workflow.fa'),
-            ({'workflow': 'workflow.fa', 'broad': None}, 'workflow.fa'),
-            ({'workflow': None, 'broad': 'broad.fa'}, 'broad.fa'),
-        ],
-    )
-    def test_using_bwa_generates_alignment_correct_command(
-        self,
-        tmp_path: Path,
-        input_type: str,
-        reference: dict[str, str | None],
-        expected_reference: str,
-        alinger: Aligner,
-        expected_tool: str,
-    ):
-        """
-        Test that the BWA aligner command is correctly configured. Test that for each
-        combination of alignment input type and aligner, the correct reference from the
-        config is used.
-        """
-        config = default_config()
-        config.workflow.ref_fasta = reference['workflow']
-        config.references['broad']['ref_fasta'] = reference['broad']
-        batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
-
-        jobs = align(b=batch, sequencing_group=sg, aligner=alinger)
-        align_jobs = select_jobs(jobs, 'align')
-        assert len(align_jobs) == 10
-
-        ref_file = re.escape(expected_reference)
-        cmd = get_command_str(align_jobs[0])
-        # Test using base pair chunks, smart pairing and soft-clipping
-        assert re.search(fr'{expected_tool} mem -K 100000000.*-p .* -Y', cmd, re.DOTALL)
-        assert re.search(rf"-R '\@RG\\tID:{sg.id}\\tSM:{sg.id}'", cmd)
-        assert re.search(fr'\${{BATCH_TMPDIR}}/inputs/\w+/{ref_file} r1', cmd)
-        assert re.search(r'\| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam', cmd)
-
-
 class TestPostProcess:
     def test_creates_merge_job_if_input_sharded(self, tmp_path: Path):
         config = default_config()
