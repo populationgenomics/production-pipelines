@@ -17,8 +17,16 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_images,
     get_references,
 )
-from cpg_workflows.targets import Cohort, SequencingGroup
-from cpg_workflows.workflow import CohortStage, SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
+from cpg_workflows.workflow import (
+    CohortStage,
+    MultiCohortStage,
+    SequencingGroupStage,
+    StageInput,
+    StageOutput,
+    get_workflow,
+    stage,
+)
 
 
 @stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
@@ -197,7 +205,7 @@ class EvidenceQC(CohortStage):
 
 
 @stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
-class CreateSampleBatches(CohortStage):
+class CreateSampleBatches(MultiCohortStage):
     """
     uses the values generated in EvidenceQC
     splits the sequencing groups into batches based on median coverage,
@@ -213,22 +221,25 @@ class CreateSampleBatches(CohortStage):
     The output of this stage is used to generate custom cohorts
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'batch_json': self.get_stage_cohort_prefix(cohort) / 'sgid_batches.json'}
+    def expected_outputs(self, multicohort: MultiCohort) -> dict:
+        return {'batch_json': self.prefix / 'sgid_batches.json'}
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
         this stage has been clarified - this will only run on Genomes
         Exomes were never a supported case, they have a separate pipeline
         """
 
-        expected = self.expected_outputs(cohort)
+        expected = self.expected_outputs(multicohort)
 
         if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
             raise RuntimeError('This workflow is not intended for Exome data')
 
-        sequencing_groups = [sequencing_group.id for sequencing_group in cohort.get_sequencing_groups()]
+        sequencing_groups = {
+            sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
+        }
 
+        qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
         # get those settings
         min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)
         max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
@@ -241,11 +252,11 @@ class CreateSampleBatches(CohortStage):
         py_job.image(config_retrieve(['workflow', 'driver_image']))
         py_job.call(
             sample_batching.partition_batches,
-            inputs.as_dict(cohort, EvidenceQC)['qc_table'],
+            qc_tables,
             sequencing_groups,
             expected['batch_json'],
             min_batch_size,
             max_batch_size,
         )
 
-        return self.make_outputs(cohort, data=expected, jobs=py_job)
+        return self.make_outputs(multicohort, data=expected, jobs=py_job)
