@@ -41,12 +41,16 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         Each batch self-documents its size and male/female ratio
         {
             batch_ID: {
+                'batch_size': int,
+                'male_count': int,
+                'female_count': int,
+                'mf_ratio': float,
+                'batch_median_coverage': float,
+                'coverage_range': (float, float),
                 'sequencing_groups': [sample1, sample2, ...],
+                'coverage_medians': [float, float, ...],
                 'male': [sample1, sample3, ...],
                 'female': [sample1, sample3, ...],
-                'mf_ratio': float,
-                'size': int,
-                'coverage_medians': [float, float, ...],
             }
         }
     """
@@ -63,14 +67,16 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         get_logger().info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
         return [
             {
-                'sequencing_groups': md.ID.tolist(),
-                'male': md[~is_female].ID.to_list(),
+                'batch_size': n_sg,
                 'male_count': len(md[~is_female]),
-                'female': md[is_female].ID.to_list(),
                 'female_count': len(md[is_female]),
                 'mf_ratio': is_male.sum() / is_female.sum(),
-                'size': n_sg,
+                'batch_median_coverage': md.median_coverage.median(),
+                'coverage_range': (md.median_coverage.min(), md.median_coverage.max()),
+                'sequencing_groups': md.ID.tolist(),
                 'coverage_medians': md.median_coverage.tolist(),
+                'male': md[~is_female].ID.to_list(),
+                'female': md[is_female].ID.to_list(),
             },
         ]
 
@@ -123,16 +129,16 @@ def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> lis
         )
         batches.append(
             {
-                'sequencing_groups': sample_ids.ID.tolist(),
-                'coverage_medians': sample_ids.median_coverage.tolist(),
-                'male': md_sex_cov['male'][cov].ID.tolist(),  # type: ignore
-                'female': md_sex_cov['female'][cov].ID.tolist(),  # type: ignore
                 'batch_size': len(sample_ids),
                 'male_count': len(md_sex_cov['male'][cov]),
                 'female_count': len(md_sex_cov['female'][cov]),
                 'mf_ratio': (len(md_sex_cov['male'][cov]) or 1) / (len(md_sex_cov['female'][cov]) or 1),
                 'batch_median_coverage': sample_ids.median_coverage.median(),
                 'coverage_range': (sample_ids.median_coverage.min(), sample_ids.median_coverage.max()),
+                'sequencing_groups': sample_ids.ID.tolist(),
+                'coverage_medians': sample_ids.median_coverage.tolist(),
+                'male': md_sex_cov['male'][cov].ID.tolist(),  # type: ignore
+                'female': md_sex_cov['female'][cov].ID.tolist(),  # type: ignore
             },
         )
 
