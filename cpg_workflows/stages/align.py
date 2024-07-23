@@ -43,7 +43,11 @@ class Align(SequencingGroupStage):
         realignment_options_d = config_retrieve(['workflow', 'align', 'realign_from_cram'], {})
         if not realignment_options_d:
             return None
-        return RealignmentOptions(**realignment_options_d)
+        try:
+            return RealignmentOptions(**realignment_options_d)
+        except TypeError as e:
+            logging.error(f'Failed to parse valid realignment options: {realignment_options_d}')
+            raise
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
