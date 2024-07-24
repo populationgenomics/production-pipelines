@@ -7,7 +7,7 @@ import json
 import numpy as np
 import pandas as pd
 
-from cpg_utils import Path, to_path
+from cpg_utils import to_path
 from cpg_workflows.utils import get_logger
 
 SEX_VALS = {'male', 'female'}
