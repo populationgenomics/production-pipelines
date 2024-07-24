@@ -7,7 +7,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, dataset_path, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
