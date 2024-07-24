@@ -31,6 +31,7 @@ def multiqc(
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
     sequencing_group_id_map: dict[str, str] | None = None,
+    send_to_slack: bool = True,
     extra_config: dict | None = None,
 ) -> list[Job]:
     """
@@ -49,6 +50,7 @@ def multiqc(
     @param job_attrs: attributes to add to Hail Batch job
     @param sequencing_group_id_map: sequencing group ID map for bulk sequencing group renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
+    @param send_to_slack: whether or not to send a Slack message to the qc channel
     @param extra_config: extra config to pass to MultiQC
     @return: job objects
     """
@@ -120,6 +122,7 @@ def multiqc(
             label=label,
             out_checks_path=out_checks_path,
             job_attrs=job_attrs,
+            send_to_slack=send_to_slack,
         )
         check_j.depends_on(mqc_j)
         jobs.append(check_j)
