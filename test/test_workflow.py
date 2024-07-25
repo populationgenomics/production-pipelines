@@ -39,8 +39,18 @@ backend = 'local'
 def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
+
+    def add_sg(id, external_id):
+        ds.add_sequencing_group(
+            id=id,
+            external_id=external_id,
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        )
+
+    add_sg('CPGAA', external_id='SAMPLE1')
+    add_sg('CPGBB', external_id='SAMPLE2')
     return c
 
 

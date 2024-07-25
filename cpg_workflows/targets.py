@@ -46,13 +46,7 @@ class Target:
         whether the analysis on the target needs to be rerun.
         """
         s = ' '.join(
-            sorted(
-                [
-                    ' '.join(sorted(str(alignment_input) for alignment_input in s.alignment_input_by_seq_type.values()))
-                    for s in self.get_sequencing_groups()
-                    if s.alignment_input_by_seq_type
-                ],
-            ),
+            sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
         return f'{h}_{len(self.get_sequencing_group_ids())}'
@@ -464,12 +458,16 @@ class Dataset(Target):
     def add_sequencing_group(
         self,
         id: str,  # pylint: disable=redefined-builtin
+        *,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sequencing_platform: str,
         external_id: str | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
+        alignment_input: AlignmentInput | None = None,
     ) -> 'SequencingGroup':
         """
         Create a new sequencing group and add it to the dataset.
@@ -485,11 +483,14 @@ class Dataset(Target):
             id=id,
             dataset=self,
             external_id=external_id,
+            sequencing_type=sequencing_type,
+            sequencing_technology=sequencing_technology,
+            sequencing_platform=sequencing_platform,
             participant_id=participant_id,
             meta=meta,
             sex=sex,
             pedigree=pedigree,
-            alignment_input_by_seq_type=alignment_input_by_seq_type,
+            alignment_input=alignment_input,
             forced=forced,
         )
         self._sequencing_group_by_id[id] = s
@@ -575,12 +576,16 @@ class SequencingGroup(Target):
         self,
         id: str,  # pylint: disable=redefined-builtin
         dataset: 'Dataset',  # type: ignore  # noqa: F821
+        *,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sequencing_platform: str,
         external_id: str | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
+        alignment_input: AlignmentInput | None = None,
         assays: dict[str, tuple[Assay, ...]] | None = None,
         forced: bool = False,
     ):
@@ -588,6 +593,10 @@ class SequencingGroup(Target):
         self.id = id
         self.name = id
         self._external_id = external_id
+        self.sequencing_type = sequencing_type
+        self.sequencing_technology = sequencing_technology
+        self.sequencing_platform = sequencing_platform
+
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
@@ -598,7 +607,7 @@ class SequencingGroup(Target):
         )
         if sex:
             self.pedigree.sex = sex
-        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = alignment_input_by_seq_type or dict()
+        self.alignment_input: AlignmentInput | None = alignment_input
         self.assays: dict[str, tuple[Assay, ...]] = assays or {}
         self.forced = forced
         self.active = True
@@ -609,12 +618,13 @@ class SequencingGroup(Target):
     def __repr__(self):
         values = {
             'participant': self._participant_id if self._participant_id else '',
+            'sequencing_type': self.sequencing_type,
+            'sequencing_technology': self.sequencing_technology,
+            'sequencing_platform': self.sequencing_platform,
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'alignment_inputs': ','.join(
-                [f'{seq_t}: {al_inp}' for seq_t, al_inp in self.alignment_input_by_seq_type.items()],
-            ),
+            'alignment_inputs': self.alignment_input,
             'pedigree': self.pedigree,
         }
         retval = f'SequencingGroup({self.dataset.name}/{self.id}'
@@ -624,15 +634,15 @@ class SequencingGroup(Target):
 
     def __str__(self):
         ai_tag = ''
-        for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
-            ai_tag += f'|SEQ={seq_type}:'
-            if isinstance(alignment_input, CramPath):
-                ai_tag += 'CRAM'
-            elif isinstance(alignment_input, BamPath):
-                ai_tag += 'BAM'
-            else:
-                assert isinstance(alignment_input, FastqPairs)
-                ai_tag += f'{len(alignment_input)}FQS'
+        ai_tag += f'|SEQ={self.sequencing_type}:'
+        if isinstance(self.alignment_input, CramPath):
+            ai_tag += 'CRAM'
+        elif isinstance(self.alignment_input, BamPath):
+            ai_tag += 'BAM'
+        elif isinstance(self.alignment_input, FastqPairs):
+            ai_tag += f'{len(self.alignment_input)}FQS'
+        else:
+            raise ValueError(f'Unrecognised alignment input type {type(self.alignment_input)}')
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'SequencingGroup({self.dataset.name}/{self.id}{ext_id}{ai_tag})'

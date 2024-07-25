@@ -75,8 +75,18 @@ def mock_create_analysis(_, project, analysis) -> int:
 def mock_deprecated_create_cohort() -> Cohort:
     c = Cohort()
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBBB', external_id='SAMPLE2')
+
+    def add_sg(id, external_id):
+        ds.add_sequencing_group(
+            id=id,
+            external_id=external_id,
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        )
+
+    add_sg('CPGAAA', external_id='SAMPLE1')
+    add_sg('CPGBBB', external_id='SAMPLE2')
     return c
 
 

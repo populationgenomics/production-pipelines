@@ -506,7 +506,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     # assert test_sg.alignment_input_by_seq_type['genome'][0].r1 == CloudPath(
     #     'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz'
     # )
-    assert test_sg2.alignment_input_by_seq_type == {}
+    assert test_sg2.alignment_input is None
 
 
 def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
@@ -687,7 +687,7 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     #     'gs://cpg-fewgenomes-main/exomeexample_r1.fastq.gz'
     # )
 
-    assert test_none.alignment_input_by_seq_type == {}
+    assert test_none.alignment_input is None
     assert re.search(
         r'WARNING\s+root:inputs\.py:\d+\s+No reads found for sequencing group CPGbbb of type genome',
         caplog.text,

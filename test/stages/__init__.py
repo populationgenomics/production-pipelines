@@ -22,11 +22,22 @@ from cpg_workflows.workflow import (
 )
 
 
+def add_sg(ds, id, external_id: str):
+    sg = ds.add_sequencing_group(
+        id=id,
+        external_id=external_id,
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+    )
+    return sg
+
+
 def mock_cohort() -> Cohort:
     c = Cohort()
 
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+    add_sg(ds, 'CPGAA', external_id='SAMPLE1')
 
     return c
 
@@ -35,12 +46,12 @@ def mock_multidataset_cohort() -> Cohort:
     c = Cohort()
 
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
+    add_sg(ds, 'CPGAA', external_id='SAMPLE1')
+    add_sg(ds, 'CPGBB', external_id='SAMPLE2')
 
     ds2 = c.create_dataset('my_dataset2')
-    ds2.add_sequencing_group('CPGCC', external_id='SAMPLE3')
-    ds2.add_sequencing_group('CPGDD', external_id='SAMPLE4')
+    add_sg(ds2, 'CPGCC', external_id='SAMPLE3')
+    add_sg(ds2, 'CPGDD', external_id='SAMPLE4')
 
     return c
 
@@ -50,17 +61,17 @@ def mock_multicohort() -> MultiCohort:
 
     c = mc.create_cohort('CohortA')
     ds = c.create_dataset('projecta')
-    ds.add_sequencing_group('CPGXXXX', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGAAAA', external_id='SAMPLE2')
+    add_sg(ds, 'CPGXXXX', external_id='SAMPLE1')
+    add_sg(ds, 'CPGAAAA', external_id='SAMPLE2')
 
     ds2 = c.create_dataset('projectc')
-    ds2.add_sequencing_group('CPGCCCC', external_id='SAMPLE3')
-    ds2.add_sequencing_group('CPGDDDD', external_id='SAMPLE4')
+    add_sg(ds2, 'CPGCCCC', external_id='SAMPLE3')
+    add_sg(ds2, 'CPGDDDD', external_id='SAMPLE4')
 
     d = mc.create_cohort('CohortB')
     ds3 = d.create_dataset('projectb')
-    ds3.add_sequencing_group('CPGEEEEEE', external_id='SAMPLE5')
-    ds3.add_sequencing_group('CPGFFFFFF', external_id='SAMPLE6')
+    add_sg(ds3, 'CPGEEEEEE', external_id='SAMPLE5')
+    add_sg(ds3, 'CPGFFFFFF', external_id='SAMPLE6')
 
     return mc
 
