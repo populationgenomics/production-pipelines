@@ -296,12 +296,7 @@ def main():
     if es_client.es.indices.exists(index=args.index):
         es_client.es.indices.delete(index=args.index)
 
-    # todo why don't we do this https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L256
     es_client.export_table_to_elasticsearch(row_ht, index_name=args.index, num_shards=es_shards)
-
-    # todo find out if there's a reason we don't run this line
-    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L267
-    # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/hail_scripts/elasticsearch/elasticsearch_client_v7.py#L116
 
     # https://github.com/broadinstitute/seqr-loading-pipelines/blob/c113106204165e22b7a8c629054e94533615e7d2/luigi_pipeline/lib/hail_tasks.py#L266
     if es_shards < 25:
