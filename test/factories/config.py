@@ -127,6 +127,7 @@ class WorkflowConfig:
     skip_sgs_with_missing_input: bool | None = None
 
     # ---- Other
+    align: dict[str, Any] | None = None
     realign_from_cram_version: str | None = None
     cram_version_reference: dict[str, str | Path] | None = None
     intervals_path: str | Path | None = None
