@@ -88,7 +88,7 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
     return spice_by_date[sorted(spice_by_date)[-1]]
 
 
-@stage(analysis_keys=['cohort_ped'], analysis_type='custom')
+@stage
 class MakeCohortCombinedPed(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'ped_with_ref_panel.ped'}
@@ -102,7 +102,7 @@ class MakeCohortCombinedPed(CohortStage):
         return self.make_outputs(target=cohort, data=output)
 
 
-@stage(analysis_keys=['multicohort_ped'], analysis_type='custom')
+@stage
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {'multicohort_ped': self.prefix / 'ped_with_ref_panel.ped'}
@@ -1220,14 +1220,11 @@ class AnnotateDatasetSv(DatasetStage):
     Then work up all the genotype values
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Expected to generate a matrix table
         """
-        return {
-            'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt'),
-        }
+        return {'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt')}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -1245,13 +1242,11 @@ class AnnotateDatasetSv(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
-
         jobs = annotate_dataset_jobs_sv(
             mt_path=mt_path,
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=outputs['mt'],
-            tmp_prefix=checkpoint_prefix,
+            tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
             exclusion_file=str(exclusion_file),
         )
