@@ -225,7 +225,9 @@ class AnnotateLongReadSVsWithStrvctvre(MultiCohortStage):
         expected_out = self.expected_outputs(multicohort)
 
         strvctvre_job = queue_annotate_strvctvre_job(
-            input_vcf, str(expected_out['strvctvre_vcf']), self.get_job_attrs(),
+            input_vcf,
+            str(expected_out['strvctvre_vcf']),
+            self.get_job_attrs(),
         )
 
         return self.make_outputs(multicohort, data=expected_out, jobs=strvctvre_job)
