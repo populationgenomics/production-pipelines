@@ -59,7 +59,7 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
     return return_dict
 
 
-@stage(analysis_keys=['vcf'])
+@stage
 class ReFormatPacBioSVs(SequencingGroupStage):
     """
     take each of the long-read SV VCFs, and re-format the contents
@@ -180,7 +180,7 @@ class MergeLongReadSVs(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=merge_job)
 
 
-@stage(required_stages=MergeLongReadSVs, analysis_type='vcf', analysis_keys=['annotated_vcf'])
+@stage(required_stages=MergeLongReadSVs, analysis_type='sv', analysis_keys=['annotated_vcf'])
 class AnnotateLongReadSVs(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
