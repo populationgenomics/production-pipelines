@@ -188,7 +188,7 @@ class GatherBatchEvidence(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': get_workflow().output_version,
+            'batch': cohort.name,
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(pedigree_input),
             'counts': [
@@ -296,7 +296,7 @@ class ClusterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': get_workflow().output_version,
+            'batch': cohort.name,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(pedigree_input),
@@ -370,7 +370,7 @@ class GenerateBatchMetrics(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': get_workflow().output_version,
+            'batch': cohort.name,
             'baf_metrics': gatherbatchevidence_d['merged_BAF'],
             'discfile': gatherbatchevidence_d['merged_PE'],
             'coveragefile': gatherbatchevidence_d['merged_bincov'],
@@ -473,7 +473,7 @@ class FilterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': get_workflow().output_version,
+            'batch': cohort.name,
             'ped_file': str(pedigree_input),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
@@ -645,7 +645,7 @@ class GenotypeBatch(CohortStage):
         mergebatch_d = inputs.as_dict(this_multicohort, MergeBatchSites)
 
         input_dict: dict[str, Any] = {
-            'batch': get_workflow().output_version,
+            'batch': cohort.name,
             'n_per_split': 5000,
             'n_RD_genotype_bins': 100000,
             'coveragefile': batchevidence_d['merged_bincov'],
@@ -955,7 +955,7 @@ class GeneratePloidyTable(MultiCohortStage):
             ploidy_table_from_ped.generate_ploidy_table,
             str(pedigree_input),
             contig_path,
-            expected_d['ploidy_table'],
+            str(expected_d['ploidy_table']),
         )
 
         return self.make_outputs(multicohort, data=expected_d, jobs=py_job)
