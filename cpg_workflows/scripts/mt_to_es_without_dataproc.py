@@ -200,7 +200,11 @@ class ElasticsearchClient:
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
                 'es.spark.dataframe.write.null': 'true',
-                'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
+                # We are not explicitly indexing the ES Index on varianId at this time
+                # we should probably investigate this in future, but if we index on variantId
+                # we run into the possibility that gCNV (currently multiple separate indices)
+                # could have an ID clash, so the variant rows could overwrite each other
+                # 'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
             },
         )
         es_config['es.write.operation'] = 'index'
