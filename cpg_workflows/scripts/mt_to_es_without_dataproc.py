@@ -199,6 +199,9 @@ class ElasticsearchClient:
                 'es.nodes.wan.only': 'true',
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
+                # investigate whether we lose anything from always writing Nulls
+                # this is used in seqr-loading-pipelines, but not writing these would
+                # result in a much smaller index
                 'es.spark.dataframe.write.null': 'true',
                 # We are not explicitly indexing the ES Index on varianId at this time
                 # we should probably investigate this in future, but if we index on variantId
