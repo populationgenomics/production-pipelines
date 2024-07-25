@@ -79,6 +79,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -130,6 +131,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -360,6 +362,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -411,6 +414,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -516,6 +520,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -567,6 +572,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -600,6 +606,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'exome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA1000',
                 'participant': {
@@ -710,6 +717,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'genome',
+                'technology': 'short-read',
                 'sample': {
                     'externalId': 'NA12340',
                     'participant': {
@@ -744,6 +752,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'exome',
+                'technology': 'short-read',
                 'sample': {
                     'externalId': 'NA1000',
                     'participant': {
