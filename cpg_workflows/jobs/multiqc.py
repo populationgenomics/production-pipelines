@@ -80,8 +80,11 @@ def multiqc(
         sample_map_file = None
 
     if extra_config:
-        serialised = ', '.join(f'{k}: {v}' for k, v in extra_config.items())
-        extra_config_param = f'--cl-config "{serialised}"'
+        extra_config_param = ''
+        for k, v in extra_config.items():
+            serialised = f'{k}: {v}'
+            extra_config_param += f'''--cl-config "{serialised}" \\
+            '''
     else:
         extra_config_param = ''
 
