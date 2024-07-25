@@ -634,15 +634,16 @@ class SequencingGroup(Target):
 
     def __str__(self):
         ai_tag = ''
-        ai_tag += f'|SEQ={self.sequencing_type}:'
-        if isinstance(self.alignment_input, CramPath):
-            ai_tag += 'CRAM'
-        elif isinstance(self.alignment_input, BamPath):
-            ai_tag += 'BAM'
-        elif isinstance(self.alignment_input, FastqPairs):
-            ai_tag += f'{len(self.alignment_input)}FQS'
-        else:
-            raise ValueError(f'Unrecognised alignment input type {type(self.alignment_input)}')
+        if self.alignment_input:
+            ai_tag += f'|SEQ={self.sequencing_type}:'
+            if isinstance(self.alignment_input, CramPath):
+                ai_tag += 'CRAM'
+            elif isinstance(self.alignment_input, BamPath):
+                ai_tag += 'BAM'
+            elif isinstance(self.alignment_input, FastqPairs):
+                ai_tag += f'{len(self.alignment_input)}FQS'
+            else:
+                raise ValueError(f'Unrecognised alignment input type {type(self.alignment_input)}')
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'SequencingGroup({self.dataset.name}/{self.id}{ext_id}{ai_tag})'
