@@ -54,10 +54,7 @@ class MarkDupTool(Enum):
 
 def _get_cram_reference_from_version(cram_version) -> str:
     """
-    Get the reference used for the specific cram_version,
-    so that Bazam is able to correctly decompress the reads.
-    Note: Bazam is a tool that can output FASTQ in a form that
-    can stream directly into common aligners such as BWA
+    Get the reference used for the specific cram_version
     """
     cram_version_map = get_config()['workflow'].get('cram_version_reference', {})
     if cram_version in cram_version_map:
@@ -90,7 +87,6 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     if realign_from_cram := get_config()['workflow'].get('realign_from_cram'):
         alignment_input = CramPath(
             path=(sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'),
-            index_path=(sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram.crai'),
             reference_assembly=get_config()['workflow']['ref_fasta'],
         )
         logging.info(f'Realigning from CRAM {alignment_input.path}')
@@ -171,11 +167,7 @@ def align(
     - if the input is a cram/bam
         - for bwa or bwa-mem2, stream bazam -> bwa.
 
-        - if number_of_shards_for_realignment is > 1, use bazam to shard inputs
-        and align in parallel, then merge result together.
-
-        - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
-        because dragmap can't read streamed files from bazam.
+        - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam
 
     - if the markdup tool:
         - is biobambam2, deduplication and alignment/merging are submitted within the same job.
@@ -190,7 +182,6 @@ def align(
     # NOTE: If re-aligning from CRAM, the function call below returns a new CramPath
     # based on the [storage.<dataqset>] config key, ignoring the sequencing_group's
     # alignment input. The `index_path` attribute is set to `None` on this new instance
-    # so `sharded_bazam` will be False. Not sure if this is a bug or intended behaviour?
     alignment_input = _get_alignment_input(sequencing_group)
 
     base_job_name = 'Align'
@@ -383,33 +374,6 @@ def _align_one(
             assert (
                 alignment_input.reference_assembly
             ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
-            reference_inp = b.read_input_group(
-                base=str(alignment_input.reference_assembly),
-                fai=str(alignment_input.reference_assembly) + '.fai',
-            ).base
-            samtools_ref_cmd = f'--reference {reference_inp}'
-
-        group = alignment_input.resource_group(b)
-
-        if not alignment_input.index_path:
-            sort_index_input_cmd = dedent(
-                f"""
-            mkdir -p $BATCH_TMPDIR/sorted
-            mkdir -p $BATCH_TMPDIR/sort_tmp
-            samtools sort {samtools_ref_cmd} \
-            {group[alignment_input.ext]} \
-            -@{nthreads - 1} \
-            -T $BATCH_TMPDIR/sort_tmp \
-            > $BATCH_TMPDIR/sorted.{alignment_input.ext}
-
-            mv $BATCH_TMPDIR/sorted.{alignment_input.ext} {group[alignment_input.ext]}
-            rm -rf $BATCH_TMPDIR/sort_tmp
-
-            alignment_path="{group[alignment_input.ext]}"
-            alignment_index_path="{group[alignment_input.index_ext]}"
-            samtools index -@{nthreads - 1} $alignment_path  $alignment_index_path
-            """,
-            )
 
         prepare_fastq_cmd = ''
         r1_param = 'r1'
