@@ -194,7 +194,14 @@ def _populate_alignment_inputs(
         _assay = Assay.parse(assay, sequencing_group.id, run_parse_reads=False)
         assays.append(_assay)
 
-    _assay_meta = _combine_assay_meta(assays)
+    sequencing_group.assays = tuple(assays)
+
+    if len(assays) > 1:
+        _assay_meta = _combine_assay_meta(assays)
+    else:
+        _assay_meta = assays[0].meta
+        if _reads := _assay_meta.get('reads'):
+            _assay_meta['reads'] = [_reads]
 
     if _assay_meta.get('reads'):
         alignment_input = parse_reads(

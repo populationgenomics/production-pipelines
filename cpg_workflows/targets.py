@@ -586,7 +586,7 @@ class SequencingGroup(Target):
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
         alignment_input: AlignmentInput | None = None,
-        assays: dict[str, tuple[Assay, ...]] | None = None,
+        assays: tuple[Assay, ...] | None = None,
         forced: bool = False,
     ):
         super().__init__()
@@ -608,7 +608,7 @@ class SequencingGroup(Target):
         if sex:
             self.pedigree.sex = sex
         self.alignment_input: AlignmentInput | None = alignment_input
-        self.assays: dict[str, tuple[Assay, ...]] = assays or {}
+        self.assays: tuple[Assay, ...] | None = assays
         self.forced = forced
         self.active = True
         # Only set if the file exists / found in Metamist:
