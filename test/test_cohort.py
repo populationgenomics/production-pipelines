@@ -321,9 +321,10 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
-    assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
-    assert test_sg.assays['sequencing'][0].id == '1'
-    assert test_sg.assays['sequencing'][0].meta['fluid_x_tube_id'] == '220405_FS28'
+    assert test_sg.assays
+    assert test_sg.assays[0].sequencing_group_id == 'CPGLCL17'
+    assert test_sg.assays[0].id == '1'
+    assert test_sg.assays[0].meta['fluid_x_tube_id'] == '220405_FS28'
 
     assert test_sg.participant_id == '8'
     # TODO/NOTE: The sex in the pedigree will overwrite the sex in the
@@ -490,9 +491,10 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
-    assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
-    assert test_sg.assays['sequencing'][0].id == '1'
-    assert test_sg.assays['sequencing'][0].meta['fluid_x_tube_id'] == '220405_FS28'
+    assert test_sg.assays
+    assert test_sg.assays[0].sequencing_group_id == 'CPGLCL17'
+    assert test_sg.assays[0].id == '1'
+    assert test_sg.assays[0].meta['fluid_x_tube_id'] == '220405_FS28'
 
     assert test_sg.participant_id == '8'
     assert test_sg.pedigree.sex == Sex.MALE
