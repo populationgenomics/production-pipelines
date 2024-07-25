@@ -90,6 +90,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     if realign_from_cram := get_config()['workflow'].get('realign_from_cram'):
         alignment_input = CramPath(
             (sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'),
+            (sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram.crai'),
         )
         logging.info(f'Realigning from CRAM {alignment_input.path}')
     if not alignment_input:
