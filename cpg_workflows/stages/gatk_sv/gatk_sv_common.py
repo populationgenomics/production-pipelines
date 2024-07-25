@@ -364,7 +364,7 @@ def queue_annotate_strvctvre_job(
     strv_job.command(
         f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {local_phylop}',  # type: ignore
     )
-    strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
+    strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')  # type: ignore
 
-    get_batch().write_output(strv_job.output_vcf, str(output_path).replace('.vcf.gz', ''))
+    get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))
     return strv_job
