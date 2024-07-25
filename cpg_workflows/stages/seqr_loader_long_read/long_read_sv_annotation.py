@@ -8,7 +8,7 @@ from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_sv_jobs, queue_annotate_strvctvre_job
+from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre_job, queue_annotate_sv_jobs
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
 from cpg_workflows.workflow import (
     DatasetStage,
@@ -225,7 +225,7 @@ class AnnotateLongReadSVsWithStrvctvre(MultiCohortStage):
         expected_out = self.expected_outputs(multicohort)
 
         strvctvre_job = queue_annotate_strvctvre_job(
-            input_vcf, str(expected_out['strvctvre_vcf']), self.get_job_attrs()
+            input_vcf, str(expected_out['strvctvre_vcf']), self.get_job_attrs(),
         )
 
         return self.make_outputs(multicohort, data=expected_out, jobs=strvctvre_job)
