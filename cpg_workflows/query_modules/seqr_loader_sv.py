@@ -251,7 +251,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '42'))
+    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '46'))
     gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
 
     # OK, NOW IT'S BUSINESS TIME
