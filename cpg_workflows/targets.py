@@ -115,6 +115,7 @@ class MultiCohort(Target):
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
         self._cohorts_by_name: dict[str, Cohort] = {}
+        self._datasets_by_name: dict[str, Dataset] = {}
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
 
     def __repr__(self):
@@ -155,10 +156,26 @@ class MultiCohort(Target):
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        datasets = []
-        for cohort in self.get_cohorts(only_active):
-            datasets.extend(cohort.get_datasets(only_active))
+
+        datasets = list(self._datasets_by_name.values())
+        if only_active:
+            return [d for d in datasets if d.active]
         return datasets
+
+    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" cohorts (unless only_active is False)
+        """
+        dataset = self._datasets_by_name.get(name)
+        if not dataset:
+            logging.warning(f'Dataset {name} not found in the multi-cohort')
+            return None
+        if not only_active:  # Return dataset even if it's inactive
+            return dataset
+        if dataset.active:
+            return dataset
+        return None
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -227,7 +244,7 @@ class Cohort(Target):
     def __init__(self, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
         self.name = name or get_config()['workflow']['dataset']
-        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
+        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], multicohort=multicohort)
         self._datasets_by_name: dict[str, Dataset] = {}
         self.multicohort = multicohort
 
@@ -366,12 +383,15 @@ class Dataset(Target):
     def __init__(
         self,
         name: str,
-        cohort: Cohort | None = None,
+        multicohort: MultiCohort | None = None,  # needs to be multicohort
+        sgs: dict[str, 'SequencingGroup'] | None = None
     ):
+        if sgs is None:
+            sgs = {}
         super().__init__()
-        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
+        self._sequencing_group_by_id: dict[str, SequencingGroup] = sgs
         self.name = name
-        self.cohort = cohort
+        self.multicohort = multicohort  # needs to be multicohort
         self.active = True
 
     @staticmethod
@@ -394,11 +414,10 @@ class Dataset(Target):
 
     def _seq_type_subdir(self) -> str:
         """
-        Subdirectory parametrised by sequencing type. For genomes, we don't
-        prefix at all.
+        Subdirectory parametrised by sequencing type. For genomes, we don't prefix at all.
         """
         seq_type = get_config()['workflow'].get('sequencing_type')
-        return '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
+        return '' if not seq_type or seq_type == 'genome' else seq_type
 
     def prefix(self, **kwargs) -> Path:
         """

@@ -8,7 +8,7 @@ from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
-from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
+from .targets import Cohort, Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
 _cohort: Cohort | None = None
@@ -64,7 +64,30 @@ def create_multicohort() -> MultiCohort:
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
         _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
+    # todo revise this method
+    populate_multicohort_datasets(multicohort)
+
     return multicohort
+
+
+def populate_multicohort_datasets(multicohort: MultiCohort):
+    """
+    Takes a MultiCohort with all Cohorts populated
+    Iterates over each Cohort, and collects all Samples stratified by Dataset
+
+    Args:
+        multicohort ():
+    """
+
+    sgs_by_dataset_name: dict[str, dict[str, SequencingGroup]] = {}
+    for cohort in multicohort.get_cohorts():
+        for sg in cohort.get_sequencing_groups():
+            sgs_by_dataset_name.setdefault(sg.dataset.name, {})[sg.id] = sg
+
+    multicohort._datasets_by_name = {
+        dataset_name: Dataset(name=dataset_name, sgs=dataset_sgs, multicohort=multicohort) for
+        dataset_name, dataset_sgs in sgs_by_dataset_name.items()
+    }
 
 
 def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
