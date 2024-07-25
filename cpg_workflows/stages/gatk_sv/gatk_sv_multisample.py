@@ -956,7 +956,7 @@ class GeneratePloidyTable(MultiCohortStage):
             ploidy_table_from_ped.generate_ploidy_table,
             str(pedigree_input),
             contig_path,
-            expected_d['ploidy_table'],
+            str(expected_d['ploidy_table']),
         )
 
         return self.make_outputs(multicohort, data=expected_d, jobs=py_job)
