@@ -283,8 +283,8 @@ class CramMultiQC(DatasetStage):
             logging.warning('No CRAM QC found to aggregate with MultiQC')
             return self.make_outputs(dataset)
 
-        send_to_slack = config_retrieve(['workflow', 'cram_multiqc', 'send_to_slack'], True)
-        extra_config = config_retrieve(['workflow', 'cram_multiqc', 'extra_config'], {})
+        send_to_slack = config_retrieve(['workflow', 'cram_multiqc', 'send_to_slack'], default=True)
+        extra_config = config_retrieve(['workflow', 'cram_multiqc', 'extra_config'], default={})
         extra_config['table_columns_visible'] = {'FastQC': False}
 
         jobs = multiqc(

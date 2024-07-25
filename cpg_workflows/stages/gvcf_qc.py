@@ -179,8 +179,8 @@ class GvcfMultiQC(DatasetStage):
             'happy',
         }
 
-        send_to_slack = config_retrieve(['workflow', 'gvcf_multiqc', 'send_to_slack'], True)
-        extra_config = config_retrieve(['workflow', 'gvcf_multiqc', 'extra_config'], {})
+        send_to_slack = config_retrieve(['workflow', 'gvcf_multiqc', 'send_to_slack'], default=True)
+        extra_config = config_retrieve(['workflow', 'gvcf_multiqc', 'extra_config'], default={})
         extra_config['table_columns_visible'] = {'Picard': True}
 
         jobs = multiqc(
