@@ -200,7 +200,7 @@ class ElasticsearchClient:
                 'es.net.http.auth.user': self._es_username,
                 'es.net.http.auth.pass': self._es_password,
                 'es.spark.dataframe.write.null': 'true',
-                # 'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
+                'es.mapping.id': 'variantId'  # uncomment to explicitly index rows on the UID
             },
         )
         es_config['es.write.operation'] = 'index'
