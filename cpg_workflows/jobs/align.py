@@ -365,7 +365,9 @@ def _align_one(
                 b,
                 bam_or_cram_group,
                 alignment_input,
+                ext=alignment_input.ext,
             )
+            j.depends_on(extract_fastq_j)
             interleaved_fastq = extract_fastq_j.all_reads
             interleave_param = '$BATCH_TMPDIR/all_reads.fq.gz'
             # Need file names to end with ".gz" for DRAGMAP to parse correctly:
