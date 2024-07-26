@@ -212,6 +212,28 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
             }.get(sequencing_type, ''),
         )
 
+    # flexibly draw annotations depending on whether the VCF has them - this is for compatibility with Long-Read & GATK
+    # this can all be removed if/when Long-read is removed to a separate pipeline
+
+    # add end_locus, with flexity for END2
+    if 'END2' in mt.info:
+        mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.info.CHR2, position=mt.info.END2))
+    else:
+        mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.locus.contig, position=mt.info.END))
+
+    # GATK-SV consists of multiple algorithms, other pathways may not
+    if 'ALGORITHMS' in mt.info:
+        mt = mt.annotate_rows(algorithms=mt.info.ALGORITHMS)
+
+    # CPX_INTERVALS is not present in all VCFs
+    if 'CPX_INTERVALS' in mt.info:
+        mt = mt.annotate_rows(
+            cpx_intervals=hl.or_missing(
+                hl.is_defined(mt.info.CPX_INTERVALS),
+                mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
+            )
+        )
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
     mt = mt.annotate_rows(
@@ -219,33 +241,24 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
         sf=mt.info.AF[0],
         sn=mt.info.AN,
         end=mt.info.END,
-        end_locus=hl.if_else(
-            hl.is_defined(mt.info.END2),
-            hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-            hl.struct(contig=mt.locus.contig, position=mt.info.END),
-        ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
         gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
         gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
         gnomad_svs_AC=hl.missing('float64'),
         gnomad_svs_AN=hl.missing('float64'),
-        # I DON'T HAVE THESE ANNOTATIONS
-        # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
-        # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
-        filters=hl.or_missing(  # hopefully this plays nicely
+        filters=hl.or_missing(
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size() > 0,
             mt.filters,
         ),
         bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
-        algorithms=mt.info.ALGORITHMS,
-        cpx_intervals=hl.or_missing(
-            hl.is_defined(mt.info.CPX_INTERVALS),
-            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
-        ),
         sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
+
+    # add CPX_TYPE if not present - this is a hack to make the loader work
+    if 'CPX_TYPE' not in mt.info:
+        mt = mt.annotate_rows(info=mt.info.annotate(CPX_TYPE=mt.sv_types[0]))
 
     # save those changes
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
@@ -313,10 +326,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
-            hl.or_missing(
-                (mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1),
-                mt.sv_types[1],
-            ),
+            hl.or_missing((mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1), mt.sv_types[1]),
         ),
         variantId=mt.rsid,
         docId=mt.rsid[0:512],
