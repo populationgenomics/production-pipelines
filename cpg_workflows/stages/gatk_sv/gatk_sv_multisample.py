@@ -1279,7 +1279,7 @@ class MtToEsSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Uses the non-DataProc MT-to-ES conversion script
         """
 
         # try to generate a password here - we'll find out inside the script anyway, but
