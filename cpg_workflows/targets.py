@@ -40,6 +40,17 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
+    def get_sequencing_group_by_id(self, id: str) -> SequencingGroup | None:
+        """
+        get a single SequencingGroup by ID from self._sequencing_group_by_id
+        Args:
+            id (str):
+
+        Returns:
+            SequencingGroup | None: the SequencingGroup with the given ID, or None if not found
+        """
+        return self._sequencing_group_by_id.get(id)
+
     def alignment_inputs_hash(self) -> str:
         """
         Unique hash string of sample alignment inputs. Useful to decide
@@ -93,26 +104,28 @@ class Target:
 
 class MultiCohort(Target):
     """
-    Represents a "multi-cohort" target - multiple cohorts in the workflow.
+    Represents a "multi-cohort" target - multiple cohorts & datasets in the workflow.
     """
 
     def __init__(self) -> None:
         super().__init__()
 
-        # NOTE: For a cohort, we simply pull the dataset name from the config.
-        input_cohorts = get_config()['workflow'].get('input_cohorts', [])
-        if input_cohorts:
-            cohorts_string = '_'.join(sorted(input_cohorts))
-
-        self.name = cohorts_string or get_config()['workflow']['dataset']
+        # NOTE: For a cohort, we simply pull the dataset name from the config - nominated dataset for the workflow.
+        default_dataset = get_config()['workflow']['dataset']
+        if input_cohorts := get_config()['workflow'].get('input_cohorts', []):
+            self.name = '_'.join(sorted(input_cohorts))
+        else:
+            self.name = default_dataset
 
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
         self._cohorts_by_name: dict[str, Cohort] = {}
-        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
+        self._datasets_by_name: dict[str, Dataset] = {}
+        self._sequencing_groups_by_id: dict[str, SequencingGroup] = {}
+        self.analysis_dataset = Dataset(name=default_dataset)
 
     def __repr__(self):
-        return f'MultiCohort({len(self.get_cohorts())} cohorts)'
+        return f'MultiCohort({len(self.get_cohorts())} cohorts, {len(self.get_datasets())} datasets)'
 
     @property
     def target_id(self) -> str:
@@ -129,29 +142,14 @@ class MultiCohort(Target):
             cohorts = [c for c in cohorts if c.active and c.get_datasets()]
         return cohorts
 
-    def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
-        """
-        Get cohort by name.
-        Include only "active" cohorts (unless only_active is False)
-        """
-        cohort = self._cohorts_by_name.get(name)
-        if not cohort:
-            logging.warning(f'Cohort {name} not found in the multi-cohort')
-            return None
-        if not only_active:  # Return cohort even if it's inactive
-            return cohort
-        if cohort.active and cohort.get_datasets():
-            return cohort
-        return None
-
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        datasets = []
-        for cohort in self.get_cohorts(only_active):
-            datasets.extend(cohort.get_datasets(only_active))
+        datasets = self._datasets_by_name.values()
+        if only_active:
+            datasets = [ds for ds in datasets if ds.active and ds.get_sequencing_groups()]
         return datasets
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
@@ -164,10 +162,7 @@ class MultiCohort(Target):
             all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
         return all_sequencing_groups
 
-    def create_cohort(
-        self,
-        name: str,
-    ):
+    def create_or_return_cohort(self, name: str) -> Dataset:
         """
         Create a cohort and add it to the multi-cohort.
         """
@@ -178,6 +173,41 @@ class MultiCohort(Target):
         c = Cohort(name=name, multicohort=self)
         self._cohorts_by_name[c.name] = c
         return c
+
+    def create_or_return_dataset(self, name: str) -> Dataset:
+        """
+        Create a dataset and add it to the multi-cohort.
+        return if already exists
+        """
+        if name in self._datasets_by_name:
+            logging.debug(f'Dataset {name} already exists in the multi-cohort')
+            return self._datasets_by_name[name]
+
+        d = Dataset(name=name, multicohort=self)
+        self._datasets_by_name[d.name] = d
+        return d
+
+    def add_cohort_to_multicohort(self, cohort: Cohort):
+        """
+        takes a populated Cohort, and adds it to the MultiCohort
+        Args:
+            dataset (Cohort): the Dataset to add
+        """
+        if cohort.name in self._cohorts_by_name:
+            logging.error(f'Cohort {cohort.name} already exists in the multi-cohort')
+            return
+        self._cohorts_by_name[cohort.name] = cohort
+
+    def add_dataset_to_multicohort(self, dataset: Dataset):
+        """
+        takes a populated Dataset, and adds it to the MultiCohort
+        Args:
+            dataset (Dataset): the Dataset to add
+        """
+        if dataset.name in self._datasets_by_name:
+            logging.error(f'Dataset {dataset.name} already exists in the multi-cohort')
+            return
+        self._datasets_by_name[dataset.name] = dataset
 
     def get_job_attrs(self) -> dict:
         """
@@ -220,13 +250,14 @@ class Cohort(Target):
 
     def __init__(self, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
-        self.name = name or get_config()['workflow']['dataset']
-        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
-        self._datasets_by_name: dict[str, Dataset] = {}
+        default_dataset = get_config()['workflow']['dataset']
+        self.name = name or default_dataset
+        self.analysis_dataset = Dataset(name=default_dataset, multicohort=multicohort)
+        self._sequencing_groups_by_id: dict[str, SequencingGroup] = {}
         self.multicohort = multicohort
 
     def __repr__(self):
-        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
+        return f'Cohort("{self.name}", {len(self._sequencing_groups_by_id)} SG IDs)'
 
     @property
     def target_id(self) -> str:
@@ -253,72 +284,39 @@ class Cohort(Target):
                 df.to_csv(fp, sep='\t', index=False, header=False)
         return out_path
 
-    def get_datasets(self, only_active: bool = True) -> list['Dataset']:
+    def add_sequencing_group(self, sequencing_group: SequencingGroup):
         """
-        Gets list of all datasets.
-        Include only "active" datasets (unless only_active is False)
-        """
-        datasets = [ds for k, ds in self._datasets_by_name.items()]
-        if only_active:
-            datasets = [ds for ds in datasets if ds.active and ds.get_sequencing_groups()]
-        return datasets
+        method for adding a populated SequencingGroup to the Cohort
+        it should not be possible for a cohort to contain repeated SequencingGroups
 
-    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
+        Args:
+            sequencing_group (SequencingGroup): the SequencingGroup to add
+
+        Returns:
+            None, may raise a warning logging message if the SequencingGroup already exists
         """
-        Get dataset by name.
-        Include only "active" datasets (unless only_active is False)
-        """
-        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
-        return ds_by_name.get(name)
+        if sequencing_group.id in self._sequencing_groups_by_id:
+            logging.error(f'SequencingGroup {sequencing_group.id} already exists in the cohort {self.name}')
+            return
+        self._sequencing_groups_by_id[sequencing_group.id] = sequencing_group
+
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Gets a flat list of all sequencing groups from all datasets.
         Include only "active" sequencing groups (unless only_active is False)
         """
-        all_sequencing_groups = []
-        for ds in self.get_datasets(only_active=False):
-            all_sequencing_groups.extend(ds.get_sequencing_groups(only_active=only_active))
+        all_sequencing_groups = self._sequencing_groups_by_id.values()
+        if only_active:
+            return [sg for sg in all_sequencing_groups if sg.active]
         return all_sequencing_groups
 
-    def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
-        """
-        Add existing dataset into the cohort.
-        """
-        dataset.cohort = self
-        if dataset.name in self._datasets_by_name:
-            logging.debug(f'Dataset {dataset.name} already exists in the cohort')
-            return dataset
-        self._datasets_by_name[dataset.name] = dataset
-        return dataset
-
-    def create_dataset(
-        self,
-        name: str,
-    ) -> 'Dataset':
-        """
-        Create a dataset and add it to the cohort.
-        """
-        if name in self._datasets_by_name:
-            logging.debug(f'Dataset {name} already exists in the cohort')
-            return self._datasets_by_name[name]
-
-        if name == self.analysis_dataset.name:
-            ds = self.analysis_dataset
-        else:
-            ds = Dataset(name=name, cohort=self)
-
-        self._datasets_by_name[ds.name] = ds
-        return ds
 
     def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
         """
-        return {
-            'sequencing_groups': self.get_sequencing_group_ids(),
-            'datasets': [d.name for d in self.get_datasets()],
-        }
+        return {'sequencing_groups': self.get_sequencing_group_ids()}
 
     def get_job_prefix(self) -> str:
         """
@@ -360,12 +358,13 @@ class Dataset(Target):
     def __init__(
         self,
         name: str,
-        cohort: Cohort | None = None,
+        multicohort: MultiCohort | None = None,
     ):
         super().__init__()
         self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
         self.name = name
-        self.cohort = cohort
+        # this now takes a MultiCohort, not a Cohort
+        self.multicohort = multicohort
         self.active = True
 
     @staticmethod
@@ -388,11 +387,15 @@ class Dataset(Target):
 
     def _seq_type_subdir(self) -> str:
         """
-        Subdirectory parametrised by sequencing type. For genomes, we don't
-        prefix at all.
+        Subdirectory parametrised by sequencing type. For genomes, we don't prefix
         """
-        seq_type = get_config()['workflow'].get('sequencing_type')
-        return '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
+
+        if not (seq_type := get_config()['workflow'].get('sequencing_type')):
+            # we should probably raise an error here
+            return ''
+        if seq_type == 'genome':
+            return ''
+        return seq_type
 
     def prefix(self, **kwargs) -> Path:
         """
@@ -450,51 +453,25 @@ class Dataset(Target):
         """
         URLs matching self.storage_web_path() files serverd by an HTTP server.
         """
-        return web_url(
-            self._seq_type_subdir(),
-            dataset=self.name,
-        )
+        return web_url(self._seq_type_subdir(), dataset=self.name)
 
-    def add_sequencing_group(
-        self,
-        id: str,  # pylint: disable=redefined-builtin
-        *,
-        sequencing_type: str,
-        sequencing_technology: str,
-        sequencing_platform: str,
-        external_id: str | None = None,
-        participant_id: str | None = None,
-        meta: dict | None = None,
-        sex: Optional['Sex'] = None,
-        pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
-    ) -> 'SequencingGroup':
+
+    def add_sequencing_group(self, sequencing_group: SequencingGroup):
         """
-        Create a new sequencing group and add it to the dataset.
+        method for adding a populated SequencingGroup to the Dataset
+        it's ok to add the same SequencingGroup multiple times due to overlapping cohorts
+
+        Args:
+            sequencing_group (SequencingGroup): the SequencingGroup to add
+
+        Returns:
+            None, may raise a debug logging message if the SequencingGroup already exists
         """
-        if id in self._sequencing_group_by_id:
-            logging.debug(f'SequencingGroup {id} already exists in the dataset {self.name}')
-            return self._sequencing_group_by_id[id]
+        if sequencing_group.id in self._sequencing_group_by_id:
+            logging.debug(f'SequencingGroup {sequencing_group.id} already exists in the dataset {self.name}')
+            return
+        self._sequencing_groups_by_id[sequencing_group.id] = sequencing_group
 
-        force_sgs = get_config()['workflow'].get('force_sgs', set())
-        forced = id in force_sgs or external_id in force_sgs or participant_id in force_sgs
-
-        s = SequencingGroup(
-            id=id,
-            dataset=self,
-            external_id=external_id,
-            sequencing_type=sequencing_type,
-            sequencing_technology=sequencing_technology,
-            sequencing_platform=sequencing_platform,
-            participant_id=participant_id,
-            meta=meta,
-            sex=sex,
-            pedigree=pedigree,
-            alignment_input=alignment_input,
-            forced=forced,
-        )
-        self._sequencing_group_by_id[id] = s
-        return s
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -506,10 +483,7 @@ class Dataset(Target):
         """
         Attributes for Hail Batch job.
         """
-        return {
-            'dataset': self.name,
-            'sequencing_groups': self.get_sequencing_group_ids(),
-        }
+        return {'dataset': self.name, 'sequencing_groups': self.get_sequencing_group_ids()}
 
     def get_job_prefix(self) -> str:
         """
@@ -575,7 +549,7 @@ class SequencingGroup(Target):
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
-        dataset: 'Dataset',  # type: ignore  # noqa: F821
+        dataset: str,  #  takes a dataset name, not a Dataset object
         *,
         sequencing_type: str,
         sequencing_technology: str,
@@ -596,7 +570,6 @@ class SequencingGroup(Target):
         self.sequencing_type = sequencing_type
         self.sequencing_technology = sequencing_technology
         self.sequencing_platform = sequencing_platform
-
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()

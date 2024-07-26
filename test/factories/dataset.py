@@ -7,6 +7,7 @@ from .types import DatasetId
 DEFAULT_DATASET_NAME: DatasetId = 'local-test'
 
 
+# TODO: needs updating to have a multicohort, not a cohort
 def create_dataset(
     name: DatasetId = DEFAULT_DATASET_NAME,
     cohort: Cohort | None = None,
@@ -41,8 +42,6 @@ def create_dataset(
         Dataset
     """
     dataset = Dataset(name, cohort=cohort)
-    if cohort:
-        cohort.add_dataset(dataset)
 
     sequencing_groups = sequencing_groups or []
     for sequencing_group in sequencing_groups:

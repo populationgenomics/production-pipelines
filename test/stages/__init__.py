@@ -59,7 +59,7 @@ def mock_multidataset_cohort() -> Cohort:
 def mock_multicohort() -> MultiCohort:
     mc = MultiCohort()
 
-    c = mc.create_cohort('CohortA')
+    c = mc.create_or_return_cohort('CohortA')
     ds = c.create_dataset('projecta')
     add_sg(ds, 'CPGXXXX', external_id='SAMPLE1')
     add_sg(ds, 'CPGAAAA', external_id='SAMPLE2')
@@ -68,7 +68,7 @@ def mock_multicohort() -> MultiCohort:
     add_sg(ds2, 'CPGCCCC', external_id='SAMPLE3')
     add_sg(ds2, 'CPGDDDD', external_id='SAMPLE4')
 
-    d = mc.create_cohort('CohortB')
+    d = mc.create_or_return_cohort('CohortB')
     ds3 = d.create_dataset('projectb')
     add_sg(ds3, 'CPGEEEEEE', external_id='SAMPLE5')
     add_sg(ds3, 'CPGFFFFFF', external_id='SAMPLE6')

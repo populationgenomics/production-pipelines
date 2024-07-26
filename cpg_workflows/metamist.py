@@ -259,15 +259,10 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
-    def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
-        """
-        Retrieve the sequencing groups per dataset for a list of cohort IDs.
-        """
-        return {cohort_id: self.get_sgs_by_project_from_cohort(cohort_id) for cohort_id in cohort_ids}
-
-    def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
+    def get_sgs_from_cohort(self, cohort_id: str) -> dict:
         """
         Retrieve sequencing group entries for a cohort.
+        CHANGED: now returns a list of sequencing groups, not a dictionary by project
         """
         entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
@@ -276,9 +271,7 @@ class Metamist:
 
         if len(entries['cohorts']) != 1:
             raise MetamistError('We only support one cohort at a time currently')
-        sequencing_groups = entries['cohorts'][0]['sequencingGroups']
-
-        return sort_sgs_by_project(sequencing_groups)
+        return entries['cohorts'][0]['sequencingGroups']
 
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
