@@ -2,6 +2,7 @@
 Test the `align` function using a SequencingGroup with a BAM/CRAM alignment input.
 """
 
+import enum
 import re
 from pathlib import Path
 from typing import Optional
@@ -106,6 +107,48 @@ class TestPreProcessing:
 
         jobs = align(b=batch, sequencing_group=sg)
         assert len(select_jobs(jobs, 'align')) == expected_count
+
+    @pytest.mark.parametrize('input_type', ['bam', 'cram'])
+    def test_extract_fastq_flags_correctly_set_when_extracting_reads(self, tmp_path: Path, input_type: str):
+        config = default_config()
+        batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
+
+        align(b=batch, sequencing_group=sg)
+        all_jobs = batch._jobs
+        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        assert extract_fastq_j is not None
+
+        cmd = get_command_str(extract_fastq_j)
+        file = 'SAMPLE1.bam' if input_type == 'bam' else 'SAMPLE1.cram'
+        escaped_file = re.escape(file)
+        samtools_command = fr'\${{BATCH_TMPDIR}}/inputs/\w+/{escaped_file}'
+        assert re.search(samtools_command, cmd)
+
+    def test_extract_fastq_uses_correct_reference_assembly_for_cram(self, tmp_path: Path):
+        config = default_config()
+        batch, sg = setup_test(config, tmp_path, alignment_input='cram', reference_assembly='non_default.fa')
+
+        align(b=batch, sequencing_group=sg)
+        all_jobs = batch._jobs
+        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        assert extract_fastq_j is not None
+
+        cmd = get_command_str(extract_fastq_j)
+        ref = re.escape('non_default.fa')
+        assert re.search(fr'samtools collate --reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref}', cmd)
+
+    def test_extract_fastq_does_not_use_reference_flag_for_bam(self, tmp_path: Path):
+        config = default_config()
+        batch, sg = setup_test(config, tmp_path, alignment_input='bam')
+
+        align(b=batch, sequencing_group=sg)
+        all_jobs = batch._jobs
+        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        assert extract_fastq_j is not None
+
+        cmd = get_command_str(extract_fastq_j)
+        assert 'samtools collate' in cmd
+        assert '--reference' not in cmd
 
     def test_bazam_flags_correctly_set_when_extracting_reads(self, tmp_path: Path):
         config = default_config()
