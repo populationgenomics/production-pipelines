@@ -4,6 +4,9 @@
 Hail script to submit on a dataproc cluster.
 
 Loads the matrix table into an ElasticSearch index.
+
+This code was used in DataProc to generate the ElasticSearch index. This has been replaced by a non-Dataproc version
+of the same process (see `cpg_workflows/scripts/mt_to_es_without_dataproc.py`).
 """
 
 import logging
