@@ -60,8 +60,8 @@ import toml
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
-from cpg_workflows.resources import HIGHMEM, STANDARD
-from cpg_workflows.utils import get_logger
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
@@ -386,10 +386,12 @@ class RunHailFiltering(DatasetStage):
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one
         # Genomes are more like 500GB
-        seq_type: str = config_retrieve(['workflow', 'sequencing_type'], 'genome')
-        required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(dataset.get_sequencing_group_ids()),
+        )
         required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
-        HIGHMEM.set_resources(job, ncpu=required_cpu, storage_gb=required_storage)
+        job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
