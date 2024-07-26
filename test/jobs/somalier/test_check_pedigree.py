@@ -9,7 +9,7 @@ from cpg_workflows.jobs.somalier import pedigree
 from ... import set_config
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig, WorkflowConfig
-from ...factories.dataset import create_dataset
+from ...factories.dataset import SequencingGroup, create_dataset
 from ..helpers import get_command_str
 
 
@@ -46,11 +46,14 @@ def setup_pedigree_test(tmp_path: Path, config: PipelineConfig | None = None):
 
     dataset = create_dataset(name=dataset_id)
     dataset.add_sequencing_group(
-        id='CPGABCD',
-        external_id='SAMPLE1',
-        sequencing_type='genome',
-        sequencing_technology='short-read',
-        sequencing_platform='illumina',
+        SequencingGroup(
+            id='CPGABCD',
+            dataset=dataset,
+            external_id='SAMPLE1',
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        ),
     )
     batch = create_local_batch(tmp_path)
 
@@ -203,10 +206,13 @@ class TestSomalierCheckPedigree:
         dataset_id = config.workflow.dataset
         dataset = create_dataset(name=dataset_id)
         dataset.add_sequencing_group(
-            id='CPGABCD',
-            sequencing_type='genome',
-            sequencing_technology='short-read',
-            sequencing_platform='illumina',
+            SequencingGroup(
+                id='CPGABCD',
+                dataset=dataset,
+                sequencing_type='genome',
+                sequencing_technology='short-read',
+                sequencing_platform='illumina',
+            ),
         )
 
         pedigree_jobs = pedigree(

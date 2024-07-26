@@ -12,7 +12,6 @@ from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_re
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
-
 _multicohort: MultiCohort | None = None
 
 

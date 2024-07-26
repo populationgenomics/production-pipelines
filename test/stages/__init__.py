@@ -60,16 +60,16 @@ def mock_multicohort() -> MultiCohort:
     mc = MultiCohort()
 
     c = mc.create_or_return_cohort('CohortA')
-    ds = c.create_dataset('projecta')
+    ds = mc.create_or_return_dataset('projecta')
     add_sg(ds, 'CPGXXXX', external_id='SAMPLE1')
     add_sg(ds, 'CPGAAAA', external_id='SAMPLE2')
 
-    ds2 = c.create_dataset('projectc')
+    ds2 = mc.create_or_return_dataset('projectc')
     add_sg(ds2, 'CPGCCCC', external_id='SAMPLE3')
     add_sg(ds2, 'CPGDDDD', external_id='SAMPLE4')
 
     d = mc.create_or_return_cohort('CohortB')
-    ds3 = d.create_dataset('projectb')
+    ds3 = mc.create_or_return_dataset('projectb')
     add_sg(ds3, 'CPGEEEEEE', external_id='SAMPLE5')
     add_sg(ds3, 'CPGFFFFFF', external_id='SAMPLE6')
 

@@ -9,7 +9,7 @@ from cpg_workflows.jobs.somalier import MAX_FREEMIX, pedigree
 from ... import set_config
 from ...factories.batch import create_local_batch
 from ...factories.config import PipelineConfig, WorkflowConfig
-from ...factories.dataset import create_dataset
+from ...factories.dataset import create_dataset, SequencingGroup
 from ..helpers import get_command_str
 
 
@@ -46,11 +46,14 @@ def setup_pedigree_test(tmp_path: Path, config: PipelineConfig | None = None):
 
     dataset = create_dataset(name=dataset_id)
     dataset.add_sequencing_group(
-        id='CPGAAAAAA',
-        external_id='SAMPLE1',
-        sequencing_type='genome',
-        sequencing_technology='short-read',
-        sequencing_platform='illumina',
+        SequencingGroup(
+            id='CPGAAAAAA',
+            dataset=dataset,
+            external_id='SAMPLE1',
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        )
     )
     batch = create_local_batch(tmp_path)
 
