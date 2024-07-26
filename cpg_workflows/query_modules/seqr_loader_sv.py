@@ -231,7 +231,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
             cpx_intervals=hl.or_missing(
                 hl.is_defined(mt.info.CPX_INTERVALS),
                 mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
-            )
+            ),
         )
 
     # reimplementation of
