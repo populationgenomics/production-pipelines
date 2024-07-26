@@ -1235,10 +1235,9 @@ class AnnotateDatasetSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
-        exclusion_file = inputs.as_path(dataset.cohort.multicohort, stage=CombineExclusionLists, key='exclusion_list')
+        assert dataset.multicohort
+        mt_path = inputs.as_path(target=dataset.multicohort, stage=AnnotateCohortSv, key='mt')
+        exclusion_file = inputs.as_path(dataset.multicohort, stage=CombineExclusionLists, key='exclusion_list')
 
         outputs = self.expected_outputs(dataset)
 

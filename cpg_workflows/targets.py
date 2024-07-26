@@ -300,7 +300,6 @@ class Cohort(Target):
             return
         self._sequencing_groups_by_id[sequencing_group.id] = sequencing_group
 
-
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Gets a flat list of all sequencing groups from all datasets.
@@ -310,7 +309,6 @@ class Cohort(Target):
         if only_active:
             return [sg for sg in all_sequencing_groups if sg.active]
         return all_sequencing_groups
-
 
     def get_job_attrs(self) -> dict:
         """
@@ -455,7 +453,6 @@ class Dataset(Target):
         """
         return web_url(self._seq_type_subdir(), dataset=self.name)
 
-
     def add_sequencing_group(self, sequencing_group: SequencingGroup):
         """
         method for adding a populated SequencingGroup to the Dataset
@@ -471,7 +468,6 @@ class Dataset(Target):
             logging.debug(f'SequencingGroup {sequencing_group.id} already exists in the dataset {self.name}')
             return
         self._sequencing_groups_by_id[sequencing_group.id] = sequencing_group
-
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
