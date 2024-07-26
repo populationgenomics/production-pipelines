@@ -204,10 +204,14 @@ def align(
         extract_reads = False
         if isinstance(alignment_input, CramPath | BamPath):
             extract_reads = True
+            if isinstance(alignment_input, CramPath):
+                assert (
+                    alignment_input.reference_assembly
+                ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
         align_j, align_cmd = _align_one(
             b=b,
             job_name=base_job_name,
-            alignment_input=alignment_input,
+            alignment_input=alignment_input,  # type: ignore[arg-type]
             requested_nthreads=requested_nthreads,
             sequencing_group_name=sequencing_group.id,
             job_attrs=job_attrs,
@@ -371,9 +375,6 @@ def _align_one(
             """,
             )
             use_interleaved = True
-            assert (
-                alignment_input.reference_assembly
-            ), f'The reference input for the alignment input "{alignment_input.path}" was not set'
 
         prepare_fastq_cmd = ''
         r1_param = 'r1'
