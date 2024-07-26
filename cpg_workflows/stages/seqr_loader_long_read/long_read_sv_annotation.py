@@ -4,12 +4,16 @@ Workflow for finding long-read SV files, updating file contents, merging, and an
 
 from functools import cache
 
+from google.api_core.exceptions import PermissionDenied
+
 from cpg_utils import Path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre_job, queue_annotate_sv_jobs
+from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -303,3 +307,66 @@ class AnnotateDatasetLRSv(DatasetStage):
         )
 
         return self.make_outputs(dataset, data=outputs, jobs=jobs)
+
+
+@stage(
+    required_stages=[AnnotateDatasetLRSv],
+    analysis_type='es-index',
+    analysis_keys=['index_name'],
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},
+)
+class MtToEsLrSv(DatasetStage):
+    """
+    Create a Seqr index
+    https://github.com/populationgenomics/metamist/issues/539
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        index_name = f'{dataset.name}-{sequencing_type}-LR-SV-{get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Uses the non-DataProc MT-to-ES conversion script
+        """
+
+        # try to generate a password here - we'll find out inside the script anyway, but
+        # by that point we'd already have localised the MT, wasting time and money
+        try:
+            _es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
+            return self.make_outputs(dataset)
+
+        outputs = self.expected_outputs(dataset)
+
+        # get the absolute path to the MT
+        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetLRSv, key='mt'))
+        # and just the name, used after localisation
+        mt_name = mt_path.split('/')[-1]
+
+        # get the expected outputs as Strings
+        index_name = str(outputs['index_name'])
+        flag_name = str(outputs['done_flag'])
+
+        job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
+        # set all job attributes in one bash
+        job.cpu(4).memory('lowmem').storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
+
+        # localise the MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
+
+        # run the export from the localised MT - this job writes no new data, just transforms and exports over network
+        job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
+
+        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
