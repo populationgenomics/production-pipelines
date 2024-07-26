@@ -316,7 +316,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
 
 def _align_one(
-    b,
+    b: hb.Batch,
     job_name: str,
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
@@ -336,7 +336,7 @@ def _align_one(
     """
     job_attrs = (job_attrs or {}) | dict(label=job_name, tool=aligner.name)
     job_name = f'{job_name} {alignment_input}'
-    j = b.new_job(job_name, job_attrs)
+    j: Job = b.new_job(job_name, job_attrs)
 
     if get_config()['resource_overrides'].get('align_use_highmem'):
         align_machine_type = HIGHMEM
@@ -479,7 +479,7 @@ def _align_one(
 def extract_fastq(
     b,
     bam_or_cram_group: hb.ResourceGroup,
-    alignment_input: FastqPair | CramPath | BamPath,
+    alignment_input: CramPath | BamPath,
     ext: str = 'cram',
     job_attrs: dict | None = None,
 ) -> Job:
