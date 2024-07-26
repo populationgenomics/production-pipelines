@@ -3,6 +3,7 @@ Metamist wrapper to get input sequencing groups.
 """
 
 import logging
+import typing
 
 from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
@@ -11,7 +12,7 @@ from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_re
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
-_cohort: Cohort | None = None
+
 _multicohort: MultiCohort | None = None
 
 
@@ -34,7 +35,7 @@ def deprecated_get_cohort() -> Cohort:
     return _multicohort
 
 
-def get_multicohort() -> Cohort | MultiCohort:
+def get_multicohort() -> MultiCohort:
     """
     Return the cohort or multicohort object based on the workflow configuration.
     """
@@ -55,9 +56,10 @@ def create_multicohort() -> MultiCohort:
     """
     Add cohorts in the multicohort.
     """
-    config = config_retrieve(['workflow'])
+    # create an empty  MultiCohort
     multicohort = MultiCohort()
-    read_pedigree = config.get('read_pedigree', True)
+
+    config = config_retrieve(['workflow'])
 
     for cohort_id in config.get('input_cohorts', []):
         # create a shell for this Cohort
@@ -67,36 +69,61 @@ def create_multicohort() -> MultiCohort:
         sgs_in_cohort = get_metamist().get_sgs_from_cohort(cohort_id)
 
         # populate the Cohort with SequencingGroups
-        _populate_cohort(cohort, sgs=sgs_in_cohort, read_pedigree=read_pedigree)
+        _populate_cohort(cohort, sgs=sgs_in_cohort)
 
+    # iterate over the sequencing groups and add them to Datasets
     for sg in multicohort.get_sequencing_groups():
-        multicohort.create_or_return_dataset(sg.dataset).add_sequencing_group(sg)
+        dataset = multicohort.create_or_return_dataset(sg.dataset)
+        # add the multicohort dataset instance to the sequencing group
+        # these were populated with a placeholder Dataset, useful in finding filepaths
+        # repopulating here means we can also use sg.dataset.get_sequencing_groups() correctly
+        sg.dataset = dataset
+        # reciprocally add the sequencing group to the dataset
+        dataset.add_sequencing_group(sg)
 
     # now populate the per-dataset analyses
     for dataset in multicohort.get_datasets():
         _populate_analysis(dataset)
-        if read_pedigree:
+        if config.get('read_pedigree', True):
             _populate_pedigree(dataset)
 
     return multicohort
 
 
-def _populate_cohort(cohort: Cohort, sgs: list[dict], read_pedigree: bool = True):
+def _populate_cohort(cohort: Cohort, sgs: list[dict]):
     """
     Add sequencing groups to the cohort
     Multiple cohorts can co-exist in the workflow run, and could have overlapping SG ID sets
     """
 
+    # take the data dicts from metamist and create SequencingGroups
+    for sequencing_group in create_and_populate_sgs(sgs):
+        # add this SequencingGroup to the Cohort
+        cohort.add_sequencing_group(sequencing_group)
+
+    assert cohort.get_sequencing_groups()
+
+
+def create_and_populate_sgs(sgs: list[dict]) -> typing.Generator[SequencingGroup]:
+    """
+    takes a list of data dicts from metamist and creates a SequencingGroup
+    Args:
+        sgs ():
+
+    Returns:
+        SequencingGroup objects
+    """
     for entry in sgs:
         metadata = entry.get('meta', {})
         update_dict(metadata, entry['sample']['participant'].get('meta', {}))
         # phenotypes are managed badly here, need a cleaner way to get them into the SG
         update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
+        # create the SequencingGroup object
         sequencing_group = SequencingGroup(
             id=entry['id'],
             external_id=str(entry['sample']['externalId']),
-            dataset=entry['sample']['project']['name'],
+            dataset=dataset,
             participant_id=entry['sample']['participant'].get('externalId'),
             meta=metadata,
             sequencing_type=entry['type'],
@@ -108,11 +135,7 @@ def _populate_cohort(cohort: Cohort, sgs: list[dict], read_pedigree: bool = True
             sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
         _populate_alignment_inputs(sequencing_group, entry)
-
-        # add this SequencingGroup to the Cohort
-        cohort.add_sequencing_group(sequencing_group)
-
-    assert cohort.get_sequencing_groups()
+        yield sequencing_group
 
 
 def deprecated_create_multicohort() -> MultiCohort:
@@ -147,29 +170,8 @@ def deprecated_create_multicohort() -> MultiCohort:
         sgs = get_metamist().get_sg_entries(dataset_name)
         dataset = Dataset(name=dataset_name, multicohort=multi_cohort)
 
-        for entry in sgs:
-            metadata = entry.get('meta', {})
-            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
-            # phenotypes are managed badly here, need a cleaner way to get them into the SG
-            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
-
-            # create the SequencingGroup object
-            sequencing_group = SequencingGroup(
-                id=entry['id'],
-                external_id=str(entry['sample']['externalId']),
-                dataset=dataset_name,
-                participant_id=entry['sample']['participant'].get('externalId'),
-                meta=metadata,
-                sequencing_type=entry['type'],
-                sequencing_technology=entry['technology'],
-                sequencing_platform=entry['platform'],
-            )
-
-            if reported_sex := entry['sample']['participant'].get('reportedSex'):
-                sequencing_group.pedigree.sex = Sex.parse(reported_sex)
-
-            _populate_alignment_inputs(sequencing_group, entry)
-
+        # take the data dicts from metamist and create SequencingGroups
+        for sequencing_group in create_and_populate_sgs(sgs):
             # add this SequencingGroup to the Dataset
             dataset.add_sequencing_group(sequencing_group)
             # also add this SequencingGroup to the Cohort

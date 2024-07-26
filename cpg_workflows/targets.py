@@ -545,7 +545,7 @@ class SequencingGroup(Target):
     def __init__(
         self,
         id: str,  # pylint: disable=redefined-builtin
-        dataset: str,  #  takes a dataset name, not a Dataset object
+        dataset: 'Dataset',
         *,
         sequencing_type: str,
         sequencing_technology: str,
