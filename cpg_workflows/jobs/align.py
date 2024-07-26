@@ -488,21 +488,21 @@ def extract_fastq(
     j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
     j.image(image_path('samtools'))
     # TODO: add ability to detect reference used in current BAM/CRAM and provide error handling
-    if isinstance(alignment_input, CramPath | BamPath):
-        reference_path = b.read_input(str(alignment_input.reference_assembly))
+    if isinstance(alignment_input, CramPath):
+        reference_flag = f'--reference f{b.read_input(str(alignment_input.reference_assembly))}'
     else:
-        reference_path = fasta_res_group(b)['base']
+        reference_flag = ''
     res = STANDARD.request_resources(ncpu=16)
-    if get_config()['workflow'].get('align', {})['sequencing_type'] == 'genome':
+    if get_config()['workflow']['sequencing_type'] == 'genome':
         res.attach_disk_storage_gb = 700
     res.set_to_job(j)
     tmp_prefix = '$BATCH_TMPDIR/collate'
     cmd = f"""
-    samtools collate --reference {reference_path} -@{res.get_nthreads() - 1} -u -O \
+    samtools collate {reference_flag} -@{res.get_nthreads() - 1} -u -O \
     {bam_or_cram_group[ext]} {tmp_prefix} | \\
     samtools fastq -@{res.get_nthreads() - 1} \
     -0 /dev/null -n | gzip > $BATCH_TMPDIR/all_reads.fq.gz
-    # Can't write directly to j.fq1 and j.fq2 because samtools-fastq requires the
+    # Can't write directly to j.all_reads because samtools-fastq requires the
     # file names to end with ".gz" in order to create compressed outputs.
     mv $BATCH_TMPDIR/all_reads.fq.gz {j.all_reads}
     """
