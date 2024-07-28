@@ -41,6 +41,7 @@ def add_background(
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
         path = dataset_dict['dataset_path']
         logging.info(f'Adding background dataset {path}')
+        logging.info(f'Current dataset: {dataset}')
         if to_path(path).suffix == '.mt':
             background_mt = hl.read_matrix_table(str(path))
             background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
@@ -62,8 +63,10 @@ def add_background(
                 # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
+                logging.info(f'Adding metadata table to background dataset: {path}')
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
+                logging.info(f'{metadata_tables}')
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
