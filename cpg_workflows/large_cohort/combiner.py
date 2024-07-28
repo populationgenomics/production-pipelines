@@ -4,8 +4,7 @@ import logging
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
+from cpg_utils.config import config_retrieve, genome_build, get_config
 from cpg_workflows.inputs import get_multicohort
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse, exists
@@ -70,6 +69,14 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
         sequencing_groups = [s for s in sequencing_groups if s in sequencing_group_ids]
 
     sequencing_groups = _check_gvcfs(sequencing_groups)
+    seq_types = set(s.sequencing_type for s in sequencing_groups)
+    if len(seq_types) > 1:
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        logging.warning(
+            f'Found multiple sequencing types for large cohort combiner: {seq_types}, using the config-provided {sequencing_type}',
+        )
+    # else just use the first
+    sequencing_type = seq_types.pop()
 
     params = get_config().get('large_cohort', {}).get('combiner', {})
 
@@ -80,9 +87,9 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
             )
         else:
             params['intervals'] = hl.import_locus_intervals(params['intervals'])
-    elif get_config()['workflow']['sequencing_type'] == 'exome':
+    elif sequencing_type == 'exome':
         params.setdefault('use_exome_default_intervals', True)
-    elif get_config()['workflow']['sequencing_type'] == 'genome':
+    elif sequencing_type == 'genome':
         params.setdefault('use_genome_default_intervals', True)
     else:
         raise ValueError(
