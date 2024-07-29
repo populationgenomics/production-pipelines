@@ -4,6 +4,7 @@ from os import remove
 from random import sample
 
 import pandas as pd
+from attr import dataclass
 
 import hail as hl
 
@@ -48,7 +49,7 @@ def add_background(
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            background_mt_checkpoint_path = tmp_prefix / 'densified_background_mt.mt'
+            background_mt_checkpoint_path = tmp_prefix / f'{dataset}_densified_background_mt.mt'
             if can_reuse(background_mt_checkpoint_path):
                 logging.info(f'Reusing densified background mt from {background_mt_checkpoint_path}')
                 background_mt = hl.read_matrix_table(str(background_mt_checkpoint_path))
@@ -89,16 +90,16 @@ def add_background(
                 )
             else:
                 logging.info('No related samples to drop from background dataset')
+
+            # save metadata info before merging dense and background datasets
+            ht = background_mt.cols()
+            background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+            background_mt = background_mt.naive_coalesce(5000)
+            # combine dense dataset with background population dataset
+            dense_mt = dense_mt.union_cols(background_mt)
+            sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
-
-        # save metadata info before merging dense and background datasets
-        ht = background_mt.cols()
-        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
-        background_mt = background_mt.naive_coalesce(5000)
-        # combine dense dataset with background population dataset
-        dense_mt = dense_mt.union_cols(background_mt)
-        sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
 
     if drop_columns:
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
