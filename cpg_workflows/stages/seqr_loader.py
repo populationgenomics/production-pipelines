@@ -13,11 +13,11 @@ from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_job
 from cpg_workflows.query_modules import seqr_loader
-from cpg_workflows.targets import Cohort, Dataset
+from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import (
-    CohortStage,
     DatasetStage,
+    MultiCohortStage,
     StageInput,
     StageOutput,
     get_workflow,
@@ -30,53 +30,44 @@ from .vqsr import Vqsr
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
-class AnnotateCohort(CohortStage):
+class AnnotateCohort(MultiCohortStage):
     """
     Re-annotate the entire cohort.
     """
 
-    def expected_outputs(self, cohort: Cohort):
+    def expected_outputs(self, multicohort: MultiCohort):
         """
         Expected to write a matrix table.
         """
-        return {
-            # writing into perm location for late debugging
-            # convert to str to avoid checking existence
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'cohort.mt',
-        }
+        return {'mt': self.prefix / 'cohort.mt'}
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
         Apply VEP and VQSR annotations to all-sample callset
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, key='siteonly')
-        vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
+        outputs = self.expected_outputs(multicohort)
+        vcf_path = inputs.as_path(target=multicohort, stage=JointGenotyping, key='vcf')
+        siteonly_vqsr_vcf_path = inputs.as_path(target=multicohort, stage=Vqsr, key='siteonly')
+        vep_ht_path = inputs.as_path(target=multicohort, stage=Vep, key='ht')
 
-        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        j = get_batch().new_job('annotate cohort', self.get_job_attrs(cohort))
+        j = get_batch().new_job('annotate cohort', self.get_job_attrs(multicohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
                 seqr_loader,
                 seqr_loader.annotate_cohort.__name__,
                 str(vcf_path),
-                str(self.expected_outputs(cohort)['mt']),
+                str(outputs['mt']),
                 str(vep_ht_path),
                 str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
-                str(checkpoint_prefix),
+                str(self.tmp_prefix / 'checkpoints'),
                 setup_gcp=True,
             ),
         )
-        if depends_on := inputs.get_jobs(cohort):
+        if depends_on := inputs.get_jobs(multicohort):
             j.depends_on(*depends_on)
 
-        return self.make_outputs(
-            cohort,
-            data=self.expected_outputs(cohort),
-            jobs=j,
-        )
+        return self.make_outputs(multicohort, data=outputs, jobs=j)
 
 
 def _update_meta(
