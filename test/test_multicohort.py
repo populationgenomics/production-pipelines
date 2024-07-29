@@ -220,10 +220,7 @@ def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     ]
 
 
-def test_multicohort(
-    mocker: MockFixture,
-    tmp_path,
-):
+def test_multicohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
     """

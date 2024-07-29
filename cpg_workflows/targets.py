@@ -115,6 +115,7 @@ class MultiCohort(Target):
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
         self._cohorts_by_name: dict[str, Cohort] = {}
+        self._datasets_by_name: dict[str, Dataset] = {}
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
 
     def __repr__(self):
@@ -155,10 +156,10 @@ class MultiCohort(Target):
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        datasets = []
-        for cohort in self.get_cohorts(only_active):
-            datasets.extend(cohort.get_datasets(only_active))
-        return datasets
+        all_datasets = list(self._datasets_by_name.values())
+        if only_active:
+            all_datasets = [d for d in all_datasets if d.active and d.get_sequencing_groups()]
+        return all_datasets
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -167,6 +168,9 @@ class MultiCohort(Target):
         """
         all_sequencing_groups = []
         for cohort in self.get_cohorts(only_active):
+            print(cohort)
+            print(len(cohort.get_sequencing_groups(only_active)))
+            print([sg.id for sg in cohort.get_sequencing_groups(only_active)])
             all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
         return all_sequencing_groups
 
@@ -184,6 +188,26 @@ class MultiCohort(Target):
         c = Cohort(name=name, multicohort=self)
         self._cohorts_by_name[c.name] = c
         return c
+
+    def add_dataset(self, d: 'Dataset') -> 'Dataset':
+        """
+        Add a Dataset to the MultiCohort
+        Args:
+            d: Dataset object
+        """
+        if d.name in self._datasets_by_name:
+            logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
+        else:
+            self._datasets_by_name[d.name] = d
+        return self._datasets_by_name[d.name]
+
+    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" datasets (unless only_active is False)
+        """
+        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
+        return ds_by_name.get(name)
 
     def get_job_attrs(self) -> dict:
         """
@@ -229,6 +253,7 @@ class Cohort(Target):
         self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
+        self._sg_by_id: dict[str, SequencingGroup] = {}
         self.multicohort = multicohort
 
     def __repr__(self):
@@ -298,10 +323,7 @@ class Cohort(Target):
         self._datasets_by_name[dataset.name] = dataset
         return dataset
 
-    def create_dataset(
-        self,
-        name: str,
-    ) -> 'Dataset':
+    def create_dataset(self, name: str) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
         """
@@ -494,6 +516,17 @@ class Dataset(Target):
         )
         self._sequencing_group_by_id[id] = s
         return s
+
+    def add_sequencing_group_object(self, s: 'SequencingGroup'):
+        """
+        Add a sequencing group object to the dataset.
+        Args:
+            s: SequencingGroup object
+        """
+        if s.id in self._sequencing_group_by_id:
+            logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
+            return self._sequencing_group_by_id[s.id]
+        self._sequencing_group_by_id[s.id] = s
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """

@@ -40,10 +40,12 @@ def get_multicohort() -> Cohort | MultiCohort:
         raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
 
     # NOTE: When configuring sgs in the config is deprecated, this will be removed.
-    if config_retrieve(['workflow', 'input_cohorts'], []):
+    if custom_cohort_ids:
         if not isinstance(custom_cohort_ids, list):
             raise ValueError('input_cohorts must be a list')
         return actual_get_multicohort()
+    # TODO (mwelland): this should also return a MultiCohort object, containing one Cohort for the whole run?
+    # TODO (mwelland): this would mean we're always returning a MultiCohort, even if there is only one cohort
     return deprecated_get_cohort()
 
 
@@ -63,12 +65,25 @@ def create_multicohort() -> MultiCohort:
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
         _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
+    # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
+    # across all cohorts
+    # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
+    # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
+    for cohort in multicohort.get_cohorts():
+        for dataset in cohort.get_datasets():
+            # is this dataset already in the multicohort? If so, use, otherwise create a new one
+            mc_dataset = multicohort.get_dataset_by_name(dataset.name) or multicohort.add_dataset(dataset)
+            for sg in dataset.get_sequencing_groups():
+                mc_dataset.add_sequencing_group_object(sg)
+
     return multicohort
 
 
 def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
     """
-    Add datasets in the cohort. There exists only one cohort for the workflow run.
+    Add datasets in the cohort.
+    TODO (mwelland): The Cohort object should not care about the Datasets it contains
+    TODO (mwelland): so we can lose a layer of the structure here
     """
     for dataset_name in sgs_by_dataset_for_cohort.keys():
         dataset = cohort.create_dataset(dataset_name)
@@ -95,6 +110,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     if not cohort.get_datasets():
         raise MetamistError('No datasets populated')
 
+    # TODO (mwelland): this should be done one Dataset at a time, not per Datset per Cohort
     _populate_analysis(cohort)
     if read_pedigree:
         _populate_pedigree(cohort)

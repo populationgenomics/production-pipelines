@@ -278,6 +278,7 @@ class Metamist:
             raise MetamistError('We only support one cohort at a time currently')
         sequencing_groups = entries['cohorts'][0]['sequencingGroups']
 
+        # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
         return sort_sgs_by_project(sequencing_groups)
 
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
@@ -324,6 +325,7 @@ class Metamist:
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
+    # TODO (mwelland): get in the bin
     def find_joint_calling_analysis(
         self,
         sequencing_group_ids: list[str],
