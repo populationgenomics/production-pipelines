@@ -7,7 +7,7 @@ from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, dataproc, to_path
+from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
@@ -22,6 +22,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     get_ref_panel,
     get_references,
     make_combined_ped,
+    queue_annotate_strvctvre_job,
     queue_annotate_sv_jobs,
 )
 from cpg_workflows.stages.seqr_loader import es_password
@@ -87,7 +88,7 @@ def query_for_spicy_vcf(dataset: str) -> str | None:
     return spice_by_date[sorted(spice_by_date)[-1]]
 
 
-@stage(analysis_keys=['cohort_ped'], analysis_type='custom')
+@stage
 class MakeCohortCombinedPed(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {'cohort_ped': self.get_stage_cohort_prefix(cohort) / 'ped_with_ref_panel.ped'}
@@ -101,7 +102,7 @@ class MakeCohortCombinedPed(CohortStage):
         return self.make_outputs(target=cohort, data=output)
 
 
-@stage(analysis_keys=['multicohort_ped'], analysis_type='custom')
+@stage
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {'multicohort_ped': self.prefix / 'ped_with_ref_panel.ped'}
@@ -1122,17 +1123,6 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
-
-        strv_job.image(image_path('strvctvre'))
-        config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi')
-        strv_job.storage(config_retrieve(['resource_overrides', self.name, 'storage'], '20Gi'))
-        strv_job.memory(config_retrieve(['resource_overrides', self.name, 'memory'], '16Gi'))
-
-        strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
-        assert isinstance(strvctvre_phylop, str)
-
-        phylop_in_batch = get_batch().read_input(strvctvre_phylop)
 
         input_dict = inputs.as_dict(multicohort, AnnotateVcf)
         expected_d = self.expected_outputs(multicohort)
@@ -1143,21 +1133,9 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
             vcf_index=str(input_dict['annotated_vcf_index']),
         )['vcf']
 
-        strv_job.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+        strvctvre_job = queue_annotate_strvctvre_job(input_vcf, str(expected_d['strvctvre_vcf']), self.get_job_attrs())
 
-        # run strvctvre
-        strv_job.command(
-            f'python StrVCTVRE.py -i {input_vcf} '
-            f'-o {strv_job.output_vcf["vcf.gz"]} '  # type: ignore
-            f'-f vcf -p {phylop_in_batch}',
-        )
-        strv_job.command(f'tabix {strv_job.output_vcf["vcf.gz"]}')  # type: ignore
-
-        get_batch().write_output(strv_job.output_vcf, str(expected_d['strvctvre_vcf']).replace('.vcf.gz', ''))
-        return self.make_outputs(multicohort, data=expected_d, jobs=strv_job)
-
-
-# insert spicy-naming here instead
+        return self.make_outputs(multicohort, data=expected_d, jobs=strvctvre_job)
 
 
 @stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv', analysis_keys=['new_id_vcf'])
@@ -1242,14 +1220,11 @@ class AnnotateDatasetSv(DatasetStage):
     Then work up all the genotype values
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict:
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         """
         Expected to generate a matrix table
         """
-        return {
-            'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt'),
-        }
+        return {'mt': (dataset.prefix() / 'mt' / f'SV-{get_workflow().output_version}-{dataset.name}.mt')}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -1267,13 +1242,11 @@ class AnnotateDatasetSv(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
-
         jobs = annotate_dataset_jobs_sv(
             mt_path=mt_path,
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=outputs['mt'],
-            tmp_prefix=checkpoint_prefix,
+            tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
             exclusion_file=str(exclusion_file),
         )
@@ -1306,11 +1279,13 @@ class MtToEsSv(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Uses analysis-runner's dataproc helper to run a hail query script
+        Uses the non-DataProc MT-to-ES conversion script
         """
 
+        # try to generate a password here - we'll find out inside the script anyway, but
+        # by that point we'd already have localised the MT, wasting time and money
         try:
-            es_password_string = es_password()
+            _es_password_string = es_password()
         except PermissionDenied:
             get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
             return self.make_outputs(dataset)
@@ -1318,44 +1293,25 @@ class MtToEsSv(DatasetStage):
             get_logger().warning(f'ES section not in config, skipping for {dataset}')
             return self.make_outputs(dataset)
 
-        dataset_mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt')
-        index_name = self.expected_outputs(dataset)['index_name']
-        done_flag_path = self.expected_outputs(dataset)['done_flag']
+        outputs = self.expected_outputs(dataset)
 
-        # transformation is the same, just use the same methods file?
-        script = (
-            f'cpg_workflows/dataproc_scripts/mt_to_es.py '
-            f'--mt-path {dataset_mt_path} --es-index {index_name} '
-            f'--done-flag-path {done_flag_path} --es-password {es_password_string}'
-        )
-        pyfiles = ['seqr-loading-pipelines/hail_scripts']
-        job_name = f'{dataset.name}: create ES index'
+        # get the absolute path to the MT
+        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetSv, key='mt'))
+        # and just the name, used after localisation
+        mt_name = mt_path.split('/')[-1]
 
-        if cluster_id := config_retrieve(['hail', 'dataproc', 'cluster_id'], False):
-            # noinspection PyProtectedMember
+        # get the expected outputs as Strings
+        index_name = str(outputs['index_name'])
+        flag_name = str(outputs['done_flag'])
 
-            j = dataproc._add_submit_job(
-                batch=get_batch(),
-                cluster_id=cluster_id,
-                script=script,
-                pyfiles=pyfiles,
-                job_name=job_name,
-                region='australia-southeast1',
-                hail_version=dataproc.DEFAULT_HAIL_VERSION,
-            )
-        else:
-            j = dataproc.hail_dataproc_job(
-                get_batch(),
-                script,
-                max_age='48h',
-                packages=['cpg_workflows', 'elasticsearch==8.*', 'google', 'fsspec', 'gcloud'],
-                num_workers=2,
-                num_secondary_workers=0,
-                job_name=job_name,
-                scopes=['cloud-platform'],
-                pyfiles=pyfiles,
-                depends_on=inputs.get_jobs(dataset),  # Do not remove, see production-pipelines/issues/791
-            )
-        j._preemptible = False
-        j.attributes = (j.attributes or {}) | {'tool': 'hailctl dataproc'}
-        return self.make_outputs(dataset, data=index_name, jobs=j)
+        job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
+        # set all job attributes in one bash
+        job.cpu(4).memory('lowmem').storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
+
+        # localise the MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
+
+        # run the export from the localised MT - this job writes no new data, just transforms and exports over network
+        job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
+
+        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)

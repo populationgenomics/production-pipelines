@@ -387,7 +387,7 @@ def _add_joint_genotyper_job(
     """
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
         # This is ok to do for exomes, because they shouldn't have genotypes inside centromeres
-        cmd += """
+        cmd += """\
         --merge-input-intervals \\
         """
     if tool == JointGenotyperTool.GnarlyGenotyper:
