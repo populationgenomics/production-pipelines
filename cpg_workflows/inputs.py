@@ -110,7 +110,8 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     if not cohort.get_datasets():
         raise MetamistError('No datasets populated')
 
-    # TODO (mwelland): this should be done one Dataset at a time, not per Datset per Cohort
+    # TODO (mwelland): this should be done one Dataset at a time, not per Dataset per Cohort
+    # TODO (mwelland): by querying per-dataset per-cohort we increase the number of identical requests
     _populate_analysis(cohort)
     if read_pedigree:
         _populate_pedigree(cohort)
