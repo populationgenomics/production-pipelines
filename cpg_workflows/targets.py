@@ -163,21 +163,17 @@ class MultiCohort(Target):
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
-        Gets a flat list of all sequencing groups from all cohorts.
+        Gets a flat list of all sequencing groups from all datasets.
+        uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
         Include only "active" sequencing groups (unless only_active is False)
         """
-        all_sequencing_groups = []
-        for cohort in self.get_cohorts(only_active):
-            print(cohort)
-            print(len(cohort.get_sequencing_groups(only_active)))
-            print([sg.id for sg in cohort.get_sequencing_groups(only_active)])
-            all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
-        return all_sequencing_groups
+        all_sequencing_groups: dict[str, 'SequencingGroup'] = {}
+        for dataset in self.get_datasets(only_active):
+            for sg in dataset.get_sequencing_groups(only_active):
+                all_sequencing_groups[sg.id] = sg
+        return list(all_sequencing_groups.values())
 
-    def create_cohort(
-        self,
-        name: str,
-    ):
+    def create_cohort(self, name: str):
         """
         Create a cohort and add it to the multi-cohort.
         """
@@ -253,7 +249,6 @@ class Cohort(Target):
         self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
-        self._sg_by_id: dict[str, SequencingGroup] = {}
         self.multicohort = multicohort
 
     def __repr__(self):
