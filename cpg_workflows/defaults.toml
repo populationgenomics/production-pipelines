@@ -157,3 +157,15 @@ STARD7,TBP,TBX1,TCF4,TNRC6A,VWA1,XYLT1,YEATS2,ZFHX3,ZIC2,ZIC3"""
 # custom_loci_path = "gs://cpg-reference/hg38/loci/seqr/seqr_stripy_custom_loci.bed"
 # Set to empty string if no custom loci are to be used.
 custom_loci_path = ""
+
+# Add in specific multiQC report config options
+# See https://multiqc.info/docs/getting_started/config for more details
+# [workflow.cram_multiqc]
+# send_to_slack = true
+# [workflow.cram_multiqc.extra_config]
+# plots_force_interactive = true
+
+# [workflow.gvcf_multiqc]
+# send_to_slack = true
+# [workflow.gvcf_multiqc.extra_config]
+# plots_force_interactive = true
