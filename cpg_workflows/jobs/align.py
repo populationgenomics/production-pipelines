@@ -84,7 +84,7 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
                 path,
                 reference_assembly=_get_cram_reference_from_version(realign_cram_ver),
             )
-    if realign_from_cram := get_config()['workflow'].get('realign_from_cram'):
+    elif realign_from_cram := get_config()['workflow'].get('realign_from_cram'):
         alignment_input = CramPath(
             path=(sequencing_group.dataset.prefix() / 'cram' / f'{sequencing_group.id}.cram'),
             reference_assembly=get_config()['workflow']['ref_fasta'],
