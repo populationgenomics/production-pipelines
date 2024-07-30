@@ -11,7 +11,6 @@ from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_re
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
-_cohort: Cohort | None = None
 _multicohort: MultiCohort | None = None
 
 
@@ -23,12 +22,12 @@ def actual_get_multicohort() -> MultiCohort:
     return _multicohort
 
 
-def deprecated_get_cohort() -> Cohort:
+def deprecated_get_cohort() -> MultiCohort:
     """Return the cohort object"""
-    global _cohort
-    if not _cohort:
-        _cohort = deprecated_create_cohort()
-    return _cohort
+    global _multicohort
+    if not _multicohort:
+        _multicohort = deprecated_create_cohort()
+    return _multicohort
 
 
 def get_multicohort() -> Cohort | MultiCohort:
