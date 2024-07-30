@@ -125,10 +125,10 @@ SEQR_LOADER_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'default
 
 def _mock_cohort():
     from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
-    from cpg_workflows.targets import Cohort
-
-    cohort = Cohort()
-    ds = cohort.create_dataset('test-input-dataset')
+    from cpg_workflows.targets import MultiCohort
+    multi_cohort = MultiCohort()
+    cohort = multi_cohort.create_cohort('test-analysis-dataset')
+    ds = cohort.create_dataset('test-analysis-dataset')
     ds.add_sequencing_group(
         'CPGAA',
         'SAMPLE1',
@@ -152,7 +152,7 @@ def _mock_cohort():
             ),
         },
     )
-    return cohort
+    return multi_cohort
 
 
 def selective_mock_open(*args, **kwargs):

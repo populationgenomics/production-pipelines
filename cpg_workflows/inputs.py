@@ -102,7 +102,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     assert cohort.get_sequencing_groups()
 
 
-def deprecated_create_cohort() -> Cohort:
+def deprecated_create_cohort() -> MultiCohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
@@ -120,8 +120,8 @@ def deprecated_create_cohort() -> Cohort:
         logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
-
-    cohort = Cohort()
+    multi_cohort = MultiCohort()
+    cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
@@ -156,8 +156,8 @@ def deprecated_create_cohort() -> Cohort:
     _populate_analysis(cohort)
     if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
-    assert cohort.get_sequencing_groups()
-    return cohort
+    assert multi_cohort.get_sequencing_groups()
+    return multi_cohort
 
 
 def _combine_assay_meta(assays: list[Assay]) -> dict:

@@ -282,6 +282,8 @@ class StageInput:
                 f'{self.stage.name}. Is {stage.__name__} in the `required_stages`'
                 f'decorator? Available: {self._outputs_by_target_by_stage}',
             )
+        print(self._outputs_by_target_by_stage[stage.__name__])
+        print(target.target_id)
         if not self._outputs_by_target_by_stage[stage.__name__].get(target.target_id):
             raise StageInputNotFoundError(
                 f'Not found output for {target} from stage {stage.__name__}, required for stage {self.stage.name}',
