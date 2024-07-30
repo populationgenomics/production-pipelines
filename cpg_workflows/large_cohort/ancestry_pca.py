@@ -84,8 +84,8 @@ def add_background(
                 logging.info(
                     f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
                 )
-                logging.info(f'background_relateds_to_drop: {background_relateds_to_drop.show()}')
                 background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
+                logging.info(f'background_relateds_to_drop: {background_relateds_to_drop_ht.show()}')
                 background_mt = background_mt.filter_cols(
                     ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
                 )
