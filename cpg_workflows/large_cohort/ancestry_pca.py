@@ -62,12 +62,12 @@ def add_background(
                 background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
                 logging.info('Finished checkpointing densified_background_mt')
                 # annotate background mt with metadata info derived from SampleQC stage
-            metadata_tables = []
+            metadata_tables: list[hl.Table] = []
             for path in dataset_dict['metadata_table']:
                 logging.info(f'Adding metadata table to background dataset: {path}')
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
-                logging.info(f'{metadata_tables}')
+                logging.info(f'metadata table appended to metadata_tables: {sample_qc_background.show()}')
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
@@ -92,11 +92,16 @@ def add_background(
                 logging.info('No related samples to drop from background dataset')
 
             # save metadata info before merging dense and background datasets
+            logging.info(f'background_mt after filtering and before selecting: {background_mt.show()}')
             ht = background_mt.cols()
             background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
             background_mt = background_mt.naive_coalesce(5000)
             # combine dense dataset with background population dataset
+            logging.info(f'background_mt after selecting: {background_mt.show()}')
             dense_mt = dense_mt.union_cols(background_mt)
+            logging.info(
+                f'Finished combining dense and background datasets, dense_mt after union_cols: {dense_mt.show()}',
+            )
             sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
