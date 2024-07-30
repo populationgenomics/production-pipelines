@@ -84,6 +84,7 @@ def add_background(
                 logging.info(
                     f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
                 )
+                logging.info(f'background_relateds_to_drop: {background_relateds_to_drop.show()}')
                 background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
                 background_mt = background_mt.filter_cols(
                     ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
@@ -92,15 +93,22 @@ def add_background(
                 logging.info('No related samples to drop from background dataset')
 
             # save metadata info before merging dense and background datasets
-            logging.info(f'background_mt after filtering and before selecting: {background_mt.show()}')
+            logging.info(
+                f'background_mt n_cols is {background_mt.count_cols()} and n_rows {background_mt.count_rows()} after filtering and before selecting: {background_mt.show()}',
+            )
             ht = background_mt.cols()
             background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
             background_mt = background_mt.naive_coalesce(5000)
             # combine dense dataset with background population dataset
-            logging.info(f'background_mt after selecting: {background_mt.show()}')
+            logging.info(
+                f'background_mt n_cols is {background_mt.count_cols()} and n_rows {background_mt.count_rows()} after selecting: {background_mt.show()}',
+            )
+            logging.info(
+                f'dense_mt n_cols is {dense_mt.count_cols()} and n_rows {dense_mt.count_rows()} before union_cols: {dense_mt.show()}',
+            )
             dense_mt = dense_mt.union_cols(background_mt)
             logging.info(
-                f'Finished combining dense and background datasets, dense_mt after union_cols: {dense_mt.show()}',
+                f'dense_mt n_cols is {dense_mt.count_cols()} and n_rows {dense_mt.count_rows()} after union_cols: {dense_mt.show()}',
             )
             sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
         else:
