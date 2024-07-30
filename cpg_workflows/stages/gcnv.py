@@ -136,7 +136,7 @@ class UpgradePedWithInferred(CohortStage):
     Don't trust the metamist pedigrees, update with inferred sexes
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'aneuploidy_samples': self.prefix / 'aneuploidies.txt',
             'pedigree': self.prefix / 'inferred_sex_pedigree.ped',
@@ -234,7 +234,7 @@ class TrimOffSexChromosomes(CohortStage):
         return_dict: dict[str, Path | str] = {'placeholder': str(self.prefix / 'placeholder.txt')}
 
         # load up the file of aneuploidies - I don't think the pipeline supports passing an input directly here
-        # so.. I'm making a similar path and manually string-replacing it
+        # so... I'm making a similar path and manually string-replacing it
         aneuploidy_file = str(self.prefix / 'aneuploidies.txt').replace(self.name, 'UpgradePedWithInferred')
 
         # can I walrus here?? I can!
@@ -291,15 +291,14 @@ class GCNVJointSegmentation(CohortStage):
     takes the individual VCFs and runs the joint segmentation step
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, str | Path]:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'clustered_vcf': self.prefix / 'JointClusteredSegments.vcf.gz',
             'clustered_vcf_idx': self.prefix / 'JointClusteredSegments.vcf.gz.tbi',
             'pedigree': self.tmp_prefix / 'pedigree.ped',
-            'tmp_prefix': str(self.tmp_prefix / 'intermediate_jointseg'),
         }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         So, this is a tricksy lil monster -
         Conducts a semi-heirarchical merge of the individual VCFs
@@ -339,11 +338,11 @@ class GCNVJointSegmentation(CohortStage):
             segment_vcfs=all_vcfs,
             pedigree=str(pedigree),
             intervals=str(intervals),
-            tmp_prefix=expected_out['tmp_prefix'],  # type: ignore
+            tmp_prefix=self.tmp_prefix / 'intermediate_jointseg',
             output_path=expected_out['clustered_vcf'],  # type: ignore
             job_attrs=self.get_job_attrs(cohort),
         )
-        return self.make_outputs(cohort, data=expected_out, jobs=jobs)  # type: ignore
+        return self.make_outputs(cohort, data=expected_out, jobs=jobs)
 
 
 @stage(
@@ -566,7 +565,7 @@ class AnnotateCohortgCNV(MultiCohortStage):
         """
 
         vcf_path = inputs.as_path(target=multicohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
-        mt_out = self.expected_outputs(multicohort)['mt']
+        outputs = self.expected_outputs(multicohort)
 
         j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(multicohort))
         j.image(image_path('cpg_workflows'))
@@ -575,13 +574,13 @@ class AnnotateCohortgCNV(MultiCohortStage):
                 seqr_loader_cnv,
                 seqr_loader_cnv.annotate_cohort_gcnv.__name__,
                 str(vcf_path),
-                str(mt_out),
+                str(outputs['mt']),
                 str(self.tmp_prefix / 'checkpoints'),
                 setup_gcp=True,
             ),
         )
 
-        return self.make_outputs(multicohort, data=mt_out, jobs=j)
+        return self.make_outputs(multicohort, data=outputs['mt'], jobs=j)
 
 
 @stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
@@ -607,17 +606,17 @@ class AnnotateDatasetCNV(DatasetStage):
         assert dataset.cohort
         assert dataset.cohort.multicohort
         mt_in = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortgCNV, key='mt')
-        mt_out = self.expected_outputs(dataset)['mt']
+        outputs = self.expected_outputs(dataset)
 
         jobs = gcnv.annotate_dataset_jobs_cnv(
             mt_path=mt_in,
             sgids=dataset.get_sequencing_group_ids(),
-            out_mt_path=mt_out,
+            out_mt_path=outputs['mt'],
             tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
         )
 
-        return self.make_outputs(dataset, data=mt_out, jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)
 
 
 @stage(
