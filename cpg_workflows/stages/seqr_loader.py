@@ -15,14 +15,7 @@ from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import (
-    DatasetStage,
-    MultiCohortStage,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
+from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -70,28 +63,6 @@ class AnnotateCohort(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=j)
 
 
-def _update_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'annotated-dataset-callset'}
-
-
-def _dataset_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
-
-
 def _sg_vcf_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
@@ -113,12 +84,7 @@ def _snv_es_index_meta(
     return {'seqr-dataset-type': 'VARIANTS'}
 
 
-@stage(
-    required_stages=[AnnotateCohort],
-    analysis_type='custom',
-    update_analysis_meta=_update_meta,
-    analysis_keys=['mt'],
-)
+@stage(required_stages=[AnnotateCohort], analysis_type='custom', analysis_keys=['mt'])
 class AnnotateDataset(DatasetStage):
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -155,12 +121,7 @@ class AnnotateDataset(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-@stage(
-    required_stages=[AnnotateDataset],
-    analysis_type='custom',
-    update_analysis_meta=_dataset_vcf_meta,
-    analysis_keys=['vcf'],
-)
+@stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
 class DatasetVCF(DatasetStage):
     """
     Take the per-dataset MT and write out as a VCF
