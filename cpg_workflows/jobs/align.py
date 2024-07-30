@@ -377,10 +377,10 @@ def _align_one(
             """,
             )
             use_interleaved = True
-
-        prepare_fastq_cmd = ''
-        r1_param = 'r1'
-        r2_param = ''
+        else:
+            prepare_fastq_cmd = ''
+            r1_param = 'r1'
+            r2_param = ''
 
     else:  # only for BAMs that are missing index
         assert isinstance(alignment_input, FastqPair)
