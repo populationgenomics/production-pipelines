@@ -25,6 +25,18 @@ vep_version = '110'
 
 write_vcf = ["udn-aus"]
 
+# Add in specific multiQC report config options
+# See https://multiqc.info/docs/getting_started/config for more details
+# [workflow.cram_multiqc]
+# send_to_slack = true
+# [workflow.cram_multiqc.extra_config]
+# plots_force_interactive = true
+
+# [workflow.gvcf_multiqc]
+# send_to_slack = true
+# [workflow.gvcf_multiqc.extra_config]
+# plots_force_interactive = true
+
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below
