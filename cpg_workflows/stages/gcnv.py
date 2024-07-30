@@ -598,7 +598,7 @@ class AnnotateDatasetCNV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
-        Subsets the whole MT to this cohort only, then brings genotype data into row annotations
+        Subsets the multicohort MT to this dataset only, then brings genotype data into row annotations
         Args:
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs (StageInput): results of AnnotateCohortgCNV for this MultiCohort
