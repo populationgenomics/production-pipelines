@@ -39,7 +39,7 @@ class Vqsr(MultiCohortStage):
             scatter_count=joint_calling_scatter_count(number_of_sgids),
             gvcf_count=number_of_sgids,
             out_path=outputs['siteonly'],
-            tmp_prefix=self.prefix / 'tmp',
+            tmp_prefix=self.tmp_prefix / 'tmp',
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),

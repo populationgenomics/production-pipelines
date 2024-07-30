@@ -84,10 +84,7 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return {
-            'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt'),
-        }
+        return {'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt')}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -96,13 +93,11 @@ class AnnotateDataset(DatasetStage):
         assert dataset.cohort
         mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
 
-        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
-
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
             sequencing_group_ids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
-            tmp_prefix=checkpoint_prefix,
+            tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
         )

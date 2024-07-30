@@ -47,7 +47,7 @@ class Vep(MultiCohortStage):
             input_siteonly_vcf_path=inputs.as_path(multicohort, stage=Vqsr, key='siteonly'),
             input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
             out_path=outputs['ht'],
-            tmp_prefix=self.prefix / 'tmp',
+            tmp_prefix=self.tmp_prefix / 'tmp',
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
         )
