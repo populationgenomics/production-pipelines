@@ -38,7 +38,7 @@ def complete_analysis_job(
 
     from cpg_utils import to_path
 
-    from .metamist import AnalysisStatus, get_metamist
+    from cpg_workflows.metamist import AnalysisStatus, get_metamist
 
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
