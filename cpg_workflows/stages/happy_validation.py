@@ -7,29 +7,13 @@ Content relating to the hap.py validation process
 import logging
 
 from cpg_utils.config import get_config
-from cpg_workflows.jobs.validation import (
-    parse_and_post_results,
-    run_happy_on_vcf,
-    validation_mt_to_vcf_job,
-)
-from cpg_workflows.stages.seqr_loader import _sg_vcf_meta
-from cpg_workflows.workflow import (
-    SequencingGroup,
-    SequencingGroupStage,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
-
-from .. import get_batch
+from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf, validation_mt_to_vcf_job
+from cpg_workflows.targets import SequencingGroup
+from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
 
-@stage(
-    analysis_type='custom',
-    update_analysis_meta=_sg_vcf_meta,
-    analysis_keys=['vcf'],
-)
+@stage(analysis_type='custom', analysis_keys=['vcf'])
 class ValidationMtToVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
@@ -69,11 +53,7 @@ class ValidationMtToVcf(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
 
 
-@stage(
-    required_stages=ValidationMtToVcf,
-    analysis_type='qc',
-    analysis_keys=['happy_csv'],
-)
+@stage(required_stages=ValidationMtToVcf, analysis_type='qc', analysis_keys=['happy_csv'])
 class ValidationHappyOnVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         output_prefix = (
