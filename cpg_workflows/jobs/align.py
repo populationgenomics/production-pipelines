@@ -492,7 +492,7 @@ def extract_fastq(
     j.image(image_path('samtools'))
     # TODO: add ability to detect reference used in current BAM/CRAM and provide error handling
     if isinstance(alignment_input, CramPath):
-        reference_flag = f'--reference f{b.read_input(str(alignment_input.reference_assembly))}'
+        reference_flag = f'--reference {b.read_input(str(alignment_input.reference_assembly))}'
     else:
         reference_flag = ''
     res = STANDARD.request_resources(ncpu=16)
