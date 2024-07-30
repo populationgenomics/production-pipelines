@@ -62,7 +62,7 @@ class JointGenotyping(MultiCohortStage):
             b=get_batch(),
             out_vcf_path=outputs['vcf'],
             out_siteonly_vcf_path=outputs['siteonly'],
-            tmp_bucket=self.prefix / 'tmp',
+            tmp_bucket=self.tmp_prefix / 'tmp',
             gvcf_by_sgid=gvcf_by_sgid,
             tool=(
                 joint_genotyping.JointGenotyperTool.GnarlyGenotyper
