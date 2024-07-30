@@ -63,17 +63,6 @@ class AnnotateCohort(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=j)
 
 
-def _sg_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
-
-
 def _snv_es_index_meta(
     output_path: str,  # pylint: disable=W0613:unused-argument
 ) -> dict[str, Any]:
