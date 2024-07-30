@@ -91,7 +91,8 @@ class AnnotateDataset(DatasetStage):
         Annotate MT with genotype and consequence data for Seqr
         """
         assert dataset.cohort
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
+        assert dataset.cohort.multicohort
+        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
