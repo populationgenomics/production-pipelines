@@ -60,7 +60,7 @@ def add_background(
                 background_mt = hl.vds.to_dense_mt(background_vds)
                 logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
                 background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
-                logging.info('Finished checkpointing densified_background_mt')
+                logging.info(f'Finished checkpointing {dataset}_densified_background_mt.mt')
                 # annotate background mt with metadata info derived from SampleQC stage
             metadata_tables: list[hl.Table] = []
             for path in dataset_dict['metadata_table']:
