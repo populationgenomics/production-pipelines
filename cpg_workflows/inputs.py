@@ -61,17 +61,20 @@ def create_multicohort() -> MultiCohort:
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
+        # TODO (mwelland): future optimisation following closure of #860
+        # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
+        # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
         _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
     # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
-    # across all cohorts
     # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
     # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
     for cohort in multicohort.get_cohorts():
         for dataset in cohort.get_datasets():
-            # is this dataset already in the multicohort? If so, use, otherwise create a new one
-            mc_dataset = multicohort.get_dataset_by_name(dataset.name) or multicohort.add_dataset(dataset)
+            # is this dataset already in the multicohort, if so use it, otherwise add this one
+            mc_dataset = multicohort.add_dataset(dataset)
             for sg in dataset.get_sequencing_groups():
+                # add each SG object to the MultiCohort level Dataset
                 mc_dataset.add_sequencing_group_object(sg)
 
     return multicohort
@@ -80,6 +83,7 @@ def create_multicohort() -> MultiCohort:
 def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
     """
     Add datasets in the cohort.
+    TODO (mwelland): future optimisation following closure of #860
     TODO (mwelland): The Cohort object should not care about the Datasets it contains
     TODO (mwelland): so we can lose a layer of the structure here
     """
@@ -93,6 +97,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
+            # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
@@ -108,6 +113,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     if not cohort.get_datasets():
         raise MetamistError('No datasets populated')
 
+    # TODO (mwelland): future optimisation following closure of #860
     # TODO (mwelland): this should be done one Dataset at a time, not per Dataset per Cohort
     # TODO (mwelland): by querying per-dataset per-cohort we increase the number of identical requests
     _populate_analysis(cohort)
@@ -134,11 +140,18 @@ def deprecated_create_cohort() -> MultiCohort:
         logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
+
+    # create a MultiCohort object to hold the datasets & cohorts
     multi_cohort = MultiCohort()
+
+    # this is the deprecated entrypoint, so all SG IDs are in the same cohort
+    # maintains ability to run CohortStages and MultiCohortStages without
+    # explicitly requiring workflows to update to MultiCohort
     cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
+        mc_dataset = multi_cohort.add_dataset(dataset)
         sgs = get_metamist().get_sg_entries(dataset_name)
 
         for entry in sgs:
@@ -147,6 +160,7 @@ def deprecated_create_cohort() -> MultiCohort:
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
+            # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
@@ -159,6 +173,10 @@ def deprecated_create_cohort() -> MultiCohort:
 
             _populate_alignment_inputs(sequencing_group, entry)
 
+            # add the same SG Object directly to the MultiCohort level Dataset
+            # this object exists in both the MC.Cohort and MC.Dataset
+            mc_dataset.add_sequencing_group_object(sequencing_group)
+
     if not cohort.get_datasets():
         msg = 'No datasets populated'
         if 'skip_sgs' in config:
@@ -167,6 +185,9 @@ def deprecated_create_cohort() -> MultiCohort:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
+    # TODO (mwelland): future optimisation following closure of #860
+    # TODO (mwelland): _populate_analysis should expect a Dataset, not a Cohort
+    # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
     _populate_analysis(cohort)
     if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
