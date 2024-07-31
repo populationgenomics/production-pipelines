@@ -44,8 +44,6 @@ def get_multicohort() -> Cohort | MultiCohort:
         if not isinstance(custom_cohort_ids, list):
             raise ValueError('input_cohorts must be a list')
         return actual_get_multicohort()
-    # TODO (mwelland): this should also return a MultiCohort object, containing one Cohort for the whole run?
-    # TODO (mwelland): this would mean we're always returning a MultiCohort, even if there is only one cohort
     return deprecated_get_cohort()
 
 

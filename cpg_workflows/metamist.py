@@ -325,7 +325,6 @@ class Metamist:
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
-    # TODO (mwelland): get in the bin
     def find_joint_calling_analysis(
         self,
         sequencing_group_ids: list[str],
