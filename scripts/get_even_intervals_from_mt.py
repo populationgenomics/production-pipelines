@@ -124,8 +124,12 @@ def get_telomere_and_centromere_start_end_positions(
     """
     Get the start and end positions of the telomeres and centromeres in the human genome.
     """
-    tc_intervals_path = to_path(tc_intervals_filepath) or to_path(
-        reference_path('hg38_telomeres_and_centromeres_intervals/interval_list'),
+    tc_intervals_path = (
+        to_path(tc_intervals_filepath)
+        if tc_intervals_filepath
+        else to_path(
+            reference_path('hg38_telomeres_and_centromeres_intervals/interval_list'),
+        )
     )
 
     with open(tc_intervals_path) as f:
