@@ -36,7 +36,7 @@ def get_intervals_for_chr(
         (mt.locus.position >= genotyping_region_1_start) & (mt.locus.position < genotyping_region_1_end),
     )
     mt_region_1 = mt_region_1.add_row_index(name='row_idx')
-    mt_region_1 = mt_region_1.rows().select('row_idx', 'locus')
+    mt_region_1 = mt_region_1.select_rows(mt_region_1.row_idx, mt_region_1.locus)
 
     # The second valid region for genotyping starts after the centromere and ends before the second telomere
     genotyping_region_2_start = centromere_position[1] + 1
@@ -45,7 +45,7 @@ def get_intervals_for_chr(
         (mt.locus.position >= genotyping_region_2_start) & (mt.locus.position < genotyping_region_2_end),
     )
     mt_region_2 = mt_region_2.add_row_index(name='row_idx')
-    mt_region_2 = mt_region_2.rows().select('row_idx', 'locus')
+    mt_region_2 = mt_region_2.select_rows(mt_region_2.row_idx, mt_region_2.locus)
 
     # Iterate through the first genotyping region mt in intervals of interval_size, using the row_idx
     intervals = []
