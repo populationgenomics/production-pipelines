@@ -150,20 +150,6 @@ class TestPreProcessing:
         assert 'samtools collate' in cmd
         assert '--reference' not in cmd
 
-    def test_bazam_flags_correctly_set_when_extracting_reads(self, tmp_path: Path):
-        config = default_config()
-        batch, sg = setup_test(config, tmp_path, alignment_input='bam')
-
-        jobs = align(b=batch, sequencing_group=sg)
-        align_jobs = select_jobs(jobs, 'align')
-        assert len(align_jobs) == 10
-
-        file = re.escape('SAMPLE1.bam')
-        for i, job in enumerate(align_jobs):
-            cmd = get_command_str(job)
-            pattern = fr'bazam .* -bam \${{BATCH_TMPDIR}}/inputs/\w+/{file} -s {i+1},10 > r1'
-            assert re.search(pattern, cmd)
-
     @pytest.mark.parametrize(
         'realignment_config,create_realignment_cram,expected_cram,expected_ref',
         [
@@ -196,7 +182,7 @@ class TestPreProcessing:
             ),
         ],
     )
-    def test_bazam_and_uses_correct_reference_and_cram_file_when_realigning(
+    def test_extract_fastq_and_uses_correct_reference_and_cram_file_when_realigning(
         self,
         tmp_path: Path,
         realignment_config: dict[str, str],
