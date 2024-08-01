@@ -873,7 +873,7 @@ class JoinRawCalls(MultiCohortStage):
             input_dict[f'clustered_{caller}_vcfs'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names
             ]
-            input_dict[f'clustered_{caller}_vcfs_indexes'] = [
+            input_dict[f'clustered_{caller}_vcf_indexes'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf_index'] for cohort in all_batch_names
             ]
 
