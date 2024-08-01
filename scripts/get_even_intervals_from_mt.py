@@ -18,6 +18,82 @@ from cpg_utils.hail_batch import init_batch
 CHROMS = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY']
 
 
+def get_telomere_and_centromere_start_end_positions(
+    tc_intervals_filepath: str | None,
+) -> tuple[dict[str, dict[str, tuple[int, int]]], dict[str, tuple[int, int]]]:
+    """
+    Get the start and end positions of the telomeres and centromeres in the human genome.
+    Each chromosome has two telomeres and one centromere.
+    Returns:
+        telomeres_by_chrom:   {'chr1': {'first': (1, 10000), 'second': (248946423, 248956422)}, ...}
+        centromeres_by_chrom: {'chr1': (122026460, 124932724), ...}
+    """
+    tc_intervals_path = (
+        to_path(tc_intervals_filepath)
+        if tc_intervals_filepath
+        else to_path(
+            reference_path('hg38_telomeres_and_centromeres_intervals/interval_list'),
+        )
+    )
+
+    with open(tc_intervals_path) as f:
+        # Read the intervals from the source file, skip lines starting with '@'
+        tc_intervals = [line.strip().split() for line in f if not line.startswith('@')]
+
+    # Collect the start and end positions of the centromeres and telomeres by chromosome
+    centromeres_by_chrom = {}
+    telomeres_by_chrom: dict[str, dict[str, tuple[int, int]]] = {}
+    for chrom, start, end, _, region in tc_intervals:
+        if chrom not in telomeres_by_chrom:
+            telomeres_by_chrom[chrom] = {}
+        if 'centromere' in region:
+            centromeres_by_chrom[chrom] = (int(start), int(end))
+        if 'telomere' in region:
+            if start == '1':
+                # If the start position is '1', the telomere is at the start of the chromosome
+                telomeres_by_chrom[chrom].update({'first': (int(start), int(end))})
+            else:
+                # If the start position is not '1', the telomere is at the end of the chromosome
+                telomeres_by_chrom[chrom].update({'second': (int(start), int(end))})
+
+    return telomeres_by_chrom, centromeres_by_chrom
+
+
+def get_even_intervals_from_mt(
+    mt: hl.MatrixTable,
+    n_intervals: int,
+    tc_intervals_filepath: str | None,
+    output_intervals_path: str,
+):
+    """
+    Read the matrixtable and split it into even intervals of rows by subsetting the rows by chromosome.
+    Return the start and end positions of the intervals in a json file.
+    """
+    # Get the number of rows in the matrixtable
+    n_rows = mt.count_rows()
+
+    # Get the number of rows in each interval
+    interval_size = n_rows // n_intervals
+
+    # Get the telomere and centromere positions
+    telomere_positions, centromere_positions = get_telomere_and_centromere_start_end_positions(tc_intervals_filepath)
+
+    intervals = {}
+    for chrom in CHROMS:
+        chrom_intervals = get_intervals_for_chr(
+            mt=mt.filter_rows(mt.locus.contig == chrom),
+            interval_size=interval_size,
+            telomere_positions=telomere_positions[chrom],
+            centromere_position=centromere_positions[chrom],
+        )
+        intervals[chrom] = chrom_intervals
+
+    # Evaluate the intervals
+    interval_positions_by_chrom = write_intervals_json(intervals, output_intervals_path)
+
+    return interval_positions_by_chrom
+
+
 def get_intervals_for_chr(
     mt: hl.MatrixTable,
     interval_size: int,
@@ -25,10 +101,9 @@ def get_intervals_for_chr(
     centromere_position: tuple[int, int],
 ) -> list[hl.MatrixTable]:
     """
-    Evenly split the matrixtable into intervals for variants in a single chromosome.
-    Hard breaks at telomeres and centromeres.
+    Evenly split the chromosome subset of the matrixtable into intervals of interval_size.
+    Hard exclude the telomeric and centromeric regions of the chromosome.
     """
-
     # The first valid region for genotyping begins after the first telomere and ends before the centromere
     genotyping_region_1_start = telomere_positions['first'][1] + 1
     genotyping_region_1_end = centromere_position[0] - 1
@@ -60,40 +135,6 @@ def get_intervals_for_chr(
     return intervals
 
 
-def get_even_intervals_from_mt(
-    mt: hl.MatrixTable,
-    n_intervals: int,
-    tc_intervals_filepath: str | None,
-    output_intervals_path: str,
-):
-    """
-    Get even intervals from a matrixtable.
-    """
-    # Get the number of rows in the matrixtable
-    n_rows = mt.count_rows()
-
-    # Get the number of rows in each interval
-    interval_size = n_rows // n_intervals
-
-    # Get the telomere and centromere positions
-    telomere_positions, centromere_positions = get_telomere_and_centromere_start_end_positions(tc_intervals_filepath)
-
-    intervals = {}
-    for chrom in CHROMS:
-        chrom_intervals = get_intervals_for_chr(
-            mt=mt.filter_rows(mt.locus.contig == chrom),
-            interval_size=interval_size,
-            telomere_positions=telomere_positions[chrom],
-            centromere_position=centromere_positions[chrom],
-        )
-        intervals[chrom] = chrom_intervals
-
-    # Evaluate the intervals
-    interval_positions_by_chrom = write_intervals_json(intervals, output_intervals_path)
-
-    return interval_positions_by_chrom
-
-
 def write_intervals_json(intervals: dict[str, list[hl.MatrixTable]], output_path: str):
     """
     Evaluate the list of MatrixTable intervals and save them to a json.
@@ -116,43 +157,6 @@ def write_intervals_json(intervals: dict[str, list[hl.MatrixTable]], output_path
 
     print(f'Intervals saved to {output_path}')
     return interval_positions
-
-
-def get_telomere_and_centromere_start_end_positions(
-    tc_intervals_filepath: str | None,
-) -> tuple[dict[str, dict[str, tuple[int, int]]], dict[str, tuple[int, int]]]:
-    """
-    Get the start and end positions of the telomeres and centromeres in the human genome.
-    """
-    tc_intervals_path = (
-        to_path(tc_intervals_filepath)
-        if tc_intervals_filepath
-        else to_path(
-            reference_path('hg38_telomeres_and_centromeres_intervals/interval_list'),
-        )
-    )
-
-    with open(tc_intervals_path) as f:
-        # Read the intervals from the source file, skip lines starting with '@'
-        tc_intervals = [line.strip().split() for line in f if not line.startswith('@')]
-
-    # Collect the start and end positions of the centromeres and telomeres by chromosome
-    centromeres_by_chrom = {}
-    telomeres_by_chrom: dict[str, dict[str, tuple[int, int]]] = {}
-    for chrom, start, end, _, region in tc_intervals:
-        if chrom not in telomeres_by_chrom:
-            telomeres_by_chrom[chrom] = {}
-        if 'centromere' in region:
-            centromeres_by_chrom[chrom] = (int(start), int(end))
-        if 'telomere' in region:
-            if start == '1':
-                # If the start position is '1', the telomere is at the start of the chromosome
-                telomeres_by_chrom[chrom].update({'first': (int(start), int(end))})
-            else:
-                # If the start position is not '1', the telomere is at the end of the chromosome
-                telomeres_by_chrom[chrom].update({'second': (int(start), int(end))})
-
-    return telomeres_by_chrom, centromeres_by_chrom
 
 
 def main(args):
