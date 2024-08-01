@@ -136,10 +136,11 @@ def get_telomere_and_centromere_start_end_positions(
     centromeres_by_chrom = {}
     telomeres_by_chrom: dict[str, dict[str, tuple[int, int]]] = {}
     for chrom, start, end, _, region in tc_intervals:
+        if chrom not in telomeres_by_chrom:
+            telomeres_by_chrom[chrom] = {}
         if 'centromere' in region:
             centromeres_by_chrom[chrom] = (int(start), int(end))
         if 'telomere' in region:
-            telomeres_by_chrom[chrom] = {}
             if start == '1':
                 # If the start position is '1', the telomere is at the start of the chromosome
                 telomeres_by_chrom[chrom].update({'first': (int(start), int(end))})
