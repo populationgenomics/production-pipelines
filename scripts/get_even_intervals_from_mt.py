@@ -130,7 +130,7 @@ def get_intervals_from_ht(
     # Create a dictionary of the interval positions by chromosome
     interval_starts_by_chrom = {}
     interval_ends_by_chrom = {}
-    for counter, chr, pos, i in enumerate(zip(chroms, positions, idx)):
+    for counter, (chr, pos, i) in enumerate(zip(chroms, positions, idx)):
         if chr not in interval_starts_by_chrom:
             interval_starts_by_chrom[chr] = []
             interval_ends_by_chrom[chr] = []
