@@ -1,19 +1,26 @@
 import logging
 
+from functools import cache
+
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify
-from cpg_workflows.workflow import (
-    CohortStage,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
+from cpg_workflows.utils import slugify, tshirt_mt_sizing, ExpectedResultT
+from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
+
+
+@cache
+def relatedness_version() -> str:
+    """
+    generate the relatedness version
+    """
+    if relatedness_version := config_retrieve(['large_cohort', 'output_versions', 'relatedness'], default=None):
+        return slugify(relatedness_version)
+    else:
+        return get_workflow().output_version
 
 
 @stage(required_stages=[Genotype])
@@ -125,45 +132,111 @@ class DenseSubset(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=[SampleQC, DenseSubset])
-class Relatedness(CohortStage):
+@stage(required_stages=DenseSubset, analysis_keys=['relatedness_ht'], analysis_type='mt')  # is MT an analysis type?
+class RelatednessPCRelate(CohortStage):
+    """
+    This is the first step of the Relatedness Stage, without Dataproc
+    """
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if relatedness_version := config_retrieve(['large_cohort', 'output_versions', 'relatedness'], default=None):
-            relatedness_version = slugify(relatedness_version)
+        return {
+            'relatedness_ht': (
+                    cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relatedness.ht'
+            )
+        }
 
-        relatedness_version = relatedness_version or get_workflow().output_version
-        relatedness_path = (
-            cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version / 'relatedness.ht'
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        outputs = self.expected_outputs(cohort)
+        dense_mt_path = str(inputs.as_path(cohort, DenseSubset))
+        dense_mt_name = dense_mt_path.split('/')[-1]
+
+        # estimate required storage - we create a new HT, so provision double the storage
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
+        ) * 2
+
+        # create a job
+        job = get_batch().new_job(f'Run Relatedness PCRelate stage: {cohort.name}')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command('set -eux pipefail')
+
+        # localise the Dense MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {dense_mt_path} $BATCH_TMPDIR')
+
+        # how many cores do we need?
+        required_cpu: int = config_retrieve(['RelatednessPCRelate', 'cores'], 8)
+        job.cpu(required_cpu).storage(required_storage).memory('highmem')
+
+        job.command(
+            f'relatedness_pcrelate '
+            f'--dense_mt "${{BATCH_TMPDIR}}/{dense_mt_name}" '
+            f'--out {job.output} '
+            f'--checkpoint "${{BATCH_TMPDIR}}"'
         )
-        relatedness_to_drop_path = (
-            cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version / 'relateds_to_drop.ht'
+
+        # delocalise the output HT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.output} {str(outputs["relatedness_ht"])}')
+
+        return self.make_outputs(cohort, outputs, job)
+
+
+@stage(required_stages=[SampleQC, RelatednessPCRelate], analysis_keys=['relateds_to_drop'], analysis_type='mt') # not HT
+class RelatednessFlag(CohortStage):
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'relateds_to_drop': (
+                cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relateds_to_drop.ht'
+            )
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        outputs = self.expected_outputs(cohort)
+
+        # estimate required storage - I've got nothing to base this on...
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
+        ) * 2
+
+        # create a job
+        job = get_batch().new_job(f'Run Relatedness Sample Flagging stage: {cohort.name}')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command('set -eux pipefail')
+
+        # localise the Relatedness HT
+        prcrelate_mt_path = str(inputs.as_path(cohort, RelatednessPCRelate, 'relatedness_ht'))
+        prcrelate_mt_name = prcrelate_mt_path.split('/')[-1]
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {prcrelate_mt_path} $BATCH_TMPDIR')
+
+        # localise the Sample QC HT MT
+        sample_qc_ht_path = str(inputs.as_path(cohort, SampleQC))
+        sample_qc_ht_name = sample_qc_ht_path.split('/')[-1]
+
+        # localise the Dense MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {prcrelate_mt_path} $BATCH_TMPDIR')
+
+        # how many cores do we need?
+        required_cpu: int = config_retrieve(['RelatednessFlag', 'cores'], 8)
+        job.cpu(required_cpu).storage(required_storage).memory('highmem')
+
+        job.command(
+            'relatedness_flag '
+            f'--relatedness "${{BATCH_TMPDIR}}/{prcrelate_mt_name}" '
+            f'--qc "${{BATCH_TMPDIR}}/{sample_qc_ht_name}" '
+            f'--out {job.output} '
+            f'--checkpoint "${{BATCH_TMPDIR}}" '
         )
 
-        return dict(
-            relatedness=relatedness_path,
-            relateds_to_drop=relatedness_to_drop_path,
-        )
+        # delocalise the output HT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.output} {str(outputs["relateds_to_drop"])}')
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
-        from cpg_workflows.large_cohort.relatedness import run
-
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                dense_mt_path=inputs.as_path(cohort, DenseSubset),
-                sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                out_relatedness_ht_path=self.expected_outputs(cohort)['relatedness'],
-                out_relateds_to_drop_ht_path=self.expected_outputs(cohort)['relateds_to_drop'],
-                tmp_prefix=self.tmp_prefix,
-            ),
-            depends_on=inputs.get_jobs(cohort),
-        )
-        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+        return self.make_outputs(cohort, outputs, job)
 
 
-@stage(required_stages=[SampleQC, DenseSubset, Relatedness])
+@stage(required_stages=[SampleQC, DenseSubset, RelatednessFlag])
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
@@ -184,11 +257,7 @@ class Ancestry(CohortStage):
             function_path_args=dict(
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                relateds_to_drop_ht_path=inputs.as_path(
-                    cohort,
-                    Relatedness,
-                    key='relateds_to_drop',
-                ),
+                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'),
                 tmp_prefix=self.tmp_prefix,
                 out_scores_ht_path=self.expected_outputs(cohort)['scores'],
                 out_eigenvalues_ht_path=self.expected_outputs(cohort)['eigenvalues'],
@@ -201,7 +270,7 @@ class Ancestry(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=[SampleQC, Ancestry, Relatedness])
+@stage(required_stages=[SampleQC, Ancestry, RelatednessFlag])
 class AncestryPlots(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -244,18 +313,14 @@ class AncestryPlots(CohortStage):
                     Ancestry,
                     key='inferred_pop',
                 ),
-                relateds_to_drop_ht_path=inputs.as_path(
-                    cohort,
-                    Relatedness,
-                    key='relateds_to_drop',
-                ),
+                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'),
             ),
             depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=[Combiner, SampleQC, Relatedness])
+@stage(required_stages=[Combiner, SampleQC, RelatednessFlag])
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
@@ -278,7 +343,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 site_only_vcf.run.__name__,
                 str(inputs.as_path(cohort, Combiner)),
                 str(inputs.as_path(cohort, SampleQC)),
-                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
                 setup_gcp=True,
@@ -315,7 +380,7 @@ class Vqsr(CohortStage):
 
 @stage(required_stages=Vqsr)
 class LoadVqsr(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         return get_workflow().prefix / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -340,9 +405,9 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, SampleQC, Relatedness])
+@stage(required_stages=[Combiner, SampleQC, RelatednessFlag])
 class Frequencies(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         return get_workflow().prefix / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -360,7 +425,7 @@ class Frequencies(CohortStage):
                 frequencies.run.__name__,
                 str(inputs.as_path(cohort, Combiner)),
                 str(inputs.as_path(cohort, SampleQC)),
-                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
