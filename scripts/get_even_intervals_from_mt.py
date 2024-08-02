@@ -60,17 +60,17 @@ def get_telomere_and_centromere_start_end_positions(
 
 
 def get_even_intervals_from_mt(
-    mt: hl.MatrixTable,
+    ht: hl.Table,
     n_intervals: int,
     tc_intervals_filepath: str | None,
     output_intervals_path: str,
 ):
     """
-    Read the matrixtable and split it into even intervals of rows by subsetting the rows by chromosome.
+    Read the matrixtable rows (ht) and split it into even intervals of rows by subsetting the rows by chromosome.
     Return the start and end positions of the intervals in a json file.
     """
-    # Get the number of rows in the matrixtable
-    n_rows = mt.count_rows()
+    # Get the number of rows in the table
+    n_rows = ht.count()
 
     # Get the number of rows in each interval
     interval_size = n_rows // n_intervals
@@ -80,13 +80,12 @@ def get_even_intervals_from_mt(
 
     intervals = {}
     for chrom in CHROMS:
-        chrom_intervals = get_intervals_for_chr(
-            mt=mt.filter_rows(mt.locus.contig == chrom),
+        intervals[chrom] = get_intervals_for_chr(
+            ht=ht.filter(ht.locus.contig == chrom),
             interval_size=interval_size,
             telomere_positions=telomere_positions[chrom],
             centromere_position=centromere_positions[chrom],
         )
-        intervals[chrom] = chrom_intervals
 
     # Evaluate the intervals
     interval_positions_by_chrom = write_intervals_json(intervals, output_intervals_path)
@@ -95,39 +94,39 @@ def get_even_intervals_from_mt(
 
 
 def get_intervals_for_chr(
-    mt: hl.MatrixTable,
+    ht: hl.Table,
     interval_size: int,
     telomere_positions: dict[str, tuple[int, int]],
     centromere_position: tuple[int, int],
-) -> list[hl.MatrixTable]:
+) -> list[hl.Table]:
     """
-    Evenly split the chromosome subset of the matrixtable into intervals of interval_size.
+    Evenly split the chromosome subset of the table into intervals of interval_size.
     Hard exclude the telomeric and centromeric regions of the chromosome.
     """
     # The first valid region for genotyping begins after the first telomere and ends before the centromere
     genotyping_region_1_start = telomere_positions['first'][1] + 1
     genotyping_region_1_end = centromere_position[0] - 1
-    mt_region_1 = mt.filter_rows(
-        (mt.locus.position >= genotyping_region_1_start) & (mt.locus.position < genotyping_region_1_end),
+    ht_region_1 = ht.filter(
+        (ht.locus.position >= genotyping_region_1_start) & (ht.locus.position < genotyping_region_1_end),
     )
-    mt_region_1 = mt_region_1.add_row_index(name='row_idx')
-    mt_region_1 = mt_region_1.select_rows(mt_region_1.row_idx)
+    ht_region_1 = ht_region_1.add_index(name='row_idx')
+    ht_region_1 = ht_region_1.select(ht_region_1.global_row_idx, ht_region_1.row_idx)
 
     # The second valid region for genotyping starts after the centromere and ends before the second telomere
     genotyping_region_2_start = centromere_position[1] + 1
     genotyping_region_2_end = telomere_positions['second'][0] - 1
-    mt_region_2 = mt.filter_rows(
-        (mt.locus.position >= genotyping_region_2_start) & (mt.locus.position < genotyping_region_2_end),
+    ht_region_2 = ht.filter(
+        (ht.locus.position >= genotyping_region_2_start) & (ht.locus.position < genotyping_region_2_end),
     )
-    mt_region_2 = mt_region_2.add_row_index(name='row_idx')
-    mt_region_2 = mt_region_2.select_rows(mt_region_2.row_idx)
+    ht_region_2 = ht_region_2.add_index(name='row_idx')
+    ht_region_2 = ht_region_2.select(ht_region_2.global_row_idx, ht_region_2.row_idx)
 
-    # Iterate through the first genotyping region mt in intervals of interval_size, using the row_idx
+    # Iterate through both genotyping regions in intervals of interval_size, using the row_idx
     intervals = []
-    for mt_region in [mt_region_1, mt_region_2]:
-        for i in range(0, mt_region.count_rows(), interval_size):
+    for ht_region in [ht_region_1, ht_region_2]:
+        for i in range(0, ht_region.count(), interval_size):
             # Get the interval
-            interval = mt_region.filter_rows((mt_region.row_idx >= i) & (mt_region.row_idx < i + interval_size))
+            interval = ht_region.filter((ht_region.row_idx >= i) & (ht_region.row_idx < i + interval_size))
 
             # Add the interval to the intervals list
             intervals.append(interval)
@@ -135,9 +134,9 @@ def get_intervals_for_chr(
     return intervals
 
 
-def write_intervals_json(intervals: dict[str, list[hl.MatrixTable]], output_path: str):
+def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str):
     """
-    Evaluate the list of MatrixTable intervals and save them to a json.
+    Evaluate the list of intervals and save them to a json.
     """
     interval_positions: dict[str, list[tuple[int, int]]] = {}
     for chrom, chrom_intervals in intervals.items():
@@ -161,12 +160,24 @@ def write_intervals_json(intervals: dict[str, list[hl.MatrixTable]], output_path
 
 def write_intervals_file(intervals: list[hl.expr.IntervalExpression], output_path: str):
     """Evaluate the start and end of each interval and write to a file."""
-    intervals_eval = [(hl.eval(interval.start), hl.eval(interval.end)) for interval in intervals]
+    # Create a temporary Hail Table with a single row
+    temp_ht = hl.Table.parallelize([{'dummy': 0}])
+    temp_ht = temp_ht.annotate(intervals=intervals)
+    # evaluate the intervals
+    result = temp_ht.aggregate(
+        hl.agg.array_agg(
+            lambda interval: hl.struct(
+                start=interval.start,
+                end=interval.end,
+            ),
+            temp_ht.intervals,
+        ),
+    )
     with open(output_path, 'w') as f:
-        for start, stop in intervals_eval:
-            f.write(f'{start}\t{stop}\n')
+        for interval in result:
+            f.write(f'{interval["start"]}\t{interval["end"]}\n')
 
-    print(f'{len(intervals_eval)} intervals written to {output_path}')
+    print(f'{len(result)} intervals written to {output_path}')
 
 
 def main(args):
@@ -175,10 +186,15 @@ def main(args):
     """
     init_batch()
     mt = hl.read_matrix_table(args.input_mt)
-    mt = mt.add_row_index(name='global_row_idx')
+    print('Read matrixtable')
+    # ht = mt.rows()
+    # ht = ht.select().select_globals()
+    # ht = ht.add_index(name='global_row_idx')
+    # ht = ht.key_by('locus', 'alleles', 'global_row_idx')
+    # get_even_intervals_from_mt(ht, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
     intervals = mt._calculate_new_partitions(args.n_intervals)
+    print('Calculated intervals')
     write_intervals_file(intervals, args.output_intervals_path)
-    # get_even_intervals_from_mt(mt, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
 
 
 if __name__ == '__main__':
