@@ -226,7 +226,7 @@ class TestPreProcessing:
         ref = re.escape(expected_ref)
         file = re.escape(expected_cram)
         cmd = get_command_str(extract_fastq_j)
-        pattern = fr'samtools collate --reference ${{BATCH_TMPDIR}}/inputs/\w+/{expected_ref} -@15 -u -O ${{BATCH_TMPDIR}}/inputs/\w+/{expected_cram} $BATCH_TMPDIR/collate'
+        pattern = fr'samtools collate --reference \${{BATCH_TMPDIR}}/inputs/\w+/{ref} -@15 -u -O \${{BATCH_TMPDIR}}/inputs/\w+/{file} \$BATCH_TMPDIR/collate'
 
         assert re.search(pattern, cmd)
 
