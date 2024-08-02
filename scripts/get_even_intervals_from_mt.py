@@ -8,7 +8,9 @@ Hard breaks at centromeres.
 
 import argparse
 import json
-from typing import Generator, List, NamedTuple
+import logging
+import time
+from typing import Generator, List, NamedTuple, Optional
 
 import hail as hl
 
@@ -22,11 +24,13 @@ class IntervalInfo(NamedTuple):
     end_idx: int
     start_pos: int
     end_pos: int
-    start_contig: str
-    end_contig: str
+    start_contig: Optional[str]
+    end_contig: Optional[str]
 
 CHROMS = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY']
 
+# Set up logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def get_telomere_and_centromere_start_end_positions(
     tc_intervals_filepath: str | None,
@@ -145,6 +149,8 @@ def get_intervals_for_chr(
 
 
 def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalInfo]:
+    start_time = time.time()
+    logging.info(f"Starting interval extraction for {n_intervals} intervals")
    # Get the number of rows in the table
     n_rows = ht.count()
 
@@ -160,6 +166,7 @@ def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalI
         )),
     )
 
+    logging.info("Joining interval table with original table")
     # Join the interval table with our original table
     joined = interval_table.key_by(
         global_row_idx = hl.int64(hl.if_else(
@@ -168,19 +175,43 @@ def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalI
             interval_table.start_idx,
         )),
     ).join(ht.key_by('global_row_idx'))
+    logging.info(f"Total rows: {n_rows}, Interval size: {interval_size}")
 
     # Aggregate to get start and end information for each interval
+    # Add a progress column
+    joined = joined.annotate(progress = hl.scan.count())
+
+    logging.info("Starting aggregation and collection")
     result = joined.group_by(joined.interval_idx).aggregate(
         start_idx = hl.agg.min(joined.start_idx),
         end_idx = hl.agg.max(joined.end_idx),
         start_pos = hl.agg.min(joined.locus.position),
         end_pos = hl.agg.max(joined.locus.position),
-        start_contig = hl.agg.take(joined.locus.contig, 1)[0],
-        end_contig = hl.agg.take(joined.locus.contig, -1)[0],
-    ).collect()
+        start_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, 1)[0]),
+        end_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, -1)[0]),
+        progress = hl.agg.max(joined.progress),
+    )
+    # Add action to log progress
+    def log_progress(t):
+        elapsed_time = time.time() - start_time
+        progress_fraction = t.progress / n_rows
+        estimated_total_time = elapsed_time / progress_fraction if progress_fraction > 0 else 0
+        remaining_time = estimated_total_time - elapsed_time
+        logging.info(f"Progress: {progress_fraction:.2%}, Elapsed time: {elapsed_time:.2f}s, Estimated remaining time: {remaining_time:.2f}s")
+        return t
 
+    # Collect results with progress logging
+    result = result.map(log_progress).collect()
+
+    logging.info("Collection complete. Converting to IntervalInfo objects")
     # Convert to list of IntervalInfo objects
-    return [IntervalInfo(**interval) for interval in result]
+    interval_info = [IntervalInfo(**{k: v for k, v in interval.items() if k != 'progress'}) for interval in result]
+
+    end_time = time.time()
+    logging.info(f"Interval extraction completed in {end_time - start_time:.2f} seconds")
+
+    return interval_info
+
 
 def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str):
     """
