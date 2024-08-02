@@ -16,6 +16,10 @@ require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
 
+[FindGeneSymbolMap]
+# much higher than this and we get into throttling issues
+chunk_size = 800
+
 [ValidateMOI]
 # thresholds for different filters during the MOI checks
 gnomad_dominant = 0.001
@@ -74,3 +78,14 @@ sv1 = 'Predicted LOF SV'
 
 # cohort specific parts of the config are not stored in this repository due to data protection concerns.
 # Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration
+
+
+[HPOFlagging]
+# this section relates to phenotype-matching the final variant set
+
+# set this to True to do strict phenotype matching (participant must have an HPO term associated with the Gene)
+# set this to True to do a wiggly semantic similarity test between participant and gene HPOs
+strict = false
+
+# min similarity score when doing a semsimian termset similarity test
+min_similarity = 14.0
