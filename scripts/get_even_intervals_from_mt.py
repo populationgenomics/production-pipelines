@@ -91,9 +91,11 @@ def get_intervals_from_ht(
     """
     # Get the number of rows in the table
     n_rows = ht.count()
+    logging.info(f'Number of rows in the table: {n_rows}')
 
     # Get the number of rows in each interval
     interval_size = n_rows // n_intervals
+    logging.info(f'Interval size: {interval_size}')
 
     # Get the telomere and centromere positions
     telomere_positions, centromere_positions = get_telomere_and_centromere_start_end_positions(tc_intervals_filepath)
@@ -115,11 +117,15 @@ def get_intervals_from_ht(
     intervals_ht = hl.Table.union(*intervals)
 
     # Collect the positions of the intervals
-    chroms, positions, idx = intervals_ht.aggregate(
-        chroms=hl.agg.collect(intervals_ht.locus.contig),
-        positions=hl.agg.collect(intervals_ht.locus.position),
-        idx=hl.agg.collect(intervals_ht.global_row_idx),
+    struct = hl.struct(
+        chrom=intervals_ht.locus.contig,
+        pos=intervals_ht.locus.position,
+        idx=intervals_ht.global_row_idx,
     )
+    result = ht.aggregate(hl.agg.collect(struct))
+    chroms = [r.chrom for r in result]
+    positions = [r.pos for r in result]
+    idx = [r.idx for r in result]
 
     # Create a dictionary of the interval positions by chromosome
     interval_starts_by_chrom = {}
