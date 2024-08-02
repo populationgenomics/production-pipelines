@@ -109,13 +109,15 @@ class TestPreProcessing:
         assert len(select_jobs(jobs, 'align')) == expected_count
 
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    def test_extract_fastq_flags_correctly_set_when_extracting_reads(self, tmp_path: Path, input_type: str):
+    def test_extract_fastq_sets_correct_flags_for_input_type(self, tmp_path: Path, input_type: str):
         config = default_config()
         batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
 
         align(b=batch, sequencing_group=sg)
         all_jobs = batch._jobs
-        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        extract_fastq_jobs = [job for job in all_jobs if job.name == 'Extract fastq']
+        assert len(extract_fastq_jobs) == 1
+        extract_fastq_j = extract_fastq_jobs[0]
         assert extract_fastq_j is not None
 
         cmd = get_command_str(extract_fastq_j)
@@ -130,7 +132,9 @@ class TestPreProcessing:
 
         align(b=batch, sequencing_group=sg)
         all_jobs = batch._jobs
-        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        extract_fastq_jobs = [job for job in all_jobs if job.name == 'Extract fastq']
+        assert len(extract_fastq_jobs) == 1
+        extract_fastq_j = extract_fastq_jobs[0]
         assert extract_fastq_j is not None
 
         cmd = get_command_str(extract_fastq_j)
@@ -143,7 +147,9 @@ class TestPreProcessing:
 
         align(b=batch, sequencing_group=sg)
         all_jobs = batch._jobs
-        extract_fastq_j = next((job for job in all_jobs if job.name == 'Extract fastq'), None)
+        extract_fastq_jobs = [job for job in all_jobs if job.name == 'Extract fastq']
+        assert len(extract_fastq_jobs) == 1
+        extract_fastq_j = extract_fastq_jobs[0]
         assert extract_fastq_j is not None
 
         cmd = get_command_str(extract_fastq_j)
@@ -211,15 +217,17 @@ class TestPreProcessing:
 
         jobs = align(b=batch, sequencing_group=sg)
         align_jobs = select_jobs(jobs, 'align')
+        all_jobs = batch._jobs
+        extract_fastq_jobs = [job for job in all_jobs if job.name == 'Extract fastq']
+        assert len(extract_fastq_jobs) == 1
         assert len(align_jobs) == 1
+        extract_fastq_j = extract_fastq_jobs[0]
 
         ref = re.escape(expected_ref)
         file = re.escape(expected_cram)
-        cmd = get_command_str(align_jobs[0])
-        pattern = (
-            fr'bazam .* -Dsamjdk\.reference_fasta=\${{BATCH_TMPDIR}}/inputs/\w+/{ref}'
-            fr'.* -bam \${{BATCH_TMPDIR}}/inputs/\w+/{file} > r1'
-        )
+        cmd = get_command_str(extract_fastq_j)
+        pattern = fr'samtools collate --reference ${{BATCH_TMPDIR}}/inputs/\w+/{expected_ref} -@15 -u -O ${{BATCH_TMPDIR}}/inputs/\w+/{expected_cram} $BATCH_TMPDIR/collate'
+
         assert re.search(pattern, cmd)
 
     def test_indexes_bam_if_index_does_not_exist(self, tmp_path: Path):
