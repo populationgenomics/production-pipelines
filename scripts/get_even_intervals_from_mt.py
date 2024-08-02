@@ -8,7 +8,7 @@ Hard breaks at centromeres.
 
 import argparse
 import json
-from typing import Generator, NamedTuple
+from typing import Generator, List, NamedTuple
 
 import hail as hl
 
@@ -144,47 +144,43 @@ def get_intervals_for_chr(
     return intervals
 
 
-def extract_interval_positions(ht: hl.Table, n_intervals: int) -> Generator[IntervalInfo, None, None]:
+def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalInfo]:
    # Get the number of rows in the table
     n_rows = ht.count()
 
     # Get the number of rows in each interval
     interval_size = n_rows // n_intervals
 
-    # Create an array of structs, each representing an interval
-    intervals = hl.range(n_intervals).map(lambda i: hl.struct(
-        start_idx = i * interval_size,
-        end_idx = hl.min((i + 1) * interval_size, ht.count()) - 1,
-    ))
+    # Create a new table with interval information
+    interval_table = hl.Table.parallelize(
+        hl.range(n_intervals).map(lambda i: hl.struct(
+            interval_idx = i,
+            start_idx = i * interval_size,
+            end_idx = hl.min((i + 1) * interval_size - 1, ht.count() - 1),
+        )),
+    )
 
-    # Annotate the table with interval information
-    ht = ht.annotate_globals(intervals = intervals)
+    # Join the interval table with our original table
+    joined = interval_table.key_by(
+        hl.struct(global_row_idx = hl.if_else(
+            interval_table.interval_idx == n_intervals - 1,
+            interval_table.end_idx,
+            interval_table.start_idx,
+        )),
+    ).join(ht.key_by('global_row_idx'))
 
-    # Collect interval start and end positions, along with chromosome info
-    result = ht.aggregate(hl.struct(
-        interval_info = hl.agg.array_agg(lambda interval: hl.agg.filter(
-            (ht.global_row_idx == interval.start_idx) | (ht.global_row_idx == interval.end_idx),
-            hl.struct(
-                start_pos = hl.agg.take(ht.locus.position, 1)[0],
-                end_pos = hl.agg.take(ht.locus.position, -1)[0],
-                start_contig = hl.agg.take(ht.locus.contig, 1)[0],
-                end_contig = hl.agg.take(ht.locus.contig, -1)[0],
-                start_idx = interval.start_idx,
-                end_idx = interval.end_idx,
-            ),
-        ), ht.intervals),
-    ))
+    # Aggregate to get start and end information for each interval
+    result = joined.group_by(joined.interval_idx).aggregate(
+        start_idx = hl.agg.min(joined.start_idx),
+        end_idx = hl.agg.max(joined.end_idx),
+        start_pos = hl.agg.min(joined.locus.position),
+        end_pos = hl.agg.max(joined.locus.position),
+        start_contig = hl.agg.take(joined.locus.contig, 1)[0],
+        end_contig = hl.agg.take(joined.locus.contig, -1)[0],
+    ).collect()
 
-    # Convert the Hail array to a Python list of IntervalInfo objects
-    for interval in result.interval_info:
-        yield IntervalInfo(
-            start_idx=interval.start_idx,
-            end_idx=interval.end_idx,
-            start_pos=interval.start_pos,
-            end_pos=interval.end_pos,
-            start_contig=interval.start_contig,
-            end_contig=interval.end_contig,
-        )
+    # Convert to list of IntervalInfo objects
+    return [IntervalInfo(**interval) for interval in result]
 
 def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str):
     """
@@ -244,6 +240,7 @@ def main(args):
     ht = ht.select().select_globals()
     ht = ht.add_index(name='global_row_idx')
     ht = ht.key_by('locus', 'alleles', 'global_row_idx')
+    print('Re-keyed table')
     with to_path(args.output_intervals_path).open('w') as f:
         for interval in extract_interval_positions(ht, n_intervals=args.n_intervals):
             print(f"Interval: {interval.start_idx}-{interval.end_idx}, "
