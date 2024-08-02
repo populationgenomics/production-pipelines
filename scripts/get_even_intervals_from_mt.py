@@ -177,20 +177,11 @@ def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalI
     ).join(ht.key_by('global_row_idx'))
     logging.info(f"Total rows: {n_rows}, Interval size: {interval_size}")
 
-    # Aggregate to get start and end information for each interval
     # Add a progress column
     joined = joined.annotate(progress = hl.scan.count())
 
     logging.info("Starting aggregation and collection")
-    result = joined.group_by(joined.interval_idx).aggregate(
-        start_idx = hl.agg.min(joined.start_idx),
-        end_idx = hl.agg.max(joined.end_idx),
-        start_pos = hl.agg.min(joined.locus.position),
-        end_pos = hl.agg.max(joined.locus.position),
-        start_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, 1)[0]),
-        end_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, -1)[0]),
-        progress = hl.agg.max(joined.progress),
-    )
+
     # Add action to log progress
     def log_progress(t):
         elapsed_time = time.time() - start_time
@@ -199,13 +190,20 @@ def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalI
         remaining_time = estimated_total_time - elapsed_time
         logging.info(f"Progress: {progress_fraction:.2%}, Elapsed time: {elapsed_time:.2f}s, Estimated remaining time: {remaining_time:.2f}s")
         return t
-
-    # Collect results with progress logging
-    result = result.map(log_progress).collect()
+    # Aggregate to get start and end information for each interval
+    result = joined.group_by(joined.interval_idx).aggregate(
+        start_idx = hl.agg.min(joined.start_idx),
+        end_idx = hl.agg.max(joined.end_idx),
+        start_pos = hl.agg.min(joined.locus.position),
+        end_pos = hl.agg.max(joined.locus.position),
+        start_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, 1)[0]),
+        end_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, -1)[0]),
+        _progress = hl.agg.max(hl.agg.filter(lambda x: log_progress(x), joined.progress)),
+    ).collect()
 
     logging.info("Collection complete. Converting to IntervalInfo objects")
     # Convert to list of IntervalInfo objects
-    interval_info = [IntervalInfo(**{k: v for k, v in interval.items() if k != 'progress'}) for interval in result]
+    interval_info = [IntervalInfo(**{k: v for k, v in interval.items() if k != '_progress'}) for interval in result]
 
     end_time = time.time()
     logging.info(f"Interval extraction completed in {end_time - start_time:.2f} seconds")
