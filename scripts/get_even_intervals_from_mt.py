@@ -176,6 +176,7 @@ def write_intervals_file(intervals: list[hl.expr.IntervalExpression], output_pat
     with open(output_path, 'w') as f:
         for interval in result:
             f.write(f'{interval["start"]}\t{interval["end"]}\n')
+            print(f'{interval["start"]}\t{interval["end"]}')
 
     print(f'{len(result)} intervals written to {output_path}')
 
