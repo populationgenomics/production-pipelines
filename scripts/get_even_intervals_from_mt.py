@@ -162,11 +162,11 @@ def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalI
 
     # Join the interval table with our original table
     joined = interval_table.key_by(
-        hl.struct(global_row_idx = hl.if_else(
+        global_row_idx = hl.if_else(
             interval_table.interval_idx == n_intervals - 1,
             interval_table.end_idx,
             interval_table.start_idx,
-        )),
+        ),
     ).join(ht.key_by('global_row_idx'))
 
     # Aggregate to get start and end information for each interval
