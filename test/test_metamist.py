@@ -527,10 +527,7 @@ class TestMetamist:
             )
         assert str(exc_info.value) == ('SG01: ERROR: index file does not exist: file.bam')
 
-        # test secondaryFiles file incorrect extension error
-        # This should throw MetamistError, however because of bug in implementation
-        # it fails later with assertion error
-        with pytest.raises(AssertionError) as exc_info:
+        with pytest.raises(MetamistError) as exc_info:
             parse_reads(
                 sequencing_group_id='SG01',
                 assay_meta={
@@ -544,9 +541,9 @@ class TestMetamist:
                 },
                 check_existence=False,
             )
-        # TODO: once parse_reads implementation fixed, fix the exception message
-        # ATM it is not clear what the error is as it is AssertionError
-        assert str(exc_info.value) == ''
+        assert str(exc_info.value) == (
+            'SG01: ERROR: expected the index file to have an extension .crai or .bai, got: file.rubbish'
+        )
 
     def test_metamist_parse_reads_bam_ok(self, metamist: Metamist):
         """
