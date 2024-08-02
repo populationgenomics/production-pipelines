@@ -8,12 +8,22 @@ Hard breaks at centromeres.
 
 import argparse
 import json
+from typing import Generator, NamedTuple
 
 import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.config import dataset_path, reference_path
 from cpg_utils.hail_batch import init_batch
+
+
+class IntervalInfo(NamedTuple):
+    start_idx: int
+    end_idx: int
+    start_pos: int
+    end_pos: int
+    start_contig: str
+    end_contig: str
 
 CHROMS = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY']
 
@@ -59,7 +69,7 @@ def get_telomere_and_centromere_start_end_positions(
     return telomeres_by_chrom, centromeres_by_chrom
 
 
-def get_even_intervals_from_mt(
+def get_even_intervals_from_mt_rows(
     ht: hl.Table,
     n_intervals: int,
     tc_intervals_filepath: str | None,
@@ -134,6 +144,48 @@ def get_intervals_for_chr(
     return intervals
 
 
+def extract_interval_positions(ht: hl.Table, n_intervals: int) -> Generator[IntervalInfo]:
+   # Get the number of rows in the table
+    n_rows = ht.count()
+
+    # Get the number of rows in each interval
+    interval_size = n_rows // n_intervals
+
+    # Create an array of structs, each representing an interval
+    intervals = hl.range(n_intervals).map(lambda i: hl.struct(
+        start_idx = i * interval_size,
+        end_idx = hl.min((i + 1) * interval_size, ht.count()) - 1,
+    ))
+
+    # Annotate the table with interval information
+    ht = ht.annotate_globals(intervals = intervals)
+
+    # Collect interval start and end positions, along with chromosome info
+    result = ht.aggregate(hl.struct(
+        interval_info = hl.agg.array_agg(lambda interval: hl.agg.filter(
+            (ht.global_row_idx == interval.start_idx) | (ht.global_row_idx == interval.end_idx),
+            hl.struct(
+                start_pos = hl.agg.take(ht.locus.position, 1)[0],
+                end_pos = hl.agg.take(ht.locus.position, -1)[0],
+                start_contig = hl.agg.take(ht.locus.contig, 1)[0],
+                end_contig = hl.agg.take(ht.locus.contig, -1)[0],
+                start_idx = interval.start_idx,
+                end_idx = interval.end_idx,
+            ),
+        ), ht.intervals),
+    ))
+
+    # Convert the Hail array to a Python list of IntervalInfo objects
+    for interval in result.interval_info:
+        yield IntervalInfo(
+            start_idx=interval.start_idx,
+            end_idx=interval.end_idx,
+            start_pos=interval.start_pos,
+            end_pos=interval.end_pos,
+            start_contig=interval.start_contig,
+            end_contig=interval.end_contig,
+        )
+
 def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str):
     """
     Evaluate the list of intervals and save them to a json.
@@ -144,7 +196,7 @@ def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str)
         for i, interval in enumerate(chrom_intervals):
             print(f'Chrom {chrom}, interval {i}: {interval.count_rows()} rows')
             # Get the start and end position of the interval
-            positions = interval.locus.position.collect()
+            positions = interval.aggregate(interval_positions=hl.agg.collect(interval.locus.position))
             start_pos = positions[0]
             end_pos = positions[-1]
             print(f'Interval start: {start_pos}, end: {end_pos}')
@@ -158,27 +210,27 @@ def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str)
     return interval_positions
 
 
-def write_intervals_file(intervals: list[hl.expr.IntervalExpression], output_path: str):
-    """Evaluate the start and end of each interval and write to a file."""
+# def write_intervals_file(output_path: str):
+#     """Evaluate the start and end of each interval and write to a file."""
     # Create a temporary Hail Table with a single row
-    temp_ht = hl.Table.parallelize([{'dummy': 0}])
-    temp_ht = temp_ht.annotate(intervals=intervals)
-    # evaluate the intervals
-    result = temp_ht.aggregate(
-        hl.agg.array_agg(
-            lambda interval: hl.struct(
-                start=interval.start,
-                end=interval.end,
-            ),
-            temp_ht.intervals,
-        ),
-    )
-    with open(output_path, 'w') as f:
-        for interval in result:
-            f.write(f'{interval["start"]}\t{interval["end"]}\n')
-            print(f'{interval["start"]}\t{interval["end"]}')
+    # temp_ht = hl.Table.parallelize([{'dummy': 0}])
+    # temp_ht = temp_ht.annotate(intervals=intervals)
+    # # evaluate the intervals
+    # result = temp_ht.aggregate(
+    #     hl.agg.array_agg(
+    #         lambda interval: hl.struct(
+    #             start=interval.start,
+    #             end=interval.end,
+    #         ),
+    #         temp_ht.intervals,
+    #     ),
+    # )
+    # with open(output_path, 'w') as f:
+    #     for interval in result:
+    #         f.write(f'{interval["start"]}\t{interval["end"]}\n')
+    #         print(f'{interval["start"]}\t{interval["end"]}')
 
-    print(f'{len(result)} intervals written to {output_path}')
+    # print(f'{len(result)} intervals written to {output_path}')
 
 
 def main(args):
@@ -188,14 +240,20 @@ def main(args):
     init_batch()
     mt = hl.read_matrix_table(args.input_mt)
     print('Read matrixtable')
-    # ht = mt.rows()
-    # ht = ht.select().select_globals()
-    # ht = ht.add_index(name='global_row_idx')
-    # ht = ht.key_by('locus', 'alleles', 'global_row_idx')
-    # get_even_intervals_from_mt(ht, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
-    intervals = mt._calculate_new_partitions(args.n_intervals)
-    print('Calculated intervals')
-    write_intervals_file(intervals, args.output_intervals_path)
+    ht = mt.rows()
+    ht = ht.select().select_globals()
+    ht = ht.add_index(name='global_row_idx')
+    ht = ht.key_by('locus', 'alleles', 'global_row_idx')
+    with open(args.output_intervals_path, 'w') as f:
+        for interval in extract_interval_positions(ht, n_intervals=args.n_intervals):
+            print(f"Interval: {interval.start_idx}-{interval.end_idx}, "
+            f"Positions: {interval.start_pos}-{interval.end_pos}, "
+            f"Contigs: {interval.start_contig}-{interval.end_contig}")
+            f.write(f"{interval.start_contig}\t{interval.start_pos}\t{interval.end_pos}\t{interval.end_contig}\n")
+    # get_even_intervals_from_mt_rows(ht, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
+    # intervals = mt._calculate_new_partitions(args.n_intervals)
+    # print('Calculated intervals')
+    # write_intervals_file(intervals, args.output_intervals_path)
 
 
 if __name__ == '__main__':
