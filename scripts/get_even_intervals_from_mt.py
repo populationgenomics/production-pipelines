@@ -159,14 +159,26 @@ def write_intervals_json(intervals: dict[str, list[hl.MatrixTable]], output_path
     return interval_positions
 
 
+def write_intervals_file(intervals: list[hl.expr.IntervalExpression], output_path: str):
+    """Evaluate the start and end of each interval and write to a file."""
+    intervals_eval = [(hl.eval(interval.start), hl.eval(interval.end)) for interval in intervals]
+    with open(output_path, 'w') as f:
+        for start, stop in intervals_eval:
+            f.write(f'{start}\t{stop}\n')
+
+    print(f'{len(intervals_eval)} intervals written to {output_path}')
+
+
 def main(args):
     """
     Run the script.
     """
-    output_intervals_path = dataset_path('derived_intervals/hg38_even_intervals.json')
     init_batch()
     mt = hl.read_matrix_table(args.input_mt)
-    get_even_intervals_from_mt(mt, args.n_intervals, args.tc_intervals_filepath, output_intervals_path)
+    mt = mt.add_row_index(name='global_row_idx')
+    intervals = mt._calculate_new_partitions(args.n_intervals)
+    write_intervals_file(intervals, args.output_intervals_path)
+    # get_even_intervals_from_mt(mt, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
 
 
 if __name__ == '__main__':
@@ -183,6 +195,12 @@ if __name__ == '__main__':
         help='Number of intervals to split the matrixtable into',
         type=int,
         required=True,
+    )
+    parser.add_argument(
+        '--output-intervals-path',
+        help='Path to save the intervals file',
+        required=False,
+        default=dataset_path('derived_intervals/hg38_even_intervals.json'),
     )
     args = parser.parse_args()
     main(args)
