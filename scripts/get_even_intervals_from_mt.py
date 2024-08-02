@@ -244,7 +244,7 @@ def main(args):
     ht = ht.select().select_globals()
     ht = ht.add_index(name='global_row_idx')
     ht = ht.key_by('locus', 'alleles', 'global_row_idx')
-    with open(args.output_intervals_path, 'w') as f:
+    with to_path(args.output_intervals_path).open('w') as f:
         for interval in extract_interval_positions(ht, n_intervals=args.n_intervals):
             print(f"Interval: {interval.start_idx}-{interval.end_idx}, "
             f"Positions: {interval.start_pos}-{interval.end_pos}, "
