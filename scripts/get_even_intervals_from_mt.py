@@ -144,7 +144,7 @@ def get_intervals_for_chr(
     return intervals
 
 
-def extract_interval_positions(ht: hl.Table, n_intervals: int) -> Generator[IntervalInfo]:
+def extract_interval_positions(ht: hl.Table, n_intervals: int) -> Generator[IntervalInfo, None, None]:
    # Get the number of rows in the table
     n_rows = ht.count()
 
