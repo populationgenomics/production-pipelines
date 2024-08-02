@@ -1,5 +1,6 @@
 import logging
 import pickle
+from os import remove
 from random import sample
 
 import pandas as pd
@@ -13,6 +14,12 @@ from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relate
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
 MIN_N_SAMPLES = 10
+
+
+def reorder_columns(ht: hl.Table, reference_table: hl.Table) -> hl.Table:
+    reference_fields = reference_table.sample_qc.dtype.fields
+    ordered_sample_qc = {field: ht.sample_qc[field] for field in reference_fields}
+    return ht.annotate(sample_qc=hl.struct(**ordered_sample_qc))
 
 
 def add_background(
@@ -58,6 +65,7 @@ def add_background(
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
+            metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if populations_to_filter:
                 logging.info(f'Filtering background samples by {populations_to_filter}')
@@ -65,6 +73,19 @@ def add_background(
                     hl.literal(populations_to_filter).contains(background_mt.superpopulation),
                 )
                 logging.info(f'Finished filtering background, kept samples that are {populations_to_filter}')
+            if background_relateds_to_drop := get_config()['large_cohort']['pca_background'][dataset].get(
+                'background_relateds_to_drop',
+                False,
+            ):
+                logging.info(
+                    f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
+                )
+                background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
+                background_mt = background_mt.filter_cols(
+                    ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
+                )
+            else:
+                logging.info('No related samples to drop from background dataset')
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 

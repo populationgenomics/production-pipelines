@@ -60,8 +60,8 @@ import toml
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
-from cpg_workflows.resources import HIGHMEM, STANDARD
-from cpg_workflows.utils import get_logger
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
@@ -291,7 +291,9 @@ class GeneratePED(DatasetStage):
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
-        job.command(f'TALOS_CONFIG={conf_in_batch} GeneratePED {query_dataset} {job.output}')
+        # mandatory argument
+        seq_type = config_retrieve(['workflow', 'sequencing_type'])
+        job.command(f'TALOS_CONFIG={conf_in_batch} GeneratePED {query_dataset} {job.output} {seq_type}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -384,10 +386,12 @@ class RunHailFiltering(DatasetStage):
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one
         # Genomes are more like 500GB
-        seq_type: str = config_retrieve(['workflow', 'sequencing_type'], 'genome')
-        required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(dataset.get_sequencing_group_ids()),
+        )
         required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
-        HIGHMEM.set_resources(job, ncpu=required_cpu, storage_gb=required_storage)
+        job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
@@ -406,18 +410,16 @@ class RunHailFiltering(DatasetStage):
         clinvar_name = clinvar_decisions.split('/')[-1]
 
         # localise the clinvar decisions table
-        job.command(
-            f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} . && cd -',
-        )
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
 
         # find, localise, and use the clinvar PM5 table
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
-        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {pm5} . && cd -')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
-        job.command(f'cd $BATCH_TMPDIR && gcloud --no-user-output-enabled storage cp -r {input_mt} . && cd -')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
 
         job.command(
             f'TALOS_CONFIG={conf_in_batch} RunHailFiltering '
@@ -426,7 +428,8 @@ class RunHailFiltering(DatasetStage):
             f'--pedigree {local_ped} '
             f'--vcf_out {job.output["vcf.bgz"]} '
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
-            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" ',
+            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
+            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" ',
         )
         get_batch().write_output(job.output, str(expected_out["labelled_vcf"]).removesuffix('.vcf.bgz'))
 
@@ -468,10 +471,10 @@ class RunHailFilteringSV(DatasetStage):
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
             # copy the mt in
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} .')
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
             job.command(
                 f'TALOS_CONFIG={conf_in_batch} RunHailFilteringSV '
-                f'--mt {sv_file} '
+                f'--mt "${{BATCH_TMPDIR}}/{sv_file}" '
                 f'--panelapp {panelapp_json} '
                 f'--pedigree {local_ped} '
                 f'--vcf_out {job.output["vcf.bgz"]} ',  # type: ignore
