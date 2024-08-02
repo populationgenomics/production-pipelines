@@ -1,10 +1,10 @@
+import logging
 from argparse import ArgumentParser
 from os.path import join
-import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config, config_retrieve
+from cpg_utils.config import config_retrieve, get_config
 from gnomad.sample_qc.relatedness import compute_related_samples_to_drop
 
 
@@ -25,7 +25,7 @@ def cli_main():
     flag_related(pcrelate_ht_path=args.relatedness, qc_ht_path=args.qc, out=args.out, checkpoint=args.checkpoint)
 
 
-def flag_related(pcrelate_ht_path: str, qc_ht_path: str, out: str, checkpoint: str | None=None):
+def flag_related(pcrelate_ht_path: str, qc_ht_path: str, out: str, checkpoint: str | None = None):
     """
     Rank samples and flag samples to drop so there is only one sample per family
     left, with the highest rank in the family. The ranking is based on either

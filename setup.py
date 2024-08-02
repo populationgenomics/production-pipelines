@@ -67,7 +67,7 @@ setup(
             # the PCRelate step of LargeCohort - Relatedness
             'relatedness_pcrelate = cpg_workflows.large_cohort.scripts.relatedness_pcrelate:cli_main'
             # the Flagging step of LargeCohort - Relatedness
-            'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main'
+            'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main',
         ],
     },
 )

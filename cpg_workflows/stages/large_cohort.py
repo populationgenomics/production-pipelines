@@ -1,12 +1,11 @@
 import logging
-
 from functools import cache
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify, tshirt_mt_sizing, ExpectedResultT
+from cpg_workflows.utils import ExpectedResultT, slugify, tshirt_mt_sizing
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
@@ -137,11 +136,12 @@ class RelatednessPCRelate(CohortStage):
     """
     This is the first step of the Relatedness Stage, without Dataproc
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'relatedness_ht': (
-                    cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relatedness.ht'
-            )
+                cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relatedness.ht'
+            ),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -151,10 +151,13 @@ class RelatednessPCRelate(CohortStage):
         dense_mt_name = dense_mt_path.split('/')[-1]
 
         # estimate required storage - we create a new HT, so provision double the storage
-        required_storage = tshirt_mt_sizing(
-            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-            cohort_size=len(cohort.get_sequencing_group_ids()),
-        ) * 2
+        required_storage = (
+            tshirt_mt_sizing(
+                sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+                cohort_size=len(cohort.get_sequencing_group_ids()),
+            )
+            * 2
+        )
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness PCRelate stage: {cohort.name}')
@@ -172,7 +175,7 @@ class RelatednessPCRelate(CohortStage):
             f'relatedness_pcrelate '
             f'--dense_mt "${{BATCH_TMPDIR}}/{dense_mt_name}" '
             f'--out {job.output} '
-            f'--checkpoint "${{BATCH_TMPDIR}}"'
+            f'--checkpoint "${{BATCH_TMPDIR}}"',
         )
 
         # delocalise the output HT
@@ -181,14 +184,18 @@ class RelatednessPCRelate(CohortStage):
         return self.make_outputs(cohort, outputs, job)
 
 
-@stage(required_stages=[SampleQC, RelatednessPCRelate], analysis_keys=['relateds_to_drop'], analysis_type='mt') # not HT
+@stage(
+    required_stages=[SampleQC, RelatednessPCRelate],
+    analysis_keys=['relateds_to_drop'],
+    analysis_type='mt',
+)  # not HT
 class RelatednessFlag(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'relateds_to_drop': (
                 cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relateds_to_drop.ht'
-            )
+            ),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -196,10 +203,13 @@ class RelatednessFlag(CohortStage):
         outputs = self.expected_outputs(cohort)
 
         # estimate required storage - I've got nothing to base this on...
-        required_storage = tshirt_mt_sizing(
-            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-            cohort_size=len(cohort.get_sequencing_group_ids()),
-        ) * 2
+        required_storage = (
+            tshirt_mt_sizing(
+                sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+                cohort_size=len(cohort.get_sequencing_group_ids()),
+            )
+            * 2
+        )
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness Sample Flagging stage: {cohort.name}')
@@ -227,7 +237,7 @@ class RelatednessFlag(CohortStage):
             f'--relatedness "${{BATCH_TMPDIR}}/{prcrelate_mt_name}" '
             f'--qc "${{BATCH_TMPDIR}}/{sample_qc_ht_name}" '
             f'--out {job.output} '
-            f'--checkpoint "${{BATCH_TMPDIR}}" '
+            f'--checkpoint "${{BATCH_TMPDIR}}" ',
         )
 
         # delocalise the output HT

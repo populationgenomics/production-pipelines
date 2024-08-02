@@ -1,7 +1,6 @@
+import logging
 from argparse import ArgumentParser
 from os.path import join
-
-import logging
 
 import hail as hl
 
