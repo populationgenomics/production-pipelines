@@ -122,7 +122,7 @@ def get_intervals_from_ht(
         pos=intervals_ht.locus.position,
         idx=intervals_ht.global_row_idx,
     )
-    result = ht.aggregate(hl.agg.collect(struct))
+    result = intervals_ht.aggregate(hl.agg.collect(struct))
     chroms = [r.chrom for r in result]
     positions = [r.pos for r in result]
     idx = [r.idx for r in result]
