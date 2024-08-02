@@ -16,7 +16,7 @@ import hail as hl
 
 from cpg_utils import to_path
 from cpg_utils.config import dataset_path, reference_path
-from cpg_utils.hail_batch import init_batch
+from cpg_utils.hail_batch import get_batch, init_batch
 
 
 class IntervalInfo(NamedTuple):
@@ -73,14 +73,20 @@ def get_telomere_and_centromere_start_end_positions(
     return telomeres_by_chrom, centromeres_by_chrom
 
 
-def get_even_intervals_from_mt_rows(
+def get_intervals_from_ht(
     ht: hl.Table,
     n_intervals: int,
     tc_intervals_filepath: str | None,
     output_intervals_path: str,
 ):
     """
-    Read the matrixtable rows (ht) and split it into even intervals of rows by subsetting the rows by chromosome.
+    Read the matrixtable rows (ht), and split them into n_intervals of 
+    approximately equal sized rows.
+
+    Subsets the ht by locus.contig to get the intervals for each chromosome. 
+    Hard exclude the telomeric and centromeric regions of each chromosome by 
+    reading the telomere and centromere positions from the tc_intervals_filepath.
+
     Return the start and end positions of the intervals in a json file.
     """
     # Get the number of rows in the table
@@ -92,22 +98,80 @@ def get_even_intervals_from_mt_rows(
     # Get the telomere and centromere positions
     telomere_positions, centromere_positions = get_telomere_and_centromere_start_end_positions(tc_intervals_filepath)
 
-    intervals = {}
+    # intervals = {}
+    intervals: list[hl.Table] = []
     for chrom in CHROMS:
-        intervals[chrom] = get_intervals_for_chr(
-            ht=ht.filter(ht.locus.contig == chrom),
-            interval_size=interval_size,
-            telomere_positions=telomere_positions[chrom],
-            centromere_position=centromere_positions[chrom],
+        # intervals[chrom] = get_ht_intervals_for_chrom(
+        intervals.extend(
+            get_ht_intervals_for_chrom(
+                ht=ht.filter(ht.locus.contig == chrom),
+                interval_size=interval_size,
+                telomere_positions=telomere_positions[chrom],
+                centromere_position=centromere_positions[chrom],
+            ),
         )
 
-    # Evaluate the intervals
-    interval_positions_by_chrom = write_intervals_json(intervals, output_intervals_path)
+    # Stack the hail Table intervals into a single Table
+    intervals_ht = hl.Table.union(*intervals)
 
-    return interval_positions_by_chrom
+    # Collect the positions of the intervals
+    chroms, positions, idx = intervals_ht.aggregate(
+        chroms=hl.agg.collect(intervals_ht.locus.contig),
+        positions=hl.agg.collect(intervals_ht.locus.position),
+        idx=hl.agg.collect(intervals_ht.global_row_idx),
+    )
+
+    # Create a dictionary of the interval positions by chromosome
+    interval_starts_by_chrom = {}
+    interval_ends_by_chrom = {}
+    for counter, chr, pos, i in enumerate(zip(chroms, positions, idx)):
+        if chr not in interval_starts_by_chrom:
+            interval_starts_by_chrom[chr] = []
+            interval_ends_by_chrom[chr] = []
+        # odd numbers are the start of the interval, even numbers are the end
+        if counter % 2 != 0:
+            interval_starts_by_chrom[chr].append(pos)
+            logging.info(f'{chr} :: start :: {pos} :: idx :: {i}')
+        else:
+            interval_ends_by_chrom[chr].append(pos)
+            logging.info(f'{chr} :: stop  :: {pos} :: idx :: {i}')
+
+    intervals_by_chrom = {}
+    for chrom in CHROMS:
+        intervals_by_chrom[chrom] = []
+        for start, end in zip(interval_starts_by_chrom[chrom], interval_ends_by_chrom[chrom]):
+            intervals_by_chrom[chrom].append((start, end))
 
 
-def get_intervals_for_chr(
+    with to_path(output_intervals_path).open('w') as f:
+        json.dump(intervals_by_chrom, f)
+
+    logging.info(f'Intervals saved to {output_intervals_path}')
+
+    return intervals_by_chrom
+
+
+def filter_telomeres_and_centromeres(ht, telomere_positions, centromere_position):
+    """
+    Filter the table to exclude the telomeric and centromeric regions of the chromosome.
+    """
+    # Filter the table to exclude the telomeric regions
+    ht = ht.filter(
+        (ht.locus.position < telomere_positions['first'][0]) | (ht.locus.position > telomere_positions['first'][1]),
+    )
+    ht = ht.filter(
+        (ht.locus.position < telomere_positions['second'][0]) | (ht.locus.position > telomere_positions['second'][1]),
+    )
+
+    # Filter the table to exclude the centromeric region
+    ht = ht.filter(
+        (ht.locus.position < centromere_position[0]) | (ht.locus.position > centromere_position[1]),
+    )
+
+    return ht
+
+
+def get_ht_intervals_for_chrom(
     ht: hl.Table,
     interval_size: int,
     telomere_positions: dict[str, tuple[int, int]],
@@ -117,133 +181,36 @@ def get_intervals_for_chr(
     Evenly split the chromosome subset of the table into intervals of interval_size.
     Hard exclude the telomeric and centromeric regions of the chromosome.
     """
-    # The first valid region for genotyping begins after the first telomere and ends before the centromere
-    genotyping_region_1_start = telomere_positions['first'][1] + 1
-    genotyping_region_1_end = centromere_position[0] - 1
-    ht_region_1 = ht.filter(
-        (ht.locus.position >= genotyping_region_1_start) & (ht.locus.position < genotyping_region_1_end),
-    )
-    ht_region_1 = ht_region_1.add_index(name='row_idx')
-    ht_region_1 = ht_region_1.select(ht_region_1.global_row_idx, ht_region_1.row_idx)
+    ht = filter_telomeres_and_centromeres(ht, telomere_positions, centromere_position)
 
-    # The second valid region for genotyping starts after the centromere and ends before the second telomere
-    genotyping_region_2_start = centromere_position[1] + 1
-    genotyping_region_2_end = telomere_positions['second'][0] - 1
-    ht_region_2 = ht.filter(
-        (ht.locus.position >= genotyping_region_2_start) & (ht.locus.position < genotyping_region_2_end),
-    )
-    ht_region_2 = ht_region_2.add_index(name='row_idx')
-    ht_region_2 = ht_region_2.select(ht_region_2.global_row_idx, ht_region_2.row_idx)
+    ht_region_1 = ht.filter(ht.locus.position < centromere_position[0]).add_index(name='row_idx')
+    ht_region_2 = ht.filter(ht.locus.position > centromere_position[1]).add_index(name='row_idx')
 
     # Iterate through both genotyping regions in intervals of interval_size, using the row_idx
     intervals = []
     for ht_region in [ht_region_1, ht_region_2]:
         for i in range(0, ht_region.count(), interval_size):
             # Get the interval
-            interval = ht_region.filter((ht_region.row_idx >= i) & (ht_region.row_idx < i + interval_size))
+            # interval = ht_region.filter((ht_region.row_idx >= i) & (ht_region.row_idx < i + interval_size))
+            interval_start = ht_region.filter(ht_region.row_idx == i)
+            interval_end = ht_region.filter(ht_region.row_idx == i + interval_size - 1)
 
-            # Add the interval to the intervals list
-            intervals.append(interval)
+            # Add the interval start and end rows to the intervals list
+            intervals.extend([interval_start, interval_end])
 
     return intervals
 
 
-def extract_interval_positions(ht: hl.Table, n_intervals: int) -> List[IntervalInfo]:
-    start_time = time.time()
-    logging.info(f"Starting interval extraction for {n_intervals} intervals")
-   # Get the number of rows in the table
-    n_rows = ht.count()
 
-    # Get the number of rows in each interval
-    interval_size = n_rows // n_intervals
-
-    # Create a new table with interval information
-    interval_table = hl.Table.parallelize(
-        hl.range(n_intervals).map(lambda i: hl.struct(
-            interval_idx = i,
-            start_idx = i * interval_size,
-            end_idx = hl.min((i + 1) * interval_size - 1, ht.count() - 1),
-        )),
-    )
-
-    logging.info("Joining interval table with original table")
-    # Join the interval table with our original table
-    joined = interval_table.key_by(
-        global_row_idx = hl.int64(hl.if_else(
-            interval_table.interval_idx == n_intervals - 1,
-            interval_table.end_idx,
-            interval_table.start_idx,
-        )),
-    ).join(ht.key_by('global_row_idx'))
-
-    logging.info(f"Total rows: {n_rows}, Interval size: {interval_size}")
-    logging.info("Starting aggregation and collection")
-
-    # Aggregate to get start and end information for each interval
-    result = joined.group_by(joined.interval_idx).aggregate(
-        start_idx = hl.agg.min(joined.start_idx),
-        end_idx = hl.agg.max(joined.end_idx),
-        start_pos = hl.agg.min(joined.locus.position),
-        end_pos = hl.agg.max(joined.locus.position),
-        start_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, 1)[0]),
-        end_contig = hl.or_missing(hl.agg.count() > 0, hl.agg.take(joined.locus.contig, -1)[0]),
-    ).collect()
-
-    logging.info("Collection complete. Converting to IntervalInfo objects")
-    # Convert to list of IntervalInfo objects
-    interval_info = [IntervalInfo(**interval) for interval in result]
-
-    end_time = time.time()
-    logging.info(f"Interval extraction completed in {end_time - start_time:.2f} seconds")
-
-    return interval_info
-
-
-def write_intervals_json(intervals: dict[str, list[hl.Table]], output_path: str):
-    """
-    Evaluate the list of intervals and save them to a json.
-    """
-    interval_positions: dict[str, list[tuple[int, int]]] = {}
-    for chrom, chrom_intervals in intervals.items():
-        interval_positions[chrom] = []
-        for i, interval in enumerate(chrom_intervals):
-            print(f'Chrom {chrom}, interval {i}: {interval.count_rows()} rows')
-            # Get the start and end position of the interval
-            positions = interval.aggregate(interval_positions=hl.agg.collect(interval.locus.position))
-            start_pos = positions[0]
-            end_pos = positions[-1]
-            print(f'Interval start: {start_pos}, end: {end_pos}')
-            interval_positions[chrom].append((start_pos, end_pos))
-
-    # Save the interval positions to a file
-    with open(output_path, 'w') as f:
-        json.dump(interval_positions, f)
-
-    print(f'Intervals saved to {output_path}')
-    return interval_positions
-
-
-# def write_intervals_file(output_path: str):
-#     """Evaluate the start and end of each interval and write to a file."""
+def write_intervals_file(intervals: list, output_path: str):
+    """Evaluate the start and end of each interval and write to a file."""
     # Create a temporary Hail Table with a single row
-    # temp_ht = hl.Table.parallelize([{'dummy': 0}])
-    # temp_ht = temp_ht.annotate(intervals=intervals)
-    # # evaluate the intervals
-    # result = temp_ht.aggregate(
-    #     hl.agg.array_agg(
-    #         lambda interval: hl.struct(
-    #             start=interval.start,
-    #             end=interval.end,
-    #         ),
-    #         temp_ht.intervals,
-    #     ),
-    # )
-    # with open(output_path, 'w') as f:
-    #     for interval in result:
-    #         f.write(f'{interval["start"]}\t{interval["end"]}\n')
-    #         print(f'{interval["start"]}\t{interval["end"]}')
+    with to_path(output_path).open('w') as f:
+        for interval in intervals:
+            f.write(f'{interval["start"]}\t{interval["end"]}\n')
+            print(f'{interval["start"]}\t{interval["end"]}')
 
-    # print(f'{len(result)} intervals written to {output_path}')
+    print(f'{len(intervals)} intervals written to {output_path}')
 
 
 def main(args):
@@ -258,13 +225,8 @@ def main(args):
     ht = ht.add_index(name='global_row_idx')
     ht = ht.key_by('locus', 'alleles', 'global_row_idx')
     print('Re-keyed table')
-    with to_path(args.output_intervals_path).open('w') as f:
-        for interval in extract_interval_positions(ht, n_intervals=args.n_intervals):
-            print(f"Interval: {interval.start_idx}-{interval.end_idx}, "
-            f"Positions: {interval.start_pos}-{interval.end_pos}, "
-            f"Contigs: {interval.start_contig}-{interval.end_contig}")
-            f.write(f"{interval.start_contig}\t{interval.start_pos}\t{interval.end_pos}\t{interval.end_contig}\n")
-    # get_even_intervals_from_mt_rows(ht, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
+    intervals = get_intervals_from_ht(ht, args.n_intervals, args.tc_intervals_filepath, args.output_intervals_path)
+    print('Calculated intervals')
     # intervals = mt._calculate_new_partitions(args.n_intervals)
     # print('Calculated intervals')
     # write_intervals_file(intervals, args.output_intervals_path)
