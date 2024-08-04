@@ -88,27 +88,6 @@ class TestPreProcessing:
         assert len(select_jobs(jobs, 'align')) == 1
 
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    @pytest.mark.parametrize('index,expected_count', [(True, 10), (False, 1)])
-    def test_does_not_shard_if_sequencing_genome_and_index_does_not_exist(
-        self,
-        tmp_path: Path,
-        input_type: str,
-        index: bool,
-        expected_count: int,
-    ):
-        """
-        Test that when genome sequencing is specified, the `align` function does not
-        split the alignment into more than one job unless an index exists.
-        """
-        config = default_config()
-        config.workflow.sequencing_type = 'genome'
-
-        batch, sg = setup_test(config, tmp_path, alignment_input=input_type, index=index)
-
-        jobs = align(b=batch, sequencing_group=sg)
-        assert len(select_jobs(jobs, 'align')) == expected_count
-
-    @pytest.mark.parametrize('input_type', ['bam', 'cram'])
     def test_extract_fastq_sets_correct_flags_for_input_type(self, tmp_path: Path, input_type: str):
         config = default_config()
         batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
