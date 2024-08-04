@@ -230,6 +230,10 @@ class TestPreProcessing:
 
         assert re.search(pattern, cmd)
 
+    # THIS TEST WILL BE REDUNDANT BECAUSE WE WILL NOT BE USING BAZAM AND WE ONLY INDEXED BEFORE ALIGNMENT
+    # BECAUSE BAZAM REQUIRED IT.
+    # ALSO, EXTRACTING READS FROM BAMS DOES NOT NEED A REFERENCE ASSEMBLY BUT FROM CRAMS IT DOES. HENCE WHY
+    # CREATE_BAM_INPUT DOESN'T NEED A REFERENCE_ASSEMBLY ARGUMENT FOR THE BAMPATH OBJECT.
     def test_indexes_bam_if_index_does_not_exist(self, tmp_path: Path):
         """
         Test that the `align` function sorts and indexes the BAM input when index is

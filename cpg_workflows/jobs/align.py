@@ -357,10 +357,10 @@ def _align_one(
     fifo_commands: dict[str, str] = {}
     use_interleaved = False
     if isinstance(alignment_input, CramPath | BamPath):
+        bam_or_cram_group = alignment_input.resource_group(b)
         if extract_reads:
             logging.info("Using samtools to extract FASTQs from CRAM/BAM")
             logging.info(f"Alignment input: {alignment_input.path} {alignment_input.index_path}")
-            bam_or_cram_group = alignment_input.resource_group(b)
             extract_fastq_j = extract_fastq(
                 b,
                 bam_or_cram_group,
@@ -377,12 +377,15 @@ def _align_one(
             """,
             )
             use_interleaved = True
+        ###TODO: CONFIRM I NEED THIS ELSE STATEMENT
         else:
             prepare_fastq_cmd = ''
             r1_param = 'r1'
             r2_param = ''
+        # DON'T NEED TO INDEX CRAMS/BAMS BEFORE ANYMORE
+        # TODO: DOUBLE CHECK IF DRAGEN MAKES INDEXES
 
-    else:  # only for BAMs that are missing index
+    else:  # FastqPair
         assert isinstance(alignment_input, FastqPair)
         fastq_pair = alignment_input.as_resources(b)
         r1_param = '$BATCH_TMPDIR/R1.fq.gz'
