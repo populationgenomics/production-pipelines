@@ -259,10 +259,9 @@ class TestDragmap:
             markdup_tool=MarkDupTool.NO_MARKDUP,
         )
         align_jobs = select_jobs(jobs, 'align')
-        assert len(align_jobs) == 10
-
+        assert len(align_jobs) == 1
         pattern = (
-            r'dragen-os -r \${BATCH_TMPDIR}/inputs/\w+ --interleaved=1 -b r1 \\'
+            r'dragen-os -r \${BATCH_TMPDIR}/inputs/\w+ --interleaved=1 -b \${BATCH_TMPDIR}/inputs/\w+/all_reads\.fq\.gz \\'
             fr'\n--RGID {sg.id} --RGSM {sg.id}'
             r'.* \| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam'
         )
