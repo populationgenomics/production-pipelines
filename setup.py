@@ -65,7 +65,7 @@ setup(
             # for use in translating a MatrixTable to an ES index, first localising the MT
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
             # the PCRelate step of LargeCohort - Relatedness
-            'relatedness_pcrelate = cpg_workflows.large_cohort.scripts.relatedness_pcrelate:cli_main'
+            'relatedness_pcrelate = cpg_workflows.large_cohort.scripts.relatedness_pcrelate:cli_main',
             # the Flagging step of LargeCohort - Relatedness
             'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main',
         ],
