@@ -168,6 +168,7 @@ class RelatednessPCRelate(CohortStage):
         job.command(f'gcloud --no-user-output-enabled storage cp -r {dense_mt_path} $BATCH_TMPDIR')
 
         # how many cores do we need?
+        logging.info(f'Required storage: {required_storage}')
         required_cpu: int = config_retrieve(['RelatednessPCRelate', 'cores'], 8)
         job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
