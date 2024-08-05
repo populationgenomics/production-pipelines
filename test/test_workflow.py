@@ -8,7 +8,7 @@ from cpg_utils import Path, to_path
 from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_workflows.workflow import path_walk
 
-from test import set_config
+from . import set_config
 
 TOML = """
 [workflow]
