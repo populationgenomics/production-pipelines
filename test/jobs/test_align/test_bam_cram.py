@@ -247,7 +247,9 @@ class TestDragmap:
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
     def test_using_dragmap_generates_alignment_correct_command(self, tmp_path: Path, input_type: str):
         """
-        Tests that the dragmap aligner command is correctly configured.
+        Tests that the dragmap aligner command is correctly configured. For bam and cram
+        inputs we no longer shard therefore merging is not required and hence the `-o`
+        dragen-os flag is not required to sort output.
         """
         config = default_config()
         batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
@@ -261,9 +263,9 @@ class TestDragmap:
         align_jobs = select_jobs(jobs, 'align')
         assert len(align_jobs) == 1
         pattern = (
-            r'dragen-os -r \${BATCH_TMPDIR}/inputs/\w+ --interleaved=1 -b \${BATCH_TMPDIR}/inputs/\w+/all_reads\.fq\.gz \\'
+            r'dragen-os -r \${BATCH_TMPDIR}/inputs/\w+ --interleaved=1 -b \$BATCH_TMPDIR/all_reads\.fq\.gz \\'  #    \\
             fr'\n--RGID {sg.id} --RGSM {sg.id}'
-            r'.* \| samtools sort .* -Obam -o \${BATCH_TMPDIR}/.*/sorted_bam'
+            r'.* \| samtools sort .* -Obam'
         )
 
         cmd = get_command_str(align_jobs[0])
@@ -276,7 +278,7 @@ class TestDragmap:
         spy = mocker.spy(batch, 'read_input_group')
         jobs = align(b=batch, sequencing_group=sg, aligner=Aligner.DRAGMAP)
         align_jobs = select_jobs(jobs, 'align')
-        assert len(align_jobs) == 10
+        assert len(align_jobs) == 1
 
         file_location = config.references['broad']['dragmap_prefix']
         spy.assert_any_call(
