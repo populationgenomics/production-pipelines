@@ -1287,7 +1287,7 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
         if not (active_sgs := multicohort.get_sequencing_groups()):
             all_sgs = len(multicohort.get_sequencing_groups(only_active=False))
             logging.warning(
-                f'{active_sgs}/{all_sgs} usable (active=True) SGs found in the multicohort. '
+                f'{len(active_sgs)}/{all_sgs} usable (active=True) SGs found in the multicohort. '
                 'Check that input_cohorts` or `input_datasets` are provided and not skipped',
             )
             return output_by_target
