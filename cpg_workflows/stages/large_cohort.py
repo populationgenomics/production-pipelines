@@ -151,13 +151,12 @@ class RelatednessPCRelate(CohortStage):
         dense_mt_name = dense_mt_path.split('/')[-1]
 
         # estimate required storage - we create a new HT, so provision double the storage
-        required_storage = (
-            tshirt_mt_sizing(
-                sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-                cohort_size=len(cohort.get_sequencing_group_ids()),
-            )
-            * 2
-        )
+        t_shirt_size_value = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
+        ).split('Gi')[0]
+        required_storage_value = int(t_shirt_size_value) * 2
+        required_storage = f'{required_storage_value}Gi'
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness PCRelate stage: {cohort.name}')
