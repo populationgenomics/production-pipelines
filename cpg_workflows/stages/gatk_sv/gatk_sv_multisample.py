@@ -633,7 +633,10 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+        return {
+            key: self.get_stage_cohort_prefix(cohort) / get_workflow().output_version / fname
+            for key, fname in ending_by_key.items()
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
@@ -870,7 +873,7 @@ class JoinRawCalls(MultiCohortStage):
             input_dict[f'clustered_{caller}_vcfs'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names
             ]
-            input_dict[f'clustered_{caller}_vcfs_indexes'] = [
+            input_dict[f'clustered_{caller}_vcf_indexes'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf_index'] for cohort in all_batch_names
             ]
 

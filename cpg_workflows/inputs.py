@@ -11,7 +11,6 @@ from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_re
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
-_cohort: Cohort | None = None
 _multicohort: MultiCohort | None = None
 
 
@@ -23,12 +22,12 @@ def actual_get_multicohort() -> MultiCohort:
     return _multicohort
 
 
-def deprecated_get_cohort() -> Cohort:
+def deprecated_get_cohort() -> MultiCohort:
     """Return the cohort object"""
-    global _cohort
-    if not _cohort:
-        _cohort = deprecated_create_cohort()
-    return _cohort
+    global _multicohort
+    if not _multicohort:
+        _multicohort = deprecated_create_cohort()
+    return _multicohort
 
 
 def get_multicohort() -> Cohort | MultiCohort:
@@ -105,7 +104,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     assert cohort.get_sequencing_groups()
 
 
-def deprecated_create_cohort() -> Cohort:
+def deprecated_create_cohort() -> MultiCohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
@@ -123,8 +122,8 @@ def deprecated_create_cohort() -> Cohort:
         logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
-
-    cohort = Cohort()
+    multi_cohort = MultiCohort()
+    cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
@@ -162,8 +161,8 @@ def deprecated_create_cohort() -> Cohort:
     _populate_analysis(cohort)
     if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
-    assert cohort.get_sequencing_groups()
-    return cohort
+    assert multi_cohort.get_sequencing_groups()
+    return multi_cohort
 
 
 def _combine_assay_meta(assays: list[Assay]) -> dict:

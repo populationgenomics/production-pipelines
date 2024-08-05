@@ -102,9 +102,9 @@ class MultiCohort(Target):
         # NOTE: For a cohort, we simply pull the dataset name from the config.
         input_cohorts = get_config()['workflow'].get('input_cohorts', [])
         if input_cohorts:
-            cohorts_string = '_'.join(sorted(input_cohorts))
-
-        self.name = cohorts_string or get_config()['workflow']['dataset']
+            self.name = '_'.join(sorted(input_cohorts))
+        else:
+            self.name = get_config()['workflow']['dataset']
 
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 

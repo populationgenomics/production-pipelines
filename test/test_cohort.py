@@ -297,24 +297,24 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup, Sex
 
-    cohort = get_multicohort()
+    multicohort = get_multicohort()
 
-    assert cohort
-    assert isinstance(cohort, Cohort)
+    assert multicohort
+    assert isinstance(multicohort, MultiCohort)
 
     # Testing Cohort Information
-    assert len(cohort.get_sequencing_groups()) == 2
-    assert cohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
+    assert len(multicohort.get_sequencing_groups()) == 2
+    assert multicohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
 
-    for sg in cohort.get_sequencing_groups():
+    for sg in multicohort.get_sequencing_groups():
         assert sg.dataset.name == 'fewgenomes'
         assert not sg.forced
         assert sg.cram is None
         assert sg.gvcf is None
 
     # Test SequenceGroup Population
-    test_sg = cohort.get_sequencing_groups()[0]
-    test_sg2 = cohort.get_sequencing_groups()[1]
+    test_sg = multicohort.get_sequencing_groups()[0]
+    test_sg2 = multicohort.get_sequencing_groups()[1]
     assert test_sg.id == 'CPGLCL17'
     assert test_sg.external_id == 'NA12340'
     assert test_sg.participant_id == '8'
@@ -339,12 +339,12 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     assert test_sg.pedigree.dad.participant_id == '14'
 
     # Test _sequencing_group_by_id attribute
-    assert cohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
         'CPGLCL17',
         'CPGLCL25',
     }
-    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
-    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'
 
     # Test reads
     # TODO: As above
