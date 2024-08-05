@@ -89,3 +89,9 @@ strict = false
 
 # min similarity score when doing a semsimian termset similarity test
 min_similarity = 14.0
+
+# download from https://data.monarchinitiative.org/monarch-kg/latest/phenio.db.gz
+# needs to be decompressed to use
+phenio_db_file = 'gs://cpg-common-test/references/aip/phenotype.db.gz'
+# download from https://hpo.jax.org/data/annotations "genes to phenotype" file
+gene_to_phenotype = 'gs://cpg-common-test/references/aip/genes_to_phenotype.txt'

@@ -595,7 +595,7 @@ class HPOFlagging(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        # IDK, get these from config?
+        # TODO IDK, get these from config?
         phenio_db_file = ''
         gene_to_phenotype = ''
 
