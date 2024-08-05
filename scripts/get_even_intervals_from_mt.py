@@ -222,7 +222,7 @@ def main(args):
     """
     Run the script.
     """
-    init_batch()
+    init_batch(driver_memory='16G')
     mt = hl.read_matrix_table(args.input_mt)
     logging.info('Read matrixtable')
     ht = mt.rows()
