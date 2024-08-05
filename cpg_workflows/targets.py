@@ -167,7 +167,7 @@ class MultiCohort(Target):
         uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
         Include only "active" sequencing groups (unless only_active is False)
         """
-        all_sequencing_groups: dict[str, 'SequencingGroup'] = {}
+        all_sequencing_groups: dict[str, SequencingGroup] = {}
         for dataset in self.get_datasets(only_active):
             for sg in dataset.get_sequencing_groups(only_active):
                 all_sequencing_groups[sg.id] = sg
