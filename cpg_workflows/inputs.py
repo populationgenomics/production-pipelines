@@ -30,7 +30,7 @@ def deprecated_get_cohort() -> MultiCohort:
     return _multicohort
 
 
-def get_multicohort() -> Cohort | MultiCohort:
+def get_multicohort() -> MultiCohort:
     """
     Return the cohort or multicohort object based on the workflow configuration.
     """
