@@ -371,8 +371,6 @@ def _align_one(
             """,
             )
             use_interleaved = True
-        # DON'T NEED TO INDEX CRAMS/BAMS BEFORE ANYMORE
-        # TODO: DOUBLE CHECK IF DRAGEN MAKES INDEXES
 
     else:  # FastqPair
         assert isinstance(alignment_input, FastqPair)
