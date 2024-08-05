@@ -591,13 +591,12 @@ class HPOFlagging(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        # TODO (mwelland) get hold of quite a few things here...
 
         outputs = self.expected_outputs(dataset)
 
         # TODO IDK, get these from config?
-        phenio_db_file = ''
-        gene_to_phenotype = ''
+        phenio_db = get_batch().read_input(config_retrieve(['HPOFlagging', 'phenio_db']))
+        gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
 
         job = get_batch().new_job(f'Label phenotype matches: {dataset.name}')
         job.cpu(2.0).memory('highmem').image(image_path('talos'))
@@ -615,7 +614,7 @@ class HPOFlagging(DatasetStage):
             f'--results {results_json} '
             f'--gene_map {gene_map} '
             f'--gen2phen {gene_to_phenotype} '
-            f'--phenio {phenio_db_file} '
+            f'--phenio {phenio_db} '
             f'--out {job.output} '
             f'--phenout {job.phenout} ',
         )
