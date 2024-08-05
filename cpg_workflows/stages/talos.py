@@ -599,7 +599,7 @@ class HPOFlagging(DatasetStage):
         gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
 
         job = get_batch().new_job(f'Label phenotype matches: {dataset.name}')
-        job.cpu(2.0).memory('highmem').image(image_path('talos'))
+        job.cpu(2.0).memory('highmem').image(image_path('talos')).storage('20Gi')
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
