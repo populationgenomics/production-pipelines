@@ -22,27 +22,34 @@ from cpg_workflows.workflow import (
 )
 
 
-def mock_cohort() -> Cohort:
-    c = Cohort()
+def mock_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
+    ds = c.create_dataset('my_dataset')
+    sg1 = ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+    m_ds = m.add_dataset(ds)
+    m_ds.add_sequencing_group_object(sg1)
+    return m
+
+
+def mock_multidataset_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
 
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-
-    return c
-
-
-def mock_multidataset_cohort() -> Cohort:
-    c = Cohort()
-
-    ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
+    sg1 = ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+    sg2 = ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
+    m_ds_1 = m.add_dataset(ds)
+    m_ds_1.add_sequencing_group_object(sg1)
+    m_ds_1.add_sequencing_group_object(sg2)
 
     ds2 = c.create_dataset('my_dataset2')
-    ds2.add_sequencing_group('CPGCC', external_id='SAMPLE3')
-    ds2.add_sequencing_group('CPGDD', external_id='SAMPLE4')
-
-    return c
+    sg3 = ds2.add_sequencing_group('CPGCC', external_id='SAMPLE3')
+    sg4 = ds2.add_sequencing_group('CPGDD', external_id='SAMPLE4')
+    m_ds_2 = m.add_dataset(ds2)
+    m_ds_2.add_sequencing_group_object(sg3)
+    m_ds_2.add_sequencing_group_object(sg4)
+    return m
 
 
 def mock_multicohort() -> MultiCohort:
