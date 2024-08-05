@@ -16,7 +16,6 @@ from cpg_utils import to_path
 from cpg_utils.config import dataset_path, reference_path
 from cpg_utils.hail_batch import init_batch
 
-
 CHROMS = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY']
 
 # Set up logging
