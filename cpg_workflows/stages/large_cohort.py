@@ -5,7 +5,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import ExpectedResultT, slugify, tshirt_mt_sizing
+from cpg_workflows.utils import slugify, tshirt_mt_sizing
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
@@ -16,22 +16,44 @@ def relatedness_version() -> str:
     """
     generate the relatedness version
     """
-    if relatedness_version := config_retrieve(['large_cohort', 'output_versions', 'relatedness'], default=None):
-        return slugify(relatedness_version)
-    else:
+    if not (relatedness_str := config_retrieve(['large_cohort', 'output_versions', 'relatedness'], default=None)):
         return get_workflow().output_version
+    return slugify(relatedness_str)
+
+
+@cache
+def sample_qc_version() -> str:
+    """
+    generate the sample_qc version
+    """
+    if not (sample_qc_str := config_retrieve(['large_cohort', 'output_versions', 'sample_qc'], default=None)):
+        return get_workflow().output_version
+    return slugify(sample_qc_str)
+
+
+@cache
+def vds_version() -> str:
+    if not (vds_version_str := get_config()['workflow'].get('vds_version')):
+        return get_workflow().output_version
+    vds_version_str = slugify(vds_version_str)
+    if not vds_version_str.startswith('v'):
+        vds_version_str = f'v{vds_version_str}'
+    return vds_version_str
+
+@cache
+def dense_subset_version() -> str:
+    """
+    generate the dense_subset version
+    """
+    if not (dense_subset_str := config_retrieve(['large_cohort', 'output_versions', 'dense_subset'], default=None)):
+        return get_workflow().output_version
+    return slugify(dense_subset_str)
 
 
 @stage(required_stages=[Genotype])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if vds_version := get_config()['workflow'].get('vds_version'):
-            vds_version = slugify(vds_version)
-            if not vds_version.startswith('v'):
-                vds_version = f'v{vds_version}'
-
-        vds_version = vds_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
+        return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version()}.vds'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
@@ -70,12 +92,7 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if sample_qc_version := config_retrieve(['large_cohort', 'output_versions', 'sample_qc'], default=None):
-            sample_qc_version = slugify(sample_qc_version)
-
-        sample_qc_version = sample_qc_version or get_workflow().output_version
-        sample_qc_path = cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version / 'sample_qc.ht'
-        return sample_qc_path
+        return cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'sample_qc.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
@@ -101,14 +118,7 @@ class SampleQC(CohortStage):
 @stage(required_stages=[Combiner])
 class DenseSubset(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if dense_subset_version := config_retrieve(['large_cohort', 'output_versions', 'dense_subset'], default=None):
-            dense_subset_version = slugify(dense_subset_version)
-
-        dense_subset_version = dense_subset_version or get_workflow().output_version
-        dense_subset_path = (
-            cohort.analysis_dataset.prefix() / get_workflow().name / dense_subset_version / 'dense_subset.mt'
-        )
-        return dense_subset_path
+        return cohort.analysis_dataset.prefix() / get_workflow().name / dense_subset_version() / 'dense_subset.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import dense_subset
