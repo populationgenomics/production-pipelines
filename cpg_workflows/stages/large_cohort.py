@@ -225,7 +225,7 @@ class RelatednessFlag(CohortStage):
         sample_qc_ht_name = sample_qc_ht_path.split('/')[-1]
 
         # localise the Dense MT
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {prcrelate_mt_path} $BATCH_TMPDIR')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {sample_qc_ht_path} $BATCH_TMPDIR')
 
         # how many cores do we need?
         required_cpu: int = config_retrieve(['RelatednessFlag', 'cores'], 8)
