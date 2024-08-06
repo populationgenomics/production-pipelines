@@ -71,9 +71,12 @@ def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.V
     sequencing_groups = _check_gvcfs(sequencing_groups)
     seq_types = set(s.sequencing_type for s in sequencing_groups)
     if len(seq_types) > 1:
-        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
-        logging.warning(
-            f'Found multiple sequencing types for large cohort combiner: {seq_types}, using the config-provided {sequencing_type}',
+        by_seq_type = collections.defaultdict(list)
+        for s in sequencing_groups:
+            by_seq_type[s.sequencing_type].append(s.id)
+
+        raise ValueError(
+            f'Found multiple sequencing types for large cohort combiner: {by_seq_type}',
         )
     # else just use the first
     sequencing_type = seq_types.pop()
