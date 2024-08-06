@@ -5,7 +5,7 @@ Test building Workflow object.
 from unittest import mock
 
 from cpg_utils import Path, to_path
-from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_workflows.workflow import path_walk
 
 from . import set_config
@@ -36,12 +36,14 @@ backend = 'local'
 """
 
 
-def mock_deprecated_create_cohort() -> Cohort:
-    c = Cohort()
+def mock_deprecated_create_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
     ds = c.create_dataset('my_dataset')
+    m_ds = m.add_dataset(ds)
 
     def add_sg(id, external_id):
-        ds.add_sequencing_group(
+        return ds.add_sequencing_group(
             id=id,
             external_id=external_id,
             sequencing_type='genome',
@@ -49,9 +51,11 @@ def mock_deprecated_create_cohort() -> Cohort:
             sequencing_platform='illumina',
         )
 
-    add_sg('CPGAA', external_id='SAMPLE1')
-    add_sg('CPGBB', external_id='SAMPLE2')
-    return c
+    sg1 = add_sg('CPGAA', external_id='SAMPLE1')
+    sg2 = add_sg('CPGBB', external_id='SAMPLE2')
+    m_ds.add_sequencing_group_object(sg1)
+    m_ds.add_sequencing_group_object(sg2)
+    return m
 
 
 @mock.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)

@@ -846,15 +846,16 @@ def test_custom_cohort(mocker: MockFixture, tmp_path, monkeypatch):
 
     from cpg_workflows.inputs import get_multicohort
 
-    cohort = get_multicohort()
+    multicohort = get_multicohort()
 
-    assert cohort
-    assert isinstance(cohort, MultiCohort)
+    assert multicohort
+    assert isinstance(multicohort, MultiCohort)
 
     # Testing Cohort Information
-    assert len(cohort.get_sequencing_groups()) == 2
-    assert cohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA']
+    assert len(multicohort.get_sequencing_groups()) == 2
+    assert sorted(multicohort.get_sequencing_group_ids()) == ['CPGAAAA', 'CPGXXXX']
 
     # Test the projects they belong to
-    assert cohort.get_sequencing_groups()[0].dataset.name == 'projecta'
-    assert cohort.get_sequencing_groups()[1].dataset.name == 'projectb'
+    ds_map = {'CPGAAAA': 'projectb', 'CPGXXXX': 'projecta'}
+    for sg in multicohort.get_sequencing_groups():
+        assert sg.dataset.name == ds_map[sg.id]

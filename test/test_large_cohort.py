@@ -21,7 +21,7 @@ from cpg_workflows.large_cohort import (
     sample_qc,
     site_only_vcf,
 )
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import MultiCohort
 
 from . import set_config
 from .factories.config import HailConfig, PipelineConfig, StorageConfig, WorkflowConfig
@@ -101,8 +101,10 @@ def create_config(
 
 
 def _mock_cohort(dataset_id: str):
-    cohort = Cohort()
+    mc = MultiCohort()
+    cohort = mc.create_cohort('large-cohort-test')
     dataset = cohort.create_dataset(dataset_id)
+    mc_dataset = mc.add_dataset(dataset)
     gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
     found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
     assert len(found_gvcf_paths) > 0, gvcf_root
@@ -116,7 +118,8 @@ def _mock_cohort(dataset_id: str):
             sequencing_platform='illumina',
         )
         sequencing_group.gvcf = GvcfPath(gvcf_path)
-    return cohort
+        mc_dataset.add_sequencing_group_object(sequencing_group)
+    return mc
 
 
 class TestAllLargeCohortMethods:
