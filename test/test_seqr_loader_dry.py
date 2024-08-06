@@ -130,12 +130,14 @@ def _mock_cohort():
     multi_cohort = MultiCohort()
     cohort = multi_cohort.create_cohort('test-analysis-dataset')
     ds = cohort.create_dataset('test-analysis-dataset')
-    ds.add_sequencing_group(
+    mc_dataset = multi_cohort.add_dataset(ds)
+    sg1 = ds.add_sequencing_group(
         'CPGAA',
         'SAMPLE1',
         alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
     )
-    ds.add_sequencing_group(
+    mc_dataset.add_sequencing_group_object(sg1)
+    sg2 = ds.add_sequencing_group(
         'CPGBB',
         'SAMPLE2',
         alignment_input_by_seq_type={
@@ -153,6 +155,8 @@ def _mock_cohort():
             ),
         },
     )
+    mc_dataset.add_sequencing_group_object(sg2)
+
     return multi_cohort
 
 
@@ -169,11 +173,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     Test entire seqr-loader in a dry mode.
     """
     conf = TOML.format(directory=str(tmp_path))
-    set_config(
-        conf,
-        tmp_path / 'config.toml',
-        merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG],
-    )
+    set_config(conf, tmp_path / 'config.toml', merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG])
 
     mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', _mock_cohort)
 
@@ -190,10 +190,7 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     mocker.patch('hailtop.batch.job.Job.always_run', do_nothing)
     # can't access secrets from CI environment
     mocker.patch('cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password')
-    mocker.patch(
-        'metamist.apis.AnalysisApi.create_analysis',
-        mock_create_analysis,
-    )
+    mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
     from cpg_utils.hail_batch import get_batch

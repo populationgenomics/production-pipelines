@@ -7,7 +7,7 @@ from pathlib import Path
 from pytest_mock import MockFixture
 
 from cpg_utils import to_path
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import MultiCohort
 
 from . import set_config
 
@@ -72,12 +72,16 @@ def mock_create_analysis(_, project, analysis) -> int:
     return 1  # metamist "analysis" entry ID
 
 
-def mock_deprecated_create_cohort() -> Cohort:
-    c = Cohort()
+def mock_deprecated_create_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBBB', external_id='SAMPLE2')
-    return c
+    m_ds = m.add_dataset(ds)
+    sg1 = ds.add_sequencing_group('CPGAAA', external_id='SAMPLE1')
+    m_ds.add_sequencing_group_object(sg1)
+    sg2 = ds.add_sequencing_group('CPGBBB', external_id='SAMPLE2')
+    m_ds.add_sequencing_group_object(sg2)
+    return m
 
 
 def test_attributes(mocker: MockFixture, tmp_path):
