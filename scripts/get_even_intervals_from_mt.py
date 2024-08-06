@@ -157,7 +157,7 @@ def get_intervals_from_ht(
 
     # Stack the hail Table intervals into a single Table
     intervals_ht = hl.Table.union(*intervals)
-    intervals_by_chrom = get_intervals_from_intervals_ht(intervals_ht, n_intervals, output_intervals_path)
+    intervals_by_chrom = get_intervals_from_intervals_ht(intervals_ht)
 
     with to_path(output_intervals_path).open('w') as f:
         json.dump(intervals_by_chrom, f)
