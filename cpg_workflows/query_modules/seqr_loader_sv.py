@@ -218,7 +218,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     # add end_locus, with flexibility for END2
     if 'END2' in mt.info:
         mt = mt.annotate_rows(
-            hl.if_else(
+            end_locus=hl.if_else(
                 hl.is_defined(mt.info.END2),
                 hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
                 hl.struct(contig=mt.locus.contig, position=mt.info.END),
