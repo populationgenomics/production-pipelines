@@ -203,13 +203,12 @@ class RelatednessFlag(CohortStage):
         outputs = self.expected_outputs(cohort)
 
         # estimate required storage - I've got nothing to base this on...
-        required_storage = (
-            tshirt_mt_sizing(
-                sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-                cohort_size=len(cohort.get_sequencing_group_ids()),
-            )
-            * 2
-        )
+        t_shirt_size_value = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
+        ).split('Gi')[0]
+        required_storage_value = int(t_shirt_size_value) * 2
+        required_storage = f'{required_storage_value}Gi'
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness Sample Flagging stage: {cohort.name}')
