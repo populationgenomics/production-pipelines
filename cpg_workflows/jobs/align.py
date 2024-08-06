@@ -153,10 +153,10 @@ def align(
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
+    if sequencing_group.sequencing_type == 'genome':
         realignment_shards_num = 10
     else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
+        assert sequencing_group.sequencing_type == 'exome'
         realignment_shards_num = 1
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1

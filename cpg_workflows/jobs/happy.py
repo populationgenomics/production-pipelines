@@ -57,7 +57,7 @@ def happy(
         """
 
     # Calling regions
-    seq_type = get_config()['workflow']['sequencing_type']
+    seq_type = sequencing_group.sequencing_type
     eval_intervals_path = reference_path(f'broad/{seq_type}_evaluation_interval_lists')
     if seq_type == 'genome':
         # sparse regions, bcftools would loop through them
