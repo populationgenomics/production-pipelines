@@ -7,7 +7,14 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
+
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -21,7 +28,7 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.utils import exists
 from metamist import models
 from metamist.apis import AnalysisApi
-from metamist.exceptions import ApiException
+from metamist.exceptions import ApiException, ServiceException
 from metamist.graphql import gql, query
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
@@ -259,6 +266,49 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
+        retry=retry_if_exception_type(ServiceException),
+        reraise=True,
+    )
+    def make_retry_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi with retries.
+        Retry only if ServiceException is thrown
+
+        TODO: How many retries?
+        e.g. try 3 times, wait 2^3: 8, 16, 24 seconds
+        """
+        try:
+            return api_func(**kwargv)
+        except ServiceException:
+            # raise here so the retry occurs
+            logging.warning(
+                f'Retrying {api_func} ...',
+            )
+            raise
+
+    def make_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi.
+        This is a wrapper around retry of API call to handle exceptions and logging.
+        """
+        try:
+            return self.make_retry_aapi_call(api_func, **kwargv)
+        except (ServiceException, ApiException) as e:
+            # Metamist API failed even after retries
+            # log the error and continue
+            traceback.print_exc()
+            logging.error(
+                f'Error: {e} Call {api_func} failed with payload:\n{str(kwargv)}',
+            )
+        # TODO: discuss should we catch all here as well?
+        # except Exception as e:
+        #     # Other exceptions?
+
+        return None
+
     def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
         """
         Retrieve the sequencing groups per dataset for a list of cohort IDs.
@@ -316,13 +366,15 @@ class Metamist:
         """
         Update "status" of an Analysis entry.
         """
-        try:
-            self.aapi.update_analysis(
-                analysis.id,
-                models.AnalysisUpdateModel(status=models.AnalysisStatus(status.value)),
-            )
-        except ApiException:
-            traceback.print_exc()
+        self.make_aapi_call(
+            self.aapi.update_analysis,
+            analysis_id=analysis.id,
+            analysis_update_model=models.AnalysisUpdateModel(
+                status=models.AnalysisStatus(status.value),
+            ),
+        )
+        # Keeping this as is for compatibility with the existing code
+        # However this should only be set after the API call is successful
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
@@ -337,16 +389,19 @@ class Metamist:
         metamist_proj = dataset or self.default_dataset
         if get_config()['workflow']['access_level'] == 'test':
             metamist_proj += '-test'
-        try:
-            data = self.aapi.get_latest_complete_analysis_for_type(
-                project=metamist_proj,
-                analysis_type=models.AnalysisType('joint-calling'),
-            )
-        except ApiException:
+
+        data = self.make_aapi_call(
+            self.aapi.get_latest_complete_analysis_for_type,
+            project=metamist_proj,
+            analysis_type=models.AnalysisType('joint-calling'),
+        )
+        if data is None:
             return None
+
         a = Analysis.parse(data)
         if not a:
             return None
+
         assert a.type == AnalysisType.JOINT_CALLING, data
         assert a.status == AnalysisStatus.COMPLETED, data
         if a.sequencing_group_ids != set(sequencing_group_ids):
@@ -430,10 +485,15 @@ class Metamist:
             sequencing_group_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
-        try:
-            aid = self.aapi.create_analysis(project=metamist_proj, analysis=am)
-        except ApiException:
-            traceback.print_exc()
+        aid = self.make_aapi_call(
+            self.aapi.create_analysis,
+            project=metamist_proj,
+            analysis=am,
+        )
+        if aid is None:
+            logging.error(
+                f'Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
+            )
             return None
         else:
             logging.info(
@@ -637,11 +697,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         index_location = None
         if reads_data[0].get('secondaryFiles'):
             index_location = reads_data[0]['secondaryFiles'][0]['location']
-            if (
-                location.endswith('.cram')
-                and not index_location.endswith('.crai')
-                or location.endswith('.bai')
-                and not index_location.endswith('.bai')
+            if (location.endswith('.cram') and not index_location.endswith('.crai')) or (
+                location.endswith('.bam') and not index_location.endswith('.bai')
             ):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: expected the index file to have an extension '

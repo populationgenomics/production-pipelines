@@ -34,6 +34,7 @@ setup(
         'bokeh',
         'numpy',
         'click',
+        'tenacity',
         'toml',
     ],
     extras_require={
