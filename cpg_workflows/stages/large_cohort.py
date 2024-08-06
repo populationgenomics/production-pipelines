@@ -5,7 +5,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify, tshirt_mt_sizing
+from cpg_workflows.utils import slugify, tshirt_mt_sizing, ExpectedResultT
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
@@ -39,6 +39,7 @@ def vds_version() -> str:
     if not vds_version_str.startswith('v'):
         vds_version_str = f'v{vds_version_str}'
     return vds_version_str
+
 
 @cache
 def dense_subset_version() -> str:
@@ -141,7 +142,7 @@ class DenseSubset(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-@stage(required_stages=DenseSubset, analysis_keys=['relatedness_ht'], analysis_type='mt')  # is MT an analysis type?
+@stage(required_stages=DenseSubset, analysis_keys=['relatedness_ht'], analysis_type='custom')
 class RelatednessPCRelate(CohortStage):
     """
     This is the first step of the Relatedness Stage, without Dataproc
@@ -197,8 +198,8 @@ class RelatednessPCRelate(CohortStage):
 @stage(
     required_stages=[SampleQC, RelatednessPCRelate],
     analysis_keys=['relateds_to_drop'],
-    analysis_type='mt',
-)  # not HT
+    analysis_type='custom',
+)
 class RelatednessFlag(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -255,16 +256,167 @@ class RelatednessFlag(CohortStage):
         return self.make_outputs(cohort, outputs, job)
 
 
+@stage(required_stages=[DenseSubset, SampleQC])
+class AncestryAddBackground(CohortStage):
+    """
+    optional stage, runs if we need to annotate with background datasets
+    """
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'bg_qc_ht': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'sample_qc.ht',
+            'bg_dense_mt': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'dense.mt',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        # no datasets, no running
+        if not config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            return self.make_outputs(target=cohort)
+
+        # inputs
+        dense_mt_path = inputs.as_path(cohort, DenseSubset)
+        sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
+
+        # expected outputs
+        outputs = self.expected_outputs(cohort)
+
+        # job runs QOB, shouldn't need many resources itself
+        job = get_batch().new_job('Add Ancestry Background')
+        job.storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
+        job.command(
+            f'ancestry_add_background '
+            f'--qc_in {str(sample_qc_ht_path)} '
+            f'--dense_in {str(dense_mt_path)} '
+            f'--qc_out {str(outputs["bg_qc_ht"])} '
+            f'--dense_out {str(outputs["bg_dense_mt"])} '
+            f'--tmp {str(self.tmp_prefix)} '
+        )
+
+        return self.make_outputs(target=cohort, jobs=job, data=outputs)
+
+
+@stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset, AncestryAddBackground])
+class AncestryPCA(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        ancestry_prefix = get_workflow().prefix / 'ancestry'
+        return {
+            'scores': ancestry_prefix / 'scores.ht',
+            'eigenvalues': ancestry_prefix / 'eigenvalues.ht',
+            'loadings': ancestry_prefix / 'loadings.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+
+        # decide which stage to pull input from
+        if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            dense_mt_path = str(inputs.as_path(cohort, AncestryAddBackground, 'bg_dense_mt'))
+
+        else:
+            dense_mt_path = str(inputs.as_path(cohort, DenseSubset))
+            # sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
+
+        # negligible amount of storage for this one
+        related = str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'))
+
+        # big job
+        job = get_batch().new_bash_job('Run Ancestry PCA')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.storage('50gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
+
+        # localise the Dense MT
+        dense_name = dense_mt_path.split('/')[-1]
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {dense_mt_path} $BATCH_TMPDIR')
+
+        # localise the relatedness HT
+        related_name = related.split('/')[-1]
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {related} $BATCH_TMPDIR')
+
+        # run the command
+        job.command(
+            'ancestry_pca '
+            f'--dense_mt "${{BATCH_TMPDIR}}/{dense_name}" '
+            f'--related "${{BATCH_TMPDIR}}/{related_name}" '
+            f'--scores_out {job.scores} '
+            f'--eigen_out {job.eigen} '
+            f'--loadings_out {job.loadings} ',
+        )
+
+        # copy 3 tables out
+        outputs = self.expected_outputs(cohort)
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.scores} {str(outputs["scores"])}')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.eigen} {str(outputs["eigenvalues"])}')
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.loadings} {str(outputs["loadings"])}')
+
+        return self.make_outputs(target=cohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=[AncestryPCA, SampleQC, AncestryAddBackground])
+class AncestryInfer(CohortStage):
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+
+        ancestry_prefix = get_workflow().prefix / 'ancestry'
+        return {
+            'inferred_pop': ancestry_prefix / 'inferred_pop.ht',
+            'sample_qc_ht': ancestry_prefix / 'sample_qc_ht.ht',
+            'pickled_model': ancestry_prefix / 'pop.RF_fit.pickle',
+            'inference_txt': ancestry_prefix / 'RF_pop_assignments.txt.gz',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            sample_qc_ht_path = str(inputs.as_path(cohort, AncestryAddBackground, 'bg_qc_ht'))
+        else:
+            sample_qc_ht_path = str(inputs.as_path(cohort, SampleQC))
+        scores_table = str(inputs.as_path(cohort, AncestryPCA, 'scores'))
+
+        # big job
+        job = get_batch().new_bash_job('Run Ancestry PCA')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.storage('50gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
+
+        sample_qc_name = sample_qc_ht_path.split('/')[-1]
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {sample_qc_ht_path} $BATCH_TMPDIR')
+
+        scores_name = scores_table.split('/')[-1]
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {scores_table} $BATCH_TMPDIR')
+
+        # run the command
+        job.command(
+            'ancestry_infer_labels '
+            f'--scores_ht "${{BATCH_TMPDIR}}/{scores_name}" '
+            f'--qc_in "${{BATCH_TMPDIR}}/{sample_qc_name}" '
+            f'--qc_out {job.qc} '
+            f'--ht_out {job.ht} '
+            f'--pickle_out {job.pickle} '
+            f'--txt_out {job.txt} ',
+        )
+
+        outputs = self.expected_outputs(cohort)
+
+        # copy out the scores HT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.ht} {str(outputs["inferred_pop"])}')
+
+        # copy out the sample QC HT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.qc} {str(outputs["sample_qc_ht"])}')
+
+        # and copy the other single files
+        get_batch().write_output(job.pickle, str(outputs['pickled_model']))
+        get_batch().write_output(job.txt, str(outputs['inference_txt']))
+
+        return self.make_outputs(cohort, data=outputs, jobs=job)
+
+
 @stage(required_stages=[SampleQC, DenseSubset, RelatednessFlag])
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return dict(
-            scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
-            eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
-            loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
-            inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
-        )
+        ancestry_prefix = get_workflow().prefix / 'ancestry'
+        return {
+            'scores': ancestry_prefix / 'scores.ht',
+            'eigenvalues': ancestry_prefix / 'eigenvalues.ht',
+            'loadings': ancestry_prefix / 'loadings.ht',
+            'inferred_pop': ancestry_prefix / 'inferred_pop.ht',
+            'sample_qc_ht': ancestry_prefix / 'sample_qc_ht.ht',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort.ancestry_pca import run

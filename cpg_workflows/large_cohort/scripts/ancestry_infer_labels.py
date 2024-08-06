@@ -35,29 +35,36 @@ def cli_main():
 
     parser = ArgumentParser()
     parser.add_argument('--scores_ht', help='The PCA scores HT')
-    parser.add_argument('--sample_qc', help='The SampleQC HT')
-    parser.add_argument('--pop_ht_out', help='population table output path')
-    parser.add_argument('--pop_pickle_out', help='population model output path')
-    parser.add_argument('--pop_txt_out', help='population inference output path')
+    parser.add_argument('--qc_in', help='The SampleQC HT to read')
+    parser.add_argument('--qc_out', help='The updated SampleQC HT to write')
+    parser.add_argument('--ht_out', help='population table output path')
+    parser.add_argument('--pickle_out', help='population model output path')
+    parser.add_argument('--txt_out', help='population inference output path')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    main(scores_ht_path=args.scores_ht, sample_qc_in=args.sample_qc, pop_out=args.pop_out)
+    main(
+        scores_ht_path=args.scores_ht,
+        qc_in=args.qc_in,
+        qc_out=args.qc_out,
+        pop_ht_out=args.pop_ht_out,
+        pickle_out=args.pickle_out,
+        txt_out=args.txt_out,
+    )
 
 
-def main(scores_ht_path: str, sample_qc_in: str, sample_qc_out: str, pop_out: str, pickle_out: str):
+def main(scores_ht_path: str, qc_in: str, qc_out: str, pop_ht_out: str, pickle_out: str, txt_out: str):
     """
 
     Args:
         scores_ht_path ():
-        sample_qc_in ():
-        sample_qc_out ():
-        pop_out ():
-        pickle_out (str): where to write the model. pickled
-
-    Returns:
-
+        qc_in (): where to read SampleQC HT from
+        qc_out (): where to write updated SampleQC table
+        pop_ht (): where to write the population table
+        pickle_out (): where to write the model, pickled
+        txt_out (): where to write population inference, text.gz
     """
+
     min_prob = config_retrieve(['large_cohort', 'min_pop_prob'])
     n_pcs = config_retrieve(['large_cohort', 'n_pcs'], 16)
 
@@ -66,7 +73,7 @@ def main(scores_ht_path: str, sample_qc_in: str, sample_qc_out: str, pop_out: st
     hl.default_reference('GRCh38')
 
     scores_ht = hl.read_table(scores_ht_path)
-    sample_qc_ht = hl.read_table(sample_qc_in)
+    sample_qc_ht = hl.read_table(qc_in)
 
     training_pop_ht = sample_qc_ht.filter(hl.is_defined(sample_qc_ht['training_pop']))
 
@@ -99,17 +106,18 @@ def main(scores_ht_path: str, sample_qc_in: str, sample_qc_out: str, pop_out: st
 
     # Writing a tab delimited file indicating inferred sample populations
     pc_cnt = min(hl.min(10, hl.len(pop_ht.pca_scores)).collect())
-    pop_ht.transmute(**{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}).export(str(pop_tsv_file))
+    pop_ht.transmute(**{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}).export(txt_out)
 
     # Writing the RF model used for inferring sample populations
     with open(pickle_out, 'wb', encoding='utf-8') as handle:
         pickle.dump(pops_rf_model, handle)
 
-    pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key])).write(pop_out, overwrite=True)
+    pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key])).write(pop_ht_out)
     # read this version back in
-    pop_ht = hl.read_table(pop_out)
+    pop_ht = hl.read_table(pop_ht_out)
 
-    sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key]).write(sample_qc_out)
+    # update contents and write out
+    sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key]).write(qc_out)
 
 
 if __name__ == '__main__':

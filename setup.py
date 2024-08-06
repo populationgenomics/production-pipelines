@@ -73,6 +73,8 @@ setup(
             'ancestry_add_background = cpg_workflows.large_cohort.scripts.ancestry_add_background:cli_main',
             # the Background Stage of Ancestry - PCA
             'ancestry_pca = cpg_workflows.large_cohort.scripts.ancestry_run_pca:cli_main',
+            # the Background Stage of Ancestry - Infer Population Labels
+            'ancestry_infer_labels = cpg_workflows.large_cohort.scripts.ancestry_infer_labels:cli_main',
         ],
     },
 )
