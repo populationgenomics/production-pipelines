@@ -215,9 +215,15 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     # flexibly draw annotations depending on whether the VCF has them - this is for compatibility with Long-Read & GATK
     # this can all be removed if/when Long-read is removed to a separate pipeline
 
-    # add end_locus, with flexity for END2
+    # add end_locus, with flexibility for END2
     if 'END2' in mt.info:
-        mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.info.CHR2, position=mt.info.END2))
+        mt = mt.annotate_rows(
+            end_locus=hl.if_else(
+                hl.is_defined(mt.info.END2),
+                hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
+                hl.struct(contig=mt.locus.contig, position=mt.info.END),
+            ),
+        )
     else:
         mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.locus.contig, position=mt.info.END))
 

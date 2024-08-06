@@ -61,14 +61,28 @@ def _common(mocker, tmp_path):
 
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
 
-    from cpg_workflows.targets import Cohort
+    from cpg_workflows.targets import MultiCohort
 
-    def mock_create_cohort() -> Cohort:
-        c = Cohort()
+    def mock_create_cohort() -> MultiCohort:
+        m = MultiCohort()
+        c = m.create_cohort('fewgenomes')
         ds = c.create_dataset('my_dataset')
-        ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-        ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
-        return c
+        m_ds = m.add_dataset(ds)
+
+        def add_sg(id, external_id):
+            return ds.add_sequencing_group(
+                id,
+                external_id=external_id,
+                sequencing_type='genome',
+                sequencing_technology='short-read',
+                sequencing_platform='illumina',
+            )
+
+        sg1 = add_sg('CPGAA', external_id='SAMPLE1')
+        sg2 = add_sg('CPGBB', external_id='SAMPLE2')
+        m_ds.add_sequencing_group_object(sg1)
+        m_ds.add_sequencing_group_object(sg2)
+        return m
 
     mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_create_cohort)
 
