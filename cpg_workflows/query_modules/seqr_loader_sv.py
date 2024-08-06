@@ -222,7 +222,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
                 hl.is_defined(mt.info.END2),
                 hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
                 hl.struct(contig=mt.locus.contig, position=mt.info.END),
-            )
+            ),
         )
     else:
         mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.locus.contig, position=mt.info.END))
