@@ -81,7 +81,7 @@ def mock_multicohort() -> MultiCohort:
     sg1 = add_sg(ds, 'CPGXXXX', external_id='SAMPLE1')
     sg2 = add_sg(ds, 'CPGAAAA', external_id='SAMPLE2')
     dm1.add_sequencing_group_object(sg1)
-    dm1.add_sequencing_group_object(ds.add_sequencing_group('CPGAAAA', external_id='SAMPLE2'))
+    dm1.add_sequencing_group_object(sg2)
 
     ds2 = cohort_a.create_dataset('projectc')
     dm2 = mc.add_dataset(ds2)
