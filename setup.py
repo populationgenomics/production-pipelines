@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.26.3',
+    version='1.26.4',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -34,6 +34,7 @@ setup(
         'bokeh',
         'numpy',
         'click',
+        'tenacity',
         'toml',
     ],
     extras_require={

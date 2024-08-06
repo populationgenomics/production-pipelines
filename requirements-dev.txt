@@ -5,3 +5,4 @@ black
 pytest
 pytest_mock
 mypy
+tenacity
