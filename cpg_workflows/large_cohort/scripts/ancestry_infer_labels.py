@@ -8,9 +8,8 @@ from argparse import ArgumentParser
 
 import hail as hl
 
-from gnomad.sample_qc.ancestry import assign_population_pcs
-
 from cpg_utils.config import config_retrieve
+from gnomad.sample_qc.ancestry import assign_population_pcs
 
 MAX_MISLABELLED_TRAINING_SAMPLES: int = 50
 

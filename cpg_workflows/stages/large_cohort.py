@@ -5,7 +5,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify, tshirt_mt_sizing, ExpectedResultT
+from cpg_workflows.utils import ExpectedResultT, slugify, tshirt_mt_sizing
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
@@ -261,6 +261,7 @@ class AncestryAddBackground(CohortStage):
     """
     optional stage, runs if we need to annotate with background datasets
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'bg_qc_ht': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'sample_qc.ht',
@@ -288,7 +289,7 @@ class AncestryAddBackground(CohortStage):
             f'--dense_in {str(dense_mt_path)} '
             f'--qc_out {str(outputs["bg_qc_ht"])} '
             f'--dense_out {str(outputs["bg_dense_mt"])} '
-            f'--tmp {str(self.tmp_prefix)} '
+            f'--tmp {str(self.tmp_prefix)} ',
         )
 
         return self.make_outputs(target=cohort, jobs=job, data=outputs)

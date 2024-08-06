@@ -105,7 +105,8 @@ def add_background(dense_mt: hl.MatrixTable, sample_qc_ht: hl.Table, tmp_path: s
             )
             logging.info(f'Finished filtering background, kept samples that are {populations_to_filter}')
         if background_relateds_to_drop := config_retrieve(
-            ['large_cohort', 'pca_background', dataset, 'background_relateds_to_drop'], False
+            ['large_cohort', 'pca_background', dataset, 'background_relateds_to_drop'],
+            False,
         ):
             logging.info(
                 f'Removing related samples from background dataset {dataset}.\n'
