@@ -11,7 +11,6 @@ from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_re
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
-_cohort: Cohort | None = None
 _multicohort: MultiCohort | None = None
 
 
@@ -23,15 +22,15 @@ def actual_get_multicohort() -> MultiCohort:
     return _multicohort
 
 
-def deprecated_get_cohort() -> Cohort:
+def deprecated_get_cohort() -> MultiCohort:
     """Return the cohort object"""
-    global _cohort
-    if not _cohort:
-        _cohort = deprecated_create_cohort()
-    return _cohort
+    global _multicohort
+    if not _multicohort:
+        _multicohort = deprecated_create_cohort()
+    return _multicohort
 
 
-def get_multicohort() -> Cohort | MultiCohort:
+def get_multicohort() -> MultiCohort:
     """
     Return the cohort or multicohort object based on the workflow configuration.
     """
@@ -41,7 +40,7 @@ def get_multicohort() -> Cohort | MultiCohort:
         raise ValueError('Cannot use both custom_cohort_ids and input_datasets in the same workflow')
 
     # NOTE: When configuring sgs in the config is deprecated, this will be removed.
-    if config_retrieve(['workflow', 'input_cohorts'], []):
+    if custom_cohort_ids:
         if not isinstance(custom_cohort_ids, list):
             raise ValueError('input_cohorts must be a list')
         return actual_get_multicohort()
@@ -62,14 +61,31 @@ def create_multicohort() -> MultiCohort:
     for cohort_id in custom_cohort_ids:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
+        # TODO (mwelland): future optimisation following closure of #860
+        # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
+        # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
         _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
+
+    # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
+    # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
+    # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
+    for cohort in multicohort.get_cohorts():
+        for dataset in cohort.get_datasets():
+            # is this dataset already in the multicohort, if so use it, otherwise add this one
+            mc_dataset = multicohort.add_dataset(dataset)
+            for sg in dataset.get_sequencing_groups():
+                # add each SG object to the MultiCohort level Dataset
+                mc_dataset.add_sequencing_group_object(sg)
 
     return multicohort
 
 
 def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
     """
-    Add datasets in the cohort. There exists only one cohort for the workflow run.
+    Add datasets in the cohort.
+    TODO (mwelland): future optimisation following closure of #860
+    TODO (mwelland): The Cohort object should not care about the Datasets it contains
+    TODO (mwelland): so we can lose a layer of the structure here
     """
     for dataset_name in sgs_by_dataset_for_cohort.keys():
         dataset = cohort.create_dataset(dataset_name)
@@ -81,11 +97,15 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
+            # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),
                 meta=metadata,
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
             )
 
             if reported_sex := entry['sample']['participant'].get('reportedSex'):
@@ -96,13 +116,16 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     if not cohort.get_datasets():
         raise MetamistError('No datasets populated')
 
+    # TODO (mwelland): future optimisation following closure of #860
+    # TODO (mwelland): this should be done one Dataset at a time, not per Dataset per Cohort
+    # TODO (mwelland): by querying per-dataset per-cohort we increase the number of identical requests
     _populate_analysis(cohort)
     if read_pedigree:
         _populate_pedigree(cohort)
     assert cohort.get_sequencing_groups()
 
 
-def deprecated_create_cohort() -> Cohort:
+def deprecated_create_cohort() -> MultiCohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
     """
@@ -121,10 +144,17 @@ def deprecated_create_cohort() -> Cohort:
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
 
-    cohort = Cohort()
+    # create a MultiCohort object to hold the datasets & cohorts
+    multi_cohort = MultiCohort()
+
+    # this is the deprecated entrypoint, so all SG IDs are in the same cohort
+    # maintains ability to run CohortStages and MultiCohortStages without
+    # explicitly requiring workflows to update to MultiCohort
+    cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
+        mc_dataset = multi_cohort.add_dataset(dataset)
         sgs = get_metamist().get_sg_entries(dataset_name)
 
         for entry in sgs:
@@ -133,10 +163,14 @@ def deprecated_create_cohort() -> Cohort:
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
+            # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
                 meta=metadata,
             )
 
@@ -144,6 +178,10 @@ def deprecated_create_cohort() -> Cohort:
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
             _populate_alignment_inputs(sequencing_group, entry)
+
+            # add the same SG Object directly to the MultiCohort level Dataset
+            # this object exists in both the MC.Cohort and MC.Dataset
+            mc_dataset.add_sequencing_group_object(sequencing_group)
 
     if not cohort.get_datasets():
         msg = 'No datasets populated'
@@ -153,11 +191,14 @@ def deprecated_create_cohort() -> Cohort:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
+    # TODO (mwelland): future optimisation following closure of #860
+    # TODO (mwelland): _populate_analysis should expect a Dataset, not a Cohort
+    # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
     _populate_analysis(cohort)
     if config.get('read_pedigree', True):
         _populate_pedigree(cohort)
-    assert cohort.get_sequencing_groups()
-    return cohort
+    assert multi_cohort.get_sequencing_groups()
+    return multi_cohort
 
 
 def _combine_assay_meta(assays: list[Assay]) -> dict:
@@ -183,20 +224,19 @@ def _populate_alignment_inputs(
     Populate sequencing inputs for a sequencing group
     """
     assays: list[Assay] = []
-    for assay in entry['assays']:
+
+    for assay in entry.get('assays', []):
         _assay = Assay.parse(assay, sequencing_group.id, run_parse_reads=False)
         assays.append(_assay)
 
-    # Check only one assay type per sequencing group
-    assert len(set([assay.assay_type for assay in assays])) == 1
-    sequencing_group.assays[assays[0].assay_type] = tuple(assays)
+    sequencing_group.assays = tuple(assays)
 
-    if len(entry['assays']) > 1:
+    if len(assays) > 1:
         _assay_meta = _combine_assay_meta(assays)
     else:
         _assay_meta = assays[0].meta
-        if _assay_meta.get('reads'):
-            _assay_meta['reads'] = [_assay_meta['reads']]
+        if _reads := _assay_meta.get('reads'):
+            _assay_meta['reads'] = [_reads]
 
     if _assay_meta.get('reads'):
         alignment_input = parse_reads(
@@ -204,7 +244,7 @@ def _populate_alignment_inputs(
             assay_meta=_assay_meta,
             check_existence=check_existence,
         )
-        sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
+        sequencing_group.alignment_input = alignment_input
     else:
         logging.warning(f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}')
 

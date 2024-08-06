@@ -12,13 +12,6 @@ the Talos default config file here:
 [cohorts.DATASET_NAME]
 - cohort_panels, list[int], PanelApp panel IDs to apply to this project. By
   default, only the Mendeliome (137) is applied to all analyses.
-- gene_prior, str, path to gene prior file to use for this project. When
-  identifying Cat 2 (new disease-gene associations), the gene prior is used
-  to determine whether a gene is novel or not. In ongoing analysis the gene
-  prior used is the PanelApp result from the previous analysis.
-- clinvar_filter, list[str], any clinvar submitters to filter out
-  for this dataset (to blind this Talos run to its own clinvar entries).
-  Note, this is not currently included in this workflow
 
 [cohorts.DATASET_NAME.genome]  # repeated for exome if appropriate
 - DATASET_NAME is taken from config[workflow][dataset]
@@ -44,8 +37,10 @@ Generates:
     - PED file for this cohort (extended format, with additional columns for Ext. ID and HPO terms)
     - Latest panels found through HPO matches against this cohort
     - PanelApp results
+    - A mapping of all the Gene IDs in PanelApp to their Gene Symbol
     - Category-labelled VCF
     - Talos results JSON (metamist `aip-results` analysis)
+    - Talos results + phenotype-match annotation
     - Talos report HTML (metamist `aip-report` analysis)
 
 This will have to be run using Full permissions as we will need to reference data in test and main buckets.
@@ -54,14 +49,15 @@ This will have to be run using Full permissions as we will need to reference dat
 from datetime import datetime
 from functools import lru_cache
 from os.path import join
+from random import randint
 
 import toml
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
-from cpg_workflows.resources import HIGHMEM, STANDARD
-from cpg_workflows.utils import get_logger
+from cpg_workflows.resources import STANDARD
+from cpg_workflows.utils import get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
@@ -227,8 +223,10 @@ class MakeRuntimeConfig(DatasetStage):
         new_config: dict = {
             'categories': config_retrieve(['categories']),
             'GeneratePanelData': config_retrieve(['GeneratePanelData']),
+            'FindGeneSymbolMap': config_retrieve(['FindGeneSymbolMap']),
             'RunHailFiltering': config_retrieve(['RunHailFiltering']),
             'ValidateMOI': config_retrieve(['ValidateMOI']),
+            'HPOFlagging': config_retrieve(['HPOFlagging']),
             'CreateTalosHTML': {},
         }
 
@@ -293,7 +291,10 @@ class GeneratePED(DatasetStage):
 
         # mandatory argument
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
-        job.command(f'TALOS_CONFIG={conf_in_batch} GeneratePED {query_dataset} {job.output} {seq_type}')
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        # insert a little stagger
+        job.command(f'sleep {randint(0, 30)}')
+        job.command(f'GeneratePED {query_dataset} {job.output} {seq_type}')
         get_batch().write_output(job.output, str(expected_out["pedigree"]))
         get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
 
@@ -324,12 +325,11 @@ class GeneratePanelData(DatasetStage):
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
         local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
-        job.command(
-            f'TALOS_CONFIG={conf_in_batch} GeneratePanelData '
-            f'-i {local_ped} '
-            f'--hpo {hpo_file} '
-            f'--out {job.output}',
-        )
+
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        # insert a little stagger
+        job.command(f'sleep {randint(0, 30)}')
+        job.command(f'GeneratePanelData -i {local_ped} --hpo {hpo_file} --out {job.output}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -354,12 +354,37 @@ class QueryPanelapp(DatasetStage):
 
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
         expected_out = self.expected_outputs(dataset)
-        job.command(
-            f'TALOS_CONFIG={conf_in_batch} QueryPanelapp '
-            f'--panels {get_batch().read_input(str(hpo_panel_json))} '
-            f'--out_path {job.output}',
-        )
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        # insert a little stagger
+        job.command(f'sleep {randint(0, 30)}')
+        job.command(f'QueryPanelapp --panels {get_batch().read_input(str(hpo_panel_json))} --out_path {job.output}')
         get_batch().write_output(job.output, str(expected_out['panel_data']))
+
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
+
+
+@stage(required_stages=[MakeRuntimeConfig, QueryPanelapp])
+class FindGeneSymbolMap(DatasetStage):
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {'symbol_lookup': dataset.prefix() / DATED_FOLDER / 'symbol_to_ensg.json'}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
+        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+
+        panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+        expected_out = self.expected_outputs(dataset)
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        # insert a little stagger
+        job.command(f'sleep {randint(0, 30)}')
+        job.command(f'FindGeneSymbolMap --panelapp {panel_json} --out_path {job.output}')
+
+        get_batch().write_output(job.output, str(expected_out['symbol_lookup']))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -386,10 +411,12 @@ class RunHailFiltering(DatasetStage):
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one
         # Genomes are more like 500GB
-        seq_type: str = config_retrieve(['workflow', 'sequencing_type'], 'genome')
-        required_storage: int = config_retrieve(['hail', 'storage', seq_type], 500)
+        required_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(dataset.get_sequencing_group_ids()),
+        )
         required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
-        HIGHMEM.set_resources(job, ncpu=required_cpu, storage_gb=required_storage)
+        job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
@@ -419,8 +446,9 @@ class RunHailFiltering(DatasetStage):
         mt_name = input_mt.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
 
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
-            f'TALOS_CONFIG={conf_in_batch} RunHailFiltering '
+            'RunHailFiltering '
             f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
@@ -470,8 +498,9 @@ class RunHailFilteringSV(DatasetStage):
 
             # copy the mt in
             job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
+            job.command(f'export TALOS_CONFIG={conf_in_batch}')
             job.command(
-                f'TALOS_CONFIG={conf_in_batch} RunHailFilteringSV '
+                'RunHailFilteringSV '
                 f'--mt "${{BATCH_TMPDIR}}/{sv_file}" '
                 f'--panelapp {panelapp_json} '
                 f'--pedigree {local_ped} '
@@ -492,8 +521,6 @@ class RunHailFilteringSV(DatasetStage):
         RunHailFilteringSV,
         MakeRuntimeConfig,
     ],
-    analysis_type='aip-results',  # note - legacy analysis type
-    analysis_keys=['summary_json'],
 )
 class ValidateMOI(DatasetStage):
     """
@@ -535,8 +562,9 @@ class ValidateMOI(DatasetStage):
             **{'vcf.bgz': str(hail_inputs['labelled_vcf']), 'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi'},
         )['vcf.bgz']
 
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
-            f'TALOS_CONFIG={conf_in_batch} ValidateMOI '
+            'ValidateMOI '
             f'--labelled_vcf {labelled_vcf} '
             f'--out_json {job.output} '
             f'--panelapp {panel_input} '
@@ -550,7 +578,55 @@ class ValidateMOI(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, ValidateMOI, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
+    required_stages=[MakeRuntimeConfig, FindGeneSymbolMap, ValidateMOI],
+    analysis_type='aip-results',
+    analysis_keys=['pheno_annotated', 'pheno_filtered'],
+)
+class HPOFlagging(DatasetStage):
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {
+            'pheno_annotated': dataset.prefix() / DATED_FOLDER / 'pheno_annotated_report.json',
+            'pheno_filtered': dataset.prefix() / DATED_FOLDER / 'pheno_filtered_report.json',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        outputs = self.expected_outputs(dataset)
+
+        # TODO IDK, get these from config?
+        phenio_db = get_batch().read_input(config_retrieve(['HPOFlagging', 'phenio_db']))
+        gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
+
+        job = get_batch().new_job(f'Label phenotype matches: {dataset.name}')
+        job.cpu(2.0).memory('highmem').image(image_path('talos')).storage('20Gi')
+
+        # use the new config file
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        conf_in_batch = get_batch().read_input(runtime_config)
+
+        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
+        gene_map = get_batch().read_input(str(inputs.as_dict(dataset, FindGeneSymbolMap)['symbol_lookup']))
+
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        job.command(
+            'HPOFlagging '
+            f'--results {results_json} '
+            f'--gene_map {gene_map} '
+            f'--gen2phen {gene_to_phenotype} '
+            f'--phenio {phenio_db} '
+            f'--out {job.output} '
+            f'--phenout {job.phenout} ',
+        )
+
+        get_batch().write_output(job.output, str(outputs['pheno_annotated']))
+        get_batch().write_output(job.phenout, str(outputs['pheno_filtered']))
+
+        return self.make_outputs(target=dataset, jobs=job, data=outputs)
+
+
+@stage(
+    required_stages=[GeneratePED, HPOFlagging, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     tolerate_missing_output=True,
@@ -570,14 +646,15 @@ class CreateTalosHTML(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
+        results_json = get_batch().read_input(str(inputs.as_dict(dataset, HPOFlagging)['pheno_annotated']))
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
         expected_out = self.expected_outputs(dataset)
 
-        # this will still try to write directly out - latest is optional, and splitting is arbitrary
-        # Hail can't handle optional outputs being copied out AFAIK
+        # this will write output files directly to GCP
+        # report splitting is arbitrary, so can't be reliably done in Hail
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
         command_string = (
-            f'TALOS_CONFIG={conf_in_batch} CreateTalosHTML '
+            'CreateTalosHTML '
             f'--results {results_json} '
             f'--panelapp {panel_input} '
             f'--output {str(expected_out["results_html"])} '
@@ -634,8 +711,9 @@ class GenerateSeqrFile(DatasetStage):
         conf_in_batch = get_batch().read_input(runtime_config)
 
         lookup_in_batch = get_batch().read_input(seqr_lookup)
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
-            f'TALOS_CONFIG={conf_in_batch} GenerateSeqrFile '
+            'GenerateSeqrFile '
             f'{input_localised} '
             f'{job.out_json} '
             f'{job.pheno_json} '

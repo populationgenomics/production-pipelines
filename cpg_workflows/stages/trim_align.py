@@ -27,8 +27,7 @@ def get_trim_inputs(sequencing_group: SequencingGroup) -> FastqPairs | None:
     """
     Get the input FASTQ file pairs for trimming
     """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
+    alignment_input = sequencing_group.alignment_input
     if (
         not alignment_input
         or (get_config()['workflow'].get('check_inputs', True) and not alignment_input.exists())

@@ -2,10 +2,11 @@
 single-sample components of the GATK SV workflow
 """
 
+import json
 import logging
 from typing import Any
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import sample_batching
@@ -235,26 +236,33 @@ class CreateSampleBatches(MultiCohortStage):
         if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
             raise RuntimeError('This workflow is not intended for Exome data')
 
-        sequencing_groups = {
-            sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
-        }
-
-        qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
-        # get those settings
+        # get the batch size parameters
         min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)
         max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
 
+        # Get the sequencing groups
+        sequencing_groups = {
+            sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
+        }
         if len(sequencing_groups) < min_batch_size:
             logging.error('Too few sequencing groups to form batches')
             raise RuntimeError('too few samples to create batches')
+
+        # write them to a json file in tmp
+        sgs_json_path = to_path(self.tmp_prefix / 'sgs_meta.json')
+        with sgs_json_path.open('w') as f:
+            json.dump(sequencing_groups, f)
+
+        # Get the QC tables for each input cohort
+        qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
 
         py_job = get_batch().new_python_job('create_sample_batches')
         py_job.image(config_retrieve(['workflow', 'driver_image']))
         py_job.call(
             sample_batching.partition_batches,
             qc_tables,
-            sequencing_groups,
-            expected['batch_json'],
+            sgs_json_path,
+            str(expected['batch_json']),
             min_batch_size,
             max_batch_size,
         )

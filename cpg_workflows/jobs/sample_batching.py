@@ -194,7 +194,7 @@ def add_sg_meta_fields(sg_df: pd.DataFrame, sg_meta: dict[str, dict]) -> pd.Data
 
 def partition_batches(
     metadata_files: list[str],
-    sequencing_groups: dict[str, dict],
+    sequencing_groups_json: str,
     output_json: str,
     min_batch_size: int,
     max_batch_size: int,
@@ -208,7 +208,7 @@ def partition_batches(
 
     Args:
         metadata_files (list[str]): paths to the metadata files
-        sequencing_groups (dict[str, dict]): all SGs in scope with their meta
+        sequencing_groups_json (str): path to json of all SGs with their meta
         output_json (str): location to write the batch result
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
@@ -220,6 +220,10 @@ def partition_batches(
     # load in the metadata files
     md = pd.concat([pd.read_csv(md_file, sep='\t', low_memory=False) for md_file in metadata_files])
     md.columns = [x.replace('#', '') for x in md.columns]  # type: ignore
+
+    # load the sequencing groups
+    with to_path(sequencing_groups_json).open('r') as f:
+        sequencing_groups = json.load(f)
 
     # filter to the PCR-state SGs we're interested in
     sample_ids = list(sequencing_groups.keys())

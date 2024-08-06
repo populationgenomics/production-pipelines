@@ -19,7 +19,7 @@ import hail as hl
 from hailtop.batch import ResourceFile
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 
 LOGGER: logging.Logger | None = None
 
@@ -300,6 +300,29 @@ def rich_sequencing_group_id_seds(
             cmd += f'sed -iBAK \'s/{sgid}/{rich_sgid}/g\' {fname}'
             cmd += '\n'
     return cmd
+
+
+def tshirt_mt_sizing(sequencing_type: str, cohort_size: int) -> str:
+    """
+    Some way of taking the details we have (#SGs, sequencing type)
+    and producing an estimate (with padding) of the MT size on disc
+    used to determine VM provision during ES export and Talos
+
+    Args:
+        sequencing_type ():
+        cohort_size ():
+
+    Returns:
+        str, the value for job.storage(X)
+    """
+
+    # allow for an override from config
+    if preset := config_retrieve(['workflow', 'es_storage'], False):
+        return preset
+
+    if (sequencing_type == 'genome' and cohort_size < 100) or (sequencing_type == 'exome' and cohort_size < 1000):
+        return '50Gi'
+    return '500Gi'
 
 
 ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]

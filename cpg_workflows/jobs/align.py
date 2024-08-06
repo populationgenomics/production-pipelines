@@ -75,8 +75,7 @@ class MissingAlignmentInputException(Exception):
 def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     """Given a sequencing group, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
+    alignment_input = sequencing_group.alignment_input
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')

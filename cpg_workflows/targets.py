@@ -46,13 +46,7 @@ class Target:
         whether the analysis on the target needs to be rerun.
         """
         s = ' '.join(
-            sorted(
-                [
-                    ' '.join(sorted(str(alignment_input) for alignment_input in s.alignment_input_by_seq_type.values()))
-                    for s in self.get_sequencing_groups()
-                    if s.alignment_input_by_seq_type
-                ],
-            ),
+            sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
         return f'{h}_{len(self.get_sequencing_group_ids())}'
@@ -108,13 +102,14 @@ class MultiCohort(Target):
         # NOTE: For a cohort, we simply pull the dataset name from the config.
         input_cohorts = get_config()['workflow'].get('input_cohorts', [])
         if input_cohorts:
-            cohorts_string = '_'.join(sorted(input_cohorts))
-
-        self.name = cohorts_string or get_config()['workflow']['dataset']
+            self.name = '_'.join(sorted(input_cohorts))
+        else:
+            self.name = get_config()['workflow']['dataset']
 
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
         self._cohorts_by_name: dict[str, Cohort] = {}
+        self._datasets_by_name: dict[str, Dataset] = {}
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
 
     def __repr__(self):
@@ -155,25 +150,24 @@ class MultiCohort(Target):
         Gets list of all datasets.
         Include only "active" datasets (unless only_active is False)
         """
-        datasets = []
-        for cohort in self.get_cohorts(only_active):
-            datasets.extend(cohort.get_datasets(only_active))
-        return datasets
+        all_datasets = list(self._datasets_by_name.values())
+        if only_active:
+            all_datasets = [d for d in all_datasets if d.active and d.get_sequencing_groups()]
+        return all_datasets
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
-        Gets a flat list of all sequencing groups from all cohorts.
+        Gets a flat list of all sequencing groups from all datasets.
+        uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
         Include only "active" sequencing groups (unless only_active is False)
         """
-        all_sequencing_groups = []
-        for cohort in self.get_cohorts(only_active):
-            all_sequencing_groups.extend(cohort.get_sequencing_groups(only_active))
-        return all_sequencing_groups
+        all_sequencing_groups: dict[str, SequencingGroup] = {}
+        for dataset in self.get_datasets(only_active):
+            for sg in dataset.get_sequencing_groups(only_active):
+                all_sequencing_groups[sg.id] = sg
+        return list(all_sequencing_groups.values())
 
-    def create_cohort(
-        self,
-        name: str,
-    ):
+    def create_cohort(self, name: str):
         """
         Create a cohort and add it to the multi-cohort.
         """
@@ -184,6 +178,26 @@ class MultiCohort(Target):
         c = Cohort(name=name, multicohort=self)
         self._cohorts_by_name[c.name] = c
         return c
+
+    def add_dataset(self, d: 'Dataset') -> 'Dataset':
+        """
+        Add a Dataset to the MultiCohort
+        Args:
+            d: Dataset object
+        """
+        if d.name in self._datasets_by_name:
+            logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
+        else:
+            self._datasets_by_name[d.name] = d
+        return self._datasets_by_name[d.name]
+
+    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" datasets (unless only_active is False)
+        """
+        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
+        return ds_by_name.get(name)
 
     def get_job_attrs(self) -> dict:
         """
@@ -298,10 +312,7 @@ class Cohort(Target):
         self._datasets_by_name[dataset.name] = dataset
         return dataset
 
-    def create_dataset(
-        self,
-        name: str,
-    ) -> 'Dataset':
+    def create_dataset(self, name: str) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
         """
@@ -464,12 +475,16 @@ class Dataset(Target):
     def add_sequencing_group(
         self,
         id: str,  # pylint: disable=redefined-builtin
+        *,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sequencing_platform: str,
         external_id: str | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Optional['Sex'] = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
+        alignment_input: AlignmentInput | None = None,
     ) -> 'SequencingGroup':
         """
         Create a new sequencing group and add it to the dataset.
@@ -485,15 +500,29 @@ class Dataset(Target):
             id=id,
             dataset=self,
             external_id=external_id,
+            sequencing_type=sequencing_type,
+            sequencing_technology=sequencing_technology,
+            sequencing_platform=sequencing_platform,
             participant_id=participant_id,
             meta=meta,
             sex=sex,
             pedigree=pedigree,
-            alignment_input_by_seq_type=alignment_input_by_seq_type,
+            alignment_input=alignment_input,
             forced=forced,
         )
         self._sequencing_group_by_id[id] = s
         return s
+
+    def add_sequencing_group_object(self, s: 'SequencingGroup'):
+        """
+        Add a sequencing group object to the dataset.
+        Args:
+            s: SequencingGroup object
+        """
+        if s.id in self._sequencing_group_by_id:
+            logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
+            return self._sequencing_group_by_id[s.id]
+        self._sequencing_group_by_id[s.id] = s
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -575,19 +604,27 @@ class SequencingGroup(Target):
         self,
         id: str,  # pylint: disable=redefined-builtin
         dataset: 'Dataset',  # type: ignore  # noqa: F821
+        *,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sequencing_platform: str,
         external_id: str | None = None,
         participant_id: str | None = None,
         meta: dict | None = None,
         sex: Sex | None = None,
         pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input_by_seq_type: dict[str, AlignmentInput] | None = None,
-        assays: dict[str, tuple[Assay, ...]] | None = None,
+        alignment_input: AlignmentInput | None = None,
+        assays: tuple[Assay, ...] | None = None,
         forced: bool = False,
     ):
         super().__init__()
         self.id = id
         self.name = id
         self._external_id = external_id
+        self.sequencing_type = sequencing_type
+        self.sequencing_technology = sequencing_technology
+        self.sequencing_platform = sequencing_platform
+
         self.dataset = dataset
         self._participant_id = participant_id
         self.meta: dict = meta or dict()
@@ -598,8 +635,8 @@ class SequencingGroup(Target):
         )
         if sex:
             self.pedigree.sex = sex
-        self.alignment_input_by_seq_type: dict[str, AlignmentInput] = alignment_input_by_seq_type or dict()
-        self.assays: dict[str, tuple[Assay, ...]] = assays or {}
+        self.alignment_input: AlignmentInput | None = alignment_input
+        self.assays: tuple[Assay, ...] | None = assays
         self.forced = forced
         self.active = True
         # Only set if the file exists / found in Metamist:
@@ -609,12 +646,13 @@ class SequencingGroup(Target):
     def __repr__(self):
         values = {
             'participant': self._participant_id if self._participant_id else '',
+            'sequencing_type': self.sequencing_type,
+            'sequencing_technology': self.sequencing_technology,
+            'sequencing_platform': self.sequencing_platform,
             'forced': str(self.forced),
             'active': str(self.active),
             'meta': str(self.meta),
-            'alignment_inputs': ','.join(
-                [f'{seq_t}: {al_inp}' for seq_t, al_inp in self.alignment_input_by_seq_type.items()],
-            ),
+            'alignment_inputs': self.alignment_input,
             'pedigree': self.pedigree,
         }
         retval = f'SequencingGroup({self.dataset.name}/{self.id}'
@@ -624,15 +662,16 @@ class SequencingGroup(Target):
 
     def __str__(self):
         ai_tag = ''
-        for seq_type, alignment_input in self.alignment_input_by_seq_type.items():
-            ai_tag += f'|SEQ={seq_type}:'
-            if isinstance(alignment_input, CramPath):
+        if self.alignment_input:
+            ai_tag += f'|SEQ={self.sequencing_type}:'
+            if isinstance(self.alignment_input, CramPath):
                 ai_tag += 'CRAM'
-            elif isinstance(alignment_input, BamPath):
+            elif isinstance(self.alignment_input, BamPath):
                 ai_tag += 'BAM'
+            elif isinstance(self.alignment_input, FastqPairs):
+                ai_tag += f'{len(self.alignment_input)}FQS'
             else:
-                assert isinstance(alignment_input, FastqPairs)
-                ai_tag += f'{len(alignment_input)}FQS'
+                raise ValueError(f'Unrecognised alignment input type {type(self.alignment_input)}')
 
         ext_id = f'|{self._external_id}' if self._external_id else ''
         return f'SequencingGroup({self.dataset.name}/{self.id}{ext_id}{ai_tag})'

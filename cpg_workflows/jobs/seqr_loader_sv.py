@@ -2,7 +2,6 @@
 Hail Query Batch-Backend jobs for seqr-loader.
 """
 
-from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
