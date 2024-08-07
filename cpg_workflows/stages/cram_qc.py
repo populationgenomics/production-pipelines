@@ -189,7 +189,10 @@ class SomalierPedigree(DatasetStage):
         else:
             html_url = None
 
-        if any(sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()):
+        if any(sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()) or config_retrieve(
+            ['workflow', 'force_somalier_pedigree'],
+            False,
+        ):
             expected_ped_path = dataset.write_ped_file(self.expected_outputs(dataset)['expected_ped'])
             jobs = somalier.pedigree(
                 b=get_batch(),
