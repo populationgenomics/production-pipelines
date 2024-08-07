@@ -8,6 +8,7 @@ from os.path import join
 
 import hail as hl
 
+from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
@@ -25,12 +26,12 @@ def prepare_background_mt(data_path: str, dataset: str, qc_variants_ht: hl.Table
     """
     background_mt_checkpoint_path = join(tmp_path, f'{dataset}_densified_background.mt')
 
-    if data_path.endswith('.mt'):
+    if to_path(data_path).suffix == '.mt':
         background_mt = hl.read_matrix_table(data_path)
         background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
         background_mt = background_mt.semi_join_rows(qc_variants_ht)
         return background_mt.densify().checkpoint(background_mt_checkpoint_path, overwrite=True)
-    elif data_path.endswith('.vds'):
+    elif to_path(data_path).suffix == '.vds':
         background_vds = hl.vds.read_vds(data_path)
         background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
         background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
