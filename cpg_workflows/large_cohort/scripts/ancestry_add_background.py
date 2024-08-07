@@ -41,11 +41,11 @@ def prepare_background_mt(data_path: str, dataset: str, qc_variants_ht: hl.Table
         raise ValueError('Background dataset path must be either .mt or .vds')
 
 
-def prepare_metadata_table(table_list: list[str], sample_qc_ht: hl.Table) -> hl.Table:
+def prepare_metadata_table(background_sample_qc_paths: list[str], sample_qc_ht: hl.Table) -> hl.Table:
     """
 
     Args:
-        table_list ():
+        background_sample_qc_paths ():
         sample_qc_ht (hl.Table):
 
     Returns:
@@ -54,7 +54,7 @@ def prepare_metadata_table(table_list: list[str], sample_qc_ht: hl.Table) -> hl.
     # annotate background mt with metadata info derived from SampleQC stage
     allow_missing_columns = config_retrieve(['large_cohort', 'pca_background', 'allow_missing_columns'], False)
     metadata_tables = []
-    for path in table_list:
+    for path in background_sample_qc_paths:
         metadata_tables.append(hl.read_table(path))
 
     metadata_table = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
