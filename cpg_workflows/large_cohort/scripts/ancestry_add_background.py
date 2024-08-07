@@ -12,7 +12,7 @@ from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
 
-def prepare_background_mt(data_path: str, qc_variants_ht: hl.Table, tmp_path) -> hl.MatrixTable:
+def prepare_background_mt(data_path: str, dataset: str, qc_variants_ht: hl.Table, tmp_path) -> hl.MatrixTable:
     """
 
     Args:
@@ -23,7 +23,7 @@ def prepare_background_mt(data_path: str, qc_variants_ht: hl.Table, tmp_path) ->
     Returns:
         A densified MT, checkpointed
     """
-    background_mt_checkpoint_path = join(tmp_path, 'densified_background.mt')
+    background_mt_checkpoint_path = join(tmp_path, f'{dataset}_densified_background.mt')
 
     if data_path.endswith('.mt'):
         background_mt = hl.read_matrix_table(data_path)
@@ -31,7 +31,6 @@ def prepare_background_mt(data_path: str, qc_variants_ht: hl.Table, tmp_path) ->
         background_mt = background_mt.semi_join_rows(qc_variants_ht)
         return background_mt.densify().checkpoint(background_mt_checkpoint_path, overwrite=True)
     elif data_path.endswith('.vds'):
-        background_mt_checkpoint_path = join(tmp_path, 'densified_background.mt')
         background_vds = hl.vds.read_vds(data_path)
         background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
         background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
@@ -93,7 +92,7 @@ def add_background(dense_mt: hl.MatrixTable, sample_qc_ht: hl.Table, tmp_path: s
         logging.info(f'Adding background dataset {dataset_dict["dataset_path"]}')
 
         # prepare the background MT, from either a Mt or VDS
-        background_mt = prepare_background_mt(dataset_dict['dataset_path'], qc_variants_ht, tmp_path=tmp_path)
+        background_mt = prepare_background_mt(dataset_dict['dataset_path'], dataset, qc_variants_ht, tmp_path=tmp_path)
         metadata_table = prepare_metadata_table(dataset_dict['metadata_table'], sample_qc_ht)
 
         background_mt = background_mt.annotate_cols(**metadata_table[background_mt.col_key])
