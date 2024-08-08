@@ -122,7 +122,9 @@ def add_background(dense_mt: hl.MatrixTable, sample_qc_ht: hl.Table, tmp_path: s
         # save metadata info before merging dense and background datasets
         sample_qc_ht = sample_qc_ht.union(background_mt.cols(), unify=allow_missing_columns)
 
-        background_mt = background_mt.select_entries('GT', 'GQ', 'DP', 'AD').naive_coalesce(5000)
+        background_mt = (
+            background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD').naive_coalesce(5000)
+        )
         # combine dense dataset with background population dataset
         dense_mt = dense_mt.union_cols(background_mt)
 
