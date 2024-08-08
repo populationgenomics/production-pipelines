@@ -264,8 +264,11 @@ class AncestryAddBackground(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'bg_qc_ht': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'sample_qc.ht',
-            'bg_dense_mt': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'dense.mt',
+            'bg_qc_ht': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / sample_qc_version()
+            / 'bg_sample_qc.ht',
+            'bg_dense_mt': cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version() / 'bg_dense.mt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
