@@ -73,7 +73,8 @@ def test_check_for_cohort_overlaps_fails(tmp_path):
 
     # this could also be done with pytest.raises(ValueError) as exc_info, then check that obj's attributes
     with pytest.raises(
-        ValueError, match="Overlapping cohorts fewgenomes and fewgenomes2 have overlapping SGs: {'CPGBBB'}",
+        ValueError,
+        match="Overlapping cohorts fewgenomes and fewgenomes2 have overlapping SGs: {'CPGBBB'}",
     ):
         check_for_cohort_overlaps(m)
 
