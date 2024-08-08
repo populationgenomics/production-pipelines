@@ -10,7 +10,7 @@ CHRY = 'chrY'
 CHRM = 'chrM'
 
 
-def translate_var_and_sex_to_cn(contig: str, var: str, genotype: str, sex: int) -> int:
+def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: int) -> int:
     """
     Translate a variant and sex to a CN value
     using CN==2 as a baseline, this is modified up or down based on the variant call
@@ -19,7 +19,7 @@ def translate_var_and_sex_to_cn(contig: str, var: str, genotype: str, sex: int) 
 
     Args:
         contig ():
-        var ():
+        var_type ():
         genotype (): GT string, e.g. 0/1, 0|1, 1|0
         sex (int): 0=Unknown, 1=Male, 2=Female
 
@@ -33,31 +33,24 @@ def translate_var_and_sex_to_cn(contig: str, var: str, genotype: str, sex: int) 
     global DEL
 
     # determine the baseline copy number
-    match (contig, sex):
-        case (CHRX, 1):
-            copy_number = 1
-        case (CHRY, 0):
-            copy_number = 1
-        case (CHRY, 1):
-            copy_number = 1
-        case (CHRY, 2):
-            copy_number = 0
-        case _:
-            copy_number = 2
+    # conditions where the copy number is 1
+    if sex == 1 and contig in [CHRX, CHRY]:
+        copy_number = 1
+    elif sex == 2 and contig == CHRY:
+        copy_number = 0
+    else:
+        copy_number = 2
 
-    if contig == CHRY:
-        print(f'Contig: {contig}, Sex: {sex}, Var: {var}, Genotype: {genotype}, Copy Number: {copy_number}')
-
-    if (var not in (DUP, DEL)) or contig == CHRM:
+    if (var_type not in (DUP, DEL)) or contig == CHRM:
         return copy_number
 
     # find the number of copies of the variant. Normalised variants, so only one alt
     num_alt = genotype.count('1')
 
     # reduce or increase the copy number based on the genotype, depending on the variant type
-    if var == DUP:
+    if var_type == DUP:
         copy_number += num_alt
-    elif var == DEL:
+    elif var_type == DEL:
         copy_number -= num_alt
     return copy_number
 
@@ -159,10 +152,10 @@ def modify_sniffles_vcf(
             sv_type = info_dict['SVTYPE']
 
             # pull out the GT section of the FORMAT field
-            genotype_string = dict(zip(l_split[8].split(':'), l_split[9].split(':')))['GT']
+            gt_string = dict(zip(l_split[8].split(':'), l_split[9].split(':')))['GT']
 
             # determine the copy number, based on deviation from the baseline
-            copy_number = translate_var_and_sex_to_cn(contig=chrom, var=sv_type, genotype=genotype_string, sex=sex)
+            copy_number = translate_var_and_sex_to_cn(contig=chrom, var_type=sv_type, genotype=gt_string, sex=sex)
 
             # update the FORMAT schema field
             l_split[8] = f'{l_split[8]}:CN'
