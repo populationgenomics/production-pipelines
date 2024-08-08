@@ -214,7 +214,7 @@ class MtToEs(DatasetStage):
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
 
-        job.cpu(4).storage(required_storage).memory('lowmem')
+        job.cpu(4).storage(f'{required_storage}Gi').memory('lowmem')
 
         # localise the MT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
