@@ -5,7 +5,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import ExpectedResultT, slugify, tshirt_mt_sizing
+from cpg_workflows.utils import slugify, tshirt_mt_sizing
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
