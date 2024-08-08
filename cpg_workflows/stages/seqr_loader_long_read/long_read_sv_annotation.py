@@ -89,7 +89,6 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         # find the vcf for this SG
         query_result = query_for_sv_vcfs(dataset_name=sg.dataset.name)
 
-        sex = sg.pedigree.sex
         expected_outputs = self.expected_outputs(sg)
 
         # instead of handling, we should probably just exclude this and run again
@@ -114,7 +113,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             f'--vcf_out {mod_job.output} '
             f'--ext_id {sg.external_id} '
             f'--int_id {sg.id} '
-            f'--fa {fasta} ',
+            f'--fa {fasta} '
+            f'--sex {sg.pedigree.sex} '
         )
 
         # block-gzip and index that result
