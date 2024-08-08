@@ -8,11 +8,14 @@ import pytest
 from cpg_utils import to_path
 from cpg_workflows.jobs.sample_batching import batch_sgs
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_fasta, get_images, get_references, image_path
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import check_for_cohort_overlaps
+from cpg_workflows.targets import Dataset, MultiCohort
 
 from . import set_config
 
 TOML = """
 [workflow]
+dataset = 'fewgenomes'
 sequencing_type = 'genome'
 ref_fasta = 'this/is/the/ref.fasta'
 
@@ -26,6 +29,53 @@ sv_reference = 'gatk_sv_content'
 [references.broad]
 broad_reference = 'broad_content'
 """
+
+
+def add_sg(dset: Dataset, id, external_id):
+    return dset.add_sequencing_group(
+        id=id,
+        external_id=external_id,
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+    )
+
+
+def test_check_for_cohort_overlaps(tmp_path):
+    """
+    check that the image return works correctly
+    """
+    set_config(TOML, tmp_path / 'config.toml')
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
+    ds = c.create_dataset('my_dataset')
+
+    add_sg(ds, 'CPGAAA', external_id='SAMPLE1')
+    add_sg(ds, 'CPGBBB', external_id='SAMPLE2')
+
+    check_for_cohort_overlaps(m)
+
+
+def test_check_for_cohort_overlaps_fails(tmp_path):
+    """
+    check that the image return works correctly
+    """
+    set_config(TOML, tmp_path / 'config.toml')
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
+    ds = c.create_dataset('my_dataset')
+    c2 = m.create_cohort('fewgenomes2')
+    ds2 = c2.create_dataset('my_dataset')
+
+    add_sg(ds, 'CPGAAA', external_id='SAMPLE1')
+    add_sg(ds, 'CPGBBB', external_id='SAMPLE2')
+    add_sg(ds2, 'CPGBBB', external_id='SAMPLE2')
+
+    # this could also be done with pytest.raises(ValueError) as exc_info, then check that obj's attributes
+    with pytest.raises(
+        ValueError, match="Overlapping cohorts fewgenomes and fewgenomes2 have overlapping SGs: {'CPGBBB'}",
+    ):
+        check_for_cohort_overlaps(m)
 
 
 def test_get_images(tmp_path):
