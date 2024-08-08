@@ -29,19 +29,21 @@ def annotate_cohort(
     logging.getLogger().setLevel(logging.INFO)
 
     # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
+    # don't override the block size, as it explodes the number of partitions when processing TB+ datasets
+    # Each partition comes with some computational overhead, it's to be seen whether the standard block size
+    # is viable for QOB in large datasets... Requires a test
     mt = hl.import_vcf(
         vcf_path,
         reference_genome=genome_build(),
         skip_invalid_loci=True,
         force_bgz=True,
-        array_elements_required=False,
-        block_size=10,
+        array_elements_required=False
     )
     logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
     # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
     # and hl.split_multi_hts can handle multiallelic VEP field.
-    vep_ht = hl.read_table(str(vep_ht_path))
+    vep_ht = hl.read_table(vep_ht_path)
     logging.info(
         f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions',
     )
@@ -109,7 +111,7 @@ def annotate_cohort(
     liftover_path = reference_path('liftover_38_to_37')
     rg37 = hl.get_reference('GRCh37')
     rg38 = hl.get_reference('GRCh38')
-    rg38.add_liftover(str(liftover_path), rg37)
+    rg38.add_liftover(liftover_path, rg37)
     mt = mt.annotate_rows(rg37_locus=hl.liftover(mt.locus, 'GRCh37'))
 
     # only remove InbreedingCoeff if present (post-VQSR)
@@ -169,24 +171,26 @@ def annotate_cohort(
 
     logging.info('Done:')
     mt.describe()
-    mt.write(str(out_mt_path), overwrite=True)
+    mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written final matrix table into {out_mt_path}')
 
 
-def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str | None = None):
+def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, exclusion_file: str | None = None):
     """
     Subset the MatrixTable to the provided list of samples and to variants present
     in those samples
-    @param mt_path: cohort-level matrix table from VCF.
-    @param sample_ids: samples to take from the matrix table.
-    @param out_mt_path: path to write the result.
-    @param exclusion_file: path to a file containing samples to remove from the
-            subset prior to attempting removal
+
+    Args:
+        mt_path (str): cohort-level matrix table from VCF.
+        sample_ids (list[str]): samples to take from the matrix table.
+        out_mt_path (str): path to write the result.
+        exclusion_file (str, optional): path to a file containing samples to remove from the
+                                        subset prior to extracting
     """
 
-    mt = hl.read_matrix_table(str(mt_path))
+    mt = hl.read_matrix_table(mt_path)
 
-    sample_ids = set(sample_ids)
+    unique_sids: set[str] = set(sample_ids)
 
     # if an exclusion file was passed, remove the samples from the subset
     # this executes in a query command, by execution time the file should exist
@@ -194,33 +198,44 @@ def subset_mt_to_samples(mt_path, sample_ids, out_mt_path, exclusion_file: str |
         with hl.hadoop_open(exclusion_file) as f:
             exclusion_ids = set(f.read().splitlines())
         logging.info(f'Excluding {len(exclusion_ids)} samples from the subset')
-        sample_ids -= exclusion_ids
+        unique_sids -= exclusion_ids
 
     mt_sample_ids = set(mt.s.collect())
 
-    sample_ids_not_in_mt = sample_ids - mt_sample_ids
-    if sample_ids_not_in_mt:
+    if sample_ids_not_in_mt := unique_sids - mt_sample_ids:
         raise Exception(
-            f'Found {len(sample_ids_not_in_mt)}/{len(sample_ids)} samples '
-            f'in the subset set that do not matching IDs in the variant callset.\n'
+            f'Found {len(sample_ids_not_in_mt)}/{len(unique_sids)} IDs in the requested subset not in the callset.\n'
             f'IDs that aren\'t in the callset: {sample_ids_not_in_mt}\n'
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(sample_ids)} samples.')
+    # work out the proportion of the original sample count that we'll keep
+    downsample_ratio = len(mt_sample_ids) // len(unique_sids)
+    # calculate the proportional number of partitions to generate
+    downsample_partitions = int(mt.n_partitions() * downsample_ratio)
+
+    logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(unique_sids)} samples.')
+    logging.info(f'Re-reading the MT with {downsample_partitions} partitions, reduced from {mt.n_partitions()}')
+    # re-read instead of a repartition/naive_coalesce
+    # naive coalesce could produce really unbalanced partitions, and repartitioning might be more expensive
+    # "it's basically free to read with different partitioning than you wrote with"
+    # https://hail.zulipchat.com/#narrow/stream/123010-Hail-Query-0.2E2-support/topic/Reading.20many.20HTs/near/438846215
+    mt = hl.read_matrix_table(mt_path, _n_partitions=downsample_partitions)
 
     n_rows_before = mt.count_rows()
 
-    mt = mt.filter_cols(hl.literal(sample_ids).contains(mt.s))
+    mt = mt.filter_cols(hl.literal(unique_sids).contains(mt.s))
     mt = mt.filter_rows(hl.agg.any(mt.GT.is_non_ref()))
+    mt.write(out_mt_path, overwrite=True)
 
+    # read again to get the metadata
+    mt = hl.read_matrix_table(out_mt_path)
+    # log with row/col counts as a no-op as we read the fresh metadata
     logging.info(
-        f'Finished subsetting to {len(sample_ids)} samples. '
+        f'Finished subsetting to {len(unique_sids)} samples, written to {out_mt_path}. '
         f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
         f'{mt.count_rows()}/{n_rows_before} rows',
     )
-    mt.write(str(out_mt_path), overwrite=True)
-    logging.info(f'Written {out_mt_path}')
 
 
 def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
@@ -234,17 +249,17 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
         out_vcf_path (str): path of the vcf.bgz to generate
     """
 
-    mt = hl.read_matrix_table(str(mt_path))
+    mt = hl.read_matrix_table(mt_path)
     logging.info(f'Dataset MT dimensions: {mt.count()}')
     hl.export_vcf(mt, out_vcf_path, tabix=True)
     logging.info(f'Written {out_vcf_path}')
 
 
-def annotate_dataset_mt(mt_path, out_mt_path):
+def annotate_dataset_mt(mt_path: str, out_mt_path: str):
     """
     Add dataset-level annotations.
     """
-    mt = hl.read_matrix_table(str(mt_path))
+    mt = hl.read_matrix_table(mt_path)
 
     # Convert the mt genotype entries into num_alt, gq, ab, dp, and sample_id.
     is_called = hl.is_defined(mt.GT)
@@ -263,9 +278,7 @@ def annotate_dataset_mt(mt_path, out_mt_path):
         'sample_id': mt.s,
     }
     logging.info('Annotating genotypes')
-    mt = mt.annotate_rows(
-        genotypes=hl.agg.collect(hl.struct(**genotype_fields)),
-    )
+    mt = mt.annotate_rows(genotypes=hl.agg.collect(hl.struct(**genotype_fields)))
 
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
