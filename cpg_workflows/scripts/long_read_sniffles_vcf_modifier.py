@@ -26,11 +26,6 @@ def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: 
     Returns:
         int, the CN value (copy number)
     """
-    global CHRX
-    global CHRY
-    global CHRM
-    global DUP
-    global DEL
 
     # determine the baseline copy number
     # conditions where the copy number is 1

@@ -1,4 +1,5 @@
 import pytest
+
 from cpg_workflows.scripts.long_read_sniffles_vcf_modifier import translate_var_and_sex_to_cn
 
 
@@ -19,6 +20,7 @@ from cpg_workflows.scripts.long_read_sniffles_vcf_modifier import translate_var_
 )
 def test_calculate_cn_male(contig, var_type, gt, expected):
     assert translate_var_and_sex_to_cn(contig, var_type, gt, 1) == expected
+
 
 @pytest.mark.parametrize(
     'contig,var_type,gt,expected',
