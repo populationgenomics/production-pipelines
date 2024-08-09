@@ -11,35 +11,7 @@ import hail as hl
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
-
-
-def prepare_background_mt(data_path: str, dataset: str, qc_variants_ht: hl.Table, tmp_path) -> hl.MatrixTable:
-    """
-
-    Args:
-        data_path ():
-        qc_variants_ht ():
-        tmp_path ():
-
-    Returns:
-        A densified MT, checkpointed
-    """
-    background_mt_checkpoint_path = join(tmp_path, f'{dataset}_densified_background.mt')
-
-    if to_path(data_path).suffix == '.mt':
-        background_mt = hl.read_matrix_table(data_path)
-        background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
-        background_mt = background_mt.semi_join_rows(qc_variants_ht)
-        return background_mt.densify().checkpoint(background_mt_checkpoint_path, overwrite=True)
-    elif to_path(data_path).suffix == '.vds':
-        background_vds = hl.vds.read_vds(data_path)
-        background_vds = hl.vds.split_multi(background_vds, filter_changed_loci=True)
-        background_vds = hl.vds.filter_variants(background_vds, qc_variants_ht)
-        background_mt = hl.vds.to_dense_mt(background_vds)
-        logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
-        return background_mt.checkpoint(background_mt_checkpoint_path, overwrite=True)
-    else:
-        raise ValueError('Background dataset path must be either .mt or .vds')
+from cpg_workflows.utils import can_reuse
 
 
 def prepare_metadata_table(background_sample_qc_paths: list[str], sample_qc_ht: hl.Table) -> hl.Table:
@@ -66,13 +38,19 @@ def prepare_metadata_table(background_sample_qc_paths: list[str], sample_qc_ht: 
     return metadata_table.annotate(sample_qc=hl.struct(**ordered_sample_qc))
 
 
-def add_background(dense_mt: hl.MatrixTable, sample_qc_ht: hl.Table, tmp_path: str) -> tuple[hl.MatrixTable, hl.Table]:
+def add_background(
+    dense_mt: hl.MatrixTable,
+    sample_qc_ht: hl.Table,
+    background_datasets: dict[str, str],
+    tmp_path: str,
+) -> tuple[hl.MatrixTable, hl.Table]:
     """
     Add background dataset samples to the dense MT and sample QC HT.
 
     Args:
         dense_mt ():
         sample_qc_ht ():
+        background_datasets (list[str]): List of background dataset paths
         tmp_path (): where to generate temp data, if required
 
     Returns:
@@ -93,7 +71,7 @@ def add_background(dense_mt: hl.MatrixTable, sample_qc_ht: hl.Table, tmp_path: s
         logging.info(f'Adding background dataset {dataset_dict["dataset_path"]}')
 
         # prepare the background MT, from either a Mt or VDS
-        background_mt = prepare_background_mt(dataset_dict['dataset_path'], dataset, qc_variants_ht, tmp_path=tmp_path)
+        background_mt = hl.read_matrix_table(background_datasets[dataset])
         metadata_table = prepare_metadata_table(dataset_dict['metadata_table'], sample_qc_ht)
 
         background_mt = background_mt.annotate_cols(**metadata_table[background_mt.col_key])
@@ -144,14 +122,34 @@ def cli_main():
     parser.add_argument('--dense_in', help='The Dense MT to read in')
     parser.add_argument('--qc_out', help='The output path for the QC table')
     parser.add_argument('--dense_out', help='The output path for the dense MT')
+    parser.add_argument(
+        '--background_dataset',
+        action='append',
+        help='Key-value pairs for background datasets in the format name=path',
+    )
     parser.add_argument('--tmp', help='Path to write temporary data to')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    main(qc_in=args.qc_in, dense_in=args.dense_in, qc_out=args.qc_out, dense_out=args.dense_out, tmp_path=args.tmp)
+
+    # Parse background datasets into a dictionary
+    background_datasets = {}
+    if args.background_dataset:
+        for item in args.background_dataset:
+            name, path = item.split('=')
+            background_datasets[name] = path
+
+    main(
+        qc_in=args.qc_in,
+        dense_in=args.dense_in,
+        qc_out=args.qc_out,
+        dense_out=args.dense_out,
+        background_datasets=background_datasets,
+        tmp_path=args.tmp,
+    )
 
 
-def main(qc_in: str, dense_in: str, qc_out: str, dense_out: str, tmp_path: str):
+def main(qc_in: str, dense_in: str, qc_out: str, dense_out: str, background_datasets: dict[str, str], tmp_path: str):
     """
 
     Args:
@@ -159,6 +157,7 @@ def main(qc_in: str, dense_in: str, qc_out: str, dense_out: str, tmp_path: str):
         dense_in (str):
         qc_out (str):
         dense_out (str):
+        background_datasets (list[str]):
         tmp_path (str):
     """
 
@@ -168,7 +167,7 @@ def main(qc_in: str, dense_in: str, qc_out: str, dense_out: str, tmp_path: str):
     dense_mt = hl.read_matrix_table(dense_in).select_entries('GT', 'GQ', 'DP', 'AD')
     sample_qc_ht = hl.read_table(qc_in)
 
-    dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, tmp_path)
+    dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, background_datasets, tmp_path)
 
     logging.info(f'Writing dense_mt to {dense_out}')
     dense_mt.write(dense_out)

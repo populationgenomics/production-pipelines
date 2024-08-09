@@ -4,9 +4,9 @@ from functools import cache
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import Cohort, Dataset
 from cpg_workflows.utils import ExpectedResultT, slugify, tshirt_mt_sizing
-from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.workflow import CohortStage, DatasetStage, StageInput, StageOutput, get_workflow, stage
 
 from .genotype import Genotype
 
@@ -49,6 +49,24 @@ def dense_subset_version() -> str:
     if not (dense_subset_str := config_retrieve(['large_cohort', 'output_versions', 'dense_subset'], default=None)):
         return get_workflow().output_version
     return slugify(dense_subset_str)
+
+
+@cache
+def dense_background_vds_version() -> str:
+    """
+    generate the dense_background version
+    """
+    if not (
+        dense_bg_vds_version_str := config_retrieve(
+            ['large_cohort', 'output_versions', 'dense_background'],
+            default=None,
+        )
+    ):
+        return get_workflow().output_version
+    dense_bg_vds_version_str = slugify(dense_bg_vds_version_str)
+    if not dense_bg_vds_version_str.startswith('v'):
+        dense_bg_vds_version_str = f'v{dense_bg_vds_version_str}'
+    return dense_bg_vds_version_str
 
 
 @stage(required_stages=[Genotype])
@@ -256,7 +274,75 @@ class RelatednessFlag(CohortStage):
         return self.make_outputs(cohort, outputs, job)
 
 
-@stage(required_stages=[DenseSubset, SampleQC])
+@stage()
+class DenseBackground(CohortStage):
+    """
+    Will densify a background dataset such as 1KG, HGDP, or 1KG-HGDP
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
+        background_storage_paths: dict[str, Path] = {
+            dataset: Path(config_retrieve(['storage', dataset, 'default'])) for dataset in background_datasets
+        }
+        return {
+            bg_dataset: background_storage_paths[bg_dataset] / 'dense' / 'dense.mt'
+            for bg_dataset in background_datasets
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        # no datasets, no running
+        if not config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            return self.make_outputs(target=cohort)
+
+        # inputs
+        background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
+        background_storage_paths: list[Path] = [
+            Path(config_retrieve(['storage', dataset, 'default']) for dataset in background_datasets),
+        ]
+
+        # construct input paths
+        # TODO: Allow for input background datasets to be '.mt' files
+        background_vds_version = dense_background_vds_version()
+        input_paths = {
+            bg_dataset: background_storage_paths[i] / 'vds' / f'{background_vds_version}.vds'
+            for i, bg_dataset in enumerate(background_datasets)
+        }
+
+        job = get_batch().new_job(f'Densify {", ".join(background_datasets)} background datasets')
+        job.storage('500Gi').image(config_retrieve(['workflow', 'driver_image']))
+
+        # localise the Dense MT
+        for bacgkround_vds in input_paths.values():
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {bacgkround_vds} $BATCH_TMPDIR')
+
+        # expected outputs
+        outputs = self.expected_outputs(cohort)
+
+        # localise QC variants table
+        qc_variants_ht = config_retrieve(['references', 'ancestry', 'sites_table'])
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {qc_variants_ht} $BATCH_TMPDIR')
+
+        # jobs
+        jobs = []
+        for bg_dataset in background_datasets:
+            # localise the background VDS
+            job.command(
+                f'gcloud --no-user-output-enabled storage cp -r {str(input_paths[bg_dataset])} $BATCH_TMPDIR',
+            )
+            job.command(
+                'densify_background_dataset '
+                f'--background-vds {str(input_paths[bg_dataset])} '
+                f'--qc-variants-table {qc_variants_ht}'
+                f'--dense-out {str(outputs[f"{bg_dataset}_dense_mt"])} '
+                f'--tmp {str(self.tmp_prefix)} ',
+            )
+            jobs.append(job)
+
+        return self.make_outputs(target=cohort, jobs=jobs, data=outputs)
+
+
+@stage(required_stages=[DenseSubset, SampleQC, DenseBackground])
 class AncestryAddBackground(CohortStage):
     """
     optional stage, runs if we need to annotate with background datasets
@@ -272,16 +358,18 @@ class AncestryAddBackground(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # no datasets, no running
-        if not config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
-            return self.make_outputs(target=cohort)
-
         # inputs
         dense_mt_path = inputs.as_path(cohort, DenseSubset)
         sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
+        dense_background_mt_path_dict = inputs.as_path(cohort, DenseBackground)
 
         # expected outputs
         outputs = self.expected_outputs(cohort)
+
+        # Construct the background dataset parameters
+        background_datasets = ' '.join(
+            f'--background_dataset {name}={str(path)}' for name, path in dense_background_mt_path_dict.items()
+        )
 
         # job runs QOB, shouldn't need many resources itself
         job = get_batch().new_job('Add Ancestry Background')
@@ -292,6 +380,7 @@ class AncestryAddBackground(CohortStage):
             f'--dense_in {str(dense_mt_path)} '
             f'--qc_out {str(outputs["bg_qc_ht"])} '
             f'--dense_out {str(outputs["bg_dense_mt"])} '
+            f'{background_datasets} '
             f'--tmp {str(self.tmp_prefix)} ',
         )
 
