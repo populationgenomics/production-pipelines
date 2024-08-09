@@ -107,6 +107,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
+        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
         mod_job.command(
             'modify_sniffles '
             f'--vcf_in {local_vcf} '
@@ -114,7 +115,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             f'--ext_id {sg.external_id} '
             f'--int_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sg.pedigree.sex} ',
+            f'--sex {sex} ',
         )
 
         # block-gzip and index that result
