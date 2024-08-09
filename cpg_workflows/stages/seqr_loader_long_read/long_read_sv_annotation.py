@@ -114,7 +114,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             f'--ext_id {sg.external_id} '
             f'--int_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sg.pedigree.sex} ',
+            f'--sex {sg.sex or 0} ',
         )
 
         # block-gzip and index that result
