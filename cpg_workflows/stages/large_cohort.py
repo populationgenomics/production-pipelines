@@ -282,7 +282,9 @@ class DenseBackground(CohortStage):
         access_level = config_retrieve(['workflow', 'access_level'])
         background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
         background_storage_paths: dict[str, Path] = {
-            dataset: Path(config_retrieve(['storage', ('-').join(dataset.split(f'-{access_level}')[:-1]), 'default']))
+            dataset: to_path(
+                config_retrieve(['storage', ('-').join(dataset.split(f'-{access_level}')[:-1]), 'default']),
+            )
             for dataset in background_datasets
         }
         return {
