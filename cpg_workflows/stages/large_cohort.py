@@ -313,10 +313,6 @@ class DenseBackground(CohortStage):
         job = get_batch().new_job(f'Densify {", ".join(background_datasets)} background datasets')
         job.storage('500Gi').image(config_retrieve(['workflow', 'driver_image']))
 
-        # localise the Dense MT
-        for bacgkround_vds in input_paths.values():
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {bacgkround_vds} $BATCH_TMPDIR')
-
         # expected outputs
         outputs = self.expected_outputs(cohort)
 
@@ -333,7 +329,7 @@ class DenseBackground(CohortStage):
             job.command(
                 'densify_background_dataset '
                 f'--background-vds {str(input_paths[bg_dataset])} '
-                f'--qc-variants-table {qc_variants_ht}'
+                f'--qc-variants-table {qc_variants_ht} '
                 f'--dense-out {str(outputs[bg_dataset])} '
                 f'--tmp {str(self.tmp_prefix)} ',
             )
