@@ -290,11 +290,8 @@ class DenseBackground(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # no datasets, no running
-        if not config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+        if not (background_datasets := config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)):
             return self.make_outputs(target=cohort)
-
-        # inputs
-        background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
         background_storage_paths: list[Path] = [
             Path(config_retrieve(['storage', dataset, 'default']) for dataset in background_datasets),
         ]
