@@ -50,7 +50,12 @@ def cli_main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    main(background_vds=args.background_vds, qc_variants_table=args.qc_variants_table, tmp_path=args.tmp_path)
+    main(
+        background_vds=args.background_vds,
+        qc_variants_table=args.qc_variants_table,
+        dense_out=args.dense_out,
+        tmp_path=args.tmp_path,
+    )
 
 
 def main(background_vds: str, qc_variants_table: str, dense_out: str, tmp_path: str):
