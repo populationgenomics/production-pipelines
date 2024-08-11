@@ -292,16 +292,12 @@ class DenseBackground(CohortStage):
         # no datasets, no running
         if not (background_datasets := config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)):
             return self.make_outputs(target=cohort)
-        background_storage_paths: list[Path] = [
-            Path(config_retrieve(['storage', dataset, 'default']) for dataset in background_datasets),
-        ]
-
         # construct input paths
         # TODO: Allow for input background datasets to be '.mt' files
         background_vds_version = dense_background_vds_version()
         input_paths = {
-            bg_dataset: background_storage_paths[i] / 'vds' / f'{background_vds_version}.vds'
-            for i, bg_dataset in enumerate(background_datasets)
+            dataset: to_path(config_retrieve(['storage', dataset, 'default'])) / 'vds' / f'{background_vds_version}.vds'
+            for dataset in background_datasets
         }
 
         job = get_batch().new_job(f'Densify {", ".join(background_datasets)} background datasets')
