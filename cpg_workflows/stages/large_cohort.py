@@ -312,7 +312,6 @@ class DenseBackground(CohortStage):
 
         # localise QC variants table
         qc_variants_ht = config_retrieve(['references', 'ancestry', 'sites_table'])
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {qc_variants_ht} $BATCH_TMPDIR')
 
         # jobs
         jobs = []
