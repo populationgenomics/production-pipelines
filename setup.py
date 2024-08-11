@@ -70,7 +70,7 @@ setup(
             # the Flagging step of LargeCohort - Relatedness
             'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main',
             # the Densification of a background population dataset
-            'densify_background_dataset = cpg_worfklwos.large_cohort.scripts.densify_background_dataset:cli_main',
+            'densify_background_dataset = cpg_workflows.large_cohort.scripts.densify_background_dataset:cli_main',
             # the Background Stage of Ancestry - LargeCohort
             'ancestry_add_background = cpg_workflows.large_cohort.scripts.ancestry_add_background:cli_main',
             # the Background Stage of Ancestry - PCA
