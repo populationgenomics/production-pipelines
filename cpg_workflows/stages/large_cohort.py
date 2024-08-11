@@ -1,7 +1,7 @@
 import logging
 from functools import cache
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort
