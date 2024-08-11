@@ -279,9 +279,11 @@ class DenseBackground(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        access_level = config_retrieve(['workflow', 'access_level'])
         background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
         background_storage_paths: dict[str, Path] = {
-            dataset: Path(config_retrieve(['storage', dataset, 'default'])) for dataset in background_datasets
+            dataset: Path(config_retrieve(['storage', dataset.split(f'-{access_level}'), 'default']))
+            for dataset in background_datasets
         }
         return {
             bg_dataset: background_storage_paths[bg_dataset] / 'dense' / 'dense.mt'
