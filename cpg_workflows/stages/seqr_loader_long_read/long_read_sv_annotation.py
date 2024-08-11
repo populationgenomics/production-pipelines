@@ -79,7 +79,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
         }
 
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
         """
         a python job to change the VCF contents
         - use a python job to modify all VCF lines, in-line
@@ -87,48 +87,49 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         """
 
         # find the vcf for this SG
-        query_result = query_for_sv_vcfs(dataset_name=sequencing_group.dataset.name)
+        query_result = query_for_sv_vcfs(dataset_name=sg.dataset.name)
 
-        expected_outputs = self.expected_outputs(sequencing_group)
+        expected_outputs = self.expected_outputs(sg)
 
         # instead of handling, we should probably just exclude this and run again
-        if sequencing_group.id not in query_result:
-            raise ValueError(f'No SV VCFs recorded for {sequencing_group.id}')
+        if sg.id not in query_result:
+            raise ValueError(f'No SV VCFs recorded for {sg.id}')
 
-        lr_sv_vcf: str = query_result[sequencing_group.id]
+        lr_sv_vcf: str = query_result[sg.id]
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        modifier_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
-        modifier_job.storage('10Gi')
-        modifier_job.image(config_retrieve(['workflow', 'driver_image']))
+        mod_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
+        mod_job.storage('10Gi')
+        mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
         # mandatory argument
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
-        fasta = get_batch().read_input_group(fa=ref_fasta, fai=f'{ref_fasta}.fai')
+        fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
-        modifier_job.command(
-            f'modify_sniffles '
+        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
+        mod_job.command(
+            'modify_sniffles '
             f'--vcf_in {local_vcf} '
-            f'--vcf_out {modifier_job.output} '
-            f'--ext_id {sequencing_group.external_id} '
-            f'--int_id {sequencing_group.id} '
-            f'--fa {fasta.fa} '
-            f'--fai {fasta.fai} ',
+            f'--vcf_out {mod_job.output} '
+            f'--ext_id {sg.external_id} '
+            f'--int_id {sg.id} '
+            f'--fa {fasta} '
+            f'--sex {sex} ',
         )
 
         # block-gzip and index that result
-        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sequencing_group.id}', {'tool': 'bcftools'})
+        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {modifier_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(f'bcftools view {mod_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
         get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(target=sequencing_group, jobs=[modifier_job, tabix_job], data=expected_outputs)
+        return self.make_outputs(target=sg, jobs=[mod_job, tabix_job], data=expected_outputs)
 
 
 @stage(required_stages=ReFormatPacBioSVs)
