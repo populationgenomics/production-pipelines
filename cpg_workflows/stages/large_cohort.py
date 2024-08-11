@@ -334,7 +334,7 @@ class DenseBackground(CohortStage):
                 'densify_background_dataset '
                 f'--background-vds {str(input_paths[bg_dataset])} '
                 f'--qc-variants-table {qc_variants_ht}'
-                f'--dense-out {str(outputs[f"{bg_dataset}_dense_mt"])} '
+                f'--dense-out {str(outputs[bg_dataset])} '
                 f'--tmp {str(self.tmp_prefix)} ',
             )
             jobs.append(job)
