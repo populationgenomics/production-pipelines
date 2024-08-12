@@ -187,6 +187,7 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
         exclusion_file (str, optional): path to a file containing samples to remove from the
                                         subset prior to extracting
     """
+    logging.basicConfig(level=logging.INFO)
 
     mt = hl.read_matrix_table(mt_path)
 
