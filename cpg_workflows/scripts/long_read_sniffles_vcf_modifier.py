@@ -94,7 +94,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
             # alter the sample line in the header
             if line.startswith('#'):
                 if 'FORMAT=<ID=ID' in line:
-                    f_out.write('##FORMAT=<ID=CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
+                    f_out.write('##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
 
                 if line.startswith('#CHR') and new_id:
                     l_split = line.rstrip().split('\t')
