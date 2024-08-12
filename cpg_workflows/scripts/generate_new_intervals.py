@@ -24,9 +24,8 @@ splitting this can then jump up a bit (in a small test this was +50). This may b
 negligible on larger splits, but for smaller interval counts can be huge.
 """
 
-
-from argparse import ArgumentParser
 import logging
+from argparse import ArgumentParser
 
 import hail as hl
 
@@ -74,10 +73,7 @@ def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, i
         else:
             # if this is the final interval on this chromosome, shift the end position to the end of the chromosome
             # true if this is the latest interval on this chromosome
-            if index == len(new_intervals):
-                final_intervals.append((contig1, start, hl.get_reference('GRCh38').lengths[contig1]))
-            # or the next interval is on a different chromosome
-            elif new_intervals[index][0] != contig1:
+            if index == len(new_intervals) or new_intervals[index][0] != contig1:
                 final_intervals.append((contig1, start, hl.get_reference('GRCh38').lengths[contig1]))
             else:
                 final_intervals.append((contig1, start, end))
