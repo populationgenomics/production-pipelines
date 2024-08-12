@@ -62,7 +62,7 @@ def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, i
             # get the end of the first
             first_end = hl.get_reference('GRCh38').lengths[contig1]
             final_intervals.append((contig1, start, first_end))
-            final_intervals.append((contig2, 0, end))
+            final_intervals.append((contig2, 1, end))
         else:
             final_intervals.append((contig1, start, end))
 
