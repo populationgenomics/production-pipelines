@@ -51,24 +51,23 @@ def cli_main():
 
     logging.basicConfig(level=logging.INFO)
     main(
-        background_vds=args.background_vds,
+        background_vds_path=args.background_vds,
         qc_variants_table=args.qc_variants_table,
         dense_out=args.dense_out,
         tmp_path=args.tmp_path,
     )
 
 
-def main(background_vds: str, qc_variants_table: str, dense_out: str, tmp_path: str):
+def main(background_vds_path: str, qc_variants_table: str, dense_out: str, tmp_path: str):
     """
     Entrypoint for the densification of a background dataset
     """
 
     init_batch()
 
-    background_vds = hl.vds.read_vds(background_vds)
     qc_variants_ht = hl.read_table(qc_variants_table)
 
-    dense_background_mt = densify_background_dataset(background_vds, qc_variants_ht)
+    dense_background_mt = densify_background_dataset(background_vds_path, qc_variants_ht)
 
     logging.info(f'Writing dense background MT to {dense_out}')
     dense_background_mt.write(dense_out)
