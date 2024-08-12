@@ -134,26 +134,22 @@ def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: st
         for telo in telomeres.get(chrom, []):
             # there's an overlap
             if overlaps(telo, (start, end)):
-                found_overlap = True
                 # this is a 'start' telomere, shift the start coord
                 if telo[0] == 1:
-                    new_intervals.append((chrom, telo[1], end))
-                # otherwise shift the end coord
+                    start = telo[1]
                 else:
-                    new_intervals.append((chrom, start, telo[0]))
-                break
-        # does it overlap with a centromere?`If so split around it
+                    end = telo[0]
+        # does it overlap with a centromere? If so split around it
         if centro_region := centromeres.get(chrom):
             # check for an overlap
             if overlaps(centro_region, (start, end)):
-                found_overlap = True
                 # check we have some interval left
                 if centro_region[0] > start:
                     new_intervals.append((chrom, start, centro_region[0]))
                 if end > centro_region[1]:
                     new_intervals.append((chrom, centro_region[1], end))
-        if not found_overlap:
-            new_intervals.append((chrom, start, end))
+                continue
+        new_intervals.append((chrom, start, end))
 
     logging.info(f'Final intervals: {len(new_intervals)}')
 
@@ -172,19 +168,19 @@ def cli_main():
     main(args.mt, args.out, intervals=args.intervals, meres=args.meres_file)
 
 
-def main(mt: str, out: str, intervals: int, meres: str | None = None):
-    init_batch()
+def main(mt: str, out: str, intervals: int, meres: str):
+    hl.init(default_reference='GRCh38')
+    # init_batch()
     mt = hl.read_matrix_table(mt)
 
     # generate rough intervals based on the rows in this MT
     new_intervals = get_naive_intervals(mt, intervals)
 
     # polish the intervals by dodging centromeres and telomeres
-    if meres:
-        better_intervals = polish_intervals(new_intervals, meres)
-        with open(out, 'w') as f:
-            for contig, start, end in better_intervals:
-                f.write(f'{contig}\t{start}\t{end}\n')
+    better_intervals = polish_intervals(new_intervals, meres)
+    with open(out, 'w') as f:
+        for contig, start, end in better_intervals:
+            f.write(f'{contig}\t{start}\t{end}\n')
 
 
 if __name__ == "__main__":
