@@ -57,14 +57,30 @@ def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, i
 
     # check for cross-contig intervals, and split
     final_intervals: list[tuple[str, int, int]] = []
-    for contig1, start, contig2, end in new_intervals:
+    parsed_chroms: set[str] = set()
+    for index, (contig1, start, contig2, end) in enumerate(new_intervals, start=1):
+        # shift start position to 1, regardless of the variant positions used when generating the intervals
+        if contig1 not in parsed_chroms:
+            parsed_chroms.add(contig1)
+            start = 1
+
         if contig1 != contig2:
+            parsed_chroms.add(contig2)
             # get the end of the first
             first_end = hl.get_reference('GRCh38').lengths[contig1]
             final_intervals.append((contig1, start, first_end))
             final_intervals.append((contig2, 1, end))
+
         else:
-            final_intervals.append((contig1, start, end))
+            # if this is the final interval on this chromosome, shift the end position to the end of the chromosome
+            # true if this is the latest interval on this chromosome
+            if index == len(new_intervals):
+                final_intervals.append((contig1, start, hl.get_reference('GRCh38').lengths[contig1]))
+            # or the next interval is on a different chromosome
+            elif new_intervals[index][0] != contig1:
+                final_intervals.append((contig1, start, hl.get_reference('GRCh38').lengths[contig1]))
+            else:
+                final_intervals.append((contig1, start, end))
 
     return final_intervals
 
@@ -157,7 +173,7 @@ def main(mt: str, out: str, intervals: int, meres: str):
     # generate rough intervals based on the rows in this MT
     new_intervals = get_naive_intervals(mt, intervals)
 
-    # useful in debugging...
+    # # useful in debugging...
     # with open('naive_intervals.tsv', 'w') as f:
     #     for contig, start, end in new_intervals:
     #         f.write(f'{contig}\t{start}\t{end}\n')
