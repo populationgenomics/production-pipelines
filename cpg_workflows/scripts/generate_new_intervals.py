@@ -169,8 +169,7 @@ def cli_main():
 
 
 def main(mt: str, out: str, intervals: int, meres: str):
-    hl.init(default_reference='GRCh38')
-    # init_batch()
+    init_batch()
     mt = hl.read_matrix_table(mt)
 
     # generate rough intervals based on the rows in this MT
