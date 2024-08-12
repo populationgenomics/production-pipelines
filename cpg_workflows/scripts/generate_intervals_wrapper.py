@@ -4,7 +4,7 @@ A wrapper for the generate_new_intervals.py script
 """
 
 from cpg_utils.config import config_retrieve
-from cpg_utils.hail_batch import get_batch, authenticate_cloud_credentials_in_job
+from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 
 # some hard coded paths
 save_bed = 'gs://cpg-seqr-test/seqr_loader/new_intervals.bed'

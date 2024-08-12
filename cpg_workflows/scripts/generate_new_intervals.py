@@ -31,6 +31,7 @@ import hail as hl
 
 from cpg_utils.hail_batch import init_batch
 
+
 def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, int, int]]:
     """
     Get naive new intervals from a MatrixTable
