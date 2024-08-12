@@ -29,6 +29,7 @@ from argparse import ArgumentParser
 
 import hail as hl
 
+from cpg_utils.hail_batch import init_batch
 
 def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, int, int]]:
     """
@@ -42,6 +43,7 @@ def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, i
         list[tuple[str, int, int]]: List of intervals, in non-hail form
     """
     naive_interval_structs = mt._calculate_new_partitions(intervals)
+    logging.info(f'Generated {len(naive_interval_structs)} intervals')
 
     # store both start and end positions separately
     new_intervals = [
@@ -78,6 +80,8 @@ def get_naive_intervals(mt: hl.MatrixTable, intervals: int) -> list[tuple[str, i
             else:
                 final_intervals.append((contig1, start, end))
 
+    logging.info(f'Naive intervals post splitting: {len(final_intervals)}')
+
     return final_intervals
 
 
@@ -108,6 +112,8 @@ def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: st
     telomeres: dict[str, list[tuple[int, int]]] = {}
     centromeres: dict[str, tuple[int, int]] = {}
 
+    logging.info(f'Reading centromere and telomere regions from {meres_file}')
+
     with open(meres_file, encoding='utf-8') as f:
         for line in f:
             if line.startswith('@SQ') or line.startswith('@HD'):
@@ -120,6 +126,7 @@ def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: st
                 telomeres.setdefault(contig, []).append((int(start_str), int(end_str)))
 
     new_intervals: list[tuple[str, int, int]] = []
+    logging.info('Polishing intervals')
     for chrom, start, end in naive_intervals:
         found_overlap = False
         # does this overlap with a telomere?
@@ -147,6 +154,8 @@ def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: st
         if not found_overlap:
             new_intervals.append((chrom, start, end))
 
+    logging.info(f'Final intervals: {len(new_intervals)}')
+
     return new_intervals
 
 
@@ -162,17 +171,12 @@ def cli_main():
     main(args.mt, args.out, intervals=args.intervals, meres=args.meres_file)
 
 
-def main(mt: str, out: str, intervals: int, meres: str):
-    hl.init(default_reference='GRCh38')
+def main(mt: str, out: str, intervals: int, meres: str | None = None):
+    init_batch()
     mt = hl.read_matrix_table(mt)
 
     # generate rough intervals based on the rows in this MT
     new_intervals = get_naive_intervals(mt, intervals)
-
-    # # useful in debugging...
-    # with open('naive_intervals.tsv', 'w') as f:
-    #     for contig, start, end in new_intervals:
-    #         f.write(f'{contig}\t{start}\t{end}\n')
 
     # polish the intervals by dodging centromeres and telomeres
     if meres:

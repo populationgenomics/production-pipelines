@@ -66,6 +66,8 @@ setup(
             'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
             # for use in translating a MatrixTable to an ES index, first localising the MT
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
+            # Generate new intervals from a MatrixTable
+            'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
         ],
     },
 )
