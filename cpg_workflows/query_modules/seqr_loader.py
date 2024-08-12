@@ -211,9 +211,9 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
         )
 
     # work out the proportion of the original sample count that we'll keep
-    downsample_ratio = len(mt_sample_ids) // len(unique_sids)
+    downsample = len(mt_sample_ids) // len(unique_sids)
     # calculate the proportional number of partitions to generate
-    downsample_partitions = int(mt.n_partitions() * downsample_ratio)
+    downsample_partitions = mt.n_partitions() // downsample
 
     logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(unique_sids)} samples.')
     logging.info(f'Re-reading the MT with {downsample_partitions} partitions, reduced from {mt.n_partitions()}')
