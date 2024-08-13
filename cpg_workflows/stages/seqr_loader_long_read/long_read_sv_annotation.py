@@ -112,8 +112,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             'modify_sniffles '
             f'--vcf_in {local_vcf} '
             f'--vcf_out {mod_job.output} '
-            f'--ext_id {sg.external_id} '
-            f'--int_id {sg.id} '
+            f'--new_id {sg.id} '
             f'--fa {fasta} '
             f'--sex {sex} ',
         )
