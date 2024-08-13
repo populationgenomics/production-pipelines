@@ -180,7 +180,6 @@ def vep_one(
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
     j.image(vep_image)
-    splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
 
     # vep is single threaded, with a middling memory requirement
     # during test it can exceed 8GB, so we'll give it 16GB
@@ -216,12 +215,10 @@ def vep_one(
     # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
-    vcf_plugins = '--plugin UTRAnnotator,file=$UTR38 '
-    if splice_ai:
-        vcf_plugins += (
-            f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
-            f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
-        )
+    vcf_plugins = (
+        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
+        f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
+    ) if get_config()['workflow'].get('spliceai_plugin', False) else ''
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
@@ -243,6 +240,7 @@ def vep_one(
     --fasta $FASTA \\
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
+    --plugin UTRAnnotator,file=$UTR38 \\
     {vcf_plugins if (vep_version == '110' and out_format == 'vcf') else ''}
     """
 
