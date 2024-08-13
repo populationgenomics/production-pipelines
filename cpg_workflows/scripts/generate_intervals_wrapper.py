@@ -8,7 +8,6 @@ from argparse import ArgumentParser
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 
-
 parser = ArgumentParser()
 parser.add_argument('--mt', help='MatrixTable to generate intervals from')
 parser.add_argument('--out', help='Output intervals file - path to write the resulting BED in GCP')
