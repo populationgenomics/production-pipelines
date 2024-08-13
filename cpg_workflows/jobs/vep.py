@@ -11,7 +11,7 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
 from cpg_utils.hail_batch import query_command
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
@@ -212,13 +212,13 @@ def vep_one(
     # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
+    use_splice_ai = config_retrieve(['workflow', 'spliceai_plugin'], False)
     vcf_plugins = (
         f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
         f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
-    ) if get_config()['workflow'].get('spliceai_plugin', False) else ''
+    ) if (use_splice_ai and vep_version == '110' and out_format == 'vcf') else ''
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
@@ -240,8 +240,7 @@ def vep_one(
     --fasta $FASTA \\
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    --plugin UTRAnnotator,file=$UTR38 \\
-    {vcf_plugins if (vep_version == '110' and out_format == 'vcf') else ''}
+    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins}
     """
 
     if out_format == 'vcf':
