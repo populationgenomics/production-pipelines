@@ -120,14 +120,10 @@ def parity_check(project: str):
 @click.command()
 @click.option('--project', required=True)
 def main(project: str):
-    b = get_batch('Dragmap parity check')
 
-    j = b.new_python_job(name='Dragmap Parity Check')
-    j.image(config['workflow']['driver_image'])
-    j.call(parity_check, project)
-
-    b.run(wait=False)
+    parity_check(project)
 
 
 if __name__ == '__main__':
+    init_batch()
     main()
