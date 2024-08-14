@@ -117,6 +117,7 @@ def parity_check(project: str):
     new_combiner.run()
 
 
+@click.command()
 @click.option('--project', required=True)
 def main(project: str):
     b = get_batch('Dragmap parity check')
