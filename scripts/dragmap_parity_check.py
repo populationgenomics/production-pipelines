@@ -137,8 +137,8 @@ def main(project: str):
     new_vds = hl.vds.split_multi(new_vds, filter_changed_loci=True)
     nagim_mt: hl.MatrixTable = nagim_vds.variant_data
     new_mt: hl.MatrixTable = new_vds.variant_data
-    nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
-    new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
+    # nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
+    # new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
     # checkpoint the MatrixTables
     logging.info(
         f'Checkpointing MatrixTables to {dataset_path("/dragmap_parity/nagim_mt.mt", "tmp")} and {dataset_path("/dragmap_parity/new_mt.mt", "tmp")}',
