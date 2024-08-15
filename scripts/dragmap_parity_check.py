@@ -179,9 +179,9 @@ def rekey_matrix_table(mt: hl.MatrixTable, keyed_ref_table: hl.Table) -> hl.Matr
 
 @click.command()
 @click.option('--project', required=True)
-@click.option('--new-vds-path', required=False)
-@click.option('--nagim-vds-path', required=False)
-@click.option('--nagim-mt-path', required=False)
+@click.option('--new-vds-path', required=False, default=None)
+@click.option('--nagim-vds-path', required=False, default=None)
+@click.option('--nagim-mt-path', required=False, default=None)
 def main(project: str, new_vds_path: str | None, nagim_vds_path: str | None, nagim_mt_path: str | None):
 
     active_inactive_sg_map = get_active_inactive_sg_map(project)
