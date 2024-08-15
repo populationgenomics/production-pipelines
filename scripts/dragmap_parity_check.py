@@ -1,5 +1,6 @@
 #! /usr/bin/env python3
 import json
+import logging
 import subprocess
 from os.path import basename
 
@@ -139,6 +140,9 @@ def main(project: str):
     nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
     new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
     # checkpoint the MatrixTables
+    logging.info(
+        f'Checkpointing MatrixTables to {dataset_path("/dragmap_parity/nagim_mt.mt", "tmp")} and {dataset_path("/dragmap_parity/new_mt.mt", "tmp")}',
+    )
     nagim_mt = nagim_mt.checkpoint(dataset_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
     new_mt = new_mt.checkpoint(dataset_path('/dragmap_parity/new_mt.mt', 'tmp'))
 
