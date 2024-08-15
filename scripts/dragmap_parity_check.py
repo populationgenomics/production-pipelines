@@ -8,7 +8,7 @@ import click
 import hail as hl
 
 from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, init_batch, output_path
+from cpg_utils.hail_batch import dataset_path, get_batch, init_batch
 from metamist.graphql import gql, query
 
 ACTIVE_INACTIVE_QUERY = gql(
@@ -139,17 +139,17 @@ def main(project: str):
     nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
     new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
     # checkpoint the MatrixTables
-    nagim_mt = nagim_mt.checkpoint(output_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
-    new_mt = new_mt.checkpoint(output_path('/dragmap_parity/new_mt.mt', 'tmp'))
+    nagim_mt = nagim_mt.checkpoint(dataset_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
+    new_mt = new_mt.checkpoint(dataset_path('/dragmap_parity/new_mt.mt', 'tmp'))
 
     # compare the two VDS'
     global_conc, cols_conc, rows_conc = hl.concordance(nagim_mt, new_mt)
 
     # write the concordance results
-    with open(output_path('/dragmap_parity/global_concordance.json'), 'w') as f:
+    with open(dataset_path('/dragmap_parity/global_concordance.json'), 'w') as f:
         json.dump(global_conc, f)
-    cols_conc.checkpoint(output_path('/dragmap_parity/cols_concordance.ht'))
-    rows_conc.checkpoint(output_path('/dragmap_parity/rows_concordance.ht'))
+    cols_conc.checkpoint(dataset_path('/dragmap_parity/cols_concordance.ht'))
+    rows_conc.checkpoint(dataset_path('/dragmap_parity/rows_concordance.ht'))
 
 
 if __name__ == '__main__':
