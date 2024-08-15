@@ -32,7 +32,7 @@ ACTIVE_INACTIVE_QUERY = gql(
     """,
 )
 
-config = get_config()
+# config = get_config()
 
 
 def get_dict_of_gvcf_directories(project: str, nagim: bool = False) -> dict[str, str]:
@@ -73,17 +73,32 @@ def create_combiner(
     return combiner, out_path
 
 
-def create_vds(project: str) -> hl.vds.VariantDataset:
-    active_inactive_response = query(ACTIVE_INACTIVE_QUERY, variables={'project': project})
+def create_keyed_hail_tables(active_inactive_sg_map: dict[str, dict[str, str]]):
+    tob_ids = []
+    active_sgids = []
+    inactive_sgids = []
+    for tobid, sgids in active_inactive_sg_map.items():
+        tob_ids.append(tobid)
+        active_sgids.append(sgids['active'])
+        inactive_sgids.append(sgids['inactive'])
 
-    active_inactive_sg_map = {}
-    for sample in active_inactive_response['project']['samples']:
-        if len(sample['inactive_sgs']) >= 1:
-            assert len(sample['active_sgs']) == len(sample['inactive_sgs']) == 1
-            active_inactive_sg_map[sample['externalId']] = {
-                'active': sample['active_sgs'][0]['id'],
-                'inactive': sample['inactive_sgs'][0]['id'],
-            }
+    data = [
+        {'tobid': tob_ids[i], 'active': active_sgids[i], 'inactive': inactive_sgids[i]} for i in range(len(tob_ids))
+    ]
+    ht_active_key = hl.Table.parallelize(
+        data,
+        hl.tstruct(tobid=hl.tstr, active=hl.tstr, inactive=hl.tstr),
+        key='active',
+    )
+    ht_inactive_key = hl.Table.parallelize(
+        data,
+        hl.tstruct(tobid=hl.tstr, active=hl.tstr, inactive=hl.tstr),
+        key='inactive',
+    )
+    return ht_active_key, ht_inactive_key
+
+
+def check_active_inactive_gvcf_paths(project: str, active_inactive_sg_map: dict[str, dict[str, str]]):
     nagim_gvcf_paths_dict: dict[str, str] = get_dict_of_gvcf_directories(project, nagim=True)
     gvcf_paths_dict: dict[str, str] = get_dict_of_gvcf_directories(project)
 
@@ -101,6 +116,30 @@ def create_vds(project: str) -> hl.vds.VariantDataset:
             checked_nagim_gvcf_paths.append(nagim_gvcf_paths_dict[inactive_sgids])
             checked_new_gvcf_paths.append(gvcf_paths_dict[active_sgid])
             expids.append(expid)
+
+    return checked_nagim_gvcf_paths, checked_new_gvcf_paths, expids
+
+
+def get_active_inactive_sg_map(project: str) -> dict[str, dict[str, str]]:
+    active_inactive_response = query(ACTIVE_INACTIVE_QUERY, variables={'project': project})
+
+    active_inactive_sg_map = {}
+    for sample in active_inactive_response['project']['samples']:
+        if len(sample['inactive_sgs']) >= 1:
+            assert len(sample['active_sgs']) == len(sample['inactive_sgs']) == 1
+            active_inactive_sg_map[sample['externalId']] = {
+                'active': sample['active_sgs'][0]['id'],
+                'inactive': sample['inactive_sgs'][0]['id'],
+            }
+    return active_inactive_sg_map
+
+
+def create_vds(
+    project: str,
+    checked_nagim_gvcf_paths: list[str],
+    checked_new_gvcf_paths: list[str],
+    expids: list[str],
+) -> hl.vds.VariantDataset:
 
     # make Combiner objects
     nagim_combiner, nagim_vds_path = create_combiner(
@@ -124,38 +163,80 @@ def create_vds(project: str) -> hl.vds.VariantDataset:
     return hl.vds.read_vds(nagim_vds_path), hl.vds.read_vds(new_vds_path)
 
 
+def rekey_matrix_table(mt: hl.MatrixTable, keyed_ref_table: hl.Table) -> hl.MatrixTable:
+    """
+    `keyed_ref_table` must have a column `tobid`
+    """
+
+    # Annotate the MatrixTable with the tobid from keyed_ref_table
+    mt = mt.annotate_cols(tobid=keyed_ref_table[mt.s].tobid)
+
+    # Re-key the MatrixTable by the tobid
+    mt = mt.key_cols_by('tobid')
+
+    return mt
+
+
 @click.command()
 @click.option('--project', required=True)
-def main(project: str):
+@click.option('--new-vds-path', required=False)
+@click.option('--nagim-vds-path', required=False)
+@click.option('--nagim-mt-path', required=False)
+def main(project: str, new_vds_path: str | None, nagim_vds_path: str | None, nagim_mt_path: str | None):
 
-    nagim_vds, new_vds = create_vds(project)
+    active_inactive_sg_map = get_active_inactive_sg_map(project)
+
+    ht_active_key, ht_inactive_key = create_keyed_hail_tables(active_inactive_sg_map)
+
+    new_vds = hl.vds.read_vds(new_vds_path)
+
+    # read in vds/matrixtables
+    if nagim_vds_path:
+        nagim_vds = hl.vds.read_vds(nagim_vds_path)
+    elif nagim_mt_path:
+        nagim_mt = hl.read_matrix_table(nagim_mt_path)
+    else:
+        # create vds' from gvcf paths
+        # TODO: Test the below still works (need to delete currently saved vds')
+        checked_nagim_gvcf_paths, checked_new_gvcf_paths, expids = check_active_inactive_gvcf_paths(
+            project,
+            active_inactive_sg_map,
+        )
+        nagim_vds, new_vds = create_vds(project, checked_nagim_gvcf_paths, checked_new_gvcf_paths, expids)
 
     # prepare vds' for comparison
     # As per documentation, hl.methods.concordance() requires the dataset to contain no multiallelic variants.
     # as well as the entry field to be 'GT', also expects MatrixTable, not a VariantDataset
-    nagim_vds = hl.vds.split_multi(nagim_vds, filter_changed_loci=True)
+    if nagim_mt_path:
+        nagim_mt = hl.split_multi(nagim_mt, filter_changed_loci=True)
+    else:
+        nagim_vds = hl.vds.split_multi(nagim_vds, filter_changed_loci=True)
+        nagim_mt = nagim_vds.variant_data
+
     new_vds = hl.vds.split_multi(new_vds, filter_changed_loci=True)
-    nagim_mt: hl.MatrixTable = nagim_vds.variant_data
-    new_mt: hl.MatrixTable = new_vds.variant_data
-    # nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
-    # new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
-    # checkpoint the MatrixTables
+    new_mt = new_vds.variant_data
+
+    # checkpoint the split MatrixTables
     logging.info(
         f'Checkpointing MatrixTables to {dataset_path("/dragmap_parity/nagim_mt.mt", "tmp")} and {dataset_path("/dragmap_parity/new_mt.mt", "tmp")}',
     )
     nagim_mt = nagim_mt.checkpoint(dataset_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
     new_mt = new_mt.checkpoint(dataset_path('/dragmap_parity/new_mt.mt', 'tmp'))
 
+    # rekey the MatrixTables
+    nagim_mt = rekey_matrix_table(nagim_mt, ht_inactive_key)
+    new_mt = rekey_matrix_table(new_mt, ht_active_key)
+
     # compare the two VDS'
-    global_conc, cols_conc, rows_conc = hl.concordance(nagim_mt, new_mt)
+    summary, samples, variants = hl.concordance(nagim_mt, new_mt)
 
     # write the concordance results
-    with open(dataset_path('/dragmap_parity/global_concordance.json'), 'w') as f:
-        json.dump(global_conc, f)
-    cols_conc.checkpoint(dataset_path('/dragmap_parity/cols_concordance.ht'))
-    rows_conc.checkpoint(dataset_path('/dragmap_parity/rows_concordance.ht'))
+    with open(dataset_path('/dragmap_parity/summary_concordance.txt'), 'w') as f:
+        f.write(str(summary))
+    samples.checkpoint(dataset_path('/dragmap_parity/cols_concordance.ht'))
+    variants.checkpoint(dataset_path('/dragmap_parity/rows_concordance.ht'))
 
 
 if __name__ == '__main__':
-    init_batch()
+    # init_batch()
     main()
