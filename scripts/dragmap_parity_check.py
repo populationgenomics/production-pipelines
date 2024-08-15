@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import json
 import subprocess
 from os.path import basename
 
@@ -56,9 +57,11 @@ def create_combiner(
     external_header: str,
     nagim: bool = False,
 ) -> hl.vds.combiner.VariantDatasetCombiner:
+
+    out_path = f'gs://cpg-{project}/dragmap_parity/{"nagim_" if nagim else "new_"}vds.vds'
     # make Combiner objects
     combiner = hl.vds.new_combiner(
-        output_path=f'gs://cpg-{project}/dragmap_parity/{"nagim_" if nagim else "new_"}vds.vds',
+        output_path=out_path,
         temp_path=f'gs://cpg-{project}-tmp/dragmap_parity/',
         gvcf_paths=gvcf_paths,
         gvcf_sample_names=sample_names,
@@ -66,10 +69,10 @@ def create_combiner(
         reference_genome='GRCh38',
         use_genome_default_intervals=True,
     )
-    return combiner
+    return combiner, out_path
 
 
-def parity_check(project: str):
+def create_vds(project: str) -> hl.vds.VariantDataset:
     active_inactive_response = query(ACTIVE_INACTIVE_QUERY, variables={'project': project})
 
     active_inactive_sg_map = {}
@@ -99,14 +102,14 @@ def parity_check(project: str):
             expids.append(expid)
 
     # make Combiner objects
-    nagim_combiner: hl.vds.combiner.VariantDatasetCombiner = create_combiner(
+    nagim_combiner, nagim_vds_path = create_combiner(
         project=project,
         gvcf_paths=checked_nagim_gvcf_paths,
         sample_names=expids,
         external_header=checked_nagim_gvcf_paths[0],
         nagim=True,
     )
-    new_combiner: hl.vds.combiner.VariantDatasetCombiner = create_combiner(
+    new_combiner, new_vds_path = create_combiner(
         project=project,
         gvcf_paths=checked_new_gvcf_paths,
         sample_names=expids,
@@ -117,12 +120,36 @@ def parity_check(project: str):
     nagim_combiner.run()
     new_combiner.run()
 
+    return hl.vds.read_vds(nagim_vds_path), hl.vds.read_vds(new_vds_path)
+
 
 @click.command()
 @click.option('--project', required=True)
 def main(project: str):
 
-    parity_check(project)
+    nagim_vds, new_vds = create_vds(project)
+
+    # prepare vds' for comparison
+    # As per documentation, hl.methods.concordance() requires the dataset to contain no multiallelic variants.
+    # as well as the entry field to be 'GT', also expects MatrixTable, not a VariantDataset
+    nagim_vds = hl.vds.split_multi(nagim_vds, filter_changed_loci=True)
+    new_vds = hl.vds.split_multi(new_vds, filter_changed_loci=True)
+    nagim_mt: hl.MatrixTable = nagim_vds.variant_data
+    new_mt: hl.MatrixTable = new_vds.variant_data
+    nagim_mt = nagim_mt.annotate_entries(GT=hl.vds.lgt_to_gt(nagim_mt.LGT, nagim_mt.LA))
+    new_mt = new_mt.annotate_entries(GT=hl.vds.lgt_to_gt(new_mt.LGT, new_mt.LA))
+    # checkpoint the MatrixTables
+    nagim_mt = nagim_mt.checkpoint(output_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
+    new_mt = new_mt.checkpoint(output_path('/dragmap_parity/new_mt.mt', 'tmp'))
+
+    # compare the two VDS'
+    global_conc, cols_conc, rows_conc = hl.concordance(nagim_mt, new_mt)
+
+    # write the concordance results
+    with open(output_path('/dragmap_parity/global_concordance.json'), 'w') as f:
+        json.dump(global_conc, f)
+    cols_conc.checkpoint(output_path('/dragmap_parity/cols_concordance.ht'))
+    rows_conc.checkpoint(output_path('/dragmap_parity/rows_concordance.ht'))
 
 
 if __name__ == '__main__':
