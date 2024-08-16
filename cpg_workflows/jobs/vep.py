@@ -231,7 +231,6 @@ def vep_one(
 
     cmd = f"""
     set -x
-    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \\
     vep \\
     --format vcf \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
@@ -244,7 +243,7 @@ def vep_one(
     --species homo_sapiens \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
-    --fasta $FASTA \\
+    --fasta /cpg-common-main/references/vep/110/mount/vep/homo_sapiens/110/Homo_sapiens.GRCh38.dna.toplevel.fa.gz \\
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \\
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
     --plugin UTRAnnotator,file=$UTR38 {vcf_plugins} {output_bit}
