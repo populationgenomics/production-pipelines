@@ -179,10 +179,17 @@ def rekey_matrix_table(mt: hl.MatrixTable, keyed_ref_table: hl.Table) -> hl.Matr
 
 @click.command()
 @click.option('--project', required=True)
+@click.option('--output-version', required=True)
 @click.option('--new-vds-path', required=False, default=None)
 @click.option('--nagim-vds-path', required=False, default=None)
 @click.option('--nagim-mt-path', required=False, default=None)
-def main(project: str, new_vds_path: str | None, nagim_vds_path: str | None, nagim_mt_path: str | None):
+def main(
+    project: str,
+    output_version: str,
+    new_vds_path: str | None,
+    nagim_vds_path: str | None,
+    nagim_mt_path: str | None,
+):
 
     active_inactive_sg_map = get_active_inactive_sg_map(project)
 
@@ -217,11 +224,13 @@ def main(project: str, new_vds_path: str | None, nagim_vds_path: str | None, nag
     new_mt = new_vds.variant_data
 
     # checkpoint the split MatrixTables
+    nagim_out_prefix = dataset_path(f'/dragmap_parity/{output_version}/nagim_mt.mt', 'tmp')
+    new_out_prefix = dataset_path(f'/dragmap_parity/{output_version}/new_mt.mt', 'tmp')
     logging.info(
-        f'Checkpointing MatrixTables to {dataset_path("/dragmap_parity/nagim_mt.mt", "tmp")} and {dataset_path("/dragmap_parity/new_mt.mt", "tmp")}',
+        f'Checkpointing MatrixTables to {nagim_out_prefix} and {new_out_prefix} before rekeying and comparing',
     )
-    nagim_mt = nagim_mt.checkpoint(dataset_path('/dragmap_parity/nagim_mt.mt', 'tmp'))
-    new_mt = new_mt.checkpoint(dataset_path('/dragmap_parity/new_mt.mt', 'tmp'))
+    nagim_mt = nagim_mt.checkpoint(f'{nagim_out_prefix}/nagim_mt.mt')
+    new_mt = new_mt.checkpoint(f'{new_out_prefix}/new_mt.mt')
 
     # rekey the MatrixTables
     nagim_mt = rekey_matrix_table(nagim_mt, ht_inactive_key)
@@ -231,10 +240,10 @@ def main(project: str, new_vds_path: str | None, nagim_vds_path: str | None, nag
     summary, samples, variants = hl.concordance(nagim_mt, new_mt)
 
     # write the concordance results
-    with open(dataset_path('/dragmap_parity/summary_concordance.txt'), 'w') as f:
+    with open(dataset_path(f'/dragmap_parity/{output_version}/summary_concordance.txt'), 'w') as f:
         f.write(str(summary))
-    samples.checkpoint(dataset_path('/dragmap_parity/cols_concordance.ht'))
-    variants.checkpoint(dataset_path('/dragmap_parity/rows_concordance.ht'))
+    samples.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/cols_concordance.ht'))
+    variants.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/rows_concordance.ht'))
 
 
 if __name__ == '__main__':
