@@ -229,35 +229,39 @@ def main(
     new_mt = new_vds.variant_data
 
     # checkpoint the split MatrixTables
-    nagim_out_prefix = dataset_path(f'/dragmap_parity/{output_version}', category='tmp', dataset=bucket, test=test)
-    new_out_prefix = dataset_path(f'/dragmap_parity/{output_version}', category='tmp', dataset=bucket, test=test)
+    output_prefix = f'gs://cpg-{project}/dragmap_parity/{output_version}'
     logging.info(
-        f'Checkpointing MatrixTables to {nagim_out_prefix} and {new_out_prefix} before rekeying and comparing',
+        f'Checkpointing MatrixTables to {output_prefix} before rekeying and comparing',
     )
     nagim_mt = nagim_mt.checkpoint(
-        f'{dataset_path(f"/dragmap_parity/{output_version}", category="tmp", dataset=bucket, test=test)}/nagim_mt.mt',
+        f'{output_prefix}/nagim_mt.mt',
     )
     new_mt = new_mt.checkpoint(
-        f'{dataset_path(f"/dragmap_parity/{output_version}", category="tmp", dataset=bucket, test=test)}/new_mt.mt',
+        f'{output_prefix}/new_mt.mt',
     )
 
     # rekey the MatrixTables
     nagim_mt = rekey_matrix_table(nagim_mt, ht_inactive_key)
     new_mt = rekey_matrix_table(new_mt, ht_active_key)
 
+    nagim_mt = nagim_mt.checkpoint(
+        f'{output_prefix}/nagim_mt_keyed.mt',
+    )
+    new_mt = new_mt.checkpoint(
+        f'{output_prefix}/new_mt_keyed.mt',
+    )
+
     # compare the two VDS'
     summary, samples, variants = hl.concordance(nagim_mt, new_mt)
 
     # write the concordance results
     logging.info(
-        f'Writing concordance results to {dataset_path(f"/dragmap_parity/{output_version}", dataset=bucket, test=test)}',
+        f'Writing concordance results to {output_prefix}',
     )
-    with open(dataset_path(f'/dragmap_parity/{output_version}/summary_concordance.txt', test=True), 'w') as f:
+    with open(f'{output_prefix}/summary_concordance.txt', 'w') as f:
         f.write(str(summary))
-    samples.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/cols_concordance.ht', dataset=bucket, test=True))
-    variants.checkpoint(
-        dataset_path(f'/dragmap_parity/{output_version}/rows_concordance.ht', dataset=bucket, test=True),
-    )
+    samples.checkpoint(f'{output_prefix}/cols_concordance.ht')
+    variants.checkpoint(f'{output_prefix}')
 
 
 if __name__ == '__main__':
