@@ -216,9 +216,13 @@ def vep_one(
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
     use_splice_ai = config_retrieve(['workflow', 'spliceai_plugin'], False)
     vcf_plugins = (
-        f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
-        f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
-    ) if (use_splice_ai and vep_version == '110' and out_format == 'vcf') else ''
+        (
+            f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
+            f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
+        )
+        if (use_splice_ai and vep_version == '110' and out_format == 'vcf')
+        else ''
+    )
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
