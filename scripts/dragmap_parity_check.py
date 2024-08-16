@@ -260,7 +260,7 @@ def main(
         f'Writing concordance results to {output_prefix}',
     )
     samples.checkpoint(f'{output_prefix}/cols_concordance.ht')
-    variants.checkpoint(f'{output_prefix}')
+    variants.checkpoint(f'{output_prefix}/variants_concordance.ht')
     with to_path(f'{output_prefix}/summary_concordance.txt').open('w') as f:
         f.write(str(summary))
 
