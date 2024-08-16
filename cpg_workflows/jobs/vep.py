@@ -210,7 +210,7 @@ def vep_one(
     }
 
     # sexy new plugin - only present in 110 build
-    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    alpha_missense_plugin = f' --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
@@ -229,7 +229,8 @@ def vep_one(
 
     output_bit = f'| sed s/5utr/fiveutr/g > {output}' if out_format == 'json' else ''
 
-    cmd = f"""\
+    cmd = f"""
+    set -x
     FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \
     vep \
     --format vcf \
