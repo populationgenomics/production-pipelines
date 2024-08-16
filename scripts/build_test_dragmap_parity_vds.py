@@ -30,7 +30,7 @@ ACTIVE_INACTIVE_QUERY = gql(
     """,
 )
 
-# config = get_config()
+config = get_config()
 
 
 def get_dict_of_gvcf_directories(project: str, nagim: bool = False) -> dict[str, str]:
@@ -138,5 +138,5 @@ def main(project: str):
 
 
 if __name__ == '__main__':
-    # init_batch()
+    init_batch()
     main()
