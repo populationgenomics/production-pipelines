@@ -4,6 +4,7 @@
 Creates a Hail Batch job to run the command line VEP tool.
 """
 import logging
+from textwrap import dedent
 from typing import Literal
 
 import hailtop.batch as hb
@@ -210,7 +211,7 @@ def vep_one(
     }
 
     # sexy new plugin - only present in 110 build
-    alpha_missense_plugin = f' --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+    alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
@@ -252,7 +253,7 @@ def vep_one(
     if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
-    j.command(cmd)
+    j.command(dedent(cmd))
 
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))
