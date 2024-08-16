@@ -30,7 +30,7 @@ ACTIVE_INACTIVE_QUERY = gql(
     """,
 )
 
-config = get_config()
+# config = get_config()
 
 
 def get_dict_of_gvcf_directories(project: str, nagim: bool = False) -> dict[str, str]:
@@ -98,18 +98,30 @@ def parity_check(project: str):
             checked_new_gvcf_paths.append(gvcf_paths_dict[active_sgid])
             expids.append(expid)
 
+    nagim_sample_names = []
+    for path in checked_nagim_gvcf_paths:
+        sgid = path.split('.')[0].split('/')[-1]
+        if sgid in nagim_sgids:
+            nagim_sample_names.append(sgid)
+
+    new_sample_names = []
+    for path in checked_new_gvcf_paths:
+        sgid = path.split('.')[0].split('/')[-1]
+        if sgid in new_sgids:
+            new_sample_names.append(sgid)
+
     # make Combiner objects
     nagim_combiner: hl.vds.combiner.VariantDatasetCombiner = create_combiner(
         project=project,
         gvcf_paths=checked_nagim_gvcf_paths,
-        sample_names=list(nagim_sgids),
+        sample_names=nagim_sample_names,
         external_header=checked_nagim_gvcf_paths[0],
         nagim=True,
     )
     new_combiner: hl.vds.combiner.VariantDatasetCombiner = create_combiner(
         project=project,
         gvcf_paths=checked_new_gvcf_paths,
-        sample_names=list(new_sgids),
+        sample_names=new_sample_names,
         external_header=checked_new_gvcf_paths[0],
     )
 
@@ -126,5 +138,5 @@ def main(project: str):
 
 
 if __name__ == '__main__':
-    init_batch()
+    # init_batch()
     main()
