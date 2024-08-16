@@ -228,11 +228,12 @@ def vep_one(
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
     cmd = f"""\
-    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
+    export FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
+    bash -c \\
     vep \\
     --format vcf \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
-    -o {output} \\
+    -o STDOUT \\
     -i {vcf} \\
     --everything \\
     --mane_select \\
@@ -244,7 +245,8 @@ def vep_one(
     --fasta $FASTA \\
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins}
+    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins} \
+    | sed s/5utr/fiveutr/g > {output}
     """
 
     if out_format == 'vcf':

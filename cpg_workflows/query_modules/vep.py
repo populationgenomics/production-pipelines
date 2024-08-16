@@ -145,8 +145,8 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                     existing_inframe_oorfs:int32,
                     existing_outofframe_oorfs:int32,
                     existing_uorfs:int32,
-                    5utr_consequence:str,
-                    5utr_annotation:dict<
+                    fiveutr_consequence:str,
+                    fiveutr_annotation:dict<
                         str,
                         struct{
                             type:str,
