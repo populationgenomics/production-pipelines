@@ -183,13 +183,18 @@ def rekey_matrix_table(mt: hl.MatrixTable, keyed_ref_table: hl.Table) -> hl.Matr
 @click.option('--new-vds-path', required=False, default=None)
 @click.option('--nagim-vds-path', required=False, default=None)
 @click.option('--nagim-mt-path', required=False, default=None)
+@click.option('--test/--no-test', default=True)
 def main(
     project: str,
     output_version: str,
     new_vds_path: str | None,
     nagim_vds_path: str | None,
     nagim_mt_path: str | None,
+    test: bool = True,
 ):
+    bucket = project
+    if test:
+        project = project + '-test'
 
     active_inactive_sg_map = get_active_inactive_sg_map(project)
 
@@ -224,8 +229,8 @@ def main(
     new_mt = new_vds.variant_data
 
     # checkpoint the split MatrixTables
-    nagim_out_prefix = dataset_path(f'/dragmap_parity/{output_version}/nagim_mt.mt', 'tmp')
-    new_out_prefix = dataset_path(f'/dragmap_parity/{output_version}/new_mt.mt', 'tmp')
+    nagim_out_prefix = dataset_path(f'/dragmap_parity/{output_version}', category='tmp', dataset=bucket, test=test)
+    new_out_prefix = dataset_path(f'/dragmap_parity/{output_version}', category='tmp', dataset=bucket, test=test)
     logging.info(
         f'Checkpointing MatrixTables to {nagim_out_prefix} and {new_out_prefix} before rekeying and comparing',
     )
@@ -240,12 +245,18 @@ def main(
     summary, samples, variants = hl.concordance(nagim_mt, new_mt)
 
     # write the concordance results
-    with open(dataset_path(f'/dragmap_parity/{output_version}/summary_concordance.txt'), 'w') as f:
+    logging.info(
+        f'Writing concordance results to {dataset_path(f"/dragmap_parity/{output_version}", dataset=bucket, test=test)}',
+    )
+    with open(dataset_path(f'/dragmap_parity/{output_version}/summary_concordance.txt', test=True), 'w') as f:
         f.write(str(summary))
-    samples.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/cols_concordance.ht'))
-    variants.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/rows_concordance.ht'))
+    samples.checkpoint(dataset_path(f'/dragmap_parity/{output_version}/cols_concordance.ht', dataset=bucket, test=True))
+    variants.checkpoint(
+        dataset_path(f'/dragmap_parity/{output_version}/rows_concordance.ht', dataset=bucket, test=True),
+    )
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     init_batch()
     main()
