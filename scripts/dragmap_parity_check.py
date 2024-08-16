@@ -8,6 +8,7 @@ import click
 
 import hail as hl
 
+from cpg_utils import to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import dataset_path, get_batch, init_batch
 from metamist.graphql import gql, query
@@ -258,10 +259,10 @@ def main(
     logging.info(
         f'Writing concordance results to {output_prefix}',
     )
-    with open(f'{output_prefix}/summary_concordance.txt', 'w') as f:
-        f.write(str(summary))
     samples.checkpoint(f'{output_prefix}/cols_concordance.ht')
     variants.checkpoint(f'{output_prefix}')
+    with to_path(f'{output_prefix}/summary_concordance.txt').open('w') as f:
+        f.write(str(summary))
 
 
 if __name__ == '__main__':
