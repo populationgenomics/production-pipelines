@@ -230,21 +230,20 @@ def vep_one(
     output_bit = f'| sed s/5utr/fiveutr/g > {output}' if out_format == 'json' else ''
 
     cmd = f"""\
-    export FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
-    bash -c \\
-    vep \\
-    --format vcf \\
-    --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
-    -o {'STDOUT' if out_format == 'json' else output} \\
-    -i {vcf} \\
-    --everything \\
-    --mane_select \\
-    --allele_number \\
-    --minimal \\
-    --species homo_sapiens \\
-    --cache --offline --assembly GRCh38 \\
-    --dir_cache {vep_dir}/vep/ \\
-    --fasta $FASTA \\
+    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz \
+    vep \
+    --format vcf \
+    --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \
+    -o {'STDOUT' if out_format == 'json' else output} \
+    -i {vcf} \
+    --everything \
+    --mane_select \
+    --allele_number \
+    --minimal \
+    --species homo_sapiens \
+    --cache --offline --assembly GRCh38 \
+    --dir_cache {vep_dir}/vep/ \
+    --fasta $FASTA \
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
     --plugin UTRAnnotator,file=$UTR38 {vcf_plugins} {output_bit}
