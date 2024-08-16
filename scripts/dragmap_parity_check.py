@@ -234,8 +234,12 @@ def main(
     logging.info(
         f'Checkpointing MatrixTables to {nagim_out_prefix} and {new_out_prefix} before rekeying and comparing',
     )
-    nagim_mt = nagim_mt.checkpoint(f'{nagim_out_prefix}/nagim_mt.mt')
-    new_mt = new_mt.checkpoint(f'{new_out_prefix}/new_mt.mt')
+    nagim_mt = nagim_mt.checkpoint(
+        f'{dataset_path(f"/dragmap_parity/{output_version}", category="tmp", dataset=bucket, test=test)}/nagim_mt.mt',
+    )
+    new_mt = new_mt.checkpoint(
+        f'{dataset_path(f"/dragmap_parity/{output_version}", category="tmp", dataset=bucket, test=test)}/new_mt.mt',
+    )
 
     # rekey the MatrixTables
     nagim_mt = rekey_matrix_table(nagim_mt, ht_inactive_key)
