@@ -228,14 +228,12 @@ def vep_one(
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
-    output_bit = f'| sed s/5utr/fiveutr/g > {output}' if out_format == 'json' else ''
-
     cmd = f"""
     set -x
     vep \\
     --format vcf \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
-    -o {'STDOUT' if out_format == 'json' else output} \\
+    -o {output} \\
     -i {vcf} \\
     --everything \\
     --mane_select \\
@@ -247,7 +245,7 @@ def vep_one(
     --fasta /cpg-common-main/references/vep/110/mount/vep/homo_sapiens/110/Homo_sapiens.GRCh38.dna.toplevel.fa.gz \\
     {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \\
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
-    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins} {output_bit}
+    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins}
     """
 
     if out_format == 'vcf':
