@@ -355,14 +355,14 @@ class AncestryAddBackground(CohortStage):
         # inputs
         dense_mt_path = inputs.as_path(cohort, DenseSubset)
         sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
-        dense_background_mt_path_dict = dict(inputs.as_dict_by_target(DenseBackground)).items()
+        dense_background_mt_path_dict: dict = inputs.as_dict(cohort, DenseBackground)
 
         # expected outputs
         outputs = self.expected_outputs(cohort)
 
         # Construct the background dataset parameters
         background_datasets = ' '.join(
-            f'--background_dataset {name}={str(path)}' for name, path in dict(dense_background_mt_path_dict).items()
+            f'--background_dataset {name}={str(path)}' for name, path in dense_background_mt_path_dict
         )
 
         # job runs QOB, shouldn't need many resources itself
