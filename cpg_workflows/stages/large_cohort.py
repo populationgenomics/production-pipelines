@@ -408,7 +408,7 @@ class AncestryPCA(CohortStage):
         # big job
         job = get_batch().new_bash_job('Run Ancestry PCA')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.storage('50gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
+        job.storage('50Gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
 
         # localise the Dense MT
         dense_name = dense_mt_path.split('/')[-1]
