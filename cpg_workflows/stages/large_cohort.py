@@ -279,11 +279,10 @@ class DenseBackground(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        access_level = config_retrieve(['workflow', 'access_level'])
         background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
         background_storage_paths: dict[str, Path] = {
             dataset: to_path(
-                config_retrieve(['storage', ('-').join(dataset.split(f'-{access_level}')[:-1]), 'default']),
+                config_retrieve(['storage', dataset, 'default']),
             )
             for dataset in background_datasets
         }
@@ -299,11 +298,10 @@ class DenseBackground(CohortStage):
         # construct input paths
         # TODO: Allow for input background datasets to be '.mt' files
         background_vds_version = dense_background_vds_version()
-        access_level = config_retrieve(['workflow', 'access_level'])
 
         input_paths = {
             dataset: to_path(
-                config_retrieve(['storage', ('-').join(dataset.split(f'-{access_level}')[:-1]), 'default']),
+                config_retrieve(['storage', dataset, 'default']),
             )
             / 'vds'
             / f'{background_vds_version}.vds'
