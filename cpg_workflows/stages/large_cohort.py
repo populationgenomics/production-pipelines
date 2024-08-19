@@ -355,7 +355,7 @@ class AncestryAddBackground(CohortStage):
         # inputs
         dense_mt_path = inputs.as_path(cohort, DenseSubset)
         sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
-        dense_background_mt_path_dict = inputs.as_path_dict_by_target(DenseBackground)
+        dense_background_mt_path_dict = inputs.as_dict_by_target(DenseBackground)
 
         # expected outputs
         outputs = self.expected_outputs(cohort)
