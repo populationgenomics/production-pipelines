@@ -302,7 +302,7 @@ def rich_sequencing_group_id_seds(
     return cmd
 
 
-def tshirt_mt_sizing(sequencing_type: str, cohort_size: int) -> str:
+def tshirt_mt_sizing(sequencing_type: str, cohort_size: int) -> int:
     """
     Some way of taking the details we have (#SGs, sequencing type)
     and producing an estimate (with padding) of the MT size on disc
@@ -321,8 +321,8 @@ def tshirt_mt_sizing(sequencing_type: str, cohort_size: int) -> str:
         return preset
 
     if (sequencing_type == 'genome' and cohort_size < 100) or (sequencing_type == 'exome' and cohort_size < 1000):
-        return '50Gi'
-    return '500Gi'
+        return 50
+    return 500
 
 
 ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]

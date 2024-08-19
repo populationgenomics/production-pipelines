@@ -1,5 +1,7 @@
 # Hail Batch Workflows
 
+[![codecov](https://codecov.io/gh/populationgenomics/production-pipelines/graph/badge.svg?token=BKODL52HOU)](https://codecov.io/gh/populationgenomics/production-pipelines)
+
 This repository provides implementations of genomics workflows using Hail Batch, specifically:
 
 * WES/WGS Seqr Loader: FASTQ -> CRAM -> GVCF -> pVCF -> Matrix Table -> Elasticsearch index, with an ability to use parts of this pipeline as e.g. a single-sample germline variant calling workflow (FASTQ -> GVCF), joint-calling pipeline (GVCF -> pVCF), AS-VQSR pipeline, etc.
