@@ -52,13 +52,14 @@ def dense_subset_version() -> str:
 
 
 @cache
-def dense_background_vds_version() -> str:
+def dense_background_vds_version(dataset: str) -> str:
     """
     generate the dense_background version
     """
+    dataset = dataset.replace('-', '_')
     if not (
         dense_bg_vds_version_str := config_retrieve(
-            ['large_cohort', 'output_versions', 'dense_background'],
+            ['large_cohort', 'output_versions', f'{dataset}_dense_background'],
             default=None,
         )
     ):
@@ -295,16 +296,15 @@ class DenseBackground(CohortStage):
         # no datasets, no running
         if not (background_datasets := config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)):
             return self.make_outputs(target=cohort)
-        # construct input paths
-        # TODO: Allow for input background datasets to be '.mt' files
-        background_vds_version = dense_background_vds_version()
 
+        # construct input paths
         input_paths = {
             dataset: to_path(
                 config_retrieve(['storage', dataset, 'default']),
             )
             / 'vds'
-            / f'{background_vds_version}.vds'
+            # TODO: Allow for input background datasets to be '.mt' files
+            / f'{dense_background_vds_version(dataset)}.vds'
             for dataset in background_datasets
         }
 
