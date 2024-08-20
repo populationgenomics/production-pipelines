@@ -53,6 +53,7 @@ def main(dense_mt: str, related: str, scores_out: str, eigen_out: str, loadings_
     ncpu = config_retrieve(['Ancestry', 'cores'], 8)
     hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
     hl.default_reference('GRCh38')
+    logging.info(f'Hail version: {hl.version()}')
 
     mt = hl.read_matrix_table(dense_mt)
     sample_to_drop_ht = hl.read_table(related)
