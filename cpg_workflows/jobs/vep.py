@@ -4,6 +4,7 @@
 Creates a Hail Batch job to run the command line VEP tool.
 """
 import logging
+from textwrap import dedent
 from typing import Literal
 
 import hailtop.batch as hb
@@ -11,7 +12,7 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
 from cpg_utils.hail_batch import query_command
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
@@ -180,7 +181,6 @@ def vep_one(
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
     j.image(vep_image)
-    splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
 
     # vep is single threaded, with a middling memory requirement
     # during test it can exceed 8GB, so we'll give it 16GB
@@ -213,21 +213,23 @@ def vep_one(
     # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
-    vcf_plugins = '--plugin UTRAnnotator,file=$UTR38 '
-    if splice_ai:
-        vcf_plugins += (
+    use_splice_ai = config_retrieve(['workflow', 'spliceai_plugin'], False)
+    vcf_plugins = (
+        (
             f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
             f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
         )
+        if (use_splice_ai and vep_version == '110' and out_format == 'vcf')
+        else ''
+    )
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
-    cmd = f"""\
-    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
+    cmd = f"""
+    set -x
     vep \\
     --format vcf \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
@@ -240,16 +242,16 @@ def vep_one(
     --species homo_sapiens \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
-    --fasta $FASTA \\
-    {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    {vcf_plugins if (vep_version == '110' and out_format == 'vcf') else ''}
+    --fasta /cpg-common-main/references/vep/110/mount/vep/homo_sapiens/110/Homo_sapiens.GRCh38.dna.toplevel.fa.gz \\
+    {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \\
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
+    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins}
     """
 
     if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
-    j.command(cmd)
+    j.command(dedent(cmd))
 
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))

@@ -207,14 +207,14 @@ class MtToEs(DatasetStage):
         index_name = str(outputs['index_name'])
         flag_name = str(outputs['done_flag'])
 
-        job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
+        job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
 
-        required_storage = tshirt_mt_sizing(
+        req_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
 
-        job.cpu(4).storage(f'{required_storage}Gi').memory('lowmem')
+        job.cpu(4).storage(f'{req_storage}Gi').memory('lowmem').image(config_retrieve(['workflow', 'driver_image']))
 
         # localise the MT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
