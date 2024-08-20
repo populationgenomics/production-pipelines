@@ -460,7 +460,7 @@ class AncestryInfer(CohortStage):
         # big job
         job = get_batch().new_bash_job('Run Ancestry PCA')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.storage('50gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
+        job.storage('50Gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
 
         sample_qc_name = sample_qc_ht_path.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {sample_qc_ht_path} $BATCH_TMPDIR')
