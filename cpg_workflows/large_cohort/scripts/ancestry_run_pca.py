@@ -13,7 +13,7 @@ from cpg_utils.config import config_retrieve
 from gnomad.sample_qc.ancestry import run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
-MIN_N_SAMPLES = 10
+MIN_N_SAMPLES = 2
 
 
 def cli_main():
