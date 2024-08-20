@@ -22,45 +22,81 @@ from cpg_workflows.workflow import (
 )
 
 
-def mock_cohort() -> Cohort:
-    c = Cohort()
+def add_sg(ds, id, external_id: str):
+    sg = ds.add_sequencing_group(
+        id=id,
+        external_id=external_id,
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+    )
+    return sg
+
+
+def mock_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
+    ds = c.create_dataset('my_dataset')
+    m_ds = m.add_dataset(ds)
+
+    sg1 = add_sg(ds, 'CPGAA', external_id='SAMPLE1')
+    m_ds.add_sequencing_group_object(sg1)
+    return m
+
+
+def mock_multidataset_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort('fewgenomes')
 
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
+    m_ds_1 = m.add_dataset(ds)
 
-    return c
+    sg1 = add_sg(ds, 'CPGAA', external_id='SAMPLE1')
+    sg2 = add_sg(ds, 'CPGBB', external_id='SAMPLE2')
 
-
-def mock_multidataset_cohort() -> Cohort:
-    c = Cohort()
-
-    ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPGAA', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGBB', external_id='SAMPLE2')
+    m_ds_1.add_sequencing_group_object(sg1)
+    m_ds_1.add_sequencing_group_object(sg2)
 
     ds2 = c.create_dataset('my_dataset2')
-    ds2.add_sequencing_group('CPGCC', external_id='SAMPLE3')
-    ds2.add_sequencing_group('CPGDD', external_id='SAMPLE4')
+    m_ds_2 = m.add_dataset(ds2)
 
-    return c
+    sg3 = add_sg(ds2, 'CPGCC', external_id='SAMPLE3')
+    sg4 = add_sg(ds2, 'CPGDD', external_id='SAMPLE4')
+    m_ds_2.add_sequencing_group_object(sg3)
+    m_ds_2.add_sequencing_group_object(sg4)
+
+    return m
 
 
 def mock_multicohort() -> MultiCohort:
     mc = MultiCohort()
 
-    c = mc.create_cohort('CohortA')
-    ds = c.create_dataset('projecta')
-    ds.add_sequencing_group('CPGXXXX', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPGAAAA', external_id='SAMPLE2')
+    # Create a cohort with two datasets
+    cohort_a = mc.create_cohort('CohortA')
+    # Create a dataset in the cohort (legacy)
+    ds = cohort_a.create_dataset('projecta')
+    # Create a dataset in the multicohort (new)
+    dm1 = mc.add_dataset(ds)
+    # Add sequencing groups to the cohort.dataset AND multicohort.dataset
+    sg1 = add_sg(ds, 'CPGXXXX', external_id='SAMPLE1')
+    sg2 = add_sg(ds, 'CPGAAAA', external_id='SAMPLE2')
+    dm1.add_sequencing_group_object(sg1)
+    dm1.add_sequencing_group_object(sg2)
 
-    ds2 = c.create_dataset('projectc')
-    ds2.add_sequencing_group('CPGCCCC', external_id='SAMPLE3')
-    ds2.add_sequencing_group('CPGDDDD', external_id='SAMPLE4')
+    ds2 = cohort_a.create_dataset('projectc')
+    dm2 = mc.add_dataset(ds2)
+    sg3 = add_sg(ds2, 'CPGCCCC', external_id='SAMPLE3')
+    sg4 = add_sg(ds2, 'CPGDDDD', external_id='SAMPLE4')
+    dm2.add_sequencing_group_object(sg3)
+    dm2.add_sequencing_group_object(sg4)
 
-    d = mc.create_cohort('CohortB')
-    ds3 = d.create_dataset('projectb')
-    ds3.add_sequencing_group('CPGEEEEEE', external_id='SAMPLE5')
-    ds3.add_sequencing_group('CPGFFFFFF', external_id='SAMPLE6')
+    cohort_b = mc.create_cohort('CohortB')
+    ds3 = cohort_b.create_dataset('projectb')
+    dm3 = mc.add_dataset(ds3)
+    sg5 = add_sg(ds3, 'CPGEEEEEE', external_id='SAMPLE5')
+    sg6 = add_sg(ds3, 'CPGFFFFFF', external_id='SAMPLE6')
+    dm3.add_sequencing_group_object(sg5)
+    dm3.add_sequencing_group_object(sg6)
 
     return mc
 

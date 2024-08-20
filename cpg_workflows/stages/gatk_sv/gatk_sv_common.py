@@ -287,7 +287,7 @@ def make_combined_ped(cohort: Cohort | MultiCohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    cohort,
+    cohort: Cohort | MultiCohort,
     cohort_prefix: Path,
     input_vcf: Path,
     outputs: dict,

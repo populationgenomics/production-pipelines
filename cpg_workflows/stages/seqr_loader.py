@@ -13,16 +13,9 @@ from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_job
 from cpg_workflows.query_modules import seqr_loader
-from cpg_workflows.targets import Cohort, Dataset
+from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import (
-    CohortStage,
-    DatasetStage,
-    StageInput,
-    StageOutput,
-    get_workflow,
-    stage,
-)
+from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -30,86 +23,44 @@ from .vqsr import Vqsr
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
-class AnnotateCohort(CohortStage):
+class AnnotateCohort(MultiCohortStage):
     """
     Re-annotate the entire cohort.
     """
 
-    def expected_outputs(self, cohort: Cohort):
+    def expected_outputs(self, multicohort: MultiCohort):
         """
         Expected to write a matrix table.
         """
-        return {
-            # writing into perm location for late debugging
-            # convert to str to avoid checking existence
-            'tmp_prefix': str(self.tmp_prefix),
-            'mt': self.prefix / 'cohort.mt',
-        }
+        return {'mt': self.prefix / 'cohort.mt'}
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
         Apply VEP and VQSR annotations to all-sample callset
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
-        siteonly_vqsr_vcf_path = inputs.as_path(target=cohort, stage=Vqsr, key='siteonly')
-        vep_ht_path = inputs.as_path(target=cohort, stage=Vep, key='ht')
+        outputs = self.expected_outputs(multicohort)
+        vcf_path = inputs.as_path(target=multicohort, stage=JointGenotyping, key='vcf')
+        siteonly_vqsr_vcf_path = inputs.as_path(target=multicohort, stage=Vqsr, key='siteonly')
+        vep_ht_path = inputs.as_path(target=multicohort, stage=Vep, key='ht')
 
-        checkpoint_prefix = to_path(self.expected_outputs(cohort)['tmp_prefix']) / 'checkpoints'
-        j = get_batch().new_job('annotate cohort', self.get_job_attrs(cohort))
+        j = get_batch().new_job('annotate cohort', self.get_job_attrs(multicohort))
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
                 seqr_loader,
                 seqr_loader.annotate_cohort.__name__,
                 str(vcf_path),
-                str(self.expected_outputs(cohort)['mt']),
+                str(outputs['mt']),
                 str(vep_ht_path),
                 str(siteonly_vqsr_vcf_path) if siteonly_vqsr_vcf_path else None,
-                str(checkpoint_prefix),
+                str(self.tmp_prefix / 'checkpoints'),
                 setup_gcp=True,
             ),
         )
-        if depends_on := inputs.get_jobs(cohort):
+        if depends_on := inputs.get_jobs(multicohort):
             j.depends_on(*depends_on)
 
-        return self.make_outputs(
-            cohort,
-            data=self.expected_outputs(cohort),
-            jobs=j,
-        )
-
-
-def _update_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'annotated-dataset-callset'}
-
-
-def _dataset_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
-
-
-def _sg_vcf_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Add meta.type to custom analysis object
-
-    TODO: Replace this once dynamic analysis types land in metamist.
-    """
-    return {'type': 'dataset-vcf'}
+        return self.make_outputs(multicohort, data=outputs, jobs=j)
 
 
 def _snv_es_index_meta(
@@ -122,12 +73,7 @@ def _snv_es_index_meta(
     return {'seqr-dataset-type': 'VARIANTS'}
 
 
-@stage(
-    required_stages=[AnnotateCohort],
-    analysis_type='custom',
-    update_analysis_meta=_update_meta,
-    analysis_keys=['mt'],
-)
+@stage(required_stages=[AnnotateCohort], analysis_type='custom', analysis_keys=['mt'])
 class AnnotateDataset(DatasetStage):
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -138,25 +84,21 @@ class AnnotateDataset(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return {
-            'tmp_prefix': str(self.tmp_prefix / dataset.name),
-            'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt'),
-        }
+        return {'mt': (dataset.prefix() / 'mt' / f'{get_workflow().output_version}-{dataset.name}.mt')}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
         Annotate MT with genotype and consequence data for Seqr
         """
         assert dataset.cohort
-        mt_path = inputs.as_path(target=dataset.cohort, stage=AnnotateCohort, key='mt')
-
-        checkpoint_prefix = to_path(self.expected_outputs(dataset)['tmp_prefix']) / 'checkpoints'
+        assert dataset.cohort.multicohort
+        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
             sequencing_group_ids=dataset.get_sequencing_group_ids(),
             out_mt_path=self.expected_outputs(dataset)['mt'],
-            tmp_prefix=checkpoint_prefix,
+            tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
         )
@@ -164,12 +106,7 @@ class AnnotateDataset(DatasetStage):
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
 
 
-@stage(
-    required_stages=[AnnotateDataset],
-    analysis_type='custom',
-    update_analysis_meta=_dataset_vcf_meta,
-    analysis_keys=['vcf'],
-)
+@stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
 class DatasetVCF(DatasetStage):
     """
     Take the per-dataset MT and write out as a VCF
@@ -277,7 +214,7 @@ class MtToEs(DatasetStage):
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
 
-        job.cpu(4).storage(required_storage).memory('lowmem')
+        job.cpu(4).storage(f'{required_storage}Gi').memory('lowmem')
 
         # localise the MT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')

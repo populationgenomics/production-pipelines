@@ -3,6 +3,7 @@ All post-batching stages of the GATK-SV workflow
 """
 
 from functools import cache
+from itertools import combinations
 from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
@@ -102,12 +103,49 @@ class MakeCohortCombinedPed(CohortStage):
         return self.make_outputs(target=cohort, data=output)
 
 
+def check_for_cohort_overlaps(multicohort: MultiCohort):
+    """
+    Check for overlapping cohorts in a MultiCohort.
+    GATK-SV does not tolerate overlapping cohorts, so we check for this here.
+    This is called once per MultiCohort, and raises an Exception if any overlaps are found
+
+    Args:
+        multicohort (MultiCohort): the MultiCohort to check
+    """
+    # placeholder for errors
+    errors: list[str] = []
+    sgs_per_cohort: dict[str, set[str]] = {}
+    # grab all SG IDs per cohort
+    for cohort in multicohort.get_cohorts():
+        # shouldn't be possible, but guard against to be sure
+        if cohort.name in sgs_per_cohort:
+            raise ValueError(f'Cohort {cohort.name} already exists in {sgs_per_cohort}')
+
+        # collect the SG IDs for this cohort
+        sgs_per_cohort[cohort.name] = set(cohort.get_sequencing_group_ids())
+
+    # pairwise iteration over cohort IDs
+    for id1, id2 in combinations(sgs_per_cohort, 2):
+        # if the IDs are the same, skip. Again, shouldn't be possible, but guard against to be sure
+        if id1 == id2:
+            continue
+        # if there are overlapping SGs, raise an error
+        if overlap := sgs_per_cohort[id1] & sgs_per_cohort[id2]:
+            errors.append(f'Overlapping cohorts {id1} and {id2} have overlapping SGs: {overlap}')
+    # upon findings any errors, raise an Exception and die
+    if errors:
+        raise ValueError('\n'.join(errors))
+
+
 @stage
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {'multicohort_ped': self.prefix / 'ped_with_ref_panel.ped'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        # check that there are no overlapping cohorts
+        check_for_cohort_overlaps(multicohort)
+
         output = self.expected_outputs(multicohort)
         # write the pedigree, if it doesn't already exist
         if not to_path(output['multicohort_ped']).exists():
@@ -633,7 +671,10 @@ class GenotypeBatch(CohortStage):
                 f'genotyped_{mode}_vcf_index': f'{mode}.vcf.gz.tbi',
             }
 
-        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in ending_by_key.items()}
+        return {
+            key: self.get_stage_cohort_prefix(cohort) / get_workflow().output_version / fname
+            for key, fname in ending_by_key.items()
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
@@ -870,7 +911,7 @@ class JoinRawCalls(MultiCohortStage):
             input_dict[f'clustered_{caller}_vcfs'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names
             ]
-            input_dict[f'clustered_{caller}_vcfs_indexes'] = [
+            input_dict[f'clustered_{caller}_vcf_indexes'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf_index'] for cohort in all_batch_names
             ]
 
