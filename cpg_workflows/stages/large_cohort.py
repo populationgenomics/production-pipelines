@@ -280,7 +280,7 @@ class DenseBackground(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)
+        background_datasets: list[str] = config_retrieve(['large_cohort', 'pca_background', 'datasets'], [])
         background_storage_paths: dict[str, Path] = {
             dataset: to_path(
                 config_retrieve(['storage', dataset, 'default']),
