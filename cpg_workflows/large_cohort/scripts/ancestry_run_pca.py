@@ -93,4 +93,5 @@ def main(dense_mt: str, related: str, scores_out: str, eigen_out: str, loadings_
 
 
 if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
     cli_main()
