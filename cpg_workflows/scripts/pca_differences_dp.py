@@ -18,7 +18,7 @@ def cli_main():
 
     logging.basicConfig(level=logging.INFO)
     main(
-        scores_ht_path=args.dense_mt,
+        dense_mt=args.dense_mt,
         output_directory=args.output_directory,
     )
 
