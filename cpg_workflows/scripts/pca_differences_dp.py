@@ -1,7 +1,9 @@
 import logging
+import os
 from argparse import ArgumentParser
 
 import hail as hl
+import hailtop.batch as hb
 
 from cpg_utils.hail_batch import get_batch
 
@@ -30,8 +32,12 @@ def main(dense_mt_path: str, output_directory: str):
     dense_mt: hl.MatrixTable = hl.read_matrix_table(dense_mt_path)
     dense_mt_subset = dense_mt.head(1000)
     n_pcs = dense_mt_subset.count_cols()
+    service_backend = hb.ServiceBackend(
+        billing_project=os.getenv('HAIL_BILLING_PROJECT'),
+        bucket=os.getenv('HAIL_BUCKET'),
+    )
+    batch = hb.Batch(name='run pca in dataproc', backend=service_backend)
 
-    b = get_batch()
     j = dataproc_job(
         job_name='run_pca',
         function=run,
