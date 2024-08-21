@@ -8,7 +8,7 @@ from cpg_utils.hail_batch import get_batch
 
 def cli_main():
     """
-    A command-line entrypoint for the ancestry add-background process
+    A command-line entrypoint
     """
 
     parser = ArgumentParser()
