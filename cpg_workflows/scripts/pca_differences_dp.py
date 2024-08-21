@@ -27,6 +27,8 @@ def main(dense_mt_path: str, output_directory: str):
     from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
     from cpg_workflows.scripts.run_pca import run
 
+    hl.init_batch()
+
     dense_mt: hl.MatrixTable = hl.read_matrix_table(dense_mt_path)
     dense_mt_subset = dense_mt.head(1000)
     n_pcs = dense_mt_subset.count_cols()
@@ -44,5 +46,4 @@ def main(dense_mt_path: str, output_directory: str):
 
 
 if '__main__' == __name__:
-    hl.init_batch()
     cli_main()
