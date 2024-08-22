@@ -14,10 +14,22 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
         k=n_pcs,
         compute_loadings=True,
     )
+
+    print("PCA evaluations, scores, and loadings computed.")
+
+    print("Checkpointing eigenvalues...")
+    pca_evals_checkpoint = pca_evals.checkpoint(output_directory + '/eigenvalues.ht', overwrite=True)
+
+    print("Checkpointing scores...")
+    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/scores.ht', overwrite=True)
+
+    print("Checkpointing loadings...")
+    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/loadings.ht', overwrite=True)
+
     return (
-        pca_evals.checkpoint(output_directory + '/eigenvalues.ht', overwrite=True),
-        pca_scores.checkpoint(output_directory + '/scores.ht', overwrite=True),
-        pca_loadings.checkpoint(output_directory + '/loadings.ht', overwrite=True),
+        pca_evals_checkpoint,
+        pca_scores_checkpoint,
+        pca_loadings_checkpoint,
     )
 
 
