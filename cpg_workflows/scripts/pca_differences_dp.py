@@ -12,7 +12,7 @@ batch = get_batch(name='run pca on dataproc')
 
 hail_dataproc_job(
     batch=batch,
-    script='run_pca.py',
+    script='cpg_workflows/scripts/run_pca.py',
     max_age='12h',
     num_secondary_workers=20,
     init=['gs://cpg-common-main/hail_dataproc/install_common.sh'],
