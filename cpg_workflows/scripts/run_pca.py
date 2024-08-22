@@ -1,3 +1,5 @@
+import pandas as pd
+
 import hail as hl
 
 
@@ -18,7 +20,8 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
     print("PCA evaluations, scores, and loadings computed.")
 
     print("Checkpointing eigenvalues...")
-    pca_evals_checkpoint = pca_evals.checkpoint(output_directory + '/eigenvalues.ht', overwrite=True)
+    eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(pca_evals, columns=['f0']))
+    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/eigenvalues.ht', overwrite=True)
 
     print("Checkpointing scores...")
     pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/scores.ht', overwrite=True)
