@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 
 import hail as hl
@@ -8,9 +10,17 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
     output_directory = 'gs://cpg-bioheart-test/pca_differences'
     hl.init(default_reference='GRCh38')
     dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/large_cohort/tenk10k1-0/dense_subset.mt')
-    dense_mt_subset = dense_mt.head(1000)
+    dense_mt = dense_mt.head(1000)
+    relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/tenk10k1-0/relateds_to_drop.ht'
+    related_samples_to_drop = hl.read_table(relateds_to_drop_path)
     n_pcs = 5
 
+    logging.info(f'relateds_to_drop: {related_samples_to_drop.show()}')
+    if related_samples_to_drop:
+        dense_mt = dense_mt.filter_cols(
+            hl.is_missing(related_samples_to_drop[dense_mt.col_key]),
+        )
+    logging.info(f'dense_mt cols after relateds_to_drop: {dense_mt.cols().show()}')
     pca_evals, pca_scores, pca_loadings = hl.hwe_normalized_pca(
         dense_mt.GT,
         k=n_pcs,
