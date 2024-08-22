@@ -7,7 +7,7 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
     hl.init(default_reference='GRCh38')
     dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/large_cohort/tenk10k1-0/dense_subset.mt')
     dense_mt_subset = dense_mt.head(1000)
-    n_pcs = dense_mt_subset.count_cols()
+    n_pcs = 5
 
     pca_evals, pca_scores, pca_loadings = hl.hwe_normalized_pca(
         dense_mt.GT,
