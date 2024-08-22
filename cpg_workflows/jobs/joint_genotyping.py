@@ -53,6 +53,13 @@ def make_joint_genotyping_jobs(
     """
     Adds samples to the GenomicsDB and runs joint genotyping on them.
     Outputs a multi-sample VCF under `output_vcf_path`.
+
+    If the input intervals_path is not specified, use the get_intervals picard job to
+    generate scatter_count interval files and submit joint genotyping jobs for each.
+
+    If the input intervals_path is specified and is a bed file, read the intervals directly
+    into and submit joint genotyping jobs for each. Avoids the need for a picard job.
+    NOTE: the start positions of each interval from the bed file must be incremented by 1.
     """
     if len(gvcf_by_sgid) == 0:
         raise ValueError('Provided samples collection for joint calling should contain at least one active sample')
@@ -68,14 +75,18 @@ def make_joint_genotyping_jobs(
     logging.info('Submitting joint-calling jobs')
 
     jobs: list[Job] = []
-    intervals_j, intervals = get_intervals(
-        b=b,
-        source_intervals_path=intervals_path,
-        exclude_intervals_path=exclude_intervals_path,
-        scatter_count=scatter_count,
-        job_attrs=job_attrs,
-        output_prefix=tmp_bucket / f'intervals_{scatter_count}',
-    )
+    intervals: list[str] | list[hb.ResourceFile] = []
+    if intervals_path and intervals_path.suffix == '.bed':
+        intervals = get_intervals_from_bed(intervals_path)
+    else:
+        intervals_j, intervals = get_intervals(
+            b=b,
+            source_intervals_path=intervals_path,
+            exclude_intervals_path=exclude_intervals_path,
+            scatter_count=scatter_count,
+            job_attrs=job_attrs,
+            output_prefix=tmp_bucket / f'intervals_{scatter_count}',
+        )
     if intervals_j:
         jobs.append(intervals_j)
 
@@ -194,11 +205,14 @@ def genomicsdb(
     b: hb.Batch,
     sample_map_bucket_path: Path,
     output_path: Path,
-    interval: Resource | None = None,
+    interval: Resource | str | None = None,
     job_attrs: dict | None = None,
 ) -> Job | None:
     """
     Create GenomicDBs for an interval.
+
+    The input interval can either be an interval_list file, or a string in the format
+    'chrN:start-end'. Either can be passed to the GenomicsDBImport tool.
 
     Note that GenomicsDBImport and GenotypeGVCFs can interact directly with a DB
     sitting on a bucket, without having to make a copy. However, there some problems
@@ -305,14 +319,17 @@ def genomicsdb(
 def _add_joint_genotyper_job(
     b: hb.Batch,
     genomicsdb_path: Path,
-    interval: hb.Resource | None = None,
+    interval: hb.Resource | str | None = None,
     output_vcf_path: Path | None = None,
     tool: JointGenotyperTool = JointGenotyperTool.GnarlyGenotyper,
     job_attrs: dict | None = None,
 ) -> tuple[Job | None, hb.ResourceGroup]:
     """
     Runs GATK GnarlyGenotyper or GenotypeGVCFs on a combined_gvcf VCF bgzipped file,
-    pre-called with HaplotypeCaller.
+    pre-called with HaplotypeCaller, over a single interval.
+
+    The input interval can either be an interval_list file, or a string in the format
+    'chrN:start-end'. Either can be passed to the GATK joint genotyper tools.
 
     GenotypeGVCFs is a standard GATK joint-genotyping tool.
 
@@ -522,3 +539,17 @@ def add_make_sitesonly_job(
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
+
+
+def get_intervals_from_bed(intervals_path: Path) -> list[str]:
+    """
+    Read intervals from a bed file.
+    Increment the start position of each interval by 1 to match the 1-based
+    coordinate system used by GATK.
+    """
+    with intervals_path.open('r') as f:
+        intervals = []
+        for line in f:
+            chrom, start, end = line.strip().split('\t')
+            intervals.append(f'{chrom}:{int(start)+1}-{end}')
+    return intervals
