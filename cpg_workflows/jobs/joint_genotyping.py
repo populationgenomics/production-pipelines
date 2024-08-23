@@ -65,15 +65,6 @@ def make_joint_genotyping_jobs(
         raise ValueError('Provided samples collection for joint calling should contain at least one active sample')
     scatter_count = scatter_count or joint_calling_scatter_count(len(gvcf_by_sgid))
 
-    all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
-    if out_siteonly_vcf_part_paths:
-        assert len(out_siteonly_vcf_part_paths) == scatter_count
-        all_output_paths.extend(out_siteonly_vcf_part_paths)
-    if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
-        return []
-
-    logging.info('Submitting joint-calling jobs')
-
     jobs: list[Job] = []
     intervals: list[str] | list[hb.ResourceFile] = []
     if intervals_path and intervals_path.suffix == '.bed':
@@ -91,6 +82,15 @@ def make_joint_genotyping_jobs(
         )
     if intervals_j:
         jobs.append(intervals_j)
+
+    logging.info('Submitting joint-calling jobs')
+
+    all_output_paths = [out_vcf_path, out_siteonly_vcf_path]
+    if out_siteonly_vcf_part_paths:
+        assert len(out_siteonly_vcf_part_paths) == scatter_count
+        all_output_paths.extend(out_siteonly_vcf_part_paths)
+    if can_reuse(all_output_paths + [to_path(f'{p}.tbi') for p in all_output_paths]):
+        return []
 
     vcfs: list[hb.ResourceGroup] = []
     siteonly_vcfs: list[hb.ResourceGroup] = []
