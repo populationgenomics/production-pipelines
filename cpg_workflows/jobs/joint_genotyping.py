@@ -79,6 +79,7 @@ def make_joint_genotyping_jobs(
     if intervals_path and intervals_path.suffix == '.bed':
         intervals_j = None
         intervals = get_intervals_from_bed(intervals_path)
+        scatter_count = len(intervals)
     else:
         intervals_j, intervals = get_intervals(
             b=b,
