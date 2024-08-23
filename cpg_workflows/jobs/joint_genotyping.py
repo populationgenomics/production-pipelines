@@ -77,6 +77,7 @@ def make_joint_genotyping_jobs(
     jobs: list[Job] = []
     intervals: list[str] | list[hb.ResourceFile] = []
     if intervals_path and intervals_path.suffix == '.bed':
+        intervals_j = None
         intervals = get_intervals_from_bed(intervals_path)
     else:
         intervals_j, intervals = get_intervals(
