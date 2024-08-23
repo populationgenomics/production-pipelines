@@ -50,24 +50,28 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
     relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/tenk10k1-0/relateds_to_drop.ht'
     related_samples_to_drop = hl.read_table(relateds_to_drop_path)
     n_pcs = 5
+    autosomes_only = True
 
-    logging.info('Filtering to autosomes')
-    dense_mt = filter_to_autosomes(dense_mt)
+    if autosomes_only:
+        logging.info('Filtering to autosomes')
+        dense_mt = filter_to_autosomes(dense_mt)
+
+    pca_mt = dense_mt
 
     logging.info(f'relateds_to_drop: {related_samples_to_drop.show()}')
     if related_samples_to_drop:
-        dense_mt = dense_mt.filter_cols(
-            hl.is_missing(related_samples_to_drop[dense_mt.col_key]),
+        pca_mt = pca_mt.filter_cols(
+            hl.is_missing(related_samples_to_drop[pca_mt.col_key]),
         )
-    logging.info(f'dense_mt cols after relateds_to_drop: {dense_mt.cols().show()}')
+    logging.info(f'pca_mt cols after relateds_to_drop: {pca_mt.cols().show()}')
     pca_evals, pca_scores, pca_loadings = hl.hwe_normalized_pca(
-        dense_mt.GT,
+        pca_mt.GT,
         k=n_pcs,
         compute_loadings=True,
     )
 
-    pca_af_ht = dense_mt.annotate_rows(
-        pca_af=hl.agg.mean(dense_mt.GT.n_alt_alleles()) / 2,
+    pca_af_ht = pca_mt.annotate_rows(
+        pca_af=hl.agg.mean(pca_mt.GT.n_alt_alleles()) / 2,
     ).rows()
     pca_loadings = pca_loadings.annotate(
         pca_af=pca_af_ht[pca_loadings.key].pca_af,
@@ -75,7 +79,7 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     pca_loadings = pca_loadings.persist()
     pca_scores = pca_scores.persist()
-    project_pca_mt = dense_mt.filter_cols(hl.is_missing(dense_mt.cols()[dense_mt.col_key]))
+    project_pca_mt = dense_mt.filter_cols(hl.is_missing(pca_mt.cols()[dense_mt.col_key]))
     projected_scores = pc_project(project_pca_mt, pca_loadings)
     pca_scores = pca_scores.union(projected_scores)
 
