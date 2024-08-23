@@ -59,11 +59,11 @@ class JointGenotyping(MultiCohortStage):
         ]
 
         intervals_path = None
-        if config_retrieve(['workflow', 'intervals_path']):
+        if config_retrieve(['workflow', 'intervals_path'], default=None):
             intervals_path = to_path(config_retrieve(['workflow', 'intervals_path']))
 
         exclude_intervals_path = None
-        if config_retrieve(['workflow', 'exclude_intervals_path']):
+        if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
             exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
 
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(

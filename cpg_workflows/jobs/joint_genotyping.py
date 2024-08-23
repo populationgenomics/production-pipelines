@@ -431,12 +431,15 @@ def _add_excess_het_filter(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     excess_het_threshold: float = 54.69,
-    interval: hb.Resource | None = None,
+    interval: hb.Resource | str | None = None,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> tuple[Job | None, hb.ResourceGroup]:
     """
-    Filter a large cohort callset on Excess Heterozygosity.
+    Filter a large cohort callset on Excess Heterozygosity, over a single interval.
+
+    The input interval can either be an interval_list file, or a string in the format
+    'chrN:start-end'. Either can be passed to GATK VariantFiltration.
 
     The filter applies only to large callsets (`not is_small_callset`)
 
