@@ -68,10 +68,12 @@ def make_joint_genotyping_jobs(
     jobs: list[Job] = []
     intervals: list[str] | list[hb.ResourceFile] = []
     if intervals_path and intervals_path.suffix == '.bed':
+        # If intervals_path is a bed file, read the intervals directly
         intervals_j = None
         intervals = get_intervals_from_bed(intervals_path)
-        scatter_count = len(intervals)
+        assert scatter_count == len(intervals)
     else:
+        # If intervals_path is not specified, use the get_intervals picard job
         intervals_j, intervals = get_intervals(
             b=b,
             source_intervals_path=intervals_path,

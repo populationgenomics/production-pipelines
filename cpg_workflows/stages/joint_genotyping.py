@@ -53,6 +53,8 @@ class JointGenotyping(MultiCohortStage):
 
         # create expected outputs once
         outputs = self.expected_outputs(multicohort)
+
+        # If defining intervals with a custom bed file, make sure the scatter count matches the number of intervals
         scatter_count = joint_calling_scatter_count(len(gvcf_by_sgid))
         out_siteonly_vcf_part_paths = [
             to_path(outputs['siteonly_part_pattern'].format(idx=idx)) for idx in range(scatter_count)
