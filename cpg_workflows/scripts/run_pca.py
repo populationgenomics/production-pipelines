@@ -46,8 +46,10 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     output_directory = 'gs://cpg-bioheart-test/pca_differences'
     hl.init(default_reference='GRCh38')
-    dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/pca_differences/dense_subset_checkpoint.mt')
-    relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/tenk10k1-0/relateds_to_drop.ht'
+    dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/dense_subset.mt')
+    dense_mt = dense_mt.head(1000)
+    dense_mt.checkpoint('gs://cpg-bioheart-test/pca_differences/dense_subset_fresh_checkpoint.mt', overwrite=True)
+    relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/relateds_to_drop.ht'
     related_samples_to_drop = hl.read_table(relateds_to_drop_path)
     n_pcs = 5
     autosomes_only = True
