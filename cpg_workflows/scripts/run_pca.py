@@ -49,7 +49,7 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
     dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/dense_subset.mt')
     relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/relateds_to_drop.ht'
     related_samples_to_drop = hl.read_table(relateds_to_drop_path)
-    n_pcs = 8
+    n_pcs = 5
     autosomes_only = True
 
     if autosomes_only:
@@ -87,13 +87,13 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     print("Checkpointing eigenvalues...")
     eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(pca_evals, columns=['f0']))
-    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues6.ht', overwrite=True)
+    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues7.ht', overwrite=True)
 
     print("Checkpointing scores...")
-    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores6.ht', overwrite=True)
+    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores7.ht', overwrite=True)
 
     print("Checkpointing loadings...")
-    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings6.ht', overwrite=True)
+    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings7.ht', overwrite=True)
 
     return (
         pca_evals_checkpoint,
