@@ -46,7 +46,7 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     output_directory = 'gs://cpg-bioheart-test/pca_differences'
     hl.init(default_reference='GRCh38')
-    dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/pca_differences/dense_subset_fresh_checkpoint.mt')
+    dense_mt = hl.read_matrix_table('gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/dense_subset.mt')
     relateds_to_drop_path = 'gs://cpg-bioheart-test/large_cohort/pca_differences_w_dp/relateds_to_drop.ht'
     related_samples_to_drop = hl.read_table(relateds_to_drop_path)
     n_pcs = 8
@@ -87,13 +87,13 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     print("Checkpointing eigenvalues...")
     eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(pca_evals, columns=['f0']))
-    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues4.ht', overwrite=True)
+    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues5.ht', overwrite=True)
 
     print("Checkpointing scores...")
-    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores4.ht', overwrite=True)
+    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores5.ht', overwrite=True)
 
     print("Checkpointing loadings...")
-    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings4.ht', overwrite=True)
+    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings5.ht', overwrite=True)
 
     return (
         pca_evals_checkpoint,
