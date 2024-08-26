@@ -87,13 +87,13 @@ def run() -> tuple[hl.Table, hl.Table, hl.Table]:
 
     print("Checkpointing eigenvalues...")
     eigenvalues_ht = hl.Table.from_pandas(pd.DataFrame(pca_evals, columns=['f0']))
-    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues3.ht', overwrite=True)
+    pca_evals_checkpoint = eigenvalues_ht.checkpoint(output_directory + '/fresh_run/eigenvalues4.ht', overwrite=True)
 
     print("Checkpointing scores...")
-    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores3.ht', overwrite=True)
+    pca_scores_checkpoint = pca_scores.checkpoint(output_directory + '/fresh_run/scores4.ht', overwrite=True)
 
     print("Checkpointing loadings...")
-    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings3.ht', overwrite=True)
+    pca_loadings_checkpoint = pca_loadings.checkpoint(output_directory + '/fresh_run/loadings4.ht', overwrite=True)
 
     return (
         pca_evals_checkpoint,
