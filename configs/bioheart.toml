@@ -2,7 +2,7 @@
 check_inputs = true
 skip_sgs_with_missing_input = false
 check_intermediates = false
-check_expected_outputs = true
+check_expected_outputs = false
 reblock_gq_bands = [ 20, 30, 40,]
 name = "gatk_sv"
 ref_fasta = "gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta"
