@@ -13,7 +13,7 @@ from cpg_utils.config import config_retrieve
 from gnomad.sample_qc.ancestry import run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
-MIN_N_SAMPLES = 2
+MIN_N_SAMPLES = 10
 
 
 def cli_main():
@@ -83,6 +83,8 @@ def main(dense_mt: str, related: str, scores_out: str, eigen_out: str, loadings_
     if n_pcs > samples_to_use:
         logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
         n_pcs = samples_to_use
+        n_pcs = 8
+        logging.info(f'Using {n_pcs} PCs for PCA')
 
     eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)
     logging.info(f'scores_ht.s: {list(scores_ht.s.collect())}')
