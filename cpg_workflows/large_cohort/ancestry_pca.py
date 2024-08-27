@@ -242,7 +242,7 @@ def _run_pca_ancestry_analysis(
 
     if n_pcs > samples_to_use:
         logging.info(f'Adjusting the number of PCs not to exceed the number of samples:{n_pcs} -> {samples_to_use}')
-        n_pcs = samples_to_use
+        n_pcs = 8
         logging.info(f'Using {n_pcs} PCs for PCA analysis')
 
     eigenvalues, scores_ht, loadings_ht = run_pca_with_relateds(mt, sample_to_drop_ht, n_pcs=n_pcs)
