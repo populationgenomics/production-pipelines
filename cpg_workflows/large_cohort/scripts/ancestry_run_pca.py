@@ -51,7 +51,7 @@ def main(dense_mt: str, related: str, scores_out: str, eigen_out: str, loadings_
     """
 
     ncpu = config_retrieve(['Ancestry', 'cores'], 8)
-    hl.context.init_spark(master=f'local[{ncpu}]', quiet=True)
+    hl.context.init_spark(master=f'local[{ncpu}]')
     hl.default_reference('GRCh38')
     logging.info(f'Hail version: {hl.version()}')
 
