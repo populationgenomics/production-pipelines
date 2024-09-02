@@ -207,12 +207,14 @@ def do_metamist_update(dataset, activeseqgroup, oldanalysis, oldpath, newpath, r
     metavar='NAME',
     help='KNOWN_REFS name of the replacement headers',
 )
+@click.option('--update-db', is_flag=True, help='Update metamist Analysis records to point to new CRAMs')
 @click.option('--dry-run', is_flag=True, help='Display information only without making changes')
 def main(
     source: tuple[str],
     new_reference_path: str,
     expected_refset: str,
     new_refset: str,
+    update_db: bool,
     dry_run: bool,
 ):
     """
@@ -304,7 +306,7 @@ def main(
         analysis = analysis_by_path[str(path)]
         if seqgroupcount := len(analysis['sequencingGroups']) != 1:
             print(f'Analysis id={analysis["id"]} for {path} is in {seqgroupcount} sequencing groups')
-        elif not dry_run:
+        elif update_db and not dry_run:
             db_j = b.new_python_job(f'Update metamist for {newpath}')
             db_j.image(config['workflow']['driver_image'])
 
