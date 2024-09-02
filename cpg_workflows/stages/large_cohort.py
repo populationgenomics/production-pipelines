@@ -36,8 +36,8 @@ def vds_version() -> str:
     if not (vds_version_str := get_config()['workflow'].get('vds_version')):
         return get_workflow().output_version
     vds_version_str = slugify(vds_version_str)
-    if not vds_version_str.startswith('v'):
-        vds_version_str = f'v{vds_version_str}'
+    # if not vds_version_str.startswith('v'):
+    #     vds_version_str = f'v{vds_version_str}'
     return vds_version_str
 
 
