@@ -457,7 +457,7 @@ class AncestryInfer(CohortStage):
         scores_table = str(inputs.as_path(cohort, AncestryPCA, 'scores'))
 
         # big job
-        job = get_batch().new_bash_job('Run Ancestry PCA')
+        job = get_batch().new_bash_job('Ancestry Infer Populations')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.storage('50Gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
 
