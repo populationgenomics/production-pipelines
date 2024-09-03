@@ -47,7 +47,7 @@ def add_background(
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            background_mt_checkpoint_path = tmp_prefix / 'densified_background_mt.mt'
+            background_mt_checkpoint_path = tmp_prefix / f'{dataset}_densified_background_mt.mt'
             if can_reuse(background_mt_checkpoint_path):
                 logging.info(f'Reusing densified background mt from {background_mt_checkpoint_path}')
                 background_mt = hl.read_matrix_table(str(background_mt_checkpoint_path))
