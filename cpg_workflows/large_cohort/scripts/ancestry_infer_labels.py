@@ -108,7 +108,7 @@ def main(scores_ht_path: str, qc_in: str, qc_out: str, pop_ht_out: str, pickle_o
     pop_ht.transmute(**{f'PC{i + 1}': pop_ht.pca_scores[i] for i in range(pc_cnt)}).export(txt_out)
 
     # Writing the RF model used for inferring sample populations
-    with open(pickle_out, 'wb', encoding='utf-8') as handle:
+    with open(pickle_out, 'wb') as handle:
         pickle.dump(pops_rf_model, handle)
 
     pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key])).write(pop_ht_out)
