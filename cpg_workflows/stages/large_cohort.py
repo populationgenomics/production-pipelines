@@ -473,7 +473,7 @@ class AncestryInfer(CohortStage):
             f'--scores_ht "${{BATCH_TMPDIR}}/{scores_name}" '
             f'--qc_in "${{BATCH_TMPDIR}}/{sample_qc_name}" '
             f'--qc_out {job.qc} '
-            f'--ht_out {job.ht} '
+            f'--pop_ht_out {job.ht} '
             f'--pickle_out {job.pickle} '
             f'--txt_out {job.txt} ',
         )

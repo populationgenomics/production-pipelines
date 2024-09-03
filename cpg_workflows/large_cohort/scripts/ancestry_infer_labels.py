@@ -36,7 +36,7 @@ def cli_main():
     parser.add_argument('--scores_ht', help='The PCA scores HT')
     parser.add_argument('--qc_in', help='The SampleQC HT to read')
     parser.add_argument('--qc_out', help='The updated SampleQC HT to write')
-    parser.add_argument('--ht_out', help='population table output path')
+    parser.add_argument('--pop_ht_out', help='population table output path')
     parser.add_argument('--pickle_out', help='population model output path')
     parser.add_argument('--txt_out', help='population inference output path')
     args = parser.parse_args()
