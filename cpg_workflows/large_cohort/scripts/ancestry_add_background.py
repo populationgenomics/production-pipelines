@@ -164,7 +164,7 @@ def main(qc_in: str, dense_in: str, qc_out: str, dense_out: str, background_data
     # start a Hail Query (on-batch) Runtime
     init_batch()
 
-    dense_mt = hl.read_matrix_table(dense_in).select_entries('GT', 'GQ', 'DP', 'AD')
+    dense_mt = hl.read_matrix_table(dense_in).select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
     sample_qc_ht = hl.read_table(qc_in)
 
     dense_mt, sample_qc_ht = add_background(dense_mt, sample_qc_ht, background_datasets, tmp_path)
