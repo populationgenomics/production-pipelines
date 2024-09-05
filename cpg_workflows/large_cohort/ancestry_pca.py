@@ -177,12 +177,16 @@ def run(
         n_pcs=n_pcs,
         out_ht_path=out_inferred_pop_ht_path,
     )
+    logging.info(f'pop_ht.show(): {pop_ht.show()}')
+    logging.info(f'pop_ht keys: {pop_ht.s.collect()}')
     logging.info('Annotating inferred population labels to sample_qc with background added')
     logging.info(f'sample_qc_ht.describe(): {sample_qc_ht.describe()}')
     logging.info(f'sample_qc_ht.show(): {sample_qc_ht.show()}')
+    logging.info(f'sample_qc_ht keys before annotation: {sample_qc_ht.s.collect()}')
     sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key])
     sample_qc_ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
     logging.info('After annotating inferred population labels to sample_qc with background added')
+    logging.info(f'sample_qc_ht keys after annotation: {sample_qc_ht.s.collect()}')
     logging.info(f'sample_qc_ht.describe(): {sample_qc_ht.describe()}')
     logging.info(f'sample_qc_ht.show(): {sample_qc_ht.show()}')
     return scores_ht, eigenvalues_ht, loadings_ht, sample_qc_ht
