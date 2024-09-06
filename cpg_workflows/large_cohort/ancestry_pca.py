@@ -183,7 +183,7 @@ def run(
     logging.info(f'sample_qc_ht.describe(): {sample_qc_ht.describe()}')
     logging.info(f'sample_qc_ht.show(): {sample_qc_ht.show()}')
     logging.info(f'sample_qc_ht keys before annotation: {sample_qc_ht.s.collect()}')
-    sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key])
+    sample_qc_ht = sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key])
     sample_qc_ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
     logging.info('After annotating inferred population labels to sample_qc with background added')
     logging.info(f'sample_qc_ht keys after annotation: {sample_qc_ht.s.collect()}')
