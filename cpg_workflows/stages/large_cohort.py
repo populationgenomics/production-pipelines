@@ -381,7 +381,7 @@ class AncestryAddBackground(CohortStage):
         return self.make_outputs(target=cohort, jobs=job, data=outputs)
 
 
-@stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset, AncestryAddBackground])
+@stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset])
 class AncestryPCA(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         ancestry_prefix = get_workflow().prefix / 'ancestry'
