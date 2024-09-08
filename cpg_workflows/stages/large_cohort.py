@@ -436,7 +436,7 @@ class AncestryPCA(CohortStage):
         return self.make_outputs(target=cohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AncestryPCA, SampleQC, AncestryAddBackground])
+@stage(required_stages=[AncestryPCA, SampleQC])
 class AncestryInfer(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
