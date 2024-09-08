@@ -385,6 +385,17 @@ class AncestryAddBackground(CohortStage):
 
 @stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset])
 class AncestryPCA(CohortStage):
+    """
+    Run PCA on the dense MT to get the scores, eigenvalues, and loadings.
+    Will run on the dense MT with the background dataset added if large_cohort.pca_background.datasets is set.
+    If not, will bypass adding background and run on the dense MT with the related samples removed.
+    """
+
+    def __init__(self):
+        super().__init__()
+        if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            self.required_stages.append(AncestryAddBackground)
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         ancestry_prefix = get_workflow().prefix / 'ancestry'
         return {
