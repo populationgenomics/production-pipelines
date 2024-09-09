@@ -187,9 +187,8 @@ class RelatednessPCRelate(CohortStage):
         t_shirt_size_value = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(cohort.get_sequencing_group_ids()),
-        ).split('Gi')[0]
-        required_storage_value = int(t_shirt_size_value) * 2
-        required_storage = f'{t_shirt_size_value*2}Gi'
+        )
+        required_storage = f'{t_shirt_size_value * 2}Gi'
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness PCRelate stage: {cohort.name}')
@@ -242,9 +241,8 @@ class RelatednessFlag(CohortStage):
         t_shirt_size_value = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(cohort.get_sequencing_group_ids()),
-        ).split('Gi')[0]
-        required_storage_value = int(t_shirt_size_value) * 2
-        required_storage = f'{t_shirt_size_value*2}Gi'
+        )
+        required_storage = f'{t_shirt_size_value * 2}Gi'
 
         # create a job
         job = get_batch().new_job(f'Run Relatedness Sample Flagging stage: {cohort.name}')
