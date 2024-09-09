@@ -163,13 +163,6 @@ class DenseSubset(CohortStage):
 
 @stage(required_stages=DenseSubset, analysis_keys=['relatedness_ht'], analysis_type='custom')
 class RelatednessPCRelate(CohortStage):
-    """
-     This is the first step of the Relatedness Stage.
-
-    This stage calculates relatedness between samples using the PC-Relate method.
-    It uses a dense matrix table (MT) as input and produces a Hail table (HT) with relatedness metrics.
-    """
-
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'relatedness_ht': (
@@ -183,23 +176,20 @@ class RelatednessPCRelate(CohortStage):
         dense_mt_path = str(inputs.as_path(cohort, DenseSubset))
         dense_mt_name = dense_mt_path.split('/')[-1]
 
-        # estimate required storage - we create a new HT, so provision double the storage
+        # Estimate required storage - we create a new HT, so provision double the storage
         t_shirt_size_value = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(cohort.get_sequencing_group_ids()),
         )
         required_storage = f'{t_shirt_size_value * 2}Gi'
 
-        # create a job
         job = get_batch().new_job(f'Run Relatedness PCRelate stage: {cohort.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command('set -eux pipefail')
 
-        # localise the Dense MT
+        # Localise the Dense MT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {dense_mt_path} $BATCH_TMPDIR')
 
-        # how many cores do we need?
-        logging.info(f'Required storage: {required_storage}')
         required_cpu: int = config_retrieve(['RelatednessPCRelate', 'cores'], 8)
         job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
@@ -210,7 +200,7 @@ class RelatednessPCRelate(CohortStage):
             f'--checkpoint "${{BATCH_TMPDIR}}"',
         )
 
-        # delocalise the output HT
+        # Delocalise the output HT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.output} {str(outputs["relatedness_ht"])}')
 
         return self.make_outputs(cohort, outputs, job)
@@ -222,10 +212,6 @@ class RelatednessPCRelate(CohortStage):
     analysis_type='custom',
 )
 class RelatednessFlag(CohortStage):
-    """
-    The second step of Relatedness calculation. This stage flags related samples to drop.
-    """
-
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'relateds_to_drop': (
@@ -237,31 +223,27 @@ class RelatednessFlag(CohortStage):
 
         outputs = self.expected_outputs(cohort)
 
-        # estimate required storage - I've got nothing to base this on...
         t_shirt_size_value = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(cohort.get_sequencing_group_ids()),
         )
         required_storage = f'{t_shirt_size_value * 2}Gi'
 
-        # create a job
         job = get_batch().new_job(f'Run Relatedness Sample Flagging stage: {cohort.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command('set -eux pipefail')
 
-        # localise the Relatedness HT
+        # Localise the Relatedness HT
         prcrelate_mt_path = str(inputs.as_path(cohort, RelatednessPCRelate, 'relatedness_ht'))
         prcrelate_mt_name = prcrelate_mt_path.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {prcrelate_mt_path} $BATCH_TMPDIR')
 
-        # localise the Sample QC HT MT
         sample_qc_ht_path = str(inputs.as_path(cohort, SampleQC))
         sample_qc_ht_name = sample_qc_ht_path.split('/')[-1]
 
-        # localise the Dense MT
+        # Localise the SampleQC HT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {sample_qc_ht_path} $BATCH_TMPDIR')
 
-        # how many cores do we need?
         required_cpu: int = config_retrieve(['RelatednessFlag', 'cores'], 8)
         job.cpu(required_cpu).storage(required_storage).memory('highmem')
 
@@ -273,7 +255,7 @@ class RelatednessFlag(CohortStage):
             f'--checkpoint "${{BATCH_TMPDIR}}" ',
         )
 
-        # delocalise the output HT
+        # Delocalise the output HT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.output} {str(outputs["relateds_to_drop"])}')
 
         return self.make_outputs(cohort, outputs, job)
@@ -302,11 +284,9 @@ class DenseBackground(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # no datasets, no running
         if not (background_datasets := config_retrieve(['large_cohort', 'pca_background', 'datasets'], False)):
             return self.make_outputs(target=cohort)
 
-        # construct input paths
         input_paths = {
             dataset: to_path(
                 config_retrieve(['storage', dataset, 'default']),
@@ -320,16 +300,14 @@ class DenseBackground(CohortStage):
         job = get_batch().new_job(f'Densify {", ".join(background_datasets)} background datasets')
         job.storage('500Gi').image(config_retrieve(['workflow', 'driver_image']))
 
-        # expected outputs
         outputs = self.expected_outputs(cohort)
 
-        # localise QC variants table
+        # Localise QC variants table
         qc_variants_ht = config_retrieve(['references', 'ancestry', 'sites_table'])
 
-        # jobs
         jobs = []
         for bg_dataset in background_datasets:
-            # localise the background VDS
+            # Localise the background VDS
             job.command(
                 f'gcloud --no-user-output-enabled storage cp -r {str(input_paths[bg_dataset])} $BATCH_TMPDIR',
             )
@@ -347,10 +325,6 @@ class DenseBackground(CohortStage):
 
 @stage(required_stages=[DenseSubset, SampleQC, DenseBackground])
 class AncestryAddBackground(CohortStage):
-    """
-    Optional stage that adds a background dataset to the dense MT and sample QC HT.
-    """
-
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
             'bg_qc_ht': cohort.analysis_dataset.prefix()
@@ -361,12 +335,10 @@ class AncestryAddBackground(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        # inputs
         dense_mt_path = inputs.as_path(cohort, DenseSubset)
         sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
         dense_background_mt_path_dict: dict = inputs.as_dict(cohort, DenseBackground)
 
-        # expected outputs
         outputs = self.expected_outputs(cohort)
 
         # Construct the background dataset parameters
@@ -374,7 +346,6 @@ class AncestryAddBackground(CohortStage):
             f'--background_dataset {name}={str(path)}' for name, path in dense_background_mt_path_dict.items()
         )
 
-        # job runs QOB, shouldn't need many resources itself
         job = get_batch().new_job('Add Ancestry Background')
         job.storage('10Gi').image(config_retrieve(['workflow', 'driver_image']))
         job.command(
@@ -392,13 +363,9 @@ class AncestryAddBackground(CohortStage):
 
 @stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset])
 class AncestryPCA(CohortStage):
-    """
-    Run PCA on the dense MT to get the scores, eigenvalues, and loadings.
-    Will run on the dense MT with the background dataset added if large_cohort.pca_background.datasets is set.
-        - Does this by directly appending to the class `Stage` requiresd_stages_classes.
-    If not, will bypass adding background and run on the dense MT with the related samples removed.
-    """
-
+    # Need to add AncestryBackground to the required stages only if we're using it.
+    # Can't have this as default in decorator as it will trigger
+    # the stage to run even if not required
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
@@ -414,31 +381,26 @@ class AncestryPCA(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
-        # decide which stage to pull input from
+        # Decide which stage to pull input from
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
             dense_mt_path = str(inputs.as_path(cohort, AncestryAddBackground, 'bg_dense_mt'))
-
         else:
             dense_mt_path = str(inputs.as_path(cohort, DenseSubset))
-            # sample_qc_ht_path = inputs.as_path(cohort, SampleQC)
 
-        # negligible amount of storage for this one
         related = str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'))
 
-        # big job
         job = get_batch().new_bash_job('Run Ancestry PCA')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.storage('50Gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
 
-        # localise the Dense MT
+        # Localise the dense MT
         dense_name = dense_mt_path.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {dense_mt_path} $BATCH_TMPDIR')
 
-        # localise the relatedness HT
+        # Localise the relatedness HT
         related_name = related.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {related} $BATCH_TMPDIR')
 
-        # run the command
         job.command(
             'ancestry_pca '
             f'--dense_mt "${{BATCH_TMPDIR}}/{dense_name}" '
@@ -448,7 +410,7 @@ class AncestryPCA(CohortStage):
             f'--loadings_out {job.loadings} ',
         )
 
-        # copy 3 tables out
+        # Copy 3 tables out
         outputs = self.expected_outputs(cohort)
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.scores} {str(outputs["scores"])}')
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.eigen} {str(outputs["eigenvalues"])}')
@@ -459,7 +421,9 @@ class AncestryPCA(CohortStage):
 
 @stage(required_stages=[AncestryPCA, SampleQC])
 class AncestryInfer(CohortStage):
-
+    # Need to add AncestryBackground to the required stages only if we're using it.
+    # Can't have this as default in decorator as it will trigger
+    # the stage to run even if not required
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
@@ -482,7 +446,6 @@ class AncestryInfer(CohortStage):
             sample_qc_ht_path = str(inputs.as_path(cohort, SampleQC))
         scores_table = str(inputs.as_path(cohort, AncestryPCA, 'scores'))
 
-        # big job
         job = get_batch().new_bash_job('Ancestry Infer Populations')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.storage('50Gi').memory('highmem').cpu(config_retrieve(['Ancestry', 'cores'], 8))
@@ -493,7 +456,6 @@ class AncestryInfer(CohortStage):
         scores_name = scores_table.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {scores_table} $BATCH_TMPDIR')
 
-        # run the command
         job.command(
             'ancestry_infer_labels '
             f'--scores_ht "${{BATCH_TMPDIR}}/{scores_name}" '
@@ -506,13 +468,12 @@ class AncestryInfer(CohortStage):
 
         outputs = self.expected_outputs(cohort)
 
-        # copy out the scores HT
+        # Delocalise the scores HT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.ht} {str(outputs["inferred_pop"])}')
 
-        # copy out the sample QC HT
+        # Delocalise the SampleQC HT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {job.qc} {str(outputs["sample_qc_ht"])}')
 
-        # and copy the other single files
         get_batch().write_output(job.pickle, str(outputs['pickled_model']))
         get_batch().write_output(job.txt, str(outputs['inference_txt']))
 
