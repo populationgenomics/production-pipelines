@@ -391,8 +391,8 @@ class AncestryPCA(CohortStage):
     If not, will bypass adding background and run on the dense MT with the related samples removed.
     """
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
             self.required_stages.append(AncestryAddBackground)
 
