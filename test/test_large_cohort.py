@@ -113,6 +113,9 @@ def _mock_cohort(dataset_id: str):
         sequencing_group = dataset.add_sequencing_group(
             id=sequencing_group_id,
             external_id=sequencing_group_id.replace('CPG', 'EXT'),
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
         )
         sequencing_group.gvcf = GvcfPath(gvcf_path)
         mc_dataset.add_sequencing_group_object(sequencing_group)

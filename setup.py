@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.26.4',
+    version='1.27.3',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -41,6 +41,7 @@ setup(
         'test': [
             'pytest',
             'pytest-mock',
+            'coverage',
         ],
     },
     package_data={
@@ -69,6 +70,16 @@ setup(
             'relatedness_pcrelate = cpg_workflows.large_cohort.scripts.relatedness_pcrelate:cli_main',
             # the Flagging step of LargeCohort - Relatedness
             'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main',
+            # the Densification of a background population dataset
+            'densify_background_dataset = cpg_workflows.large_cohort.scripts.densify_background_dataset:cli_main',
+            # the Background Stage of Ancestry - LargeCohort
+            'ancestry_add_background = cpg_workflows.large_cohort.scripts.ancestry_add_background:cli_main',
+            # the Background Stage of Ancestry - PCA
+            'ancestry_pca = cpg_workflows.large_cohort.scripts.ancestry_run_pca:cli_main',
+            # the Background Stage of Ancestry - Infer Population Labels
+            'ancestry_infer_labels = cpg_workflows.large_cohort.scripts.ancestry_infer_labels:cli_main',
+            # Generate new intervals from a MatrixTable
+            'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
         ],
     },
 )

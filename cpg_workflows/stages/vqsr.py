@@ -2,8 +2,8 @@
 Stage that performs AS-VQSR.
 """
 
-from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils import Path, to_path
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import vqsr
 from cpg_workflows.targets import MultiCohort
@@ -33,6 +33,10 @@ class Vqsr(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
         number_of_sgids = len(multicohort.get_sequencing_groups())
 
+        intervals_path = None
+        if config_retrieve(['workflow', 'intervals_path'], default=None):
+            intervals_path = to_path(config_retrieve(['workflow', 'intervals_path']))
+
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=siteonly_vcf_path,
@@ -41,7 +45,7 @@ class Vqsr(MultiCohortStage):
             out_path=outputs['siteonly'],
             tmp_prefix=self.tmp_prefix / 'tmp',
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
-            intervals_path=get_config()['workflow'].get('intervals_path'),
+            intervals_path=intervals_path,
             job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)

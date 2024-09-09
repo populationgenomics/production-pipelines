@@ -81,10 +81,23 @@ class CollectReadCounts(SequencingGroupStage):
         if seqgroup.cram is None:
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
-        assert seqgroup.dataset.cohort
+        # get the MultiCohort object
+        ds_cohort = seqgroup.dataset.cohort
+        assert ds_cohort
+        multicohort = ds_cohort.multicohort
+        assert multicohort
+        # identify the cohort that contains this SGID
+        this_cohort: Cohort | None = None
+        for c in multicohort.get_cohorts():
+            if seqgroup.id in c.get_sequencing_group_ids():
+                this_cohort = c
+                break
+
+        if this_cohort is None:
+            raise ValueError(f'Could not find cohort for {seqgroup}')
 
         jobs = gcnv.collect_read_counts(
-            intervals_path=inputs.as_path(seqgroup.dataset.cohort, PrepareIntervals, 'preprocessed'),
+            intervals_path=inputs.as_path(this_cohort, PrepareIntervals, 'preprocessed'),
             cram_path=seqgroup.cram,
             job_attrs=self.get_job_attrs(seqgroup),
             output_base_path=seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
@@ -206,15 +219,30 @@ class GermlineCNVCalls(SequencingGroupStage):
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
-        assert seqgroup.dataset.cohort
-        determine_ploidy = inputs.as_dict(seqgroup.dataset.cohort, DeterminePloidy)
+
+        # get the MultiCohort object
+        ds_cohort = seqgroup.dataset.cohort
+        assert ds_cohort
+        multicohort = ds_cohort.multicohort
+        assert multicohort
+        # identify the cohort that contains this SGID
+        this_cohort: Cohort | None = None
+        for c in multicohort.get_cohorts():
+            if seqgroup.id in c.get_sequencing_group_ids():
+                this_cohort = c
+                break
+
+        if this_cohort is None:
+            raise ValueError(f'Could not find cohort for {seqgroup}')
+
+        determine_ploidy = inputs.as_dict(this_cohort, DeterminePloidy)
 
         # pull the json file with the sgid ordering
-        sgid_ordering = json.load(inputs.as_path(seqgroup.dataset.cohort, SetSGIDOrdering, 'sgid_order').open())
+        sgid_ordering = json.load(inputs.as_path(this_cohort, SetSGIDOrdering, 'sgid_order').open())
 
         jobs = gcnv.postprocess_calls(
             ploidy_calls_path=determine_ploidy['calls'],
-            shard_paths=inputs.as_dict(seqgroup.dataset.cohort, GermlineCNV),
+            shard_paths=inputs.as_dict(this_cohort, GermlineCNV),
             sample_index=sgid_ordering.index(seqgroup.id),
             job_attrs=self.get_job_attrs(seqgroup),
             output_prefix=str(self.prefix / seqgroup.id),
@@ -370,20 +398,34 @@ class RecalculateClusteredQuality(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
-        assert sequencing_group.dataset.cohort
+
+        # get the MultiCohort object - appease mypy along the way
+        ds_cohort = sequencing_group.dataset.cohort
+        assert ds_cohort
+        multicohort = ds_cohort.multicohort
+        assert multicohort
+        # identify the cohort that contains this SGID
+        this_cohort: Cohort | None = None
+        for c in multicohort.get_cohorts():
+            if sequencing_group.id in c.get_sequencing_group_ids():
+                this_cohort = c
+                break
+
+        if this_cohort is None:
+            raise ValueError(f'Could not find cohort for {sequencing_group}')
 
         # get the clustered VCF from the previous stage
-        joint_seg = inputs.as_dict(sequencing_group.dataset.cohort, GCNVJointSegmentation)
+        joint_seg = inputs.as_dict(this_cohort, GCNVJointSegmentation)
 
-        determine_ploidy = inputs.as_dict(sequencing_group.dataset.cohort, DeterminePloidy)
+        determine_ploidy = inputs.as_dict(this_cohort, DeterminePloidy)
         gcnv_call_inputs = inputs.as_dict(sequencing_group, GermlineCNVCalls)
 
         # pull the json file with the sgid ordering
-        sgid_ordering = json.load(inputs.as_path(sequencing_group.dataset.cohort, SetSGIDOrdering, 'sgid_order').open())
+        sgid_ordering = json.load(inputs.as_path(this_cohort, SetSGIDOrdering, 'sgid_order').open())
 
         jobs = gcnv.postprocess_calls(
             ploidy_calls_path=determine_ploidy['calls'],
-            shard_paths=inputs.as_dict(sequencing_group.dataset.cohort, GermlineCNV),
+            shard_paths=inputs.as_dict(this_cohort, GermlineCNV),
             sample_index=sgid_ordering.index(sequencing_group.id),
             job_attrs=self.get_job_attrs(sequencing_group),
             output_prefix=str(self.prefix / sequencing_group.id),

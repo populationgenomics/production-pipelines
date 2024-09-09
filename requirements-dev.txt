@@ -6,3 +6,4 @@ pytest
 pytest_mock
 mypy
 tenacity
+coverage

@@ -409,14 +409,14 @@ class RunHailFiltering(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        # MTs can vary from <10GB for a small exome, to 170GB for a larger one
-        # Genomes are more like 500GB
+        # MTs can vary from <10GB for a small exome, to 170GB for a larger one, Genomes ~500GB
         required_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
         required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
-        job.cpu(required_cpu).storage(required_storage).memory('highmem')
+        # doubling storage due to the repartitioning
+        job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory('highmem')
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),

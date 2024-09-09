@@ -103,6 +103,9 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),
                 meta=metadata,
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
             )
 
             if reported_sex := entry['sample']['participant'].get('reportedSex'):
@@ -165,6 +168,9 @@ def deprecated_create_cohort() -> MultiCohort:
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
                 meta=metadata,
             )
 
@@ -218,20 +224,19 @@ def _populate_alignment_inputs(
     Populate sequencing inputs for a sequencing group
     """
     assays: list[Assay] = []
-    for assay in entry['assays']:
+
+    for assay in entry.get('assays', []):
         _assay = Assay.parse(assay, sequencing_group.id, run_parse_reads=False)
         assays.append(_assay)
 
-    # Check only one assay type per sequencing group
-    assert len(set([assay.assay_type for assay in assays])) == 1
-    sequencing_group.assays[assays[0].assay_type] = tuple(assays)
+    sequencing_group.assays = tuple(assays)
 
-    if len(entry['assays']) > 1:
+    if len(assays) > 1:
         _assay_meta = _combine_assay_meta(assays)
     else:
         _assay_meta = assays[0].meta
-        if _assay_meta.get('reads'):
-            _assay_meta['reads'] = [_assay_meta['reads']]
+        if _reads := _assay_meta.get('reads'):
+            _assay_meta['reads'] = [_reads]
 
     if _assay_meta.get('reads'):
         alignment_input = parse_reads(
@@ -239,7 +244,7 @@ def _populate_alignment_inputs(
             assay_meta=_assay_meta,
             check_existence=check_existence,
         )
-        sequencing_group.alignment_input_by_seq_type[entry['type']] = alignment_input
+        sequencing_group.alignment_input = alignment_input
     else:
         logging.warning(f'No reads found for sequencing group {sequencing_group.id} of type {entry["type"]}')
 
