@@ -394,9 +394,9 @@ class AncestryPCA(CohortStage):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
-            self.required_stages.append(AncestryAddBackground)
+            self.required_stages_classes.append(AncestryAddBackground)
 
-        logging.info(f'AncestryPCA required stages: {self.required_stages}')
+        logging.info(f'AncestryPCA required stages: {self.required_stages_classes}')
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         ancestry_prefix = get_workflow().prefix / 'ancestry'
