@@ -388,6 +388,7 @@ class AncestryPCA(CohortStage):
     """
     Run PCA on the dense MT to get the scores, eigenvalues, and loadings.
     Will run on the dense MT with the background dataset added if large_cohort.pca_background.datasets is set.
+        - Does this by directly appending to the class `Stage` requiresd_stages_classes.
     If not, will bypass adding background and run on the dense MT with the related samples removed.
     """
 
@@ -395,8 +396,6 @@ class AncestryPCA(CohortStage):
         super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
             self.required_stages_classes.append(AncestryAddBackground)
-
-        logging.info(f'AncestryPCA required stages: {self.required_stages_classes}')
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         ancestry_prefix = get_workflow().prefix / 'ancestry'
@@ -458,8 +457,6 @@ class AncestryInfer(CohortStage):
         super().__init__(*args, **kwargs)
         if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
             self.required_stages_classes.append(AncestryAddBackground)
-
-        logging.info(f'AncestryInfer required stages: {self.required_stages_classes}')
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
 
