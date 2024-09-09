@@ -164,7 +164,10 @@ class DenseSubset(CohortStage):
 @stage(required_stages=DenseSubset, analysis_keys=['relatedness_ht'], analysis_type='custom')
 class RelatednessPCRelate(CohortStage):
     """
-    This is the first step of the Relatedness Stage, without Dataproc
+     This is the first step of the Relatedness Stage.
+
+    This stage calculates relatedness between samples using the PC-Relate method.
+    It uses a dense matrix table (MT) as input and produces a Hail table (HT) with relatedness metrics.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -220,6 +223,9 @@ class RelatednessPCRelate(CohortStage):
     analysis_type='custom',
 )
 class RelatednessFlag(CohortStage):
+    """
+    The second step of Relatedness calculation. This stage flags related samples to drop.
+    """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
@@ -278,7 +284,10 @@ class RelatednessFlag(CohortStage):
 @stage()
 class DenseBackground(CohortStage):
     """
-    Will densify a background dataset such as 1KG, HGDP, or 1KG-HGDP
+    Will densify a background dataset such as 1KG, HGDP, or 1KG-HGDP.
+    This stage is run infrequently and only when the background dataset is updated.
+    The densified background dataset is saved to that dataset's bucket as 'dense.mt'.
+    Users can specify multiple background datasets to densify which will be saved to their respective buckets.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -341,7 +350,7 @@ class DenseBackground(CohortStage):
 @stage(required_stages=[DenseSubset, SampleQC, DenseBackground])
 class AncestryAddBackground(CohortStage):
     """
-    optional stage, runs if we need to annotate with background datasets
+    Optional stage that adds a background dataset to the dense MT and sample QC HT.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
