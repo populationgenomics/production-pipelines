@@ -133,27 +133,31 @@ def _mock_cohort():
     mc_dataset = multi_cohort.add_dataset(ds)
     sg1 = ds.add_sequencing_group(
         'CPGAA',
-        'SAMPLE1',
-        alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
+        external_id='SAMPLE1',
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+        alignment_input=BamPath('gs://test-input-dataset-upload/sample1.bam'),
     )
     mc_dataset.add_sequencing_group_object(sg1)
     sg2 = ds.add_sequencing_group(
         'CPGBB',
-        'SAMPLE2',
-        alignment_input_by_seq_type={
-            'genome': FastqPairs(
-                [
-                    FastqPair(
-                        'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
-                        'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
-                    ),
-                    FastqPair(
-                        'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
-                        'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
-                    ),
-                ],
-            ),
-        },
+        external_id='SAMPLE2',
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+        alignment_input=FastqPairs(
+            [
+                FastqPair(
+                    'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
+                    'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
+                ),
+                FastqPair(
+                    'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
+                    'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
+                ),
+            ],
+        ),
     )
     mc_dataset.add_sequencing_group_object(sg2)
 

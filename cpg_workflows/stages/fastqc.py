@@ -37,8 +37,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
     """
     Collect input and output paths for FASTQC for all paths in alignment inputs.
     """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    if not (alignment_input := sequencing_group.alignment_input_by_seq_type.get(sequencing_type)):
+    if not (alignment_input := sequencing_group.alignment_input):
         # Only running FASTQC if sequencing inputs are available.
         return []
 

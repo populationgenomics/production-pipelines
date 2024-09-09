@@ -28,7 +28,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table.
-    receives a vep_version String to determine how data is decoded
+    receives a vep_version str to determine how data is decoded
     """
 
     # check against supported versions
@@ -40,10 +40,10 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
         # Differences relative to the 105 schema:
         # - minimised, int32, new field at top level
         # - seq_region_name, str, new field at top level
-        # - am_class, String, new field in transcript_consequences
+        # - am_class, str, new field in transcript_consequences
         # - am_pathogenicity, Double/float, new field in transcript_consequences
         # - flags, List[str], new field in transcript_consequences
-        # - clin_sig_allele, String, new field in colocated_variants (wrongly absent in prev.?)
+        # - clin_sig_allele, str, new field in colocated_variants (wrongly absent in prev.?)
         # - frequencies, Dict[str, Dict[str, Float]], new struct in colocated_variants
         #   - this is being ignored, cannot be processed using fixed schema
         # - removal of all exac_* fields
@@ -142,6 +142,32 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path, vep_version: str):
                     lof_flags:str,
                     lof_filter:str,
                     lof_info:str,
+                    existing_inframe_oorfs:int32,
+                    existing_outofframe_oorfs:int32,
+                    existing_uorfs:int32,
+                    5utr_consequence:str,
+                    5utr_annotation:dict<
+                        str,
+                        struct{
+                            type:str,
+                            KozakContext:str,
+                            KozakStrength:str,
+                            DistanceToCDS:str,
+                            CapDistanceToStart:str,
+                            DistanceToStop:str,
+                            Evidence:str,
+                            AltStop:str,
+                            AltStopDistanceToCDS:str,
+                            FrameWithCDS:str,
+                            StartDistanceToCDS:str,
+                            newSTOPDistanceToCDS:str,
+                            alt_type:str,
+                            alt_type_length:str,
+                            ref_StartDistanceToCDS:str,
+                            ref_type:str,
+                            ref_type_length:str
+                        }
+                    >,
                     minimised:int32,
                     mirna:array<str>,
                     polyphen_prediction:str,
