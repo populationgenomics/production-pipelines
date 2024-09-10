@@ -179,7 +179,7 @@ class BatchAncestryTest(CohortStage):
         job = get_batch().new_job(f'Run Ancestry PCA: {cohort.name}')
         job.image(image_path('cpg_workflows'))
         job.command(
-            'ancestry_pca '
+            'run_ancestry_pca '
             f'--dense-mt {str(inputs.as_path(cohort, DenseSubset))} '
             f'--sample-qc-ht {str(inputs.as_path(cohort, SampleQC))} '
             f'--relateds-to-drop-ht {str(inputs.as_path(cohort, Relatedness, key="relateds_to_drop"))} '

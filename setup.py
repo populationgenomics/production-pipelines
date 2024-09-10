@@ -69,7 +69,7 @@ setup(
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             # Ancestry
-            'ancestry_pca = cpg_workflows.large_cohort.ancestry_pca:cli_run',
+            'run_ancestry_pca = cpg_workflows.large_cohort.ancestry_pca:cli_run',
         ],
     },
 )
