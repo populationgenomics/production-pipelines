@@ -179,15 +179,15 @@ class BatchAncestryTest(CohortStage):
         job = get_batch().new_job(f'Run Ancestry PCA: {cohort.name}')
         job.image(image_path('cpg_workflows'))
         job.command(
-            'ancestry_pca ',
-            f'--dense-mt {str(inputs.as_path(cohort, DenseSubset))} ',
-            f'--sample-qc-ht {str(inputs.as_path(cohort, SampleQC))} ',
-            f'--relateds-to-drop-ht {str(inputs.as_path(cohort, Relatedness, key="relateds_to_drop"))} ',
-            f'--tmp-prefix {self.tmp_prefix} ',
-            f'--out-scores-ht {self.expected_outputs(cohort)["scores"]} ',
-            f'--out-eigenvalues-ht {self.expected_outputs(cohort)["eigenvalues"]} ',
-            f'--out-loadings-ht {self.expected_outputs(cohort)["loadings"]} ',
-            f'--out-inferred-pop-ht {self.expected_outputs(cohort)["inferred_pop"]} ',
+            'ancestry_pca '
+            f'--dense-mt {str(inputs.as_path(cohort, DenseSubset))} '
+            f'--sample-qc-ht {str(inputs.as_path(cohort, SampleQC))} '
+            f'--relateds-to-drop-ht {str(inputs.as_path(cohort, Relatedness, key="relateds_to_drop"))} '
+            f'--tmp-prefix {self.tmp_prefix} '
+            f'--out-scores-ht {self.expected_outputs(cohort)["scores"]} '
+            f'--out-eigenvalues-ht {self.expected_outputs(cohort)["eigenvalues"]} '
+            f'--out-loadings-ht {self.expected_outputs(cohort)["loadings"]} '
+            f'--out-inferred-pop-ht {self.expected_outputs(cohort)["inferred_pop"]} '
             f'--out-sample-qc-ht {self.expected_outputs(cohort)["sample_qc_ht"]} ',
         )
 
