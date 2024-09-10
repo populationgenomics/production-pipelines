@@ -10,6 +10,7 @@ import hail as hl
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, reference_path
+from cpg_utils.hail_batch import get_batch, init_batch
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
@@ -126,6 +127,9 @@ def run(
         'pop': str
         'prob_<pop>': float64 (for each population label)
     """
+
+    init_batch()
+
     min_pop_prob = get_config()['large_cohort']['min_pop_prob']
     n_pcs = get_config()['large_cohort']['n_pcs']
     dense_mt = hl.read_matrix_table(str(dense_mt_path))
