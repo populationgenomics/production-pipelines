@@ -1,3 +1,4 @@
+import argparse
 import logging
 import pickle
 from os import remove
@@ -351,3 +352,33 @@ def _infer_pop_labels(
 
     pop_ht = pop_ht.annotate(is_training=hl.is_defined(training_pop_ht[pop_ht.key]))
     return pop_ht.checkpoint(str(out_ht_path), overwrite=True)
+
+
+def cli_run():
+    """
+    Command-line entrypoint for running PCA.
+    """
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dense-mt', help='Path to the dense MT')
+    parser.add_argument('--sample-qc-ht', help='Path to the SampleQC HT')
+    parser.add_argument('--relateds-to-drop-ht', help='Path to the relateds to drop HT')
+    parser.add_argument('--tmp-prefix', help='Prefix for temporary files')
+    parser.add_argument('--out-scores-ht', help='Path to write the scores HT')
+    parser.add_argument('--out-eigenvalues-ht', help='Path to write the eigenvalues HT')
+    parser.add_argument('--out-loadings-ht', help='Path to write the loadings HT')
+    parser.add_argument('--out-inferred-pop-ht', help='Path to write the inferred pop HT')
+    parser.add_argument('--out-sample-qc-ht', help='Path to write the updated SampleQC HT')
+    args = parser.parse_args()
+
+    run(
+        dense_mt_path=to_path(args.dense_mt),
+        sample_qc_ht_path=to_path(args.sample_qc_ht),
+        relateds_to_drop_ht_path=to_path(args.relateds_to_drop_ht),
+        tmp_prefix=to_path(args.tmp_prefix),
+        out_scores_ht_path=to_path(args.out_scores_ht),
+        out_eigenvalues_ht_path=to_path(args.out_eigenvalues_ht),
+        out_loadings_ht_path=to_path(args.out_loadings_ht),
+        out_inferred_pop_ht_path=to_path(args.out_inferred_pop_ht),
+        out_sample_qc_ht_path=to_path(args.out_sample_qc_ht),
+    )
