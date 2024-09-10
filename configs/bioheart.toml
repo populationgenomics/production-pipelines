@@ -15,5 +15,5 @@ driver_image = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workfl
 output_prefix = "reported_sex_populated"
 input_cohorts = ["COH708", "COH716", "COH724", "COH732",] #try just bioheart first
 sequencing_type = "genome"
-only_stages = [ "MergeBatchSites",]
+only_stages = [ "GenotypeBatch","MakeCohortVcf","FilterGenotypes"]
 batch_names = ["ca8f1c066de6f98b2f75f62b62a38b54b542d3_248","9643e708e6b9d147cd10909fa3d77d4a55b597_248","e9a59b050a9803021b2f945f3299cd1563d295_248","0d73fe6e408944ffe25adb37def212c9db68b4_246",]
