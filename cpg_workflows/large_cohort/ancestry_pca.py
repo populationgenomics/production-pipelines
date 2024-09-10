@@ -383,3 +383,8 @@ def cli_run():
         out_inferred_pop_ht_path=to_path(args.out_inferred_pop_ht),
         out_sample_qc_ht_path=to_path(args.out_sample_qc_ht),
     )
+
+
+if __name__ == '__main__':
+    logging.basicConfig(level=logging.INFO)
+    cli_run()
