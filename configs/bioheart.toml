@@ -1,0 +1,19 @@
+[workflow]
+check_inputs = true
+skip_sgs_with_missing_input = false
+check_intermediates = false
+check_expected_outputs = false
+reblock_gq_bands = [ 20, 30, 40,]
+name = "gatk_sv"
+ref_fasta = "gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta"
+status_reporter = "metamist"
+ar-guid = "fb11e9c3-913a-44c1-b19e-7c810543c7e8"
+access_level = "full"
+dataset = "bioheart"
+dataset_gcp_project = "bioheart"
+driver_image = "australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.27.0"
+output_prefix = "reported_sex_populated"
+input_cohorts = ["COH708", "COH716", "COH724", "COH732",] #try just bioheart first
+sequencing_type = "genome"
+only_stages = [ "MergeBatchSites",]
+batch_names = ["ca8f1c066de6f98b2f75f62b62a38b54b542d3_248","9643e708e6b9d147cd10909fa3d77d4a55b597_248","e9a59b050a9803021b2f945f3299cd1563d295_248","0d73fe6e408944ffe25adb37def212c9db68b4_246",]
