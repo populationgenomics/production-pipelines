@@ -98,7 +98,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
             update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
             # create a SequencingGroup object from its component parts
-            sequencing_group = cohort.add_sequencing_group(
+            sequencing_group = dataset.add_sequencing_group(
                 id=str(entry['id']),
                 external_id=str(entry['sample']['externalId']),
                 participant_id=entry['sample']['participant'].get('externalId'),

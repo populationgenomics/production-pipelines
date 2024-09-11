@@ -587,7 +587,9 @@ class Dataset(Target):
         """
         Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
         """
-        return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active)]
+        if not self.cohort:
+            return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active)]
+        return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active) and sid in self.cohort.get_sequencing_group_ids()]
 
     def get_job_attrs(self) -> dict:
         """
