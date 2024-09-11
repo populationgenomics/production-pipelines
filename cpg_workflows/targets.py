@@ -14,7 +14,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import dataset_path, get_config, reference_path, web_url
 
 from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
-from .metamist import Assay
+from .metamist import Assay, get_metamist
 
 
 class Target:
@@ -293,12 +293,12 @@ class Cohort(Target):
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
-        Gets a flat list of all sequencing groups from all datasets.
-        Include only "active" sequencing groups (unless only_active is False)
+        Gets a flat list of all sequencing groups from all datasets in the cohort.
         """
         all_sequencing_groups = []
-        for ds in self.get_datasets(only_active=False):
-            all_sequencing_groups.extend(ds.get_sequencing_groups(only_active=only_active))
+        cohort_sgs_by_project = get_metamist().get_sgs_by_project_from_cohort(self.name)
+        for ds in cohort_sgs_by_project:
+            all_sequencing_groups.extend(cohort_sgs_by_project[ds])
         return all_sequencing_groups
 
     def add_dataset(self, dataset: 'Dataset') -> 'Dataset':
