@@ -2,6 +2,7 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
+import copy
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -188,7 +189,8 @@ class MultiCohort(Target):
         if d.name in self._datasets_by_name:
             logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
         else:
-            self._datasets_by_name[d.name] = d
+            # We need perform a deepcopy to avoid manipulating the cohort dataset at this point
+            self._datasets_by_name[d.name] = copy.deepcopy(d)
         return self._datasets_by_name[d.name]
 
     def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:

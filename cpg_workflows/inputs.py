@@ -2,7 +2,6 @@
 Metamist wrapper to get input sequencing groups.
 """
 
-import copy
 import logging
 
 from cpg_utils.config import config_retrieve, update_dict
@@ -73,9 +72,7 @@ def create_multicohort() -> MultiCohort:
     for cohort in multicohort.get_cohorts():
         for dataset in cohort.get_datasets():
             # is this dataset already in the multicohort, if so use it, otherwise add this one
-            # Since datasets are created on the Cohort, and are added to the multicohort, we need to
-            # perform a deepcopy to avoid manipulating the cohort dataset at this point
-            mc_dataset = multicohort.add_dataset(copy.deepcopy(dataset))
+            mc_dataset = multicohort.add_dataset(dataset)
             for sg in dataset.get_sequencing_groups():
                 # add each SG object to the MultiCohort level Dataset
                 mc_dataset.add_sequencing_group_object(sg)
