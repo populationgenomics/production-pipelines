@@ -28,7 +28,7 @@ job.command(
     f'--mt {args.mt} '
     f'--out {job.output} '
     f'--meres_file {meres_in} '
-    f'--intervals {args.intervals}'
+    f'--intervals {args.intervals} '
     f'--max_length {args.max_length}',
 )
 get_batch().write_output(job.output, args.out)
