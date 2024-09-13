@@ -120,12 +120,12 @@ def split_interval(interval: tuple[str, int, int], max_interval_size: int) -> li
 
 
 def polish_intervals(
-    naive_intervals: list[tuple[str, int, int]], 
-    meres_file: str, 
+    naive_intervals: list[tuple[str, int, int]],
+    meres_file: str,
     max_length: int = 3000000,
 ) -> list[tuple[str, int, int]]:
     """
-    Polish intervals by splitting/removing centromere and telomere regions 
+    Polish intervals by splitting/removing centromere and telomere regions
     and setting a max interval length
     Args:
         naive_intervals (list): naive intervals, each limited to a single contig
