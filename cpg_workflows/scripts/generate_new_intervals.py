@@ -100,6 +100,25 @@ def overlaps(a: tuple[int, int], b: tuple[int, int]) -> int:
     return 0
 
 
+def split_interval(interval: tuple[str, int, int], max_interval_size: int) -> list[tuple[str, int, int]]:
+    """
+    Split an interval into approximately evenly sized smaller intervals of at most max_interval_size bp
+    """
+    chrom, start, end = interval
+    interval_size = end - start
+
+    num_splits = (interval_size + max_interval_size - 1) // max_interval_size
+    split_size = interval_size // num_splits
+
+    new_intervals = []
+    for i in range(num_splits):
+        new_start = start + i * split_size
+        new_end = new_start + split_size if i < num_splits - 1 else end
+        new_intervals.append((chrom, new_start, new_end))
+
+    return new_intervals
+
+
 def polish_intervals(
     naive_intervals: list[tuple[str, int, int]], 
     meres_file: str, 
@@ -158,10 +177,7 @@ def polish_intervals(
         # check the length of the interval
         if end - start > max_length:
             # split the interval
-            for new_start in range(start, end, max_length):
-                new_end = min(new_start + max_length, end)
-                new_intervals.append((chrom, new_start, new_end))
-            continue
+            new_intervals.extend(split_interval((chrom, start, end), max_length))
         new_intervals.append((chrom, start, end))
 
     logging.info(f'Final intervals: {len(new_intervals)}')
