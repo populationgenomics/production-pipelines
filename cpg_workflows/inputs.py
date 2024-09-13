@@ -66,16 +66,18 @@ def create_multicohort() -> MultiCohort:
         # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
         _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
-    # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
-    # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
-    # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
-    for cohort in multicohort.get_cohorts():
-        for dataset in cohort.get_datasets():
-            # is this dataset already in the multicohort, if so use it, otherwise add this one
-            mc_dataset = multicohort.add_dataset(dataset)
-            for sg in dataset.get_sequencing_groups():
-                # add each SG object to the MultiCohort level Dataset
-                mc_dataset.add_sequencing_group_object(sg)
+    # TODO: (vivbak) Remove this broken block of code to unblock. Temporary measure. Will fix asap.
+
+    # # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
+    # # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
+    # # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
+    # for cohort in multicohort.get_cohorts():
+    #     for dataset in cohort.get_datasets():
+    #         # is this dataset already in the multicohort, if so use it, otherwise add this one
+    #         mc_dataset = multicohort.add_dataset(dataset)
+    #         for sg in dataset.get_sequencing_groups():
+    #             # add each SG object to the MultiCohort level Dataset
+    #             mc_dataset.add_sequencing_group_object(sg)
 
     return multicohort
 
