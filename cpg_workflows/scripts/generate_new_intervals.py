@@ -178,6 +178,7 @@ def polish_intervals(
         if end - start > max_length:
             # split the interval
             new_intervals.extend(split_interval((chrom, start, end), max_length))
+            continue
         new_intervals.append((chrom, start, end))
 
     logging.info(f'Final intervals: {len(new_intervals)}')
