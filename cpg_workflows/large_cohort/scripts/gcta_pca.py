@@ -20,7 +20,7 @@ def cli_main():
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    main(dense_mt=args.dense_mt_path, output_path=args.output_path)
+    main(dense_mt_path=args.dense_mt_path, output_path=args.output_path)
 
 
 def main(dense_mt_path: str, output_path: str):
