@@ -100,9 +100,33 @@ def overlaps(a: tuple[int, int], b: tuple[int, int]) -> int:
     return 0
 
 
-def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: str) -> list[tuple[str, int, int]]:
+def split_interval(interval: tuple[str, int, int], max_interval_size: int) -> list[tuple[str, int, int]]:
+    """
+    Split an interval into approximately evenly sized smaller intervals of at most max_interval_size bp
+    """
+    chrom, start, end = interval
+    interval_size = end - start
+
+    num_splits = (interval_size + max_interval_size - 1) // max_interval_size
+    split_size = interval_size // num_splits
+
+    new_intervals = []
+    for i in range(num_splits):
+        new_start = start + i * split_size
+        new_end = new_start + split_size if i < num_splits - 1 else end
+        new_intervals.append((chrom, new_start, new_end))
+
+    return new_intervals
+
+
+def polish_intervals(
+    naive_intervals: list[tuple[str, int, int]],
+    meres_file: str,
+    max_length: int = 3000000,
+) -> list[tuple[str, int, int]]:
     """
     Polish intervals by splitting/removing centromere and telomere regions
+    and setting a max interval length
     Args:
         naive_intervals (list): naive intervals, each limited to a single contig
         meres_file (str): path to file containing centromere and telomere regions
@@ -149,6 +173,12 @@ def polish_intervals(naive_intervals: list[tuple[str, int, int]], meres_file: st
                 if end > centro_region[1]:
                     new_intervals.append((chrom, centro_region[1], end))
                 continue
+
+        # check the length of the interval
+        if end - start > max_length:
+            # split the interval
+            new_intervals.extend(split_interval((chrom, start, end), max_length))
+            continue
         new_intervals.append((chrom, start, end))
 
     logging.info(f'Final intervals: {len(new_intervals)}')
@@ -161,22 +191,23 @@ def cli_main():
     parser.add_argument('--mt', help='Input MatrixTable')
     parser.add_argument('--out', help='Output intervals file')
     parser.add_argument('--intervals', help='Intervals to generate', type=int, default=100)
+    parser.add_argument('--max_length', help='Max length of an interval', type=int, default=3000000)
     parser.add_argument('--meres_file', help='interval_list file of Centromere & telomere regions')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    main(args.mt, args.out, intervals=args.intervals, meres=args.meres_file)
+    main(args.mt, args.out, intervals=args.intervals, max_length=args.max_length, meres=args.meres_file)
 
 
-def main(mt: str, out: str, intervals: int, meres: str):
+def main(mt: str, out: str, intervals: int, max_length: int, meres: str):
     init_batch()
     mt = hl.read_matrix_table(mt)
 
     # generate rough intervals based on the rows in this MT
     new_intervals = get_naive_intervals(mt, intervals)
 
-    # polish the intervals by dodging centromeres and telomeres
-    better_intervals = polish_intervals(new_intervals, meres)
+    # polish the intervals by dodging centromeres and telomeres and capping the length
+    better_intervals = polish_intervals(new_intervals, meres, max_length)
     with open(out, 'w') as f:
         for contig, start, end in better_intervals:
             f.write(f'{contig}\t{start}\t{end}\n')
