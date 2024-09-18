@@ -26,6 +26,7 @@ def cli_main():
 def main(dense_mt_path: str, output_path: str):
 
     dense_mt = hl.read_matrix_table(dense_mt_path)
+    output_path = output_path + '/v1'
     hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
 
 
