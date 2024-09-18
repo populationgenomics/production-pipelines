@@ -139,3 +139,4 @@ dockers/cpg_pipes
 .vscode/
 notebooks
 .scannerwork/
+test-execution.xml
