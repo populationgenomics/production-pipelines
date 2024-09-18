@@ -15,12 +15,12 @@ def cli_main():
     init_batch()
 
     parser = ArgumentParser()
-    parser.add_argument('--dense-mt', help='Path to the dense MT')
+    parser.add_argument('--dense-mt-path', help='Path to the dense MT')
     parser.add_argument('--output-path', help='Path to the output plink files')
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
-    main(dense_mt=args.dense_mt, output_path=args.output_path)
+    main(dense_mt=args.dense_mt_path, output_path=args.output_path)
 
 
 def main(dense_mt_path: str, output_path: str):
