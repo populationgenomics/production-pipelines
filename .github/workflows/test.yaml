@@ -26,6 +26,7 @@ jobs:
         run: pip install .[test]
 
       - name: Run unit tests
+        id: runtests
         timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
@@ -53,6 +54,14 @@ jobs:
         with:
           files: ./coverage.xml
           token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Fail if unit tests are not passing
+        if: ${{ steps.runtests.outputs.rc != 0}}
+        uses: actions/github-script@v6
+        with:
+          script: |
+            core.setFailed('Unittests failed with rc = ${{ steps.runtests.outputs.rc }}')
+
 
   sonarqube:
     name: SonarQube scan
