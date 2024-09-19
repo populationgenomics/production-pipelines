@@ -11,16 +11,6 @@ from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch, init_batch
 
 
-def import_plink_files(output_path: str) -> hl.MatrixTable:
-    return dict(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
-
-
-def create_plink_files(dense_mt_path: str, output_path: str) -> hl.MatrixTable:
-    dense_mt = hl.read_matrix_table(dense_mt_path)
-    hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
-    return dict(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
-
-
 def cli_main():
 
     init_batch()
@@ -45,15 +35,15 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
 
     output_path = output_path + f'/{version}'
     if create_plink:
-        plink_files = create_plink_files(dense_mt_path=dense_mt_path, output_path=output_path)
-    else:
-        plink_files = import_plink_files(output_path=output_path)
+        dense_mt = hl.read_matrix_table(dense_mt_path)
+        hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
 
     b = get_batch()
+    bfile = b.read_input_group(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
     j = b.new_job('Create GRM')
     j.image(image_path('gcta'))
     j.command(
-        f'gcta --bfile {output_path} --make-grm --out {j.out_grm}',
+        f'gcta --bfile {bfile} --make-grm --out {j.out_grm}',
     )
 
     b.write_output(j.out_grm, f'{output_path}.grm')
