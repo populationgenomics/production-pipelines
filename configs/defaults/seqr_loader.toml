@@ -67,6 +67,7 @@ indel_filter_level = 99.0
 [cramqc]
 assume_sorted = true
 num_pcs = 4
+readgroup_metrics = false
 
 [qc_thresholds.genome.min]
 "MEDIAN_COVERAGE" = 10
