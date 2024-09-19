@@ -299,10 +299,9 @@ def picard_collect_metrics(
     assert cram_path.index_path
 
     if config_retrieve(['cramqc', 'readgroup_metrics'], default=False):
-        readgroup_metrics = """ \\
-            METRIC_ACCUMULATION_LEVEL=READ_GROUP """
+        readgroup_metrics = "METRIC_ACCUMULATION_LEVEL=READ_GROUP"
     else:
-        readgroup_metrics = ""
+        readgroup_metrics = "METRIC_ACCUMULATION_LEVEL=SAMPLE"
 
     cmd = f"""\
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
@@ -326,7 +325,7 @@ def picard_collect_metrics(
       PROGRAM=CollectBaseDistributionByCycle \\
       PROGRAM=CollectQualityYieldMetrics \\
       METRIC_ACCUMULATION_LEVEL=null \\
-      METRIC_ACCUMULATION_LEVEL=SAMPLE {readgroup_metrics}
+      {readgroup_metrics}
 
     ls $BATCH_TMPDIR/
     cp $BATCH_TMPDIR/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
