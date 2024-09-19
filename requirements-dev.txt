@@ -7,3 +7,4 @@ pytest_mock
 mypy
 tenacity
 coverage
+setuptools>=65.5.1 # not directly required, pinned by pip-audit to avoid a vulnerability
