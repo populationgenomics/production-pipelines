@@ -7,22 +7,18 @@ from argparse import ArgumentParser
 
 import hail as hl
 
+from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch, init_batch
 
 
 def import_plink_files(output_path: str) -> hl.MatrixTable:
-    return hl.import_plink(
-        bed=f'{output_path}.bed',
-        bim=f'{output_path}.bim',
-        fam=f'{output_path}.fam',
-        reference_genome='GRCh38',
-    )
+    return dict(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
 
 
 def create_plink_files(dense_mt_path: str, output_path: str) -> hl.MatrixTable:
     dense_mt = hl.read_matrix_table(dense_mt_path)
     hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
-    return import_plink_files(output_path)
+    return dict(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
 
 
 def cli_main():
@@ -53,9 +49,23 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
     else:
         plink_files = import_plink_files(output_path=output_path)
 
-    j = get_batch().new_job('Create GRM')
-    j.image('gcta')
-    j.command()
+    b = get_batch()
+    # create_plink_j = b.new_job('Create Plink files')
+    # create_plink_j.image(image_path('cpg_workflows'))
+    # create_plink_j.declare_resource_group(ofile={
+    #     'bed': '{root}.bed',
+    #     'bim': '{root}.bim',
+    #     'fam': '{root}.fam',
+    # })
+
+    j = b.new_job('Create GRM')
+    j.image(image_path('gcta'))
+    j.command(
+        f'gcta --bfile {output_path} --make-grm --out {j.out_grm}',
+    )
+
+    b.write_output(j.out_grm, f'{output_path}.grm')
+    b.run()
 
 
 if __name__ == '__main__':
