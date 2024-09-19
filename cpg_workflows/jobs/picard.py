@@ -298,7 +298,7 @@ def picard_collect_metrics(
 
     assert cram_path.index_path
 
-    if config_retrieve(['workflow', 'cramqc', 'readgroup_metrics'], default=False):
+    if config_retrieve(['cramqc', 'readgroup_metrics'], default=False):
         readgroup_metrics = """ \\
             METRIC_ACCUMULATION_LEVEL=READ_GROUP """
     else:
