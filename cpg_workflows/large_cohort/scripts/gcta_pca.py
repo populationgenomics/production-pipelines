@@ -50,14 +50,6 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
         plink_files = import_plink_files(output_path=output_path)
 
     b = get_batch()
-    # create_plink_j = b.new_job('Create Plink files')
-    # create_plink_j.image(image_path('cpg_workflows'))
-    # create_plink_j.declare_resource_group(ofile={
-    #     'bed': '{root}.bed',
-    #     'bim': '{root}.bim',
-    #     'fam': '{root}.fam',
-    # })
-
     j = b.new_job('Create GRM')
     j.image(image_path('gcta'))
     j.command(
