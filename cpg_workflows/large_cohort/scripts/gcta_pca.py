@@ -56,7 +56,7 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
         },
     )
     j.command(
-        f'gcta --bfile {bfile} --make-grm --out {j.ofile}',
+        f'gcta --bfile {bfile} --make-grm --out {j.ofile} && ls -l {j.ofile}',
     )
 
     b.write_output(j.ofile, f'{output_path}')
