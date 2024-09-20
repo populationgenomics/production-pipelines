@@ -47,11 +47,19 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
         f"awk '{{sub(/^chr/, \"\", $1); print}}' {bfile.bim} > {bfile.bim}.tmp && mv {bfile.bim}.tmp {bfile.bim}"
     )
     j.command(edit_chr_cmd)
+    j.declare_resource_group(
+        ofile={
+            'bin': '{root}.grm.bin',
+            'id': '{root}.grm.id',
+            'nbin': '{root}.grm.N.bin',
+            'log': '{root}.grm.log',
+        },
+    )
     j.command(
-        f'gcta --bfile {bfile} --make-grm --out {j.out_grm}',
+        f'gcta --bfile {bfile} --make-grm --out {j.ofile}',
     )
 
-    b.write_output(j.out_grm, f'{output_path}.grm')
+    b.write_output(j.ofile, f'{output_path}')
     b.run()
 
 
