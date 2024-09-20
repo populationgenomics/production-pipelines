@@ -40,8 +40,13 @@ def main(dense_mt_path: str, output_path: str, version: str, create_plink: bool 
 
     b = get_batch()
     bfile = b.read_input_group(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
+    # GCTA needs chromosome names to be numbers in .bim file
     j = b.new_job('Create GRM')
     j.image(image_path('gcta'))
+    edit_chr_cmd = (
+        f"awk '{{sub(/^chr/, \"\", $1); print}}' {bfile.bim} > {bfile.bim}.tmp && mv {bfile.bim}.tmp {bfile.bim}"
+    )
+    j.command(edit_chr_cmd)
     j.command(
         f'gcta --bfile {bfile} --make-grm --out {j.out_grm}',
     )
