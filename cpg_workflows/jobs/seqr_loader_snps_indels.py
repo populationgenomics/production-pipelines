@@ -2,26 +2,17 @@
 Create Hail Batch jobs for seqr_loader SNPs and Indels cohort annotation.
 """
 
-import logging
-import math
-from enum import Enum
-
-import pandas as pd
-
 import hailtop.batch as hb
-from hailtop.batch import Resource
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import config_retrieve, image_path, reference_path
-from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_command
-from cpg_workflows.filetypes import GvcfPath
-from cpg_workflows.query_modules import seqr_loader, seqr_loader_sv
-from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
+from cpg_utils.config import config_retrieve, image_path
+from cpg_utils.hail_batch import command, get_batch, query_command
+from cpg_workflows.query_modules import seqr_loader
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import can_reuse
 
 from .picard import get_intervals
-from .vcf import gather_vcfs
 
 
 def annotate_cohort_jobs_snps_indels(

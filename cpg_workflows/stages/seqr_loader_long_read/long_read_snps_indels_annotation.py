@@ -1,16 +1,17 @@
 """
-Workflow for finding long-read SV files, updating file contents, merging, and annotating the results
+Workflow for finding long-read SNPs_Indels files, updating file contents, merging, and annotating the results
 """
 
 from functools import cache
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
+from cpg_utils import Path, to_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
-from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre_job, queue_annotate_sv_jobs
+from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs
+from cpg_workflows.jobs.seqr_loader_snps_indels import annotate_cohort_jobs_snps_indels, split_vcf_for_vep
+from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
 from cpg_workflows.utils import get_logger
@@ -25,6 +26,8 @@ from cpg_workflows.workflow import (
 )
 from metamist.graphql import gql, query
 
+from ...resources import joint_calling_scatter_count
+
 VCF_QUERY = gql(
     """
     query MyQuery($dataset: String!) {
@@ -33,6 +36,7 @@ VCF_QUERY = gql(
       id
       analyses(type: {eq: "pacbio_vcf"}) {
         output
+        outputs
       }
     }
   }
@@ -41,9 +45,9 @@ VCF_QUERY = gql(
 
 
 @cache
-def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
+def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
     """
-    query metamist for the PacBio SV VCFs
+    query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
     this is cached - used in a SequencingGroupStage, but we only want to query for it once instead of once/SG
 
@@ -51,32 +55,38 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
         dataset_name (str):
 
     Returns:
-        a dictionary of the SG IDs and their phased SV VCF
+        a dictionary of the SG IDs and their phased SNPs Indels VCF
     """
     return_dict: dict[str, str] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg_id_section in analysis_results['project']['sequencingGroups']:
         for analysis in sg_id_section['analyses']:
-            if analysis['output'].endswith('.SVs.phased.vcf.gz'):
+            # check 'output' (old string path format) and 'outputs' (new dict format)
+            if analysis['output'].endswith('SNPs_Indels.phased.vcf.gz'):
                 return_dict[sg_id_section['id']] = analysis['output']
+                continue
+            if isinstance(analysis['outputs'], dict):
+                if analysis['outputs'].get('path').endswith('SNPs_Indels.phased.vcf.gz'):
+                    return_dict[sg_id_section['id']] = analysis['outputs'].get('path')
+                    break
 
     return return_dict
 
 
 @stage
-class ReFormatPacBioSVs(SequencingGroupStage):
+class ReFormatPacBioSNPsIndels(SequencingGroupStage):
     """
-    take each of the long-read SV VCFs, and re-format the contents
+    take each of the long-read SNPs Indels VCFs, and re-format the contents
     the huge REF strings are just not required
     a symbolic ALT allele (instead of "N") is required for annotation
-    adds a unique ID to each record, so that GATK-SV can do its weird sorting
+    adds a unique ID to each record, so that GATK-SV can do its weird sorting (is this necessary for SNPs?)
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         sgid_prefix = sequencing_group.dataset.prefix() / 'pacbio' / 'modified_vcfs'
         return {
-            'vcf': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz',
-            'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
+            'vcf': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_snps_indels.vcf.bgz',
+            'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_snps_indels.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
@@ -87,18 +97,18 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         """
 
         # find the vcf for this SG
-        query_result = query_for_sv_vcfs(dataset_name=sg.dataset.name)
+        query_result = query_for_snps_indels_vcfs(dataset_name=sg.dataset.name)
 
         expected_outputs = self.expected_outputs(sg)
 
         # instead of handling, we should probably just exclude this and run again
         if sg.id not in query_result:
-            raise ValueError(f'No SV VCFs recorded for {sg.id}')
+            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id}')
 
-        lr_sv_vcf: str = query_result[sg.id]
-        local_vcf = get_batch().read_input(lr_sv_vcf)
+        lr_snps_indels_vcf: str = query_result[sg.id]
+        local_vcf = get_batch().read_input(lr_snps_indels_vcf)
 
-        mod_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
+        mod_job = get_batch().new_bash_job(f'Convert {lr_snps_indels_vcf} prior to annotation')
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
@@ -131,16 +141,16 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         return self.make_outputs(target=sg, jobs=[mod_job, tabix_job], data=expected_outputs)
 
 
-@stage(required_stages=ReFormatPacBioSVs)
-class MergeLongReadSVs(MultiCohortStage):
+@stage(required_stages=ReFormatPacBioSNPsIndels)
+class MergeLongReadSNPsIndels(MultiCohortStage):
     """
     find all the amended VCFs, and do a naive merge into one huge VCF
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
-            'vcf': self.prefix / 'merged_reformatted_svs.vcf.bgz',
-            'index': self.prefix / 'merged_reformatted_svs.vcf.bgz.tbi',
+            'vcf': self.prefix / 'merged_reformatted_snps_indels.vcf.bgz',
+            'index': self.prefix / 'merged_reformatted_snps_indels.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -151,14 +161,14 @@ class MergeLongReadSVs(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         # do a bcftools merge on all input files
-        modified_vcfs = inputs.as_dict_by_target(ReFormatPacBioSVs)
+        modified_vcfs = inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
             for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in multicohort.get_sequencing_group_ids()]
         ]
 
-        merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
+        merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
         merge_job.image(image=image_path('bcftools'))
 
         # guessing at resource requirements
@@ -185,69 +195,110 @@ class MergeLongReadSVs(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=merge_job)
 
 
-@stage(required_stages=MergeLongReadSVs, analysis_type='sv', analysis_keys=['annotated_vcf'])
-class AnnotateLongReadSVs(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {
-            'annotated_vcf': self.prefix / 'annotated_long_read_svs.vcf.bgz',
-            'annotated_vcf_index': self.prefix / 'annotated_long_read_svs.vcf.bgz.tbi',
-        }
+@stage(required_stages=MergeLongReadSNPsIndels)
+class SiteOnlyVCFs(MultiCohortStage):
+    """
+    Get the site-only VCFs from the merged VCF
+    """
 
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """
-        use the communal GATK-SV wrapper to annotate this merged VCF
+        Generate site-only VCFs from the merged VCF.
         """
-        expected_out = self.expected_outputs(multicohort)
-
-        billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
-
-        job_or_none = queue_annotate_sv_jobs(
-            cohort=multicohort,
-            cohort_prefix=self.prefix,
-            input_vcf=inputs.as_dict(multicohort, MergeLongReadSVs)['vcf'],
-            outputs=expected_out,
-            labels=billing_labels,
-        )
-        return self.make_outputs(multicohort, data=expected_out, jobs=job_or_none)
-
-
-@stage(required_stages=AnnotateLongReadSVs)
-class AnnotateLongReadSVsWithStrvctvre(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
-            'strvctvre_vcf': self.prefix / 'strvctvre_annotated.vcf.gz',
-            'strvctvre_vcf_index': self.prefix / 'strvctvre_annotated.vcf.gz.tbi',
+            'siteonly': to_path(self.prefix / 'long_read' / 'siteonly.vcf.gz'),
+            'siteonly_part_pattern': str(self.prefix / 'long_read' / 'siteonly_parts' / 'part{idx}.vcf.gz'),
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Submit jobs.
+        """
+        jobs = []
+        outputs = self.expected_outputs(multicohort)
+        scatter_count = joint_calling_scatter_count(len(multicohort.get_sequencing_groups()))
+        out_siteonly_vcf_part_paths = [
+            to_path(outputs['siteonly_part_pattern'].format(idx=idx)) for idx in range(scatter_count)
+        ]
 
-        input_dict = inputs.as_dict(multicohort, AnnotateLongReadSVs)
-        input_vcf = get_batch().read_input_group(
-            vcf=str(input_dict['annotated_vcf']),
-            vcf_index=str(input_dict['annotated_vcf_index']),
-        )['vcf']
-        expected_out = self.expected_outputs(multicohort)
+        intervals_path = None
+        if config_retrieve(['workflow', 'intervals_path'], default=None):
+            intervals_path = to_path(config_retrieve(['workflow', 'intervals_path']))
 
-        strvctvre_job = queue_annotate_strvctvre_job(
-            input_vcf,
-            str(expected_out['strvctvre_vcf']),
-            self.get_job_attrs(),
+        exclude_intervals_path = None
+        if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
+            exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
+
+        vcf_jobs = split_vcf_for_vep(
+            b=get_batch(),
+            merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
+            tmp_bucket=self.tmp_prefix / 'tmp',
+            out_siteonly_vcf_path=outputs['siteonly'],
+            out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
+            intervals_path=intervals_path,
+            exclude_intervals_path=exclude_intervals_path,
+            job_attrs=self.get_job_attrs(),
+            scatter_count=scatter_count,
         )
+        jobs.extend(vcf_jobs)
+        for job in jobs:
+            assert job
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
-        return self.make_outputs(multicohort, data=expected_out, jobs=strvctvre_job)
 
-
-@stage(required_stages=AnnotateLongReadSVsWithStrvctvre)
-class AnnotateCohortLRSv(MultiCohortStage):
+@stage(required_stages=[SiteOnlyVCFs])
+class VepLRS(MultiCohortStage):
     """
-    First step to transform annotated SV callset data into a seqr ready format
+    Run VEP on the long-read site-only VCFs and write out a Hail table.
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort):
+        """
+        Expected to write a hail table.
+        """
+        return {'ht': self.prefix / 'long_read' / 'vep.ht'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Submit jobs.
+        """
+        outputs = self.expected_outputs(multicohort)
+        scatter_count = joint_calling_scatter_count(len(multicohort.get_sequencing_groups()))
+        input_siteonly_vcf_part_paths = [
+            to_path(
+                inputs.as_str(
+                    stage=SiteOnlyVCFs,
+                    target=multicohort,
+                    key='siteonly_part_pattern',
+                ).format(idx=idx),
+            )
+            for idx in range(scatter_count)
+        ]
+
+        jobs = add_vep_jobs(
+            get_batch(),
+            input_siteonly_vcf_path=inputs.as_path(multicohort, stage=SiteOnlyVCFs, key='siteonly'),
+            input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
+            out_path=outputs['ht'],
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            job_attrs=self.get_job_attrs(),
+            scatter_count=scatter_count,
+        )
+        return self.make_outputs(multicohort, outputs, jobs)
+
+
+
+@stage(required_stages=VepLRS)
+class AnnotateCohortLRSNPsIndels(MultiCohortStage):
+    """
+    First step to transform annotated SNPs Indels callset data into a seqr ready format
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         """
         Expected to write a matrix table.
         """
-        return {'mt': self.prefix / 'cohort_sv.mt'}
+        return {'mt': self.prefix / 'cohort_snps_indels.mt'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -255,9 +306,9 @@ class AnnotateCohortLRSv(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_path(target=multicohort, stage=AnnotateLongReadSVsWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
 
-        job = annotate_cohort_jobs_sv(
+        job = annotate_cohort_jobs_snps_indels(
             vcf_path=vcf_path,
             out_mt_path=outputs['mt'],
             checkpoint_prefix=self.tmp_prefix / 'checkpoints',
@@ -267,11 +318,10 @@ class AnnotateCohortLRSv(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AnnotateCohortLRSv], analysis_type='sv', analysis_keys=['mt'])
-class AnnotateDatasetLRSv(DatasetStage):
+@stage(required_stages=[AnnotateCohortLRSNPsIndels], analysis_type='custom', analysis_keys=['mt'])
+class AnnotateDatasetLRSNPsIndels(DatasetStage):
     """
     Subset the MT to be this Dataset only
-    Then work up all the genotype values
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict:
@@ -279,7 +329,7 @@ class AnnotateDatasetLRSv(DatasetStage):
         Expected to generate a matrix table
         """
 
-        return {'mt': (dataset.prefix() / 'mt' / f'LongReadSV-{get_workflow().output_version}-{dataset.name}.mt')}
+        return {'mt': (dataset.prefix() / 'mt' / f'LongReadSNPsIndels-{get_workflow().output_version}-{dataset.name}.mt')}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -292,13 +342,13 @@ class AnnotateDatasetLRSv(DatasetStage):
         """
         assert dataset.cohort
         assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSv, key='mt')
+        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSNPsIndels, key='mt')
 
         outputs = self.expected_outputs(dataset)
 
         checkpoint_prefix = dataset.tmp_prefix() / dataset.name / 'checkpoints'
 
-        jobs = annotate_dataset_jobs_sv(
+        jobs = annotate_dataset_jobs(
             mt_path=mt_path,
             sgids=dataset.get_sequencing_group_ids(),
             out_mt_path=outputs['mt'],
@@ -310,10 +360,10 @@ class AnnotateDatasetLRSv(DatasetStage):
 
 
 @stage(
-    required_stages=[AnnotateDatasetLRSv],
+    required_stages=[AnnotateDatasetLRSNPsIndels],
     analysis_type='es-index',
     analysis_keys=['index_name'],
-    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SV'},
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'SNV_INDEL'},
 )
 class MtToEsLrSv(DatasetStage):
     """
@@ -326,7 +376,7 @@ class MtToEsLrSv(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
-        index_name = f'{dataset.name}-{sequencing_type}-LR-SV-{get_workflow().run_timestamp}'.lower()
+        index_name = f'{dataset.name}-{sequencing_type}-LR-SNPsIndels-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
@@ -351,7 +401,7 @@ class MtToEsLrSv(DatasetStage):
         outputs = self.expected_outputs(dataset)
 
         # get the absolute path to the MT
-        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetLRSv, key='mt'))
+        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetLRSNPsIndels, key='mt'))
         # and just the name, used after localisation
         mt_name = mt_path.split('/')[-1]
 
