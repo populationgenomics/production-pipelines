@@ -86,9 +86,9 @@ def main(
         keep_file = f'{version}.indi.list'
         keep_flag = f'--keep {keep_file}'
         # write each sg id on new line to a file
-        with open(keep_file, 'w') as f:
-            for sgid in sgids_to_keep:
-                f.write(f'{sgid}\n')
+        keep_contents = '\n'.join(sgids_to_keep)
+        collate_relateds_cmd = f'printf {keep_contents} > {keep_file}'
+        run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
         f'gcta --grm {create_GRM_j.ofile} {keep_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
