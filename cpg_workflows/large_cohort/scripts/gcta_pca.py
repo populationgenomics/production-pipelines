@@ -87,7 +87,7 @@ def main(
         keep_flag = f'--keep {keep_file}'
         # write each sg id on new line to a file
         keep_contents = '\n'.join(sgids_to_keep)
-        collate_relateds_cmd = f'printf "{keep_contents} >> {keep_file}"'
+        collate_relateds_cmd = f'printf "{keep_contents}" >> {keep_file}'
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
