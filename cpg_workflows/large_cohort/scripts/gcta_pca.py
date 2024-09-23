@@ -57,7 +57,6 @@ def main(dense_mt_path: str, output_path: str, version: str, n_pcs: int, create_
             'bin': '{root}.grm.bin',
             'id': '{root}.grm.id',
             'nbin': '{root}.grm.N.bin',
-            'log': '{root}.grm.log',
         },
     )
     create_GRM_j.command(
