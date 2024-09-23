@@ -20,6 +20,7 @@ def cli_main():
     parser.add_argument('--output-path', help='Path to the output plink files')
     parser.add_argument('--version', help='Version of the plink files')
     parser.add_argument('--n-pcs', help='Number of PCs to compute', default=10)
+    parser.add_argument('--relateds-to-drop', help='HT of relateds to drop', default=None)
     parser.add_argument('--create-plink', help='Create plink files', action='store_true')
     args = parser.parse_args()
 
@@ -29,15 +30,23 @@ def cli_main():
         output_path=args.output_path,
         version=args.version,
         n_pcs=args.n_pcs,
+        relateds_to_drop=args.relateds_to_drop,
         create_plink=args.create_plink,
     )
 
 
-def main(dense_mt_path: str, output_path: str, version: str, n_pcs: int, create_plink: bool | None = False):
+def main(
+    dense_mt_path: str,
+    output_path: str,
+    version: str,
+    n_pcs: int,
+    relateds_to_drop: str,
+    create_plink: bool | None = False,
+):
 
     output_path = output_path + f'/{version}'
+    dense_mt = hl.read_matrix_table(dense_mt_path)
     if create_plink:
-        dense_mt = hl.read_matrix_table(dense_mt_path)
         hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
 
     b = get_batch()
@@ -72,8 +81,16 @@ def main(dense_mt_path: str, output_path: str, version: str, n_pcs: int, create_
             'eigenval': '{root}.eigenval',
         },
     )
+    if relateds_to_drop := hl.read_table(relateds_to_drop):
+        sgids_to_keep = set(dense_mt.s.collect()) - set(relateds_to_drop.s.collect())
+        keep_file = f'{version}.indi.list'
+        keep_flag = f'--keep {keep_file}'
+        # write each sg id on new line to a file
+        collate_relateds_cmd = "{} > {}".format('\n'.join(sgids_to_keep), keep_file)
+        run_PCA_j.command(collate_relateds_cmd)
+
     run_PCA_j.command(
-        f'gcta --grm {create_GRM_j.ofile} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {create_GRM_j.ofile} {keep_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(create_GRM_j.ofile, f'{output_path}')
