@@ -84,10 +84,10 @@ def main(
     if relateds_to_drop := hl.read_table(relateds_to_drop):
         sgids_to_keep = set(dense_mt.s.collect()) - set(relateds_to_drop.s.collect())
         keep_file = f'{version}.indi.list'
-        keep_flag = f'--keep {keep_file}'
+        keep_flag = f'--keep ${{BATCH_TMPDIR}}/{keep_file}'
         # write each sg id on new line to a file
         keep_contents = '\n'.join(sgids_to_keep)
-        collate_relateds_cmd = f'printf "{keep_contents}" >> ${{BATCH_TMPDIR}}{keep_file}'
+        collate_relateds_cmd = f'printf "{keep_contents}" >> ${{BATCH_TMPDIR}}/{keep_file}'
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
