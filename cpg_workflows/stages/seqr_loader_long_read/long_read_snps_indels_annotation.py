@@ -365,7 +365,7 @@ class AnnotateDatasetLRSNPsIndels(DatasetStage):
     analysis_keys=['index_name'],
     update_analysis_meta=lambda x: {'seqr-dataset-type': 'SNV_INDEL'},
 )
-class MtToEsLrSv(DatasetStage):
+class MtToEsLrSNPsIndels(DatasetStage):
     """
     Create a Seqr index
     https://github.com/populationgenomics/metamist/issues/539
