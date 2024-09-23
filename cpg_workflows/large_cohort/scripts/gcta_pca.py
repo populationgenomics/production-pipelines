@@ -82,18 +82,18 @@ def main(
         },
     )
     if relateds_to_drop := hl.read_table(relateds_to_drop):
-        sgids_to_keep = set(dense_mt.s.collect()) - set(relateds_to_drop.s.collect())
-        keep_file = f'{version}.indi.list'
-        keep_flag = f'--keep ${{BATCH_TMPDIR}}/{keep_file}'
+        sgids_to_keep = set(relateds_to_drop.s.collect())
+        remove_file = f'{version}.indi.list'
+        remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        keep_contents = '\n'.join(sgids_to_keep)
+        remove_contents = '\n'.join(sgids_to_keep)
         collate_relateds_cmd = (
-            f'printf "{keep_contents}" >> ${{BATCH_TMPDIR}}/{keep_file} && cat ${{BATCH_TMPDIR}}/{keep_file}'
+            f'printf "{remove_contents}" >> ${{BATCH_TMPDIR}}/{remove_file} && cat ${{BATCH_TMPDIR}}/{remove_file}'
         )
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {create_GRM_j.ofile} {keep_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {create_GRM_j.ofile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(create_GRM_j.ofile, f'{output_path}')
