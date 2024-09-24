@@ -79,7 +79,7 @@ def main(
     # Create PCA job
     py_PCA_j = b.new_python_job('Run PCA')
     py_PCA_j.call(
-        run_gcta_pca.cli_main,
+        run_gcta_pca.main,
         output_path=output_path,
         version=version,
         n_pcs=n_pcs,
