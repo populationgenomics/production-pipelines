@@ -46,8 +46,6 @@ def read_grm_bin(prefix, all_n=False, size=4):
 
 def cli_main():
 
-    init_batch()
-
     parser = ArgumentParser()
     parser.add_argument('--output-path', help='Path to folder containingGRM files')
     parser.add_argument('--version', help='Version of the plink files')
@@ -69,6 +67,7 @@ def main(
     n_pcs: int,
     relateds_to_drop: str,
 ):
+    init_batch()
 
     b = get_batch()
 
