@@ -68,6 +68,7 @@ def main(
     n_pcs: int,
     relateds_to_drop: str,
 ):
+    logging.basicConfig(level=logging.INFO)
     init_batch()
 
     b = get_batch()
