@@ -43,9 +43,9 @@ def read_grm_bin(prefix, all_n=False, size=4):
         return sum(range(1, i + 1))
 
     # File paths
-    bin_file_name = f"{prefix}.bin"
-    n_file_name = f"{prefix}.nbin"
-    id_file_name = f"{prefix}.id"
+    bin_file_name = prefix['bin']
+    n_file_name = prefix['nbin']
+    id_file_name = prefix['id']
 
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
@@ -124,7 +124,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(b.read_input_group(create_GRM_j.ofile), all_n=True)
+        grm_data = read_grm_bin(create_GRM_j.ofile['id'], all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
