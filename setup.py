@@ -69,7 +69,7 @@ setup(
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             # Run GCTA PCA
-            'gcta_pca = cpg_workflows.scripts.run_gcta_pca:cli_main',
+            'gcta_pca = cpg_workflows.large_cohort.scripts.run_gcta_pca:cli_main',
         ],
     },
 )
