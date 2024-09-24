@@ -43,9 +43,9 @@ def read_grm_bin(prefix, all_n=False, size=4):
         return sum(range(1, i + 1))
 
     # File paths
-    bin_file_name = prefix['grm.bin']
-    n_file_name = prefix['grm.N.bin']
-    id_file_name = prefix['grm.id']
+    bin_file_name = prefix.grm_bin
+    n_file_name = prefix.grm_N_bin
+    id_file_name = prefix.grm_id
 
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
@@ -109,6 +109,13 @@ def main(
     create_GRM_j.command(
         f'gcta --bfile {bfile} --make-grm --out {create_GRM_j.ofile}',
     )
+    b.write_output(create_GRM_j.ofile, f'{output_path}')
+
+    data_resource = b.read_input_group(
+        grm_bin=f'{output_path}.grm.bin',
+        grm_id=f'{output_path}.grm.id',
+        grm_N_bin=f'{output_path}.grm.N.bin',
+    )
 
     # Run PCA using GCTA
     run_PCA_j = b.new_job('Run PCA')
@@ -124,7 +131,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(create_GRM_j.ofile, all_n=True)
+        grm_data = read_grm_bin(data_resource, all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
@@ -138,7 +145,6 @@ def main(
         f'gcta --grm {create_GRM_j.ofile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
-    b.write_output(create_GRM_j.ofile, f'{output_path}')
     b.write_output(run_PCA_j.ofile, f'{output_path}')
     b.run()
 
