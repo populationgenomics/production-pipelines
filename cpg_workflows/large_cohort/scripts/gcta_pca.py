@@ -101,16 +101,14 @@ def main(
     create_GRM_j.command(edit_chr_cmd)
     create_GRM_j.declare_resource_group(
         ofile={
-            'bin': '{root}.grm.bin',
-            'id': '{root}.grm.id',
-            'nbin': '{root}.grm.N.bin',
+            'grm.bin': '{root}.grm.bin',
+            'grm.id': '{root}.grm.id',
+            'grm.N.bin': '{root}.grm.N.bin',
         },
     )
     create_GRM_j.command(
         f'gcta --bfile {bfile} --make-grm --out {create_GRM_j.ofile}',
     )
-
-    b.write_output(create_GRM_j.ofile, f'{output_path}')
 
     # Run PCA using GCTA
     run_PCA_j = b.new_job('Run PCA')
@@ -140,6 +138,7 @@ def main(
         f'gcta --grm {create_GRM_j.ofile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
+    b.write_output(create_GRM_j.ofile, f'{output_path}')
     b.write_output(run_PCA_j.ofile, f'{output_path}')
     b.run()
 
