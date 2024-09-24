@@ -14,11 +14,13 @@ def read_grm_bin(prefix, all_n=False, size=4):
     def sum_i(i):
         return sum(range(1, i + 1))
 
+    logging.info(f'Input paths after input group: {prefix}')
+    logging.info(f'Input paths after input group: {prefix._get_path()}')
     # File paths
-    bin_file_name = prefix.grm_bin
-    n_file_name = prefix.grm_N_bin
-    id_file_name = prefix.grm_id
-
+    bin_file_name = prefix['grm_bin']
+    n_file_name = prefix['grm_N_bin']
+    id_file_name = prefix['grm_id']
+    logging.info(f'Input paths: {bin_file_name}, {n_file_name}, {id_file_name}')
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
     n = id_data.shape[0]
@@ -78,14 +80,15 @@ def main(
         grm_id=f'{output_path}.grm.id',
         grm_N_bin=f'{output_path}.grm.N.bin',
     )
-    logging.info(f'Input paths: {input_paths}')
+    logging.info(f'Input paths before input group: {input_paths}')
     # Read GRM files
     bfile = b.read_input_group(
         grm_bin=f'{output_path}.grm.bin',
         grm_id=f'{output_path}.grm.id',
         grm_N_bin=f'{output_path}.grm.N.bin',
     )
-
+    logging.info(f'Input paths after input group: {bfile}')
+    logging.info(f'Input paths after input group: {bfile._get_path()}')
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
