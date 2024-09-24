@@ -12,6 +12,7 @@ import hail as hl
 
 from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch, init_batch
+from cpg_workflows.scripts import run_gcta_pca
 
 
 def cli_main():
@@ -46,7 +47,6 @@ def main(
     relateds_to_drop: str,
     create_plink: bool | None = False,
 ):
-    from cpg_workflows.large_cohort.scripts import run_gcta_pca
 
     output_path = output_path + f'/{version}'
     dense_mt = hl.read_matrix_table(dense_mt_path)
