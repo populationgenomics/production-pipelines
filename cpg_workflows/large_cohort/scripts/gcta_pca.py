@@ -12,6 +12,7 @@ import hail as hl
 
 from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch, init_batch
+from cpg_workflows.large_cohort.scripts import run_gcta_pca
 
 
 def cli_main():
@@ -78,7 +79,7 @@ def main(
     # Create PCA job
     py_PCA_j = b.new_python_job('Run PCA')
     py_PCA_j.call(
-        'run_gcta_pca',
+        run_gcta_pca.cli_main,
         output_path=output_path,
         version=version,
         n_pcs=n_pcs,
