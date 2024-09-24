@@ -7,7 +7,6 @@ import struct
 from argparse import ArgumentParser
 
 import numpy as np
-from cloudpathlib import CloudPath
 
 import hail as hl
 
@@ -125,7 +124,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(CloudPath(output_path), all_n=True)
+        grm_data = read_grm_bin(b.read_input_group(create_GRM_j.ofile), all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
