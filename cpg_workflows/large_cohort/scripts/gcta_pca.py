@@ -3,7 +3,10 @@ input is dense mt
 """
 
 import logging
+import struct
 from argparse import ArgumentParser
+
+import numpy as np
 
 import hail as hl
 
@@ -33,6 +36,41 @@ def cli_main():
         relateds_to_drop=args.relateds_to_drop,
         create_plink=args.create_plink,
     )
+
+
+def read_grm_bin(prefix, all_n=False, size=4):
+    def sum_i(i):
+        return sum(range(1, i + 1))
+
+    # File paths
+    bin_file_name = f"{prefix}.bin"
+    n_file_name = f"{prefix}.nbin"
+    id_file_name = f"{prefix}.id"
+
+    # Read ID file
+    id_data = np.loadtxt(id_file_name, dtype=str)
+    n = id_data.shape[0]
+
+    # Read GRM bin file
+    with open(bin_file_name, "rb") as bin_file:
+        grm = np.fromfile(bin_file, dtype=np.float32 if size == 4 else np.float64, count=n * (n + 1) // 2)
+
+    # Read N bin file
+    with open(n_file_name, "rb") as n_file:
+        if all_n:
+            N = np.fromfile(n_file, dtype=np.float32 if size == 4 else np.float64, count=n * (n + 1) // 2)
+        else:
+            N = struct.unpack('f' if size == 4 else 'd', n_file.read(size))[0]
+
+    # Compute indices for diagonal elements
+    i = np.array([sum_i(j) - 1 for j in range(1, n + 1)])
+
+    return {
+        "diag": grm[i],  # Diagonal elements of GRM
+        "off": np.delete(grm, i),  # Off-diagonal elements
+        "id": id_data,  # ID data
+        "N": N,  # N values
+    }
 
 
 def main(
@@ -82,11 +120,15 @@ def main(
         },
     )
     if relateds_to_drop := hl.read_table(relateds_to_drop):
-        sgids_to_keep = set(relateds_to_drop.s.collect())
+        sgids_to_remove = set(relateds_to_drop.s.collect())
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        remove_contents = '\n'.join(sgids_to_keep)
+        grm_data = read_grm_bin(create_GRM_j.ofile, all_n=True)
+        remove_contents = ''
+        for fam_id, sg_id in grm_data['id']:
+            if sg_id in sgids_to_remove:
+                remove_contents += f'{fam_id}\t{sg_id}\n'
         collate_relateds_cmd = (
             f'printf "{remove_contents}" >> ${{BATCH_TMPDIR}}/{remove_file} && cat ${{BATCH_TMPDIR}}/{remove_file}'
         )
