@@ -47,6 +47,7 @@ def read_grm_bin(prefix, all_n=False, size=4):
     n_file_name = prefix.grm_N_bin
     id_file_name = prefix.grm_id
 
+    logging.info(f"bin_file_name {bin_file_name}, n_file_name {n_file_name}, id_file_name {id_file_name}")
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
     n = id_data.shape[0]
