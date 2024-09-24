@@ -15,7 +15,6 @@ def read_grm_bin(prefix, all_n=False, size=4):
         return sum(range(1, i + 1))
 
     logging.info(f'Input paths after input group: {prefix}')
-    logging.info(f'Input paths after input group: {prefix._get_path()}')
     # File paths
     bin_file_name = prefix['grm_bin']
     n_file_name = prefix['grm_N_bin']
@@ -88,7 +87,6 @@ def main(
         grm_N_bin=f'{output_path}.grm.N.bin',
     )
     logging.info(f'Input paths after input group: {bfile}')
-    logging.info(f'Input paths after input group: {bfile._get_path()}')
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
