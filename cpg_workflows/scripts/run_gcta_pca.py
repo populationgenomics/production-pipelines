@@ -16,9 +16,9 @@ def read_grm_bin(prefix, all_n=False, size=4):
 
     logging.info(f'Input paths after input group: {prefix}')
     # File paths
-    bin_file_name = prefix['grm_bin']
-    n_file_name = prefix['grm_N_bin']
-    id_file_name = prefix['grm_id']
+    bin_file_name = prefix['grm.bin']
+    n_file_name = prefix['grm.N.bin']
+    id_file_name = prefix['grm.id']
     logging.info(f'Input paths: {bin_file_name}, {n_file_name}, {id_file_name}')
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
@@ -82,9 +82,11 @@ def main(
     logging.info(f'Input paths before input group: {input_paths}')
     # Read GRM files
     bfile = b.read_input_group(
-        grm_bin=f'{output_path}.grm.bin',
-        grm_id=f'{output_path}.grm.id',
-        grm_N_bin=f'{output_path}.grm.N.bin',
+        **{
+            'grm.bin': f'{output_path}.grm.bin',
+            'grm.id': f'{output_path}.grm.id',
+            'grm.N.bin': f'{output_path}.grm.N.bin',
+        },
     )
     logging.info(f'Input paths after input group: {bfile}')
     # Create PCA job
