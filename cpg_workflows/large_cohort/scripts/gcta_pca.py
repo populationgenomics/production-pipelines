@@ -84,6 +84,7 @@ def main(
         n_pcs=n_pcs,
         relateds_to_drop=relateds_to_drop,
     )
+    py_PCA_j.depends_on(create_GRM_j)
     b.write_output(create_GRM_j.ofile, f'{output_path}')
     b.run()
 
