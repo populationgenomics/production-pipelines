@@ -1,3 +1,4 @@
+import logging
 import struct
 from argparse import ArgumentParser
 
@@ -72,7 +73,12 @@ def main(
     b = get_batch()
 
     output_path = output_path + f'/{version}'
-
+    input_paths = dict(
+        grm_bin=f'{output_path}.grm.bin',
+        grm_id=f'{output_path}.grm.id',
+        grm_N_bin=f'{output_path}.grm.N.bin',
+    )
+    logging.info(f'Input paths: {input_paths}')
     # Read GRM files
     bfile = b.read_input_group(
         grm_bin=f'{output_path}.grm.bin',
