@@ -43,9 +43,9 @@ def read_grm_bin(prefix, all_n=False, size=4):
         return sum(range(1, i + 1))
 
     # File paths
-    # bin_file_name = prefix['bin']
-    # n_file_name = prefix['nbin']
-    id_file_name = prefix  # ['id']
+    bin_file_name = prefix['bin']
+    n_file_name = prefix['nbin']
+    id_file_name = prefix['id']
 
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
@@ -110,6 +110,8 @@ def main(
         f'gcta --bfile {bfile} --make-grm --out {create_GRM_j.ofile}',
     )
 
+    b.write_output(create_GRM_j.ofile, f'{output_path}')
+
     # Run PCA using GCTA
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
@@ -138,7 +140,6 @@ def main(
         f'gcta --grm {create_GRM_j.ofile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
-    b.write_output(create_GRM_j.ofile, f'{output_path}')
     b.write_output(run_PCA_j.ofile, f'{output_path}')
     b.run()
 
