@@ -72,7 +72,6 @@ def main(
 
     b = get_batch()
 
-    output_path = output_path + f'/{version}'
     input_paths = dict(
         grm_bin=f'{output_path}.grm.bin',
         grm_id=f'{output_path}.grm.id',
