@@ -43,9 +43,9 @@ def read_grm_bin(prefix, all_n=False, size=4):
         return sum(range(1, i + 1))
 
     # File paths
-    bin_file_name = prefix['bin']
-    n_file_name = prefix['nbin']
-    id_file_name = prefix['id']
+    bin_file_name = prefix['grm.bin']
+    n_file_name = prefix['grm.N.bin']
+    id_file_name = prefix['grm.id']
 
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
