@@ -33,28 +33,11 @@ input_dict: dict[str, Any] = dict(
     reference_dict=str(get_fasta().with_suffix('.dict')),
     reference_version='38',
 )
-input_dict |= get_images(
-    [
-        'sv_pipeline_base_docker',
-        'sv_pipeline_docker',
-        'sv_base_mini_docker',
-        'samtools_cloud_docker',
-        'manta_docker',
-        'scramble_docker',
-        'wham_docker',
-        'gatk_docker',
-        'gatk_docker_pesr_override',
-        'genomes_in_the_cloud_docker',
-        'cloud_sdk_docker',
-    ],
-)
+input_dict |= get_images(['wham_docker'])
 input_dict |= get_references(
     [
-        'primary_contigs_fai',
         'primary_contigs_list',
-        'preprocessed_intervals',
-        'manta_region_bed',
-        'wham_include_list_bed_file',
+        {'include_bed_file': 'wham_include_list_bed_file'},
         {'sd_locs_vcf': 'dbsnp_vcf'},
     ],
 )
