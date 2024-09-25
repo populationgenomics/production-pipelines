@@ -50,7 +50,7 @@ expected_out = {
 
 add_gatk_sv_jobs(
     dataset=WhamDataset(),
-    wfl_name='Whamg.wdl',
+    wfl_name='Whamg',
     input_dict=input_dict,
     expected_out_dict=expected_out,
     sequencing_group_id='HG00096',
