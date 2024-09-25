@@ -5,6 +5,7 @@ from argparse import ArgumentParser
 import numpy as np
 
 import hail as hl
+from hailtop.batch.resource import ResourceGroup
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch, init_batch
@@ -65,6 +66,7 @@ def cli_main():
 
 def main(
     output_path: str,
+    grm_file_group: ResourceGroup,
     version: str,
     n_pcs: int,
     relateds_to_drop: str,
@@ -74,6 +76,10 @@ def main(
 
     b = get_batch()
 
+    logging.info(f'grm_file_group: {grm_file_group}')
+    logging.info(
+        f'grm_file_group paths: {grm_file_group["grm.bin"]}, {grm_file_group["grm.id"]}, {grm_file_group["grm.N.bin"]}',
+    )
     input_paths = dict(
         grm_bin=f'{output_path}.grm.bin',
         grm_id=f'{output_path}.grm.id',

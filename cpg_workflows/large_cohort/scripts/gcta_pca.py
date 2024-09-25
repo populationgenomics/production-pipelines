@@ -57,7 +57,8 @@ def main(
 
     # Read in PLINK files created by Hail
     bfile = b.read_input_group(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
-
+    logging.info(f'Input paths after input group: {bfile}')
+    logging.info(f'bed: {bfile.bed}, bim: {bfile.bim}, fam: {bfile.fam}')
     # Create GRM using GCTA
     create_GRM_j = b.new_job('Create GRM')
     create_GRM_j.image(image_path('gcta'))  # GCTA needs chromosome names to be only numbers in .bim file
