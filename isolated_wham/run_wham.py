@@ -22,7 +22,7 @@ class WhamDataset:
     name = 'wham_test'
 
 
-cram = 'gs://cpg-seqr-test/thousand_genomes_copy/HG00096.cram'
+cram = 'gs://cpg-thousand-genomes-test/cram/CPG196519.cram'
 
 input_dict: dict[str, Any] = dict(
     bam_or_cram_file=cram,
@@ -40,8 +40,8 @@ input_dict |= get_references(
 )
 
 expected_out = {
-    'vcf': to_path(output_path('HG00096.vcf.gz')),
-    'index': to_path(output_path('HG00096.vcf.gz.tbi'))
+    'vcf': to_path(output_path('CPG196519.vcf.gz')),
+    'index': to_path(output_path('CPG196519.vcf.gz.tbi'))
 }
 
 
