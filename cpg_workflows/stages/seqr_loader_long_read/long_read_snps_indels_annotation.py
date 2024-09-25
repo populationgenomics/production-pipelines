@@ -10,7 +10,10 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs
-from cpg_workflows.jobs.seqr_loader_snps_indels import annotate_cohort_jobs_snps_indels, split_vcf_for_vep
+from cpg_workflows.jobs.seqr_loader_snps_indels import (
+    annotate_cohort_jobs_snps_indels,
+    split_merged_vcf_and_get_sitesonly_vcfs_for_vep,
+)
 from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
@@ -229,7 +232,7 @@ class SiteOnlyVCFs(MultiCohortStage):
         if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
             exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
 
-        vcf_jobs = split_vcf_for_vep(
+        vcf_jobs = split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             b=get_batch(),
             merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
             tmp_bucket=self.tmp_prefix / 'tmp',
