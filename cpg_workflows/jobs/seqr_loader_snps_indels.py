@@ -27,7 +27,7 @@ def annotate_cohort_jobs_snps_indels(
     """
 
     j = get_batch().new_job('Annotate cohort', job_attrs)
-    j.image(config_retrieve['workflow', 'driver_image'])
+    j.image(config_retrieve(['workflow', 'driver_image']))
     j.command(
         query_command(
             seqr_loader,
