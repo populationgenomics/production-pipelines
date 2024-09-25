@@ -164,7 +164,7 @@ def _add_split_vcf_job(
             gatk --java-options "{res.java_mem_options()}" \\
             SelectVariants \\
             -V {input_vcf['vcf.gz']} \\
-            -O {j[idx+1]['vcf.gz']} \\
+            -O {j[str(idx+1)]['vcf.gz']} \\
             -L {interval}
         """
         j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
