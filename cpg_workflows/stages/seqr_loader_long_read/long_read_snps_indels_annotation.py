@@ -106,7 +106,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
 
         # instead of handling, we should probably just exclude this and run again
         if sg.id not in query_result:
-            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id}')
+            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {sg.dataset.name}')
 
         lr_snps_indels_vcf: str = query_result[sg.id]
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
