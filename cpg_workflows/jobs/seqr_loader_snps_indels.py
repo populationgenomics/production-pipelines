@@ -96,7 +96,7 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     split_vcf_j = _add_split_vcf_job(
         b=b,
         input_vcf=merged_vcf,
-        interval=intervals,
+        intervals=intervals,
         output_vcf_paths=split_vcfs_paths,
         job_attrs=(job_attrs or {}) | dict(part='all'),
     )
