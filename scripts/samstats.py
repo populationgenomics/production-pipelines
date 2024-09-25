@@ -7,11 +7,12 @@ Runs sam stats on one dumb file
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_utils.hail_batch import command, fasta_res_group
-
+from cpg_utils.config import image_path
 
 
 job = get_batch().new_job("Copy Cram")
-job.image(config_retrieve(['workflow', 'samtools']))
+job.image(image_path('samtools'))
+
 job.storage('20Gi')
 
 reference = fasta_res_group(b)
