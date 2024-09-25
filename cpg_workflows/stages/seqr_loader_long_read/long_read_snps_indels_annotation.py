@@ -291,7 +291,7 @@ class VepLRS(MultiCohortStage):
 
 
 
-@stage(required_stages=VepLRS)
+@stage(required_stages=[MergeLongReadSNPsIndels, VepLRS])
 class AnnotateCohortLRSNPsIndels(MultiCohortStage):
     """
     First step to transform annotated SNPs Indels callset data into a seqr ready format
@@ -310,10 +310,12 @@ class AnnotateCohortLRSNPsIndels(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
+        vep_ht_path = inputs.as_path(target=multicohort, stage=VepLRS, key='ht')
 
         job = annotate_cohort_jobs_snps_indels(
             vcf_path=vcf_path,
             out_mt_path=outputs['mt'],
+            vep_ht_path=vep_ht_path,
             checkpoint_prefix=self.tmp_prefix / 'checkpoints',
             job_attrs=self.get_job_attrs(multicohort),
         )
