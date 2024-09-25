@@ -94,6 +94,8 @@ def main(
             'grm.N.bin': f'{output_path}.grm.N.bin',
         },
     )
+    ls_dir_j = b.new_job('ls dir')
+    ls_dir_j.command(f'ls {bfile}')
     logging.info(f'Input paths after input group: {bfile}')
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
@@ -110,7 +112,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(grm_file_group, all_n=True)
+        grm_data = read_grm_bin(bfile, all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
