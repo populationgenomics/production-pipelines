@@ -15,7 +15,7 @@ job.image(image_path('samtools'))
 
 job.storage('20Gi')
 
-reference = fasta_res_group(b)
+reference = fasta_res_group(get_batch())
 
 cmd = f"""\
     CRAM=$BATCH_TMPDIR/in.cram
