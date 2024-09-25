@@ -30,15 +30,12 @@ input_dict: dict[str, Any] = dict(
     sample_id='HG00096',
     reference_fasta=str(get_fasta()),
     reference_index=str(get_fasta()) + '.fai',
-    reference_dict=str(get_fasta().with_suffix('.dict')),
-    reference_version='38',
 )
 input_dict |= get_images(['wham_docker'])
 input_dict |= get_references(
     [
         'primary_contigs_list',
         {'include_bed_file': 'wham_include_list_bed_file'},
-        {'sd_locs_vcf': 'dbsnp_vcf'},
     ],
 )
 
