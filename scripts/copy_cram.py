@@ -10,6 +10,7 @@ from cpg_utils.hail_batch import get_batch
 
 job = get_batch().new_job("Copy Cram")
 job.image(config_retrieve(['workflow', 'driver_image']))
+job.storage('20Gi')
 
 job.command(f'wget -O {job.cram} https://ddbj.nig.ac.jp/public/public-human-genomes/GRCh38/1000Genomes/CRAM/HG00096/HG00096.cram')
 job.command(f'wget -O {job.crai} https://ddbj.nig.ac.jp/public/public-human-genomes/GRCh38/1000Genomes/CRAM/HG00096/HG00096.cram.crai')
