@@ -15,12 +15,11 @@ def read_grm_bin(prefix, all_n=False, size=4):
     def sum_i(i):
         return sum(range(1, i + 1))
 
-    logging.info(f'Input paths after input group: {prefix}')
     # File paths
     bin_file_name = prefix['grm.bin']
     n_file_name = prefix['grm.N.bin']
     id_file_name = prefix['grm.id']
-    logging.info(f'Input paths: {bin_file_name}, {n_file_name}, {id_file_name}')
+
     # Read ID file
     id_data = np.loadtxt(id_file_name, dtype=str)
     n = id_data.shape[0]
@@ -76,27 +75,6 @@ def main(
 
     b = get_batch()
 
-    logging.info(f'grm_file_group: {grm_file_group}')
-    logging.info(
-        f'grm_file_group paths: {grm_file_group["grm.bin"]}, {grm_file_group["grm.id"]}, {grm_file_group["grm.N.bin"]}',
-    )
-    input_paths = dict(
-        grm_bin=f'{output_path}.grm.bin',
-        grm_id=f'{output_path}.grm.id',
-        grm_N_bin=f'{output_path}.grm.N.bin',
-    )
-    logging.info(f'Input paths before input group: {input_paths}')
-    # Read GRM files
-    bfile = b.read_input_group(
-        **{
-            'grm.bin': f'{output_path}.grm.bin',
-            'grm.id': f'{output_path}.grm.id',
-            'grm.N.bin': f'{output_path}.grm.N.bin',
-        },
-    )
-    ls_dir_j = b.new_job('ls dir')
-    ls_dir_j.command(f'ls {bfile}')
-    logging.info(f'Input paths after input group: {bfile}')
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
@@ -112,7 +90,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(bfile, all_n=True)
+        grm_data = read_grm_bin(grm_file_group, all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
@@ -123,7 +101,7 @@ def main(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {bfile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {grm_file_group} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(run_PCA_j.ofile, f'{output_path}')
