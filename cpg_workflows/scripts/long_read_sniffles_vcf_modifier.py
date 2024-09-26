@@ -57,7 +57,7 @@ def cli_main():
     parser.add_argument('--new_id', help='The Sample ID we want in the output VCF', default=None)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
     parser.add_argument('--sex', help='0=Unknown,1=Male, 2=Female', default=0, type=int)
-    parser.add_argument('--sv', help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels', default=True)
+    parser.add_argument('--sv', help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels', default=True, type=bool, action='store_true')
     args = parser.parse_args()
 
     modify_sniffles_vcf(file_in=args.vcf_in, file_out=args.vcf_out, fa=args.fa, new_id=args.new_id, sex=args.sex, sv=args.sv)
