@@ -57,16 +57,19 @@ def cli_main():
     parser.add_argument('--new_id', help='The Sample ID we want in the output VCF', default=None)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
     parser.add_argument('--sex', help='0=Unknown,1=Male, 2=Female', default=0, type=int)
+    parser.add_argument('--sv', help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels', default=True)
     args = parser.parse_args()
 
-    modify_sniffles_vcf(file_in=args.vcf_in, file_out=args.vcf_out, fa=args.fa, new_id=args.new_id, sex=args.sex)
+    modify_sniffles_vcf(file_in=args.vcf_in, file_out=args.vcf_out, fa=args.fa, new_id=args.new_id, sex=args.sex, sv=args.sv)
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True):
     """
     Scrolls through the VCF and performs a few updates:
 
     - replaces the External Sample ID with the internal CPG identifier (if both are provided)
+
+    And if the VCF is an SV VCF:
     - replaces the ALT allele with a symbolic "<TYPE>", derived from the SVTYPE INFO field
     - swaps out the REF (huge for deletions, a symbolic "N" for insertions) with the ref base
 
@@ -78,6 +81,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
         fa (str): path to a reference FastA file, requires an implicit fa.fai index
         new_id (str): CPG ID, required inside the reformatted VCF
         sex (int): 0=Unknown, 1=Male, 2=Female
+        sv (bool): True=SV, False=SNPs_Indels
     """
 
     # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
@@ -93,7 +97,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
 
             # alter the sample line in the header
             if line.startswith('#'):
-                if 'FORMAT=<ID=ID' in line:
+                if 'FORMAT=<ID=ID' in line and sv:
                     f_out.write('##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
 
                 if line.startswith('#CHR') and new_id:
@@ -102,6 +106,11 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
                     f_out.write('\t'.join(l_split) + '\n')
                     continue
 
+                f_out.write(line)
+                continue
+
+            if not sv:
+                # if we're not dealing with SVs, just write the line and move on
                 f_out.write(line)
                 continue
 

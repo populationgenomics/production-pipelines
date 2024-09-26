@@ -128,6 +128,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             f'--new_id {sg.id} '
             f'--fa {fasta} '
             f'--sex {sex} ',
+            '--sv False ',
         )
 
         # block-gzip and index that result
