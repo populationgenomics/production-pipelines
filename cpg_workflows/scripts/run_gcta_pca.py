@@ -1,6 +1,7 @@
 import logging
 import struct
 from argparse import ArgumentParser
+from ast import Dict
 
 import numpy as np
 
@@ -65,7 +66,7 @@ def cli_main():
 
 def main(
     output_path: str,
-    grm_file_group: ResourceGroup,
+    grm_file_group: Dict,
     version: str,
     n_pcs: int,
     relateds_to_drop: str,
@@ -79,6 +80,9 @@ def main(
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
     run_PCA_j.declare_resource_group(
+        grm_files=grm_file_group,
+    )
+    run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
             'eigenval': '{root}.eigenval',
@@ -90,7 +94,7 @@ def main(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # write each sg id on new line to a file
-        grm_data = read_grm_bin(grm_file_group.ofile, all_n=True)
+        grm_data = read_grm_bin(grm_file_group, all_n=True)
         remove_contents = ''
         for fam_id, sg_id in grm_data['id']:
             if sg_id in sgids_to_remove:
@@ -101,7 +105,7 @@ def main(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {grm_file_group} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {run_PCA_j.grm_files} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(run_PCA_j.ofile, f'{output_path}')

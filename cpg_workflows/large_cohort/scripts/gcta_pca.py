@@ -82,7 +82,7 @@ def main(
     py_PCA_j.call(
         run_gcta_pca.main,
         output_path=output_path,
-        grm_file_group=create_GRM_j,
+        grm_file_group=create_GRM_j.ofile,
         version=version,
         n_pcs=n_pcs,
         relateds_to_drop=relateds_to_drop,
