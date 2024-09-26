@@ -361,6 +361,59 @@ class AncestryAddBackground(CohortStage):
         return self.make_outputs(target=cohort, jobs=job, data=outputs)
 
 
+@stage(required_stages=[DenseSubset, RelatednessFlag])
+class GctaGRM(CohortStage):
+    # Need to add AncestryBackground to the required stages only if we're using it.
+    # Can't have this as default in decorator as it will trigger
+    # the stage to run even if not required
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if config_retrieve(['large_cohort', 'pca_background', 'datasets'], False):
+            self.required_stages_classes.append(AncestryAddBackground)
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return dict(
+            grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM',
+        )
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        from cpg_workflows.large_cohort.scripts import gcta_GRM
+
+        create_GRM_j = gcta_GRM.create_GRM(
+            b=get_batch(),
+            dense_mt_path=str(inputs.as_path(cohort, DenseSubset)),
+            output_path=str(self.expected_outputs(cohort)['grm_dir']),
+            version=get_workflow().output_version,
+            n_pcs=config_retrieve(['large_cohort', 'pca', 'n_pcs']),
+            relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[create_GRM_j])
+
+
+@stage(required_stages=[DenseSubset, RelatednessFlag, GctaGRM])
+class GctaPCA(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return dict(
+            eigenvec=get_workflow().prefix / 'gcta_pca' / 'gcta.eigenvec',
+            eigenval=get_workflow().prefix / 'gcta_pca' / 'gcta.eigenval',
+        )
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort.scripts import gcta_PCA
+
+        create_PCA_j = gcta_PCA.run_PCA(
+            b=get_batch(),
+            grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
+            output_path=str(self.expected_outputs(cohort)['eigenvec']),
+            version=get_workflow().output_version,
+            n_pcs=config_retrieve(['large_cohort', 'pca', 'n_pcs']),
+            relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[create_PCA_j])
+
+
 @stage(required_stages=[SampleQC, RelatednessFlag, DenseSubset])
 class AncestryPCA(CohortStage):
     # Need to add AncestryBackground to the required stages only if we're using it.
