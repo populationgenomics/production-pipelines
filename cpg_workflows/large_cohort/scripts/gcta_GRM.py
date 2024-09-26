@@ -49,6 +49,8 @@ def create_GRM(
     create_plink: bool | None = False,
 ):
 
+    init_batch()
+
     if create_plink:
         dense_mt = hl.read_matrix_table(dense_mt_path)
         hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
