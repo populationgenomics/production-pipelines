@@ -167,7 +167,7 @@ def _add_split_vcf_job(
             -O {j[str(idx+1)]['vcf.gz']} \\
             -L {interval}
         """
-        j.command(command(cmd, monitor_space=True, setup_gcp=True, define_retry_function=True))
+        j.command(command(cmd, monitor_space=False, setup_gcp=True, define_retry_function=True))
         b.write_output(j[str(idx+1)], str(output_vcf_path))
 
     # Wait for all parts to be written before returning
