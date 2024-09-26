@@ -407,7 +407,7 @@ class GctaPCA(CohortStage):
             grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
             output_path=str(self.expected_outputs(cohort)['eigenvec']),
             version=get_workflow().output_version,
-            n_pcs=config_retrieve(['large_cohort', 'pca', 'n_pcs']),
+            n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
             relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
         )
 
