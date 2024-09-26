@@ -79,8 +79,13 @@ def main(
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
-    run_PCA_j.declare_resource_group(
-        grm_files=grm_file_group,
+    # Read GRM files
+    bfile = b.read_input_group(
+        **{
+            'grm.bin': f'{output_path}.grm.bin',
+            'grm.id': f'{output_path}.grm.id',
+            'grm.N.bin': f'{output_path}.grm.N.bin',
+        },
     )
     run_PCA_j.declare_resource_group(
         ofile={
@@ -105,7 +110,7 @@ def main(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {run_PCA_j.grm_files} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {bfile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(run_PCA_j.ofile, f'{output_path}')

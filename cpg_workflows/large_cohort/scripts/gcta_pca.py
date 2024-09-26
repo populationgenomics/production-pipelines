@@ -49,8 +49,8 @@ def main(
 ):
 
     output_path = output_path + f'/{version}'
-    dense_mt = hl.read_matrix_table(dense_mt_path)
     if create_plink:
+        dense_mt = hl.read_matrix_table(dense_mt_path)
         hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
 
     b = get_batch()
