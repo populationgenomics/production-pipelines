@@ -17,7 +17,7 @@ from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, get_intervals_from_bed
 
 from .picard import get_intervals
 from .vcf import gather_vcfs
@@ -546,17 +546,3 @@ def add_make_sitesonly_job(
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
     return j, j.output_vcf
-
-
-def get_intervals_from_bed(intervals_path: Path) -> list[str]:
-    """
-    Read intervals from a bed file.
-    Increment the start position of each interval by 1 to match the 1-based
-    coordinate system used by GATK.
-    """
-    with intervals_path.open('r') as f:
-        intervals = []
-        for line in f:
-            chrom, start, end = line.strip().split('\t')
-            intervals.append(f'{chrom}:{int(start)+1}-{end}')
-    return intervals

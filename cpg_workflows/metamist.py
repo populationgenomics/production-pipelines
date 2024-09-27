@@ -423,7 +423,7 @@ class Metamist:
         """
         dataset = dataset or self.default_dataset
         metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
+        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
             metamist_proj += '-test'
 
         analyses = query(
