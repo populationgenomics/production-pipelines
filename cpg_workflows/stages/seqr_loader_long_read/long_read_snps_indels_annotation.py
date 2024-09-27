@@ -234,6 +234,7 @@ class SiteOnlyVCFs(MultiCohortStage):
 
         vcf_jobs = split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             b=get_batch(),
+            scatter_count=scatter_count,
             merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
             tmp_bucket=self.tmp_prefix / 'tmp',
             out_siteonly_vcf_path=outputs['siteonly'],
@@ -241,7 +242,6 @@ class SiteOnlyVCFs(MultiCohortStage):
             intervals_path=intervals_path,
             exclude_intervals_path=exclude_intervals_path,
             job_attrs=self.get_job_attrs(),
-            scatter_count=scatter_count,
         )
         jobs.extend(vcf_jobs)
         for job in jobs:

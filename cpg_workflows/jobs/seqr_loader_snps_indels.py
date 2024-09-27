@@ -35,7 +35,7 @@ def annotate_cohort_jobs_snps_indels(
             str(vcf_path),
             str(out_mt_path),
             str(vep_ht_path),
-            None, # site_only_vqsr_vcf_path
+            None,  # site_only_vqsr_vcf_path
             str(checkpoint_prefix),
         ),
     )
@@ -44,6 +44,7 @@ def annotate_cohort_jobs_snps_indels(
 
 def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     b: hb.Batch,
+    scatter_count: int,
     merged_vcf_path: Path,
     tmp_bucket: Path,
     out_siteonly_vcf_path: Path,
@@ -51,7 +52,6 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     intervals_path: Path | None = None,
     exclude_intervals_path: Path | None = None,
     job_attrs: dict | None = None,
-    scatter_count: int | None = None,
 ) -> list[Job]:
     """
     Takes the merged VCF from the seqr_loader_long_read pipeline and prepares it
@@ -91,7 +91,9 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
         },
     )
 
-    split_vcfs_paths = [tmp_bucket / 'split-merged-vcf' / 'parts' / f'part{idx + 1}.vcf.gz' for idx in range(scatter_count)]
+    split_vcfs_paths = [
+        tmp_bucket / 'split-merged-vcf' / 'parts' / f'part{idx + 1}.vcf.gz' for idx in range(scatter_count)
+    ]
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
     split_vcf_j = _add_split_vcf_job(
@@ -140,7 +142,7 @@ def _add_split_vcf_job(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     intervals: list[str] | list[hb.ResourceFile],
-    output_vcf_paths: list[Path] | None = None,
+    output_vcf_paths: list[Path],
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -155,8 +157,8 @@ def _add_split_vcf_job(
         output_vcf_path = output_vcf_paths[idx]
         j.declare_resource_group(
             **{
-                str(idx+1): {
-                    'vcf.gz': '{root}.vcf.gz', 
+                str(idx + 1): {
+                    'vcf.gz': '{root}.vcf.gz',
                     'vcf.gz.tbi': '{root}.vcf.gz.tbi',
                 },
             },
@@ -169,7 +171,7 @@ def _add_split_vcf_job(
             -L {interval}
         """
         j.command(command(cmd, monitor_space=False, setup_gcp=True, define_retry_function=True))
-        b.write_output(j[str(idx+1)], str(output_vcf_path).replace('.vcf.gz', ''))
+        b.write_output(j[str(idx + 1)], str(output_vcf_path).replace('.vcf.gz', ''))
 
     # Wait for all parts to be written before returning
     j.command('wait && echo "All parts written"')
