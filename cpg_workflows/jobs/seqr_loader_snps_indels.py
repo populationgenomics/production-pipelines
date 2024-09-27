@@ -122,12 +122,12 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             output_vcf_path=siteonly_vcf_path,
             job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
         )
-        if split_vcf_j:
-            siteonly_j.depends_on(split_vcf_j)
 
         siteonly_vcfs.append(siteonly_j_vcf)
         if siteonly_j:
             jobs.append(siteonly_j)
+            if split_vcf_j:
+                siteonly_j.depends_on(split_vcf_j)
 
     jobs = [j for j in jobs if j is not None]
     for j in jobs:
