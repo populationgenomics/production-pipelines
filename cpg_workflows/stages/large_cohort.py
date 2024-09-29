@@ -70,6 +70,16 @@ def dense_background_vds_version(dataset: str) -> str:
     return dense_bg_vds_version_str
 
 
+@cache
+def gcta_version() -> str:
+    """
+    generate the GCTA version
+    """
+    if not (dense_subset_str := config_retrieve(['large_cohort', 'output_versions', 'gcta'], default=None)):
+        return get_workflow().output_version
+    return slugify(dense_subset_str)
+
+
 @stage(required_stages=[Genotype])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
@@ -373,7 +383,7 @@ class GctaGRM(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM',
+            grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM' / gcta_version(),
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -395,7 +405,7 @@ class GctaGRM(CohortStage):
 class GctaPCA(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            pca_dir=get_workflow().prefix / 'gcta_pca' / 'PCA',
+            pca_dir=get_workflow().prefix / 'gcta_pca' / 'PCA' / gcta_version(),
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
