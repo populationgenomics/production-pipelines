@@ -189,8 +189,8 @@ class MultiCohort(Target):
         if d.name in self._datasets_by_name:
             logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
         else:
-            # We need perform a deepcopy to avoid manipulating the cohort dataset at this point
-            self._datasets_by_name[d.name] = copy.deepcopy(d)
+            # We need create a new dataset to avoid manipulating the cohort dataset at this point
+            self._datasets_by_name[d.name] = Dataset(d.name, d.cohort)
         return self._datasets_by_name[d.name]
 
     def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
