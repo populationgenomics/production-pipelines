@@ -50,6 +50,8 @@ def create_GRM(
     create_plink: bool | None = False,
 ):
 
+    init_batch()
+
     if not can_reuse(output_path):
         create_plink = True
 
