@@ -87,6 +87,7 @@ def run_PCA(
             'grm.N.bin': f'{grm_directory}.grm.N.bin',
         },
     )
+    logging.info(f'GRM files: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}')
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
@@ -99,9 +100,10 @@ def run_PCA(
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
         # Write each sg id on new line to a file
-        grm_data = read_grm_bin(bfile, all_n=True)
+        id_data = np.loadtxt(bfile['grm.id'], dtype=str)
+        # grm_data = read_grm_bin(bfile, all_n=True)
         remove_contents = ''
-        for fam_id, sg_id in grm_data['id']:
+        for fam_id, sg_id in id_data:
             if sg_id in sgids_to_remove:
                 remove_contents += f'{fam_id}\t{sg_id}\n'
         collate_relateds_cmd = (

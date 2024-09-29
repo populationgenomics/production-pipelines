@@ -395,8 +395,7 @@ class GctaGRM(CohortStage):
 class GctaPCA(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            eigenvec=get_workflow().prefix / 'gcta_pca' / 'gcta.eigenvec',
-            eigenval=get_workflow().prefix / 'gcta_pca' / 'gcta.eigenval',
+            pca_dir=get_workflow().prefix / 'gcta_pca' / 'PCA',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -405,7 +404,7 @@ class GctaPCA(CohortStage):
         create_PCA_j = gcta_PCA.run_PCA(
             b=get_batch(),
             grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
-            output_path=str(self.expected_outputs(cohort)['eigenvec']),
+            output_path=str(self.expected_outputs(cohort)['pca_dir']),
             version=get_workflow().output_version,
             n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
             relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),

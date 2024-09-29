@@ -13,6 +13,7 @@ import hailtop.batch as hb
 
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import command, get_batch, init_batch
+from cpg_workflows.utils import can_reuse
 
 
 def cli_main():
@@ -50,6 +51,9 @@ def create_GRM(
 ):
 
     init_batch()
+
+    if not can_reuse(output_path):
+        create_plink = True
 
     if create_plink:
         dense_mt = hl.read_matrix_table(dense_mt_path)
