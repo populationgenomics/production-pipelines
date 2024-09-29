@@ -338,7 +338,7 @@ class Metamist:
         and filtering options.
         """
         metamist_proj = dataset_name
-        if get_config()['workflow']['access_level'] == 'test':
+        if get_config()['workflow']['access_level'] == 'test' and not dataset_name.endswith('-test'):
             metamist_proj += '-test'
         logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
