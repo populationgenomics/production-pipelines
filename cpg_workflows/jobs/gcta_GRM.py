@@ -42,12 +42,7 @@ def cli_main():
 
 def create_GRM(
     b: hb.Batch,
-    dense_mt_path: str,
     output_path: str,
-    version: str,
-    n_pcs: int,
-    relateds_to_drop: str,
-    create_plink: bool | None = False,
 ):
 
     # Read in PLINK files created by Hail
