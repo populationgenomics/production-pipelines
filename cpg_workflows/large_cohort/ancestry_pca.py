@@ -59,7 +59,9 @@ def add_background(
                 logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
                 background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
                 logging.info('Finished checkpointing densified_background_mt')
-                # annotate background mt with metadata info derived from SampleQC stage
+
+            # annotate background mt with metadata info derived from SampleQC stage
+            # TODO little confused - is this an indentation issue? We only apply metadata to a VDS?
             metadata_tables = []
             for path in dataset_dict['metadata_table']:
                 sample_qc_background = hl.read_table(path)
