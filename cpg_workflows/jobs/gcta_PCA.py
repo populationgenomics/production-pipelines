@@ -58,7 +58,7 @@ def cli_main():
     args = parser.parse_args()
 
     run_PCA(
-        output_path=args.prefix,
+        output_path=args.output_path,
         version=args.version,
         n_pcs=args.n_pcs,
         relateds_to_drop=args.relateds_to_drop,
