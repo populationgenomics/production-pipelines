@@ -24,7 +24,7 @@ vep_version = '110'
 
 # Create Seqr ElasticSearch indices for these datasets. If not specified, will
 # create indices for all input datasets.
-#create_es_index_for_datasets = []
+# create_es_index_for_datasets = []
 
 write_vcf = ["udn-aus"]
 
