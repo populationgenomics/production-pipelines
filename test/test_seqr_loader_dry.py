@@ -25,6 +25,7 @@ check_expected_outputs = false
 path_scheme = "local"
 local_dir = "{directory}"
 write_mt_for_datasets = ["test-analysis-dataset"]
+create_es_index_for_datasets = ["test-analysis-dataset"]
 
 [hail]
 billing_project = "test-analysis-dataset"

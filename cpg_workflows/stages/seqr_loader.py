@@ -91,7 +91,7 @@ class AnnotateDataset(DatasetStage):
         Annotate MT with genotype and consequence data for Seqr
         """
         # only create dataset MTs for datasets specified in the config
-        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'])
+        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
         if dataset.name not in eligible_datasets:
             return None
 
@@ -190,7 +190,7 @@ class MtToEs(DatasetStage):
         Transforms the MT into a Seqr index, no DataProc
         """
         # only create the elasticsearch index for the datasets specified in the config
-        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'])
+        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
         if dataset.name not in eligible_datasets:
             return None
 
