@@ -384,7 +384,6 @@ class Metamist:
         """
         Query the DB to find the last completed joint-calling analysis for the sequencing groups.
         """
-        dataset = dataset or self.default_dataset
         metamist_proj = self.get_metamist_proj(dataset)
 
         data = self.make_aapi_call(
@@ -418,7 +417,6 @@ class Metamist:
         and sequencing type, one Analysis object per sequencing group. Assumes the analysis
         is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
-        dataset = dataset or self.default_dataset
         metamist_proj = self.get_metamist_proj(dataset)
 
         analyses = query(
@@ -463,7 +461,6 @@ class Metamist:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
-        dataset = dataset or self.default_dataset
         metamist_proj = self.get_metamist_proj(dataset)
 
         if isinstance(type_, AnalysisType):
