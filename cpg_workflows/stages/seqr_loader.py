@@ -93,6 +93,7 @@ class AnnotateDataset(DatasetStage):
         # only create dataset MTs for datasets specified in the config
         eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
         if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return None
 
         assert dataset.cohort
@@ -192,6 +193,7 @@ class MtToEs(DatasetStage):
         # only create the elasticsearch index for the datasets specified in the config
         eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
         if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping ES index creation for {dataset}')
             return None
 
         # try to generate a password here - we'll find out inside the script anyway, but
