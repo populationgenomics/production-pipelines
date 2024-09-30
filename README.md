@@ -59,9 +59,9 @@ Submit `main.py seqr_loader` to the analysis runner, and pass along the config a
 ```bash
 analysis-runner \
   --dataset seqr --description "Seqr Loader" --output-dir "seqr-loader" \
-  --access-level full \
+  --access-level standard \
   --config ~/myconfig.toml \
-  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:latest \
+  --image australia-southeast1-docker.pkg.dev/cpg-common/images/cpg_workflows:1.2.3 \
   main.py \
   seqr_loader
 ```
