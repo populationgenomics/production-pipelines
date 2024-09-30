@@ -430,7 +430,7 @@ class GctaPCA(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.scripts import gcta_PCA
+        from cpg_workflows.jobs import gcta_PCA
 
         create_PCA_j = gcta_PCA.run_PCA(
             b=get_batch(),
