@@ -50,15 +50,6 @@ def create_GRM(
     create_plink: bool | None = False,
 ):
 
-    init_batch()
-
-    if not can_reuse(output_path):
-        create_plink = True
-
-    if create_plink:
-        dense_mt = hl.read_matrix_table(dense_mt_path)
-        hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
-
     # Read in PLINK files created by Hail
     logging.info(f'output_path: {output_path}')
     bfile = b.read_input_group(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')

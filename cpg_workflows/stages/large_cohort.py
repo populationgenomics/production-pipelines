@@ -372,7 +372,7 @@ class AncestryAddBackground(CohortStage):
 
 
 @stage(required_stages=[DenseSubset, RelatednessFlag])
-class GctaGRM(CohortStage):
+class MakePlink(CohortStage):
     # Need to add AncestryBackground to the required stages only if we're using it.
     # Can't have this as default in decorator as it will trigger
     # the stage to run even if not required
@@ -383,11 +383,36 @@ class GctaGRM(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
+            plink_dir=get_workflow().prefix / 'gcta_pca' / 'PLINK' / gcta_version(),
+        )
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        from cpg_workflows.large_cohort import make_plink
+
+        j = get_batch().new_job('Make Plink Files', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
+
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                make_plink,
+                make_plink.export_plink.__name__,
+                str(inputs.as_path(cohort, DenseSubset)),
+                str(self.expected_outputs(cohort)['plink_dir']),
+                setup_gcp=True,
+            ),
+        )
+        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+
+
+@stage(required_stages=[MakePlink])
+class GctaGRM(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return dict(
             grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM' / gcta_version(),
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        from cpg_workflows.large_cohort.scripts import gcta_GRM
+        from cpg_workflows.jobs import gcta_GRM
 
         create_GRM_j = gcta_GRM.create_GRM(
             b=get_batch(),
@@ -415,7 +440,7 @@ class GctaPCA(CohortStage):
             b=get_batch(),
             grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
             output_path=str(self.expected_outputs(cohort)['pca_dir']),
-            version=get_workflow().output_version,
+            version=gcta_version(),
             n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
             relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
         )
