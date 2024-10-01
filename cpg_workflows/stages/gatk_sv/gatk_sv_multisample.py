@@ -1276,6 +1276,12 @@ class AnnotateDatasetSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
+        # only create dataset MTs for datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping AnnotateDatasetSv mt subsetting for {dataset}')
+            return None
+
         assert dataset.cohort
         assert dataset.cohort.multicohort
         mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
@@ -1322,6 +1328,11 @@ class MtToEsSv(DatasetStage):
         """
         Uses the non-DataProc MT-to-ES conversion script
         """
+        # only create the elasticsearch index for the datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping SV ES index creation for {dataset}')
+            return None
 
         # try to generate a password here - we'll find out inside the script anyway, but
         # by that point we'd already have localised the MT, wasting time and money
