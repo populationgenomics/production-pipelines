@@ -6,7 +6,7 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
 from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import (
@@ -297,6 +297,12 @@ def picard_collect_metrics(
     sorted_output = get_config()['cramqc']['assume_sorted']
 
     assert cram_path.index_path
+
+    if config_retrieve(['cramqc', 'readgroup_metrics'], default=False):
+        readgroup_metrics = "METRIC_ACCUMULATION_LEVEL=READ_GROUP"
+    else:
+        readgroup_metrics = "METRIC_ACCUMULATION_LEVEL=SAMPLE"
+
     cmd = f"""\
     CRAM=$BATCH_TMPDIR/{cram_path.path.name}
     CRAI=$BATCH_TMPDIR/{cram_path.index_path.name}
@@ -319,7 +325,7 @@ def picard_collect_metrics(
       PROGRAM=CollectBaseDistributionByCycle \\
       PROGRAM=CollectQualityYieldMetrics \\
       METRIC_ACCUMULATION_LEVEL=null \\
-      METRIC_ACCUMULATION_LEVEL=SAMPLE
+      {readgroup_metrics}
 
     ls $BATCH_TMPDIR/
     cp $BATCH_TMPDIR/prefix.alignment_summary_metrics {j.out_alignment_summary_metrics}
