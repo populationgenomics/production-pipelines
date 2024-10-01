@@ -19,11 +19,10 @@ vep_version = '110'
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
-# Write dataset MTs for these datasets. Required fot the AnnotateDataset stage
+# Write dataset MTs for these datasets. Required for the AnnotateDataset stage
 # write_mt_for_datasets = []
 
-# Create Seqr ElasticSearch indices for these datasets. If not specified, will
-# create indices for all input datasets.
+# Create Seqr ElasticSearch indices for these datasets. Required for the MtToEs stage.
 # create_es_index_for_datasets = []
 
 write_vcf = ["udn-aus"]
