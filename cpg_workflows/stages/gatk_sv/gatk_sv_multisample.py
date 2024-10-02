@@ -1137,8 +1137,9 @@ class FilterWham(MultiCohortStage):
         job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         job.command(
-            f'bcftools view -e "SVTYPE==\"DEL\" && COUNT(ALGORITHMS)==1 && ALGORITHMS==\"wham\"" '
-            f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}')
+            'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\''
+            f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
+        )
         job.command(f'tabix {job.output["vcf.bgz"]}')
         get_batch().write_output(job.output, str(self.expected_outputs(multicohort)['filtered_vcf']))
 
@@ -1233,7 +1234,7 @@ class SpiceUpSVIDs(MultiCohortStage):
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
         skip_prior_names = bool(query_for_spicy_vcf(multicohort.analysis_dataset.name))
-        pyjob.call(rename_sv_ids,input_vcf, pyjob.output, skip_prior_names)
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, skip_prior_names)
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
