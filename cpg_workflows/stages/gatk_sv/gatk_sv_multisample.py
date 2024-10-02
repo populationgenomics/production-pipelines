@@ -1141,7 +1141,7 @@ class FilterWham(MultiCohortStage):
             f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
         )
         job.command(f'tabix {job.output["vcf.bgz"]}')
-        get_batch().write_output(job.output, str(self.expected_outputs(multicohort)['filtered_vcf']))
+        get_batch().write_output(job.output, str(self.expected_outputs(multicohort)['wham_filtered_vcf']))
 
         expected_d = self.expected_outputs(multicohort)
         return self.make_outputs(multicohort, data=expected_d, jobs=job)
