@@ -182,7 +182,7 @@ def run(
         n_pcs=n_pcs,
         out_ht_path=out_inferred_pop_ht_path,
     )
-    sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key])
+    sample_qc_ht = sample_qc_ht.annotate(**pop_ht[sample_qc_ht.key])
     sample_qc_ht.checkpoint(str(out_sample_qc_ht_path), overwrite=True)
     return scores_ht, eigenvalues_ht, loadings_ht, sample_qc_ht
 

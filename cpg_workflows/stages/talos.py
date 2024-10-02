@@ -278,7 +278,7 @@ class GeneratePED(DatasetStage):
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
         """
         job = get_batch().new_job('Generate PED from Metamist')
-        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job.cpu(1).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -315,7 +315,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
-        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job.cpu(1).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -346,7 +346,7 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
-        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job.cpu(1).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -371,7 +371,7 @@ class FindGeneSymbolMap(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
-        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job.cpu(1).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))

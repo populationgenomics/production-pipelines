@@ -5,7 +5,7 @@ Stage that performs joint genotyping of GVCFs using GATK.
 import logging
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs import joint_genotyping
@@ -53,10 +53,20 @@ class JointGenotyping(MultiCohortStage):
 
         # create expected outputs once
         outputs = self.expected_outputs(multicohort)
+
+        # If defining intervals with a custom bed file, make sure the scatter count matches the number of intervals
         scatter_count = joint_calling_scatter_count(len(gvcf_by_sgid))
         out_siteonly_vcf_part_paths = [
             to_path(outputs['siteonly_part_pattern'].format(idx=idx)) for idx in range(scatter_count)
         ]
+
+        intervals_path = None
+        if config_retrieve(['workflow', 'intervals_path'], default=None):
+            intervals_path = to_path(config_retrieve(['workflow', 'intervals_path']))
+
+        exclude_intervals_path = None
+        if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
+            exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
 
         jc_jobs = joint_genotyping.make_joint_genotyping_jobs(
             b=get_batch(),
@@ -69,8 +79,8 @@ class JointGenotyping(MultiCohortStage):
                 if get_config()['workflow'].get('use_gnarly', False)
                 else joint_genotyping.JointGenotyperTool.GenotypeGVCFs
             ),
-            intervals_path=get_config()['workflow'].get('intervals_path'),
-            exclude_intervals_path=get_config()['workflow'].get('exclude_intervals_path'),
+            intervals_path=intervals_path,
+            exclude_intervals_path=exclude_intervals_path,
             job_attrs=self.get_job_attrs(),
             scatter_count=scatter_count,
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
