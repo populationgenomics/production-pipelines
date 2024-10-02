@@ -278,7 +278,7 @@ class GeneratePED(DatasetStage):
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
         """
         job = get_batch().new_job('Generate PED from Metamist')
-        job.cpu(0.25).memory('lowmem').image(image_path('talos'))
+        job.cpu(1).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
