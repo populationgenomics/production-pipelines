@@ -1107,8 +1107,46 @@ class UpdateStructuralVariantIDs(MultiCohortStage):
 @stage(
     required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
     analysis_type='sv',
-    analysis_keys=['annotated_vcf'],
+    analysis_keys=['wham_filtered_vcf'],
 )
+class FilterWham(MultiCohortStage):
+    """
+    Filters the VCF to remove deletions only called by Wham
+    github.com/broadinstitute/gatk-sv/blob/main/wdl/ApplyManualVariantFilter.wdl
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        # index here is implicit
+        return {'wham_filtered_vcf': self.prefix / 'filtered.vcf.gz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
+        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
+        if query_for_spicy_vcf(multicohort.analysis_dataset.name):
+            get_logger().info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(multicohort, UpdateStructuralVariantIDs)['concordance_vcf']
+        else:
+            get_logger().info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(multicohort, FilterGenotypes)['filtered_vcf']
+
+        in_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})['vcf.gz']
+        job = get_batch().new_job('Filter Wham', attributes={'tool': 'bcftools'})
+        job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.command(
+            f'bcftools view -e "SVTYPE==\"DEL\" && COUNT(ALGORITHMS)==1 && ALGORITHMS==\"wham\"" '
+            f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}')
+        job.command(f'tabix {job.output["vcf.bgz"]}')
+        get_batch().write_output(job.output, str(self.expected_outputs(multicohort)['filtered_vcf']))
+
+        expected_d = self.expected_outputs(multicohort)
+        return self.make_outputs(multicohort, data=expected_d, jobs=job)
+
+
+@stage(required_stages=[FilterWham], analysis_type='sv', analysis_keys=['annotated_vcf'])
 class AnnotateVcf(MultiCohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
@@ -1137,18 +1175,9 @@ class AnnotateVcf(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        configure and queue jobs for SV annotation
-        passing the VCF Index has become implicit, which may be a problem for us
+        Configure and queue jobs for SV annotation. Passing the VCF Index has become implicit
         """
-
-        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
-        if query_for_spicy_vcf(multicohort.analysis_dataset.name):
-            get_logger().info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
-            input_vcf = inputs.as_dict(multicohort, UpdateStructuralVariantIDs)['concordance_vcf']
-        else:
-            get_logger().info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
-            input_vcf = inputs.as_dict(multicohort, FilterGenotypes)['filtered_vcf']
-
+        input_vcf = inputs.as_dict(multicohort, FilterWham)['wham_filtered_vcf']
         expected_out = self.expected_outputs(multicohort)
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
         job_or_none = queue_annotate_sv_jobs(multicohort, self.prefix, input_vcf, expected_out, billing_labels)
@@ -1203,12 +1232,8 @@ class SpiceUpSVIDs(MultiCohortStage):
         # update the IDs using a PythonJob
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
-        pyjob.call(
-            rename_sv_ids,
-            input_vcf,
-            pyjob.output,
-            bool(query_for_spicy_vcf(multicohort.analysis_dataset.name)),
-        )
+        skip_prior_names = bool(query_for_spicy_vcf(multicohort.analysis_dataset.name))
+        pyjob.call(rename_sv_ids,input_vcf, pyjob.output, skip_prior_names)
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
