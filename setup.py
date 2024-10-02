@@ -13,7 +13,7 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'cpg-utils>=5.0.4',
+        'cpg-utils>=5.0.11',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
         'hail==0.2.132',  # Pin Hail at CPG's installed version

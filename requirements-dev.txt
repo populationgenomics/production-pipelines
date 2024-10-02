@@ -5,5 +5,6 @@ black
 pytest
 pytest_mock
 mypy
+cpg-utils>=5.0.11
 tenacity
 coverage
