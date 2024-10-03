@@ -356,7 +356,7 @@ class QueryPanelapp(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
-        job.command(f'sleep {randint(0, 30)}')
+        job.command(f'sleep {randint(20, 300)}')
         job.command(f'QueryPanelapp --panels {get_batch().read_input(str(hpo_panel_json))} --out_path {job.output}')
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 

@@ -15,6 +15,7 @@ panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
 require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
+within_x_months = 6
 
 [FindGeneSymbolMap]
 # much higher than this and we get into throttling issues
