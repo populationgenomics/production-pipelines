@@ -59,7 +59,7 @@ csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotyp
 [RunHailFiltering.cores]
 # size of VM provisioned for Hail
 sv = 2
-small_variants = 8
+small_variants = 16
 
 [RunHailFiltering.storage]
 sv = 10
