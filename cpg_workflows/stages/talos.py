@@ -419,7 +419,7 @@ class RunHailFiltering(DatasetStage):
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
-        required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
+        required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'small_variants'], 8)
         # doubling storage due to the repartitioning
         job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory('highmem')
 
@@ -489,8 +489,8 @@ class RunHailFilteringSV(DatasetStage):
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
         local_ped = get_batch().read_input(str(pedigree))
 
-        required_storage: int = config_retrieve(['hail', 'storage', 'sv'], 10)
-        required_cpu: int = config_retrieve(['hail', 'cores', 'sv'], 2)
+        required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
+        required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')

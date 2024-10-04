@@ -63,8 +63,6 @@ small_variants = 8
 
 [RunHailFiltering.storage]
 sv = 10
-exome = 50
-genome = 500
 
 [RunHailFiltering.timeouts]
 # timeouts for the Hail Batch jobs, cancels the job if it hangs
