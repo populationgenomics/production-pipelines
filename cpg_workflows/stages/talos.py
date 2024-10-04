@@ -441,15 +441,18 @@ class RunHailFiltering(DatasetStage):
 
         # localise the clinvar decisions table
         job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
+        job.command('echo "ClinvArbitration decisions copied"')
 
         # find, localise, and use the clinvar PM5 table
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
+        job.command('echo "ClinvArbitration PM5 copied"')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
+        job.command('echo "Cohort MT copied"')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
