@@ -59,16 +59,19 @@ csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotyp
 [RunHailFiltering.cores]
 # size of VM provisioned for Hail
 sv = 2
-small_variants = 8
+small_variants = 16
 
 [RunHailFiltering.storage]
 sv = 10
-exome = 50
-genome = 500
+
+[RunHailFiltering.timeouts]
+# timeouts for the Hail Batch jobs, cancels the job if it hangs
+small_variants = 15000
+sv = 3600
+
 
 [categories]
 1 = 'ClinVar Pathogenic'
-2 = 'New Gene-Disease Association'
 3 = 'High Impact Variant'
 4 = 'de Novo'
 5 = 'High SpliceAI Score'

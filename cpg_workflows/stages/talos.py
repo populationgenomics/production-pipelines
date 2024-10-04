@@ -405,6 +405,11 @@ class RunHailFiltering(DatasetStage):
         job.image(image_path('talos'))
         job.command('set -eux pipefail')
 
+        # time in seconds before this jobs self-destructs
+        # some recent runs of this have hit the GCP copy and... hung indefinitely at great expense
+        # the highest current runtime when successful is just shy of 4 hours
+        job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'small_variants'], 15000))
+
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
@@ -414,7 +419,7 @@ class RunHailFiltering(DatasetStage):
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
-        required_cpu: int = config_retrieve(['hail', 'cores', 'small_variants'], 8)
+        required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'small_variants'], 8)
         # doubling storage due to the repartitioning
         job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory('highmem')
 
@@ -436,15 +441,18 @@ class RunHailFiltering(DatasetStage):
 
         # localise the clinvar decisions table
         job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
+        job.command('echo "ClinvArbitration decisions copied"')
 
         # find, localise, and use the clinvar PM5 table
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
+        job.command('echo "ClinvArbitration PM5 copied"')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
+        job.command('echo "Cohort MT copied"')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
@@ -484,14 +492,16 @@ class RunHailFilteringSV(DatasetStage):
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
         local_ped = get_batch().read_input(str(pedigree))
 
-        required_storage: int = config_retrieve(['hail', 'storage', 'sv'], 10)
-        required_cpu: int = config_retrieve(['hail', 'cores', 'sv'], 2)
+        required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
+        required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
         sv_jobs: list = []
         for sv_path, sv_file in query_for_sv_mt(dataset.name):
             job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
             # manually extract the VCF and index
             job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
             job.image(image_path('talos'))
+            # generally runtime under 10 minutes
+            job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
             # use the new config file
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
