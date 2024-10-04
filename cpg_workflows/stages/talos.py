@@ -408,7 +408,7 @@ class RunHailFiltering(DatasetStage):
         # time in seconds before this jobs self-destructs
         # some recent runs of this have hit the GCP copy and... hung indefinitely at great expense
         # the highest current runtime when successful is just shy of 4 hours
-        job.timeout(config_retrieve(['hail','timeouts','hail_label'], 15000))
+        job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'small_variants'], 15000))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -498,7 +498,7 @@ class RunHailFilteringSV(DatasetStage):
             job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
             job.image(image_path('talos'))
             # generally runtime under 10 minutes
-            job.timeout(config_retrieve(['hail', 'timeouts', 'hail_label_sv'], 3600))
+            job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
             # use the new config file
             STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
