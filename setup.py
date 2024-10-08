@@ -68,6 +68,8 @@ setup(
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
+            # Run GCTA PCA
+            'gcta_pca = cpg_workflows.scripts.run_gcta_pca:cli_main',
         ],
     },
 )
