@@ -1117,7 +1117,7 @@ class FilterWham(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         # index here is implicit
-        return {'wham_filtered_vcf': self.prefix / 'filtered.vcf.gz'}
+        return {'wham_filtered_vcf': self.prefix / 'filtered.vcf.bgz'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
