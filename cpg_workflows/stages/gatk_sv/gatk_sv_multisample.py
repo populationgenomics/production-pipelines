@@ -1137,7 +1137,7 @@ class FilterWham(MultiCohortStage):
         job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         job.command(
-            'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\''
+            'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\' '
             f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
         )
         job.command(f'tabix {job.output["vcf.bgz"]}')
