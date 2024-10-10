@@ -639,7 +639,6 @@ class Stage(Generic[TargetT], ABC):
 
         if self.skipped:
             if reusable and not first_missing_path:
-                # also adding a debug here, this is something we're intending through config
                 logging.debug(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
                 return Action.REUSE
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
@@ -698,7 +697,6 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
-            # change this to debug, as it's a bit noisy
             logging.debug(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 

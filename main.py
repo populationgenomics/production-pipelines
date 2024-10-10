@@ -87,7 +87,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     help='Dry run: do not actually communicate with Metamist or Hail Batch, '
     'instead only print a final config and stages to be run',
 )
-@click.option('--verbose', 'verbose', is_flag=True)
+@click.option('--verbose', is_flag=True, help='trigger DEBUG logging')
 def main(
     workflow: str,
     config_paths: list[str],
