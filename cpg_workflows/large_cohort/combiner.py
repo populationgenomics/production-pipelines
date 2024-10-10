@@ -1,132 +1,129 @@
-import collections
-import logging
+"""Runs the combiner.
 
-import hail as hl
+Inputs:
+    File listing sequenging group IDs corresponding to the gvcf files you want to combine
+    File listing VDSes in gs:// format, one per line
+
+Raises:
+    ValueError: _description_
+    ValueError: _description_
+    ValueError: _description_
+    ValueError: _description_
+    ValueError: _description_
+    ValueError: _description_
+
+Returns:
+    _type_: _description_
+"""
+
+from itertools import chain
+from typing import TYPE_CHECKING, Any
+
+from graphql import DocumentNode
+
+from hail.vds import VariantDataset, new_combiner, read_vds
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, genome_build, get_config
-from cpg_workflows.inputs import get_multicohort
-from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import can_reuse, exists
+from cpg_utils.hail_batch import init_batch
+from metamist.graphql import gql, query
 
+if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
+    from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
-def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGroup]:
+# Get a cohort. Samples already in a VDS will be filtered out from the gvcf combiner list
+# and used as a VDS input
+GET_COHORT_QUERY: DocumentNode = gql(
     """
-    Making sure each sequencing group has a GVCF
+query getCohort($cohort: String!) {
+  cohorts(name: {eq: $cohort}) {
+    sequencingGroups {
+      id
+      analyses(type: {eq: "gvcf"}, status: {eq: COMPLETED}, active: {eq: true}) {
+        output
+      }
+    }
+  }
+}
+""",
+)
+
+GET_VDS_ANALYSIS_QUERY: DocumentNode = gql(
     """
-    for sequencing_group in sequencing_groups:
-        if not sequencing_group.gvcf:
-            if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
-                logging.warning(f'Skipping {sequencing_group} which is missing GVCF')
-                sequencing_group.active = False
-                continue
-            else:
-                raise ValueError(
-                    f'Sequencing group {sequencing_group} is missing GVCF. '
-                    f'Use workflow/skip_sgs = [] or '
-                    f'workflow/skip_sgs_with_missing_input '
-                    f'to control behaviour',
-                )
-
-        if get_config()['workflow'].get('check_inputs', True):
-            if not exists(sequencing_group.gvcf.path):
-                if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
-                    logging.warning(f'Skipping {sequencing_group} that is missing GVCF {sequencing_group.gvcf.path}')
-                    sequencing_group.active = False
-                else:
-                    raise ValueError(
-                        f'Sequencing group {sequencing_group} is missing GVCF. '
-                        f'Use workflow/skip_sgs = [] or '
-                        f'workflow/skip_sgs_with_missing_input '
-                        f'to control behaviour',
-                    )
-    return [s for s in sequencing_groups if s.active]
+query getVDSByAnalysisIds($vds_ids: [Int!]!) {
+  analyses(id: {in_: $vds_ids}) {
+    output
+  }
+}
+""",
+)
 
 
-def check_duplicates(iterable):
-    """
-    Throws error if input list contains repeated items.
-    """
-    duplicates = [item for item, count in collections.Counter(iterable).items() if count > 1]
-    if duplicates:
-        raise ValueError(f'Found {len(duplicates)} duplicates: {duplicates}')
-    return duplicates
+def _get_samples_from_vds(input_vds: str) -> list[str]:
+    return read_vds(input_vds).variant_data.s.collect()
 
 
-def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.VariantDataset:
-    """
-    run VDS combiner, assuming we are on a cluster.
-    @param out_vds_path: output path for VDS
-    @param tmp_prefix: tmp path for intermediate fields
-    @param sequencing_group_ids: optional list of sequencing groups to subset from get_multicohort()
-    @return: VDS object
-    """
-    if can_reuse(out_vds_path):
-        return hl.vds.read_vds(str(out_vds_path))
+def _parse_metamist_cohort_output(cohort_query_output: dict[str, Any]) -> list[dict[str, Any]]:
+    return [sg for sg in cohort_query_output["cohorts"][0]["sequencingGroups"]]
 
-    sequencing_groups = get_multicohort().get_sequencing_groups()
-    if sequencing_group_ids:
-        sequencing_groups = [s for s in sequencing_groups if s in sequencing_group_ids]
 
-    sequencing_groups = _check_gvcfs(sequencing_groups)
-    seq_types = set(s.sequencing_type for s in sequencing_groups)
-    if len(seq_types) > 1:
-        by_seq_type = collections.defaultdict(list)
-        for s in sequencing_groups:
-            by_seq_type[s.sequencing_type].append(s.id)
+def _parse_metamist_analysis_output(vds_analysis_query_output: dict[str, Any]) -> list[str]:
+    return [analysis["output"] for analysis in vds_analysis_query_output["analyses"]]
 
-        raise ValueError(
-            f'Found multiple sequencing types for large cohort combiner: {by_seq_type}',
-        )
-    # else just use the first
-    sequencing_type = seq_types.pop()
 
-    params = get_config().get('large_cohort', {}).get('combiner', {})
+def run_combiner(
+    output_vds_path: Path,
+    sequencing_type: str,
+    cohort: str,
+    tmp_prfx: str,
+    existing_vds_ids: int | None = None,
+) -> VariantDataset:
+    input_vds_samples: list[str] = []
+    use_genome_default_intervals: bool = False
+    use_exome_default_intervals: bool = False
 
-    if intervals := params.get('intervals'):
-        if isinstance(intervals, list):
-            params['intervals'] = hl.eval(
-                [hl.parse_locus_interval(interval, reference_genome=genome_build()) for interval in intervals],
-            )
-        else:
-            params['intervals'] = hl.import_locus_intervals(params['intervals'])
-    elif sequencing_type == 'exome':
-        params.setdefault('use_exome_default_intervals', True)
-    elif sequencing_type == 'genome':
-        params.setdefault('use_genome_default_intervals', True)
-    else:
-        raise ValueError(
-            'Either combiner/intervals must be set, or workflow/sequencing_type must be one of: "exome", "genome"',
-        )
+    existing_vds: list[str] | None = None
+    project_gvcf_paths: list[str]
 
-    sequencing_group_names = [s.id for s in sequencing_groups]
-    logging.info(
-        f'Combining {len(sequencing_groups)} sequencing groups: '
-        f'{", ".join(sequencing_group_names)}, using parameters: '
-        f'{params}',
+    cohort_query_results: dict[str, Any] = query(
+        GET_COHORT_QUERY,
+        variables={
+            "cohort": cohort,
+        },
     )
 
-    gvcf_paths = [str(s.gvcf.path) for s in sequencing_groups if s.gvcf]
-    if not gvcf_paths:
-        raise ValueError('No sequencing groups with GVCFs found')
+    init_batch()
+    # Only support a single input cohort
+    formatted_query_results: list[dict[str, Any]] = _parse_metamist_cohort_output(cohort_query_results)
 
-    logging.info(f'Combining {len(sequencing_group_names)} sequencing groups: {", ".join(sequencing_group_names)}')
+    if existing_vds_ids:
+        vds_query_results: dict[str, Any] = query(
+            GET_VDS_ANALYSIS_QUERY,
+            variables={
+                "vds_ids": existing_vds_ids,
+            },
+        )
+        existing_vds = _parse_metamist_analysis_output(vds_query_results)
+        input_vds_samples = list(chain(input_vds_samples, *[_get_samples_from_vds(vds) for vds in existing_vds]))
+        # Remove any samples from the query that are already present in a VDS
+        formatted_query_results = [sg for sg in formatted_query_results if sg["id"] not in input_vds_samples]
 
-    check_duplicates(sequencing_group_names)
-    check_duplicates(gvcf_paths)
+    project_gvcf_paths = [entry["analyses"][0]["output"] for entry in formatted_query_results]
 
-    combiner = hl.vds.new_combiner(
-        gvcf_paths=gvcf_paths,
-        gvcf_sample_names=sequencing_group_names,
-        # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
-        # will be ignored. The first gvcf path works fine as a header because it will
-        # be only read until the last line that begins with "#":
-        gvcf_external_header=gvcf_paths[0],
-        output_path=str(out_vds_path),
-        reference_genome='GRCh38',
-        temp_path=str(tmp_prefix),
+    if sequencing_type == "genome":
+        use_genome_default_intervals = True
+    elif sequencing_type == "exome":
+        use_exome_default_intervals = True
+
+    combiner: VariantDatasetCombiner = new_combiner(
+        output_path=str(output_vds_path),
+        gvcf_paths=project_gvcf_paths,
+        vds_paths=existing_vds,
+        reference_genome="GRCh38",
+        temp_path=tmp_prfx,
+        use_exome_default_intervals=use_exome_default_intervals,
+        use_genome_default_intervals=use_genome_default_intervals,
         force=True,
-        **params,
     )
+
     combiner.run()
-    return hl.vds.read_vds(str(out_vds_path))
+    return read_vds(str(output_vds_path))
