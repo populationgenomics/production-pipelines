@@ -35,7 +35,7 @@ class SetSGIDOrdering(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {'sgid_order': self.prefix / 'sgid_order.json'}
+        return {'sgid_order': self.get_stage_cohort_prefix(cohort) / 'sgid_order.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         sorted_sgids = sorted(cohort.get_sequencing_group_ids())
@@ -53,8 +53,8 @@ class PrepareIntervals(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'preprocessed': self.prefix / 'preprocessed.interval_list',
-            'annotated': self.prefix / 'annotated_intervals.tsv',
+            'preprocessed': self.get_stage_cohort_prefix(cohort) / 'preprocessed.interval_list',
+            'annotated': self.get_stage_cohort_prefix(cohort) / 'annotated_intervals.tsv',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -115,9 +115,9 @@ class DeterminePloidy(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'filtered': self.prefix / 'filtered.interval_list',
-            'calls': self.prefix / 'ploidy-calls.tar.gz',
-            'model': self.prefix / 'ploidy-model.tar.gz',
+            'filtered': self.get_stage_cohort_prefix(cohort) / 'filtered.interval_list',
+            'calls': self.get_stage_cohort_prefix(cohort) / 'ploidy-calls.tar.gz',
+            'model': self.get_stage_cohort_prefix(cohort) / 'ploidy-model.tar.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -151,8 +151,8 @@ class UpgradePedWithInferred(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'aneuploidy_samples': self.prefix / 'aneuploidies.txt',
-            'pedigree': self.prefix / 'inferred_sex_pedigree.ped',
+            'aneuploidy_samples': self.get_stage_cohort_prefix(cohort) / 'aneuploidies.txt',
+            'pedigree': self.get_stage_cohort_prefix(cohort) / 'inferred_sex_pedigree.ped',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -177,7 +177,7 @@ class GermlineCNV(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {name: self.prefix / f'{name}.tar.gz' for name in gcnv.shard_basenames()}
+        return {name: self.get_stage_cohort_prefix(cohort) / f'{name}.tar.gz' for name in gcnv.shard_basenames()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
@@ -259,13 +259,14 @@ class TrimOffSexChromosomes(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
 
         # returning an empty dictionary might cause the pipeline setup to break?
-        return_dict: dict[str, Path | str] = {'placeholder': str(self.prefix / 'placeholder.txt')}
+        return_dict: dict[str, Path | str] = {'placeholder': str(self.get_stage_cohort_prefix(cohort) / 'placeholder.txt')}
 
         # load up the file of aneuploidies - I don't think the pipeline supports passing an input directly here
         # so... I'm making a similar path and manually string-replacing it
-        aneuploidy_file = str(self.prefix / 'aneuploidies.txt').replace(self.name, 'UpgradePedWithInferred')
+        aneuploidy_file = str(
+            self.get_stage_cohort_prefix(cohort) / 'aneuploidies.txt'
+        ).replace(self.name, 'UpgradePedWithInferred')
 
-        # can I walrus here?? I can!
         if (aneuploidy_path := to_path(aneuploidy_file)).exists():
 
             # read the identified aneuploidy samples file
@@ -282,7 +283,7 @@ class TrimOffSexChromosomes(CohortStage):
                         continue
 
                     # log an expected output
-                    return_dict[sgid] = self.prefix / f'{sgid}.segments.vcf.bgz'
+                    return_dict[sgid] = self.get_stage_cohort_prefix(cohort) / f'{sgid}.segments.vcf.bgz'
 
         return return_dict
 
@@ -321,9 +322,9 @@ class GCNVJointSegmentation(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'clustered_vcf': self.prefix / 'JointClusteredSegments.vcf.gz',
-            'clustered_vcf_idx': self.prefix / 'JointClusteredSegments.vcf.gz.tbi',
-            'pedigree': self.tmp_prefix / 'pedigree.ped',
+            'clustered_vcf': self.get_stage_cohort_prefix(cohort) / 'JointClusteredSegments.vcf.gz',
+            'clustered_vcf_idx': self.get_stage_cohort_prefix(cohort) / 'JointClusteredSegments.vcf.gz.tbi',
+            'pedigree': self.get_stage_cohort_prefix(cohort) / 'pedigree.ped',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -444,8 +445,8 @@ class FastCombineGCNVs(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'combined_calls': self.prefix / 'gcnv_joint_call.vcf.bgz',
-            'combined_calls_index': self.prefix / 'gcnv_joint_call.vcf.bgz.tbi',
+            'combined_calls': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz',
+            'combined_calls_index': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
