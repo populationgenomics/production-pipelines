@@ -266,7 +266,8 @@ class TrimOffSexChromosomes(CohortStage):
         # load up the file of aneuploidies - I don't think the pipeline supports passing an input directly here
         # so... I'm making a similar path and manually string-replacing it
         aneuploidy_file = str(self.get_stage_cohort_prefix(cohort) / 'aneuploidies.txt').replace(
-            self.name, 'UpgradePedWithInferred',
+            self.name,
+            'UpgradePedWithInferred',
         )
 
         if (aneuploidy_path := to_path(aneuploidy_file)).exists():
