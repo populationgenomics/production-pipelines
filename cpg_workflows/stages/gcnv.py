@@ -97,7 +97,6 @@ class DeterminePloidy(CohortStage):
     """
     The non-sharded cohort-wide gCNV steps after read counts have been collected:
     FilterIntervals and DetermineGermlineContigPloidy. These outputs represent
-    intermediate results for the cohort as a whole, so are written to tmp_prefix.
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
@@ -145,7 +144,9 @@ class UpgradePedWithInferred(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
         ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
-        tmp_ped_path = get_batch().read_input(str(cohort.write_ped_file(self.tmp_prefix / 'pedigree.ped')))
+        tmp_ped_path = get_batch().read_input(
+            str(cohort.write_ped_file(self.get_stage_cohort_prefix(cohort, category='tmp') / 'pedigree.ped'))
+        )
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
             new_output=str(outputs['pedigree']),
@@ -358,7 +359,7 @@ class GCNVJointSegmentation(CohortStage):
             segment_vcfs=all_vcfs,
             pedigree=str(pedigree),
             intervals=str(intervals),
-            tmp_prefix=self.tmp_prefix / 'intermediate_jointseg',
+            tmp_prefix=str(self.get_stage_cohort_prefix(cohort, category='tmp') / 'intermediate_jointseg'),
             output_path=expected_out['clustered_vcf'],  # type: ignore
             job_attrs=self.get_job_attrs(cohort),
         )

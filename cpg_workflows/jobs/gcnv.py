@@ -33,6 +33,7 @@ def upgrade_ped_file(local_ped: ResourceFile, new_output: str, aneuploidies: str
     j.image(config_retrieve(['workflow', 'driver_image']))
 
     # path to the python script
+    # todo this is jank, use as a standalone script
     script_path = upgrade_ped_with_inferred.__file__.removeprefix('/production-pipelines')
     j.command(f'tar -xf {ploidy_tar} -C .')  # creates the folder ploidy-calls
     j.command(f'python3 {script_path} {local_ped} {j.output} {j.aneuploidies} ploidy-calls')
