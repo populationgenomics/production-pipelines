@@ -435,8 +435,8 @@ class FastCombineGCNVs(CohortStage):
         pointers to both the MultiCohort and the Cohort
         """
         return {
-            'combined_calls': self.prefix / cohort.name / 'gcnv_joint_call.vcf.bgz',
-            'combined_calls_index': self.prefix / cohort.name / 'gcnv_joint_call.vcf.bgz.tbi',
+            'combined_calls': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz',
+            'combined_calls_index': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
