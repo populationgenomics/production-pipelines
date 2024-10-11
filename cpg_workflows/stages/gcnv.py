@@ -145,7 +145,9 @@ class UpgradePedWithInferred(CohortStage):
         outputs = self.expected_outputs(cohort)
         ploidy_inputs = get_batch().read_input(str(inputs.as_dict(cohort, DeterminePloidy)['calls']))
         tmp_ped_path = get_batch().read_input(
-            str(cohort.write_ped_file(self.get_stage_cohort_prefix(cohort, category='tmp') / 'pedigree.ped'))
+            str(
+                cohort.write_ped_file(self.get_stage_cohort_prefix(cohort, category='tmp') / 'pedigree.ped'),
+            ),
         )
         job = gcnv.upgrade_ped_file(
             local_ped=tmp_ped_path,
