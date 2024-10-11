@@ -22,6 +22,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -45,22 +46,23 @@ class SetSGIDOrdering(CohortStage):
 
 
 @stage
-class PrepareIntervals(CohortStage):
+class PrepareIntervals(MultiCohortStage):
     """
     Interval preparation steps that don't require the sample read counts:
     PreprocessIntervals and AnnotateIntervals.
+    This is a multicohort stage - we only ever co-process SGIDs on a unified capture
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
-            'preprocessed': self.get_stage_cohort_prefix(cohort) / 'preprocessed.interval_list',
-            'annotated': self.get_stage_cohort_prefix(cohort) / 'annotated_intervals.tsv',
+            'preprocessed': self.prefix / 'preprocessed.interval_list',
+            'annotated': self.prefix / 'annotated_intervals.tsv',
         }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        outputs = self.expected_outputs(cohort)
-        jobs = gcnv.prepare_intervals(self.get_job_attrs(cohort), outputs)
-        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(multicohort)
+        jobs = gcnv.prepare_intervals(self.get_job_attrs(multicohort), outputs)
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=PrepareIntervals)
@@ -81,23 +83,8 @@ class CollectReadCounts(SequencingGroupStage):
         if seqgroup.cram is None:
             raise ValueError(f'No CRAM file found for {seqgroup}')
 
-        # get the MultiCohort object
-        ds_cohort = seqgroup.dataset.cohort
-        assert ds_cohort
-        multicohort = ds_cohort.multicohort
-        assert multicohort
-        # identify the cohort that contains this SGID
-        this_cohort: Cohort | None = None
-        for c in multicohort.get_cohorts():
-            if seqgroup.id in c.get_sequencing_group_ids():
-                this_cohort = c
-                break
-
-        if this_cohort is None:
-            raise ValueError(f'Could not find cohort for {seqgroup}')
-
         jobs = gcnv.collect_read_counts(
-            intervals_path=inputs.as_path(this_cohort, PrepareIntervals, 'preprocessed'),
+            intervals_path=inputs.as_path(get_multicohort(), PrepareIntervals, 'preprocessed'),
             cram_path=seqgroup.cram,
             job_attrs=self.get_job_attrs(seqgroup),
             output_base_path=seqgroup.dataset.prefix() / 'gcnv' / seqgroup.id,
@@ -123,7 +110,7 @@ class DeterminePloidy(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
 
-        prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
+        prep_intervals = inputs.as_dict(get_multicohort(), PrepareIntervals)
 
         # pull the json file with the sgid ordering
         sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
@@ -182,13 +169,13 @@ class GermlineCNV(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(cohort)
         determine_ploidy = inputs.as_dict(cohort, DeterminePloidy)
-        prep_intervals = inputs.as_dict(cohort, PrepareIntervals)
+        prep_intervals = inputs.as_dict(get_multicohort(), PrepareIntervals)
+        # pull all per-sgid files from previous stage
+        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
 
         # pull the json file with the sgid ordering
         sgid_ordering = json.load(inputs.as_path(cohort, SetSGIDOrdering, 'sgid_order').open())
-        # pull all per-sgid files from previous stage
-        random_read_counts = inputs.as_path_by_target(CollectReadCounts, 'counts')
-        # order those WRT the set ordering
+        # order per-sgid files WRT the set ordering
         ordered_read_counts = [random_read_counts[seqgroup] for seqgroup in sgid_ordering]
 
         jobs = gcnv.shard_gcnv(
@@ -209,6 +196,9 @@ class GermlineCNVCalls(SequencingGroupStage):
     """
 
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
+        """
+        output paths here are per-SGID, but stored in the directory structure indicating the whole MCohort
+        """
         return {
             'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
             'intervals_index': self.prefix / f'{seqgroup.id}.intervals.vcf.gz.tbi',
@@ -220,14 +210,10 @@ class GermlineCNVCalls(SequencingGroupStage):
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
 
-        # get the MultiCohort object
-        ds_cohort = seqgroup.dataset.cohort
-        assert ds_cohort
-        multicohort = ds_cohort.multicohort
-        assert multicohort
         # identify the cohort that contains this SGID
+        # yes, this feels janky as hell, but we don't have a better approach yet
         this_cohort: Cohort | None = None
-        for c in multicohort.get_cohorts():
+        for c in get_multicohort().get_cohorts():
             if seqgroup.id in c.get_sequencing_group_ids():
                 this_cohort = c
                 break
@@ -254,6 +240,8 @@ class GermlineCNVCalls(SequencingGroupStage):
 class TrimOffSexChromosomes(CohortStage):
     """
     Trim off sex chromosomes for gCNV VCFs where the SGID is detected to be Aneuploid
+    The dependency chain here is a number of CohortStages, i.e. the MultiCohort as a whole
+    isn't relevant to determining aneuploidy. As a result we're happy writing this to a Cohort-specific path
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path | str]:
@@ -360,7 +348,7 @@ class GCNVJointSegmentation(CohortStage):
                 raise ValueError(f'No VCF found for {sgid}')
 
         # get the intervals
-        intervals = inputs.as_path(cohort, PrepareIntervals, 'preprocessed')
+        intervals = inputs.as_path(get_multicohort(), PrepareIntervals, 'preprocessed')
 
         expected_out = self.expected_outputs(cohort)
 
@@ -403,14 +391,9 @@ class RecalculateClusteredQuality(SequencingGroupStage):
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(sequencing_group)
 
-        # get the MultiCohort object - appease mypy along the way
-        ds_cohort = sequencing_group.dataset.cohort
-        assert ds_cohort
-        multicohort = ds_cohort.multicohort
-        assert multicohort
         # identify the cohort that contains this SGID
         this_cohort: Cohort | None = None
-        for c in multicohort.get_cohorts():
+        for c in get_multicohort().get_cohorts():
             if sequencing_group.id in c.get_sequencing_group_ids():
                 this_cohort = c
                 break
@@ -447,9 +430,13 @@ class FastCombineGCNVs(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        This is now explicitly continuing from multicohort work, so the output path must include
+        pointers to both the MultiCohort and the Cohort
+        """
         return {
-            'combined_calls': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz',
-            'combined_calls_index': self.get_stage_cohort_prefix(cohort) / 'gcnv_joint_call.vcf.bgz.tbi',
+            'combined_calls': self.prefix / cohort.name / 'gcnv_joint_call.vcf.bgz',
+            'combined_calls_index': self.prefix / cohort.name / 'gcnv_joint_call.vcf.bgz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -649,9 +636,7 @@ class AnnotateDatasetCNV(DatasetStage):
             inputs (StageInput): results of AnnotateCohortgCNV for this MultiCohort
         """
 
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_in = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortgCNV, key='mt')
+        mt_in = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortgCNV, key='mt')
         outputs = self.expected_outputs(dataset)
 
         jobs = gcnv.annotate_dataset_jobs_cnv(
