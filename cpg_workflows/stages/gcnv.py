@@ -592,7 +592,6 @@ class AnnotateCohortgCNV(MultiCohortStage):
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        # convert temp path to str to avoid checking existence
         return {'mt': self.prefix / 'gcnv_annotated_cohort.mt'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -616,7 +615,7 @@ class AnnotateCohortgCNV(MultiCohortStage):
             ),
         )
 
-        return self.make_outputs(multicohort, data=outputs['mt'], jobs=j)
+        return self.make_outputs(multicohort, data=outputs, jobs=j)
 
 
 @stage(required_stages=AnnotateCohortgCNV, analysis_type='cnv', analysis_keys=['mt'])
@@ -722,4 +721,4 @@ class MtToEsCNV(DatasetStage):
         # run the export from the localised MT - this job writes no new data, just transforms and exports over network
         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
 
-        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
+        return self.make_outputs(dataset, data=outputs, jobs=job)
