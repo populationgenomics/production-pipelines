@@ -481,10 +481,10 @@ class MergeCohortsgCNV(MultiCohortStage):
             inputs (StageInput): link to FastCombineGCNVs outputs
 
         Returns:
-            the bcftools merge job to join the Cohorts into a MultiCohort VCF
+            the bcftools merge job to join the Cohort-VCFs into a MultiCohort VCF
         """
         outputs = self.expected_outputs(multicohort)
-        cohort_merges = inputs.as_dict_by_target(RecalculateClusteredQuality)
+        cohort_merges = inputs.as_dict_by_target(FastCombineGCNVs)
         cohort_vcfs = [str(cohort_merges[cohort.name]['combined_calls']) for cohort in multicohort.get_cohorts()]
 
         pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
