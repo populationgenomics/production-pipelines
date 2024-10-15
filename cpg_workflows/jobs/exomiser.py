@@ -13,7 +13,7 @@ from cpg_utils.config import config_retrieve, get_config, image_path, reference_
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.scripts import collect_dataset_tsvs
 from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import chunks, exists
+from cpg_workflows.utils import chunks, check_exists_path
 
 HPO_KEY: str = 'HPO Terms (present)'
 
@@ -98,7 +98,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
     for family, members in families.items():
 
         # skip if already done
-        if exists(out_paths[family]):
+        if check_exists_path(out_paths[family]):
             continue
 
         jobs.append(family_vcf_from_gvcf(members, str(out_paths[family])))
@@ -118,8 +118,9 @@ def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_pa
     for family_id, members in family_dict.items():
 
         ped_path = out_paths[family_id]
+
         # don't recreate if it exists
-        if not ped_path.exists():
+        if not check_exists_path(ped_path):
             # make the pedigree for this family
             df = pd.DataFrame([sg.pedigree.get_ped_dict() for sg in members])
             with ped_path.open('w') as ped_file:
@@ -138,7 +139,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
 
     for family, members in family_dict.items():
 
-        if out_path[family].exists():
+        if check_exists_path(out_path[family]):
             continue
 
         # get all affected and unaffected

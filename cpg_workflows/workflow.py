@@ -31,12 +31,7 @@ from cpg_utils.hail_batch import get_batch, reset_batch
 from .inputs import get_multicohort
 from .status import MetamistStatusReporter
 from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
-from .utils import (
-    ExpectedResultT,
-    exists,
-    slugify,
-    timestamp,
-)
+from .utils import ExpectedResultT, check_exists_path, slugify, timestamp
 
 StageDecorator = Callable[..., 'Stage']
 
@@ -713,7 +708,7 @@ class Stage(Generic[TargetT], ABC):
                 logging.info(f'{expected_out} is not reusable. No paths found.')
                 return False, None
 
-            if first_missing_path := next((p for p in paths if not exists(p)), None):
+            if first_missing_path := next((p for p in paths if not check_exists_path(p)), None):
                 logging.info(f'{expected_out} is not reusable, {first_missing_path} is missing')
                 return False, first_missing_path
 
