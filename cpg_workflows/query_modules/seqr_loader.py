@@ -180,8 +180,15 @@ def annotate_cohort(
     logging.info('Done:')
     mt.describe()
 
-    # show the a_index field
-    logging.info(f'Example rows: {mt.rows().take(5)}')
+    # The problematic rows are where a_index=2 and info.AC or info.AF has length 1
+    problem_rows = mt.rows().filter(
+        (mt.a_index == 2) & ((hl.len(mt.info.AC) == 1) | (hl.len(mt.info.AF) == 1)),
+    )
+    if problem_rows.count() > 0:
+        logging.warning(f'Found {problem_rows.count()} rows with problematic info.AC or info.AF fields')
+        logging.warning('Showing the first 100 rows')
+        for row in problem_rows.take(100):
+            logging.warning(row)
 
     mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written final matrix table into {out_mt_path}')
