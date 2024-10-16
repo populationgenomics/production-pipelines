@@ -182,7 +182,11 @@ def annotate_cohort(
 
     # The problematic rows are where a_index=2 and info.AC or info.AF has length 1
     problem_rows = mt.rows().filter(
-        (mt.a_index == 2) & ((hl.len(mt.info.AC) == 1) | (hl.len(mt.info.AF) == 1)),
+        hl.all(
+            mt.a_index == 2,
+            hl.len(mt.info.AC) == 1,
+        ),
+        keep=True,
     )
     if problem_rows.count() > 0:
         logging.warning(f'Found {problem_rows.count()} rows with problematic info.AC or info.AF fields')
