@@ -19,6 +19,7 @@ def annotate_cohort(
     vep_ht_path: str,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
+    long_read=False,
 ):
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
@@ -72,8 +73,10 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    if 'AF' in mt.entry:
-        mt.drop('AF')
+    if 'AF' in mt.entry and long_read:
+        # For long read data, drop the pre-computed AF entry field and recompute it as a row field
+        mt = mt.drop('AF')
+        mt = mt.annotate_rows(info=mt.info.annotate(AF=hl.agg.mean(mt.GT.n_alt_alleles()) / mt.info.AN))
 
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
