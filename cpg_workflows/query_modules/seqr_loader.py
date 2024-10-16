@@ -73,9 +73,11 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    if 'AF' in mt.entry and long_read:
+    if long_read:
         # For long read data, drop the pre-computed AF entry field
         mt = mt.drop('AF')
+        mt = hl.variant_qc(mt)
+        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF[1], AN=mt.variant_qc.AN, AC=mt.variant_qc.AC[1]))
         # mt = mt.annotate_rows(info=mt.info.annotate(AF=hl.agg.mean(mt.GT.n_alt_alleles()) / mt.info.AN))
 
     # don't fail if the AC/AF attributes are an inappropriate type
