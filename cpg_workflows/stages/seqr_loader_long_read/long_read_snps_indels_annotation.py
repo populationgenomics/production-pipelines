@@ -209,8 +209,8 @@ class SiteOnlyVCFs(MultiCohortStage):
         Generate site-only VCFs from the merged VCF.
         """
         return {
-            'siteonly': to_path(self.prefix / 'long_read' / 'siteonly.vcf.gz'),
-            'siteonly_part_pattern': str(self.prefix / 'long_read' / 'siteonly_parts' / 'part{idx}.vcf.gz'),
+            # 'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
+            'siteonly_part_pattern': str(self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'),
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -237,7 +237,7 @@ class SiteOnlyVCFs(MultiCohortStage):
             scatter_count=scatter_count,
             merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
             tmp_bucket=self.tmp_prefix / 'tmp',
-            out_siteonly_vcf_path=outputs['siteonly'],
+            # out_siteonly_vcf_path=outputs['siteonly'],
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             intervals_path=intervals_path,
             exclude_intervals_path=exclude_intervals_path,

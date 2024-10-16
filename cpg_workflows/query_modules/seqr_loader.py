@@ -72,6 +72,9 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
+    if 'AF' in mt.entry:
+        mt.drop('AF')
+
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
     for attr in ['AC', 'AF']:

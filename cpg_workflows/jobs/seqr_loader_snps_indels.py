@@ -47,7 +47,7 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     scatter_count: int,
     merged_vcf_path: Path,
     tmp_bucket: Path,
-    out_siteonly_vcf_path: Path,
+    # out_siteonly_vcf_path: Path,
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     intervals_path: Path | None = None,
     exclude_intervals_path: Path | None = None,
@@ -77,7 +77,8 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     if intervals_j:
         jobs.append(intervals_j)
 
-    all_output_paths = [out_siteonly_vcf_path]
+    # all_output_paths = [out_siteonly_vcf_path]
+    all_output_paths = []
     if out_siteonly_vcf_part_paths:
         assert len(out_siteonly_vcf_part_paths) == scatter_count
         all_output_paths.extend(out_siteonly_vcf_part_paths)
@@ -108,11 +109,12 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
         if out_siteonly_vcf_part_paths:
             siteonly_vcf_path = out_siteonly_vcf_part_paths[idx]
         else:
-            siteonly_vcf_path = (
-                (tmp_bucket / 'split-merged-vcf-siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
-                if scatter_count > 1
-                else out_siteonly_vcf_path
-            )
+            siteonly_vcf_path = tmp_bucket / 'split-merged-vcf-siteonly' / 'parts' / f'part{idx + 1}.vcf.gz'
+            # siteonly_vcf_path = (
+            #     (tmp_bucket / 'split-merged-vcf-siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
+            #     if scatter_count > 1
+            #     else out_siteonly_vcf_path
+            # )
         vcf_part = b.read_input_group(
             **{
                 'vcf.gz': str(split_vcfs_paths[idx]),
