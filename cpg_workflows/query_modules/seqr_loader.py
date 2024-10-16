@@ -177,6 +177,7 @@ def annotate_cohort(
 
     logging.info('Done:')
     mt.describe()
+    mt.show()
     mt.write(out_mt_path, overwrite=True)
     logging.info(f'Written final matrix table into {out_mt_path}')
 
