@@ -47,6 +47,9 @@ def complete_analysis_job(
     if update_analysis_meta is not None:
         print(f'Updating analysis meta for {output}')
         meta_update = update_analysis_meta(output)
+        print(f'Analysis meta: {meta}')
+        print(f'Update: {meta_update}')
+        print(f'update_analysis_meta: {update_analysis_meta(output)}')
         if meta_update is not None:
             meta |= meta_update
         else:
