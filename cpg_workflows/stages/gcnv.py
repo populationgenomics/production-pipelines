@@ -381,14 +381,29 @@ class RecalculateClusteredQuality(SequencingGroupStage):
     This is done as another pass through PostprocessGermlineCNVCalls, with prior/clustered results
     """
 
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+    def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
+
+        # identify the cohort that contains this SGID
+        this_cohort: Cohort | None = None
+        for c in get_multicohort().get_cohorts():
+            if seqgroup.id in c.get_sequencing_group_ids():
+                this_cohort = c
+                break
+
+        if this_cohort is None:
+            raise ValueError(f'Could not find cohort for {seqgroup}')
+
+        # this job runs per sample, on results with a cohort context
+        # so we need to prefix the outputs with the cohort name
+        path_prefix = seqgroup.dataset.prefix() / 'gcnv' / self.name / this_cohort.name
+
         return {
-            'genotyped_intervals_vcf': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.prefix / f'{sequencing_group.id}.intervals.vcf.gz.tbi',
-            'genotyped_segments_vcf': self.prefix / f'{sequencing_group.id}.segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.prefix / f'{sequencing_group.id}.segments.vcf.gz.tbi',
-            'denoised_copy_ratios': self.prefix / f'{sequencing_group.id}.ratios.tsv',
-            'qc_status_file': self.prefix / f'{sequencing_group.id}.qc_status.txt',
+            'genotyped_intervals_vcf': path_prefix / f'{seqgroup.id}.intervals.vcf.gz',
+            'genotyped_intervals_vcf_index': path_prefix / f'{seqgroup.id}.intervals.vcf.gz.tbi',
+            'genotyped_segments_vcf': path_prefix / f'{seqgroup.id}.segments.vcf.gz',
+            'genotyped_segments_vcf_index': path_prefix / f'{seqgroup.id}.segments.vcf.gz.tbi',
+            'denoised_copy_ratios': path_prefix / f'{seqgroup.id}.ratios.tsv',
+            'qc_status_file': path_prefix / f'{seqgroup.id}.qc_status.txt',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
