@@ -59,12 +59,15 @@ class Stripy(SequencingGroupStage):
     """
     Call stripy to run STR analysis on known pathogenic loci.
     """
+
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
         # When testing new loci, its useful to save the report to an alternate path
         output_prefix = config_retrieve(['stripy', 'output_prefix'], default='stripy')
         return {
             'stripy_html': sequencing_group.dataset.web_prefix() / output_prefix / f'{sequencing_group.id}.stripy.html',
-            'stripy_json': sequencing_group.dataset.analysis_prefix() / output_prefix / f'{sequencing_group.id}.stripy.json',
+            'stripy_json': sequencing_group.dataset.analysis_prefix()
+            / output_prefix
+            / f'{sequencing_group.id}.stripy.json',
             'stripy_log': sequencing_group.dataset.analysis_prefix()
             / output_prefix
             / f'{sequencing_group.id}.stripy.log.txt',
