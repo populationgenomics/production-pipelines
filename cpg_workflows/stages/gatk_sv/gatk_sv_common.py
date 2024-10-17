@@ -191,6 +191,7 @@ def add_gatk_sv_jobs(
         labels=labels,
         min_watch_poll_interval=polling_minimum,
         max_watch_poll_interval=polling_maximum,
+        time_limit_seconds=config_retrieve(['workflow', 'time_limit_seconds'], None),
     )
 
     copy_j = get_batch().new_job(f'{job_prefix}: copy outputs')
