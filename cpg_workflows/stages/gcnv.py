@@ -6,6 +6,8 @@ import json
 
 from google.api_core.exceptions import PermissionDenied
 
+from functools import lru_cache
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch, query_command
@@ -26,6 +28,19 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+
+
+@lru_cache(maxsize=None)
+def get_cohort_for_sgid(sgid: str) -> Cohort:
+    """
+    Return the cohort that contains this sgid
+    until a better central method exists this needs to run multiple times
+    so build a method here with caching
+    """
+    for c in get_multicohort().get_cohorts():
+        if sgid in c.get_sequencing_group_ids():
+            return c
+    raise ValueError(f'Could not find cohort for {sgid}')
 
 
 @stage
@@ -202,27 +217,25 @@ class GermlineCNVCalls(SequencingGroupStage):
         """
         output paths here are per-SGID, but stored in the directory structure indicating the whole MCohort
         """
+
+        # identify the cohort that contains this SGID
+        this_cohort: Cohort = get_cohort_for_sgid(seqgroup.id)
+
+        # this job runs per sample, on results with a cohort context
+        # so we need to write the outputs to a cohort-specific location
         return {
-            'intervals': self.prefix / f'{seqgroup.id}.intervals.vcf.gz',
-            'intervals_index': self.prefix / f'{seqgroup.id}.intervals.vcf.gz.tbi',
-            'segments': self.prefix / f'{seqgroup.id}.segments.vcf.gz',
-            'segments_index': self.prefix / f'{seqgroup.id}.segments.vcf.gz.tbi',
-            'ratios': self.prefix / f'{seqgroup.id}.ratios.tsv',
+            'intervals': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.intervals.vcf.gz',
+            'intervals_index': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.intervals.vcf.gz.tbi',
+            'segments': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.segments.vcf.gz',
+            'segments_index': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.segments.vcf.gz.tbi',
+            'ratios': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.ratios.tsv',
         }
 
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(seqgroup)
 
         # identify the cohort that contains this SGID
-        # yes, this feels janky as hell, but we don't have a better approach yet
-        this_cohort: Cohort | None = None
-        for c in get_multicohort().get_cohorts():
-            if seqgroup.id in c.get_sequencing_group_ids():
-                this_cohort = c
-                break
-
-        if this_cohort is None:
-            raise ValueError(f'Could not find cohort for {seqgroup}')
+        this_cohort = get_cohort_for_sgid(seqgroup.id)
 
         determine_ploidy = inputs.as_dict(this_cohort, DeterminePloidy)
 
@@ -234,7 +247,7 @@ class GermlineCNVCalls(SequencingGroupStage):
             shard_paths=inputs.as_dict(this_cohort, GermlineCNV),
             sample_index=sgid_ordering.index(seqgroup.id),
             job_attrs=self.get_job_attrs(seqgroup),
-            output_prefix=str(self.prefix / seqgroup.id),
+            output_prefix=str(self.get_stage_cohort_prefix(this_cohort) / seqgroup.id),
         )
         return self.make_outputs(seqgroup, data=outputs, jobs=jobs)
 
@@ -384,14 +397,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
     def expected_outputs(self, seqgroup: SequencingGroup) -> dict[str, Path]:
 
         # identify the cohort that contains this SGID
-        this_cohort: Cohort | None = None
-        for c in get_multicohort().get_cohorts():
-            if seqgroup.id in c.get_sequencing_group_ids():
-                this_cohort = c
-                break
-
-        if this_cohort is None:
-            raise ValueError(f'Could not find cohort for {seqgroup}')
+        this_cohort = get_cohort_for_sgid(seqgroup.id)
 
         # this job runs per sample, on results with a cohort context
         # so we need to write the outputs to a cohort-specific location
@@ -410,14 +416,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
         expected_out = self.expected_outputs(sequencing_group)
 
         # identify the cohort that contains this SGID
-        this_cohort: Cohort | None = None
-        for c in get_multicohort().get_cohorts():
-            if sequencing_group.id in c.get_sequencing_group_ids():
-                this_cohort = c
-                break
-
-        if this_cohort is None:
-            raise ValueError(f'Could not find cohort for {sequencing_group}')
+        this_cohort = get_cohort_for_sgid(sequencing_group.id)
 
         # get the clustered VCF from the previous stage
         joint_seg = inputs.as_dict(this_cohort, GCNVJointSegmentation)
@@ -433,7 +432,7 @@ class RecalculateClusteredQuality(SequencingGroupStage):
             shard_paths=inputs.as_dict(this_cohort, GermlineCNV),
             sample_index=sgid_ordering.index(sequencing_group.id),
             job_attrs=self.get_job_attrs(sequencing_group),
-            output_prefix=str(self.prefix / sequencing_group.id),
+            output_prefix=str(self.get_stage_cohort_prefix(this_cohort) / sequencing_group.id),
             clustered_vcf=str(joint_seg['clustered_vcf']),
             intervals_vcf=str(gcnv_call_inputs['intervals']),
             qc_file=str(expected_out['qc_status_file']),
