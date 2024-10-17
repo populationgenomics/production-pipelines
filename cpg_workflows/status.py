@@ -42,6 +42,8 @@ def complete_analysis_job(
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
 
+    print('Analysis meta update')
+    print(update_analysis_meta)
     if update_analysis_meta is not None:
         print(f'Updating analysis meta for {output}')
         meta_update = update_analysis_meta(output)
