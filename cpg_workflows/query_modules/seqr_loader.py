@@ -181,10 +181,11 @@ def annotate_cohort(
     mt.describe()
 
     # The problematic rows are where a_index=2 and info.AC or info.AF has length 1
-    problem_rows = mt.rows().filter(
+    rows = mt.rows()
+    problem_rows = rows.filter(
         hl.all(
-            mt.rows().a_index == 2,
-            hl.len(mt.rows().info.AC) == 1,
+            rows.a_index == 2,
+            hl.len(rows.info.AC) == 1,
         ),
         keep=True,
     )
