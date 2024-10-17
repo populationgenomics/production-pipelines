@@ -43,7 +43,13 @@ def complete_analysis_job(
     output_cloudpath = to_path(output)
 
     if update_analysis_meta is not None:
-        meta | update_analysis_meta(output)
+        print(f'Updating analysis meta for {output}')
+        meta_update = update_analysis_meta(output)
+        if meta_update is not None:
+            meta |= meta_update
+        else:
+            print(f'No meta update for {output}')
+        # meta | update_analysis_meta(output)
 
     # if SG IDs are listed in the meta, remove them
     # these are already captured in the sg_ids list
