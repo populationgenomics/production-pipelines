@@ -42,23 +42,8 @@ def complete_analysis_job(
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
 
-    print('Analysis meta update')
-    print(update_analysis_meta)
     if update_analysis_meta is not None:
-        print(f'Updating analysis meta for {output}')
-        meta_update = update_analysis_meta(output)
-        print(f'Analysis meta: {meta}')
-        print(f'Update: {meta_update}')
-        print(f'update_analysis_meta: {update_analysis_meta(output)}')
-        if meta_update is not None:
-            meta |= meta_update
-        else:
-            print(f'No meta update for {output}')
-        # meta | update_analysis_meta(output)
-    else:
-        print(f'No meta update for {output}')
-        print(f'Analysis meta: {meta}')
-        print(f'Update analysis meta: {update_analysis_meta}')
+        meta = meta | update_analysis_meta(output)
 
     # if SG IDs are listed in the meta, remove them
     # these are already captured in the sg_ids list
