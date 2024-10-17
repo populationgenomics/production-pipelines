@@ -3,10 +3,9 @@ Stages that implement GATK-gCNV.
 """
 
 import json
+from functools import lru_cache
 
 from google.api_core.exceptions import PermissionDenied
-
-from functools import lru_cache
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
