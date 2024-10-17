@@ -397,9 +397,11 @@ class RecalculateClusteredQuality(SequencingGroupStage):
         # so we need to write the outputs to a cohort-specific location
         return {
             'genotyped_intervals_vcf': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.intervals.vcf.gz',
-            'genotyped_intervals_vcf_index': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.intervals.vcf.gz.tbi',
+            'genotyped_intervals_vcf_index': self.get_stage_cohort_prefix(this_cohort)
+            / f'{seqgroup.id}.intervals.vcf.gz.tbi',
             'genotyped_segments_vcf': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.segments.vcf.gz',
-            'genotyped_segments_vcf_index': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.segments.vcf.gz.tbi',
+            'genotyped_segments_vcf_index': self.get_stage_cohort_prefix(this_cohort)
+            / f'{seqgroup.id}.segments.vcf.gz.tbi',
             'denoised_copy_ratios': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.ratios.tsv',
             'qc_status_file': self.get_stage_cohort_prefix(this_cohort) / f'{seqgroup.id}.qc_status.txt',
         }
