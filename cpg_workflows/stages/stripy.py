@@ -52,6 +52,8 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     analysis_type='web',
     analysis_keys=[
         'stripy_html',
+        'stripy_json',
+        'stripy_log',
     ],
     update_analysis_meta=_update_meta,
 )
