@@ -50,6 +50,10 @@ def complete_analysis_job(
         else:
             print(f'No meta update for {output}')
         # meta | update_analysis_meta(output)
+    else:
+        print(f'No meta update for {output}')
+        print(f'Analysis meta: {meta}')
+        print(f'Update analysis meta: {update_analysis_meta}')
 
     # if SG IDs are listed in the meta, remove them
     # these are already captured in the sg_ids list
