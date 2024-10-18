@@ -15,6 +15,7 @@ panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
 require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
+within_x_months = 6
 
 [FindGeneSymbolMap]
 # much higher than this and we get into throttling issues
@@ -58,16 +59,19 @@ csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotyp
 [RunHailFiltering.cores]
 # size of VM provisioned for Hail
 sv = 2
-small_variants = 8
+small_variants = 16
 
 [RunHailFiltering.storage]
 sv = 10
-exome = 50
-genome = 500
+
+[RunHailFiltering.timeouts]
+# timeouts for the Hail Batch jobs, cancels the job if it hangs
+small_variants = 15000
+sv = 3600
+
 
 [categories]
 1 = 'ClinVar Pathogenic'
-2 = 'New Gene-Disease Association'
 3 = 'High Impact Variant'
 4 = 'de Novo'
 5 = 'High SpliceAI Score'

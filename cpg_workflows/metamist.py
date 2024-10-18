@@ -337,9 +337,7 @@ class Metamist:
         Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
-        metamist_proj = dataset_name
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset_name)
         logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
         skip_sgs = get_config()['workflow'].get('skip_sgs', [])
@@ -386,9 +384,7 @@ class Metamist:
         """
         Query the DB to find the last completed joint-calling analysis for the sequencing groups.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         data = self.make_aapi_call(
             self.aapi.get_latest_complete_analysis_for_type,
@@ -421,10 +417,7 @@ class Metamist:
         and sequencing type, one Analysis object per sequencing group. Assumes the analysis
         is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         analyses = query(
             GET_ANALYSES_QUERY,
@@ -468,10 +461,7 @@ class Metamist:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         if isinstance(type_, AnalysisType):
             type_ = type_.value
@@ -594,15 +584,22 @@ class Metamist:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
-
+        metamist_proj = self.get_metamist_proj(dataset)
         entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
         return pedigree_entries
+
+    def get_metamist_proj(self, dataset: str | None = None) -> str:
+        """
+        Return the Metamist project name, appending '-test' if the access level is 'test'.
+        """
+        metamist_proj = dataset or self.default_dataset
+        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
+            metamist_proj += '-test'
+
+        return metamist_proj
 
 
 @dataclass

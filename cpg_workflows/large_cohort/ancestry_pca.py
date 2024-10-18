@@ -4,6 +4,7 @@ from os import remove
 from random import sample
 
 import pandas as pd
+from attr import dataclass
 
 import hail as hl
 
@@ -41,13 +42,14 @@ def add_background(
         dataset_dict = get_config()['large_cohort']['pca_background'][dataset]
         path = dataset_dict['dataset_path']
         logging.info(f'Adding background dataset {path}')
+        logging.info(f'Current dataset: {dataset}')
         if to_path(path).suffix == '.mt':
             background_mt = hl.read_matrix_table(str(path))
             background_mt = hl.split_multi(background_mt, filter_changed_loci=True)
             background_mt = background_mt.semi_join_rows(qc_variants_ht)
             background_mt = background_mt.densify()
         elif to_path(path).suffix == '.vds':
-            background_mt_checkpoint_path = tmp_prefix / 'densified_background_mt.mt'
+            background_mt_checkpoint_path = tmp_prefix / f'{dataset}_densified_background_mt.mt'
             if can_reuse(background_mt_checkpoint_path):
                 logging.info(f'Reusing densified background mt from {background_mt_checkpoint_path}')
                 background_mt = hl.read_matrix_table(str(background_mt_checkpoint_path))
@@ -58,12 +60,14 @@ def add_background(
                 background_mt = hl.vds.to_dense_mt(background_vds)
                 logging.info(f'Checkpointing background_mt to {background_mt_checkpoint_path}')
                 background_mt = background_mt.checkpoint(str(background_mt_checkpoint_path), overwrite=True)
-                logging.info('Finished checkpointing densified_background_mt')
+                logging.info(f'Finished checkpointing {dataset}_densified_background_mt.mt')
                 # annotate background mt with metadata info derived from SampleQC stage
-            metadata_tables = []
+            metadata_tables: list[hl.Table] = []
             for path in dataset_dict['metadata_table']:
+                logging.info(f'Adding metadata table to background dataset: {path}')
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
+                logging.info(f'metadata table appended to metadata_tables: {sample_qc_background.show()}')
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
@@ -81,21 +85,22 @@ def add_background(
                     f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
                 )
                 background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
+                logging.info(f'background_relateds_to_drop: {background_relateds_to_drop_ht.show()}')
                 background_mt = background_mt.filter_cols(
                     ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
                 )
             else:
                 logging.info('No related samples to drop from background dataset')
+
+            # save metadata info before merging dense and background datasets
+            ht = background_mt.cols()
+            background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
+            background_mt = background_mt.naive_coalesce(5000)
+            # combine dense dataset with background population dataset
+            dense_mt = dense_mt.union_cols(background_mt)
+            sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
-
-        # save metadata info before merging dense and background datasets
-        ht = background_mt.cols()
-        background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
-        background_mt = background_mt.naive_coalesce(5000)
-        # combine dense dataset with background population dataset
-        dense_mt = dense_mt.union_cols(background_mt)
-        sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
 
     if drop_columns:
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
