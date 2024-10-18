@@ -1,4 +1,8 @@
 import logging
+from itertools import chain
+from typing import Any, Tuple
+
+from graphql import DocumentNode
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
@@ -12,6 +16,7 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from metamist.graphql import gql, query
 
 
 @stage(analysis_type="combiner", analysis_keys=["combiner"])
@@ -23,6 +28,57 @@ class Combiner(CohortStage):
             f"{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
         return cohort.analysis_dataset.prefix() / "vds" / f"{output_vds_name}.vds"
+
+        # Example query and output
+        """
+        query MyQuery {
+        analyses(id: {eq: 238489}) {
+            type
+            outputs
+            sequencingGroups {
+            id
+            }
+        }
+        }
+
+
+        {
+        "data": {
+            "analyses": [
+            {
+                "type": "combiner",
+                "outputs": "gs://cpg-fewgenomes-test/vds/combiner-test4-genome-0-3.vds",
+                "sequencingGroups": [
+                {
+                    "id": "CPG280156"
+                },
+                {
+                    "id": "CPG280164"
+                }
+                ]
+            }
+            ]
+        }
+        }
+        """
+
+    def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
+        get_vds_analysis_query: DocumentNode = gql(
+            """
+            query getVDSByAnalysisIds($vds_id: Int!) {
+                analyses(id: {eq: $vds_id}) {
+                    output
+                    sequencingGroups {
+                        id
+                    }
+                }
+            }
+        """,
+        )
+        query_results: dict[str, Any] = query(get_vds_analysis_query, variables={"vds_id": vds_id})
+        vds_path: str = query_results["analyses"][0]["output"]
+        vds_ids: list[str] = [sg["id"] for sg in query_results["analyses"][0]["sequencingGroups"]]
+        return (vds_path, vds_ids)
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
@@ -36,11 +92,19 @@ class Combiner(CohortStage):
         tmp_prfx = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
+
+        vds_paths: list[str] = []
+        vds_sg_ids: list[str] = []
+        new_sg_gvcfs: list[str] = []
+        for vds_id in combiner_config["vds_analysis_ids"]:
+            query_res = self.get_vds_ids_output(vds_id)
+            vds_paths.append(query_res[0])
+            vds_sg_ids = list(chain(vds_sg_ids, *query_res[1]))
+
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        print([(sg.id, str(sg.gvcf)) for sg in sg_ids])
-        exit(1)
+        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if sg.id not in vds_sg_ids]
 
         j.image(image_path("cpg_workflows"))
         j.memory(combiner_config["memory"])
