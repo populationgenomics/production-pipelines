@@ -16,10 +16,9 @@ the Talos default config file here:
 [cohorts.DATASET_NAME.genome]  # repeated for exome if appropriate
 - DATASET_NAME is taken from config[workflow][dataset]
 - historic_results, str, path to historic results directory for this project. If
-  present, new genes and new variant categories will be identified based on the
-  state from the previous run. If absent, panel searching will default to using
-  gene_prior above, and the results from this current run will not be stored in
-  a suitable format to inform the next run.
+  present, new variant categories will be identified based on the state from the
+  previous run. If absent, the results from this current run will not be stored
+  in a suitable format to inform the next run.
 - seqr_instance, str, URL for this seqr instance. Remove if not in seqr
 - seqr_project, str, project ID for this project/seq type. Remove if not in seqr
 - seqr_lookup, str, path to JSON file containing the mapping of CPG internal IDs
@@ -205,6 +204,21 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
 
     raise ValueError('no Clinvar Tables were identified')
 
+@stage
+class GeneratePED(DatasetStage):
+    """
+    revert to just using the metamist/CPG-flow Pedigree generation
+    """
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        expected_out = self.expected_outputs(dataset)
+        pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
+        get_logger().info(f'PED file for {dataset.name} written to {pedigree}')
+
+        return self.make_outputs(dataset, data=expected_out)
+
 
 @stage
 class MakeRuntimeConfig(DatasetStage):
@@ -263,45 +277,44 @@ class MakeRuntimeConfig(DatasetStage):
         return self.make_outputs(target=dataset, data=expected_outputs)
 
 
-@stage(required_stages=[MakeRuntimeConfig])
-class GeneratePED(DatasetStage):
+class GeneratePhenopacket(DatasetStage):
     """
-    this calls the script which reads pedigree data from metamist
+    this calls the script which reads phenotype data from metamist
+    and generates a phenopacket file (GA4GH compliant)
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
+        return {'phenopackets': dataset.prefix() / DATED_FOLDER / 'phenopackets.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         generate a pedigree from metamist
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
         """
-        job = get_batch().new_job('Generate PED from Metamist')
+        job = get_batch().new_job('Generate Phenopackets from Metamist')
         job.cpu(1).image(image_path('talos'))
-
-        # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
-        conf_in_batch = get_batch().read_input(runtime_config)
 
         expected_out = self.expected_outputs(dataset)
         query_dataset = dataset.name
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
+        hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
+
         # mandatory argument
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
-        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
-        job.command(f'GeneratePED {query_dataset} {job.output} {seq_type}')
-        get_batch().write_output(job.output, str(expected_out["pedigree"]))
-        get_logger().info(f'PED file for {dataset.name} written to {expected_out["pedigree"]}')
+
+        job.command(f'MakePhenopackets {query_dataset} {job.output} {seq_type} --hpo {hpo_file}')
+        get_batch().write_output(job.output, str(expected_out['phenopackets']))
+        get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out["phenopackets"]}')
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
-@stage(required_stages=[GeneratePED, MakeRuntimeConfig])
+@stage(required_stages=[GeneratePhenopacket, MakeRuntimeConfig])
 class GeneratePanelData(DatasetStage):
     """
     PythonJob to find HPO-matched panels
@@ -324,12 +337,15 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
-        local_ped = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
+        local_phenopacket = get_batch().read_input(
+            str(inputs.as_path(target=dataset, stage=GeneratePhenopacket, key='phenopackets'))
+        )
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
+
         job.command(f'sleep {randint(0, 30)}')
-        job.command(f'GeneratePanelData -i {local_ped} --hpo {hpo_file} --out {job.output}')
+        job.command(f'GeneratePanelData {local_phenopacket} {job.output} --hpo {hpo_file}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -393,7 +409,6 @@ class FindGeneSymbolMap(DatasetStage):
 class RunHailFiltering(DatasetStage):
     """
     hail job to filter & label the MT
-
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
@@ -542,7 +557,13 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
-        job.cpu(2.0).memory('highmem').image(image_path('talos'))
+        job.cpu(
+            config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)
+        ).memory(
+            config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem')
+        ).storage(
+            config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], 'highmem')
+        ).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -636,7 +657,7 @@ class HPOFlagging(DatasetStage):
 
 
 @stage(
-    required_stages=[GeneratePED, HPOFlagging, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
+    required_stages=[HPOFlagging, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     tolerate_missing_output=True,
