@@ -37,8 +37,9 @@ class Combiner(CohortStage):
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
         # Get SG IDs from the cohort object itself, rather than call Metamist.
+        # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        print(['\n'.join((sg.id, sg.gvcf) for sg in sg_ids]))
+        print([(sg.id, str(sg.gvcf)) for sg in sg_ids])
         exit(1)
 
         j.image(image_path("cpg_workflows"))
