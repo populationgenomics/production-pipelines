@@ -76,7 +76,7 @@ def run_combiner(
     cohort: str,
     tmp_prfx: str,
     existing_vds_ids: int | None = None,
-) -> VariantDataset:
+) -> None:
     input_vds_samples: list[str] = []
     use_genome_default_intervals: bool = False
     use_exome_default_intervals: bool = False
@@ -126,4 +126,3 @@ def run_combiner(
     )
 
     combiner.run()
-    return read_vds(str(output_vds_path))
