@@ -542,7 +542,9 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
-        job.cpu(2.0).memory('highmem').image(image_path('talos'))
+        job.cpu(config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)).memory(
+            config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
+        ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], 'highmem')).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
