@@ -38,7 +38,7 @@ class Combiner(CohortStage):
         )
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        print(sg_ids)
+        print(['\n'.join((sg.id, sg.gvcf) for sg in sg_ids]))
         exit(1)
 
         j.image(image_path("cpg_workflows"))
