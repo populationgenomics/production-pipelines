@@ -78,7 +78,6 @@ def annotate_cohort(
         mt = mt.drop('AF')
         mt = hl.variant_qc(mt)
         mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
-        # mt = mt.annotate_rows(info=mt.info.annotate(AF=hl.agg.mean(mt.GT.n_alt_alleles()) / mt.info.AN))
 
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
