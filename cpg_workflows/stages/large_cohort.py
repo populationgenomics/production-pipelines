@@ -1,4 +1,6 @@
 import logging
+from itertools import chain
+from typing import TYPE_CHECKING, Any, Tuple
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
@@ -12,6 +14,12 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from metamist.graphql import gql, query
+
+if TYPE_CHECKING:
+    from graphql import DocumentNode
+
+    from hailtop.batch.job import PythonJob
 
 
 @stage(analysis_type="combiner", analysis_keys=["combiner"])
@@ -24,33 +32,69 @@ class Combiner(CohortStage):
         )
         return cohort.analysis_dataset.prefix() / "vds" / f"{output_vds_name}.vds"
 
+    def get_vds_ids_output(self, vds_id: int) -> list[str]:
+        get_vds_analysis_query: DocumentNode = gql(
+            """
+            query getVDSByAnalysisIds($vds_id: Int!) {
+                analyses(id: {eq: $vds_id}) {
+                    output
+                    sequencingGroups {
+                        id
+                    }
+                }
+            }
+        """,
+        )
+        query_results: dict[str, Any] = query(get_vds_analysis_query, variables={"vds_id": vds_id})
+        vds_path: list[str] = [query_results["analyses"][0]["output"]]
+        vds_ids: list[str] = [sg["id"] for sg in query_results["analyses"][0]["sequencingGroups"]]
+        return vds_path + vds_ids
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
         workflow_config = config_retrieve("workflow")
         combiner_config = config_retrieve("combiner")
-        j = get_batch().new_python_job("Combiner", (self.get_job_attrs() or {}) | {"tool": "hail query"})
+        j: PythonJob = get_batch().new_python_job("Combiner", (self.get_job_attrs() or {}) | {"tool": "hail query"})
 
         output_vds_path: Path = self.expected_outputs(cohort)
-        tmp_prfx = slugify(
+        tmp_prefix = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
+
+        vds_paths: list[str] | None = None
+        vds_sg_ids: list[str] | None = None
+        new_sg_gvcfs: list[str] | None = None
+
+        if combiner_config.get("vds_analysis_ids", None) is not None:
+            vds_paths = []
+            vds_sg_ids = []
+            for vds_id in combiner_config["vds_analysis_ids"]:
+                query_res: list[str] = self.get_vds_ids_output(vds_id)
+                vds_paths.append(query_res[0])
+                vds_sg_ids = vds_sg_ids + query_res[1:]
+
         # Get SG IDs from the cohort object itself, rather than call Metamist.
+        # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        print(sg_ids)
-        exit(1)
+        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if vds_sg_ids and sg.id not in vds_sg_ids]
+        if len(new_sg_gvcfs) == 0:
+            new_sg_gvcfs = None
 
         j.image(image_path("cpg_workflows"))
         j.memory(combiner_config["memory"])
         j.storage(combiner_config["storage"])
+
+        # Default to GRCh38 for reference if not specified
         j.call(
-            combiner.run_combiner,
-            output_vds_path=output_vds_path,
+            combiner.run,
+            output_vds_path=str(output_vds_path),
             sequencing_type=workflow_config["sequencing_type"],
-            cohort=workflow_config["cohort"],
-            tmp_prfx=tmp_prfx,
-            existing_vds_ids=combiner_config["vds_analysis_ids"],
+            tmp_prefix=tmp_prefix,
+            genome_build=workflow_config["workflow"].get("genome_build", "GRCh38"),
+            gvcf_paths=new_sg_gvcfs,
+            vds_paths=vds_paths,
         )
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])

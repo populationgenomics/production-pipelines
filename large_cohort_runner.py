@@ -15,7 +15,7 @@ from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
-WORKFLOWS: dict[str, list[StageDecorator] | None] = {
+WORKFLOWS: dict[str, list[StageDecorator]] = {
     "large_cohort": [
         LoadVqsr,
         Frequencies,
@@ -33,12 +33,6 @@ WORKFLOWS: dict[str, list[StageDecorator] | None] = {
     help="Add configuration files to the files specified $CPG_CONFIG_PATH."
     "Configs are merged left to right, meaning the rightmost file has the"
     "highest priority.",
-)
-@click.option(
-    "--list-workflows",
-    "list_workflows",
-    is_flag=True,
-    help="Only list possible values for WORKFLOW (and available last stages)",
 )
 @click.option(
     "--list-last-stages",
@@ -61,7 +55,6 @@ WORKFLOWS: dict[str, list[StageDecorator] | None] = {
 def main(
     workflow: str,
     config_paths: list[str],
-    list_workflows: bool,
     list_last_stages: bool,
     dry_run: bool,
     verbose: bool,
@@ -72,9 +65,9 @@ def main(
     fmt = "%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s"
     coloredlogs.install(level="DEBUG" if verbose else "INFO", fmt=fmt)
 
-    if not workflow and not list_workflows:
+    if not workflow:
         click.echo("You must specify WORKFLOW as a first positional command line argument.")
-    if not workflow or list_workflows or workflow == "list":
+    if not workflow or workflow == "list":
         click.echo("Available values for WORKFLOW (and corresponding last stages):")
         for wfl, last_stages in WORKFLOWS.items():
             click.echo(f'\t{wfl} ({", ".join(s.__name__ for s in last_stages)})')
