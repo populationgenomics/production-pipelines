@@ -3,7 +3,7 @@ import logging
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
@@ -36,6 +36,10 @@ class Combiner(CohortStage):
         tmp_prfx = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
+        # Get SG IDs from the cohort object itself, rather than call Metamist.
+        sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
+        print(sg_ids)
+        exit(1)
 
         j.image(image_path("cpg_workflows"))
         j.memory(combiner_config["memory"])
