@@ -16,7 +16,7 @@ from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
 from cpg_workflows.workflow import Stage, StageDecorator, run_workflow
 
-WORKFLOWS: dict[str, list[StageDecorator | Stage[Any]]] = {
+WORKFLOWS: dict[str, list[StageDecorator]] = {
     "large_cohort": [
         LoadVqsr,
         Frequencies,
