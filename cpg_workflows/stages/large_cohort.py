@@ -63,17 +63,17 @@ class Combiner(CohortStage):
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
 
-        vds_paths: list[str] | None = []
-        vds_sg_ids: list[str] | None = []
-        new_sg_gvcfs: list[str] | None = []
+        vds_paths: list[str] | None = None
+        vds_sg_ids: list[str] | None = None
+        new_sg_gvcfs: list[str] | None = None
 
-        if input_vds := combiner_config.get("vds_analysis_ids", None):
+        if combiner_config.get("vds_analysis_ids", None) is not None:
+            vds_paths = []
+            vds_sg_ids = []
             for vds_id in combiner_config["vds_analysis_ids"]:
                 query_res: list[str] = self.get_vds_ids_output(vds_id)
                 vds_paths.append(query_res[0])
                 vds_sg_ids = vds_sg_ids + query_res[1:]
-        else:
-            vds_paths = None
 
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
