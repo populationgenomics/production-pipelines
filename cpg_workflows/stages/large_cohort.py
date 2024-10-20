@@ -78,7 +78,7 @@ class Combiner(CohortStage):
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if sg.id not in vds_sg_ids]
+        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if vds_sg_ids and sg.id not in vds_sg_ids]
         if len(new_sg_gvcfs) == 0:
             new_sg_gvcfs = None
 
