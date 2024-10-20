@@ -1,73 +1,27 @@
-"""Runs the combiner.
+"""Runs the combiner."""
 
-Inputs:
-    File listing sequenging group IDs corresponding to the gvcf files you want to combine
-    File listing VDSes in gs:// format, one per line
+from typing import TYPE_CHECKING
 
-Raises:
-    ValueError: _description_
-    ValueError: _description_
-    ValueError: _description_
-    ValueError: _description_
-    ValueError: _description_
-    ValueError: _description_
-
-Returns:
-    _type_: _description_
-"""
-
-from itertools import chain
-from typing import TYPE_CHECKING, Any
-
-from graphql import DocumentNode
-
-from hail.vds import VariantDataset, new_combiner, read_vds
+from hail.vds import new_combiner
 
 from cpg_utils import Path
 from cpg_utils.hail_batch import init_batch
-from metamist.graphql import gql, query
 
 if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
     from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
 
-def _get_samples_from_vds(input_vds: str) -> list[str]:
-    return read_vds(input_vds).variant_data.s.collect()
-
-
-def _parse_metamist_analysis_output(vds_analysis_query_output: dict[str, Any]) -> list[str]:
-    return [analysis["output"] for analysis in vds_analysis_query_output["analyses"]]
-
-
 def run_combiner(
     output_vds_path: Path,
     sequencing_type: str,
-    cohort: str,
     tmp_prfx: str,
-    existing_vds_ids: int | None = None,
+    gvcf_paths: list[str] | None = None,
+    vds_paths: list[str] | None = None,
 ) -> None:
-    input_vds_samples: list[str] = []
     use_genome_default_intervals: bool = False
     use_exome_default_intervals: bool = False
 
-    existing_vds: list[str] | None = None
-    project_gvcf_paths: list[str]
-
     init_batch()
-
-    if existing_vds_ids:
-        vds_query_results: dict[str, Any] = query(
-            GET_VDS_ANALYSIS_QUERY,
-            variables={
-                "vds_ids": existing_vds_ids,
-            },
-        )
-        existing_vds = _parse_metamist_analysis_output(vds_query_results)
-        input_vds_samples = list(chain(input_vds_samples, *[_get_samples_from_vds(vds) for vds in existing_vds]))
-        # Remove any samples from the query that are already present in a VDS
-        formatted_query_results = [sg for sg in formatted_query_results if sg["id"] not in input_vds_samples]
-
-    project_gvcf_paths = [entry["analyses"][0]["output"] for entry in formatted_query_results]
 
     if sequencing_type == "genome":
         use_genome_default_intervals = True
@@ -76,8 +30,8 @@ def run_combiner(
 
     combiner: VariantDatasetCombiner = new_combiner(
         output_path=str(output_vds_path),
-        gvcf_paths=project_gvcf_paths,
-        vds_paths=existing_vds,
+        gvcf_paths=gvcf_paths,
+        vds_paths=vds_paths,
         reference_genome="GRCh38",
         temp_path=tmp_prfx,
         use_exome_default_intervals=use_exome_default_intervals,

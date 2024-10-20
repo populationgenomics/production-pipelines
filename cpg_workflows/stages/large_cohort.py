@@ -4,6 +4,8 @@ from typing import Any, Tuple
 
 from graphql import DocumentNode
 
+from hailtop.batch.job import PythonJob
+
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -29,40 +31,7 @@ class Combiner(CohortStage):
         )
         return cohort.analysis_dataset.prefix() / "vds" / f"{output_vds_name}.vds"
 
-        # Example query and output
-        """
-        query MyQuery {
-        analyses(id: {eq: 238489}) {
-            type
-            outputs
-            sequencingGroups {
-            id
-            }
-        }
-        }
-
-
-        {
-        "data": {
-            "analyses": [
-            {
-                "type": "combiner",
-                "outputs": "gs://cpg-fewgenomes-test/vds/combiner-test4-genome-0-3.vds",
-                "sequencingGroups": [
-                {
-                    "id": "CPG280156"
-                },
-                {
-                    "id": "CPG280164"
-                }
-                ]
-            }
-            ]
-        }
-        }
-        """
-
-    def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
+    def get_vds_ids_output(self, vds_id: int) -> list[str]:
         get_vds_analysis_query: DocumentNode = gql(
             """
             query getVDSByAnalysisIds($vds_id: Int!) {
@@ -76,9 +45,9 @@ class Combiner(CohortStage):
         """,
         )
         query_results: dict[str, Any] = query(get_vds_analysis_query, variables={"vds_id": vds_id})
-        vds_path: str = query_results["analyses"][0]["output"]
+        vds_path: list[str] = [query_results["analyses"][0]["output"]]
         vds_ids: list[str] = [sg["id"] for sg in query_results["analyses"][0]["sequencingGroups"]]
-        return (vds_path, vds_ids)
+        return vds_path + vds_ids
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
@@ -86,25 +55,31 @@ class Combiner(CohortStage):
 
         workflow_config = config_retrieve("workflow")
         combiner_config = config_retrieve("combiner")
-        j = get_batch().new_python_job("Combiner", (self.get_job_attrs() or {}) | {"tool": "hail query"})
+        j: PythonJob = get_batch().new_python_job("Combiner", (self.get_job_attrs() or {}) | {"tool": "hail query"})
 
         output_vds_path: Path = self.expected_outputs(cohort)
         tmp_prfx = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
 
-        vds_paths: list[str] = []
-        vds_sg_ids: list[str] = []
-        new_sg_gvcfs: list[str] = []
-        for vds_id in combiner_config["vds_analysis_ids"]:
-            query_res = self.get_vds_ids_output(vds_id)
-            vds_paths.append(query_res[0])
-            vds_sg_ids = list(chain(vds_sg_ids, *query_res[1]))
+        vds_paths: list[str] | None = []
+        vds_sg_ids: list[str] | None = []
+        new_sg_gvcfs: list[str] | None = []
+
+        if combiner_config.get("vds_analysis_ids", None):
+            for vds_id in combiner_config["vds_analysis_ids"]:
+                query_res: list[str] = self.get_vds_ids_output(vds_id)
+                vds_paths.append(query_res[0])
+                vds_sg_ids = vds_sg_ids + query_res[1:]
+        else:
+            vds_paths = None
 
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
         new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if sg.id not in vds_sg_ids]
+        if len(new_sg_gvcfs) == 0:
+            new_sg_gvcfs = None
 
         j.image(image_path("cpg_workflows"))
         j.memory(combiner_config["memory"])
@@ -113,9 +88,9 @@ class Combiner(CohortStage):
             combiner.run_combiner,
             output_vds_path=output_vds_path,
             sequencing_type=workflow_config["sequencing_type"],
-            cohort=workflow_config["cohort"],
             tmp_prfx=tmp_prfx,
-            existing_vds_ids=combiner_config["vds_analysis_ids"],
+            gvcf_paths=new_sg_gvcfs,
+            vds_paths=vds_paths,
         )
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
