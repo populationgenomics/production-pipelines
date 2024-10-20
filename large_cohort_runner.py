@@ -5,7 +5,6 @@ Entry point to run the large cohort workflow.
 """
 
 import os
-from typing import Any
 
 import click
 import coloredlogs
@@ -14,7 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
-from cpg_workflows.workflow import Stage, StageDecorator, run_workflow
+from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     "large_cohort": [
