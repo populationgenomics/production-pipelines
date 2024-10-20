@@ -13,7 +13,7 @@ if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-
 def run_combiner(
     output_vds_path: str,
     sequencing_type: str,
-    tmp_prfx: str,
+    tmp_prefix: str,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
 ) -> None:
@@ -32,7 +32,7 @@ def run_combiner(
         gvcf_paths=gvcf_paths,
         vds_paths=vds_paths,
         reference_genome="GRCh38",
-        temp_path=tmp_prfx,
+        temp_path=tmp_prefix,
         use_exome_default_intervals=use_exome_default_intervals,
         use_genome_default_intervals=use_genome_default_intervals,
         force=True,

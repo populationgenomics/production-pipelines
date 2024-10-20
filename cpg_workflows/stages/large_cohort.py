@@ -59,7 +59,7 @@ class Combiner(CohortStage):
         j: PythonJob = get_batch().new_python_job("Combiner", (self.get_job_attrs() or {}) | {"tool": "hail query"})
 
         output_vds_path: Path = self.expected_outputs(cohort)
-        tmp_prfx = slugify(
+        tmp_prefix = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
 
@@ -89,7 +89,7 @@ class Combiner(CohortStage):
             combiner.run_combiner,
             output_vds_path=str(output_vds_path),
             sequencing_type=workflow_config["sequencing_type"],
-            tmp_prfx=tmp_prfx,
+            tmp_prefix=tmp_prefix,
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
         )
