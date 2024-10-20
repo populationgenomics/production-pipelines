@@ -562,7 +562,6 @@ class ValidateMOI(DatasetStage):
         job.cpu(config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)).memory(
             config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
         ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')).image(image_path('talos'))
-
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)

@@ -103,4 +103,4 @@ gene_to_phenotype = 'gs://cpg-common-test/references/aip/genes_to_phenotype.txt'
 [talos_stages.ValidateMOI]
 cpu = 4.0
 memory = 'highmem'
-storage = '10Gi'
+#storage = '10Gi'
