@@ -127,7 +127,12 @@ class TestAllLargeCohortMethods:
         """
         Run entire workflow in a local mode.
         """
-        conf = create_config(tmp_path, "genome", gnomad_prefix, broad_prefix)
+        conf = create_config(
+            tmp_path=tmp_path,
+            seq_type="genome",
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
         set_config(
             conf,
             tmp_path / "config.toml",
