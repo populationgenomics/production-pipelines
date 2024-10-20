@@ -1,10 +1,6 @@
 import logging
 from itertools import chain
-from typing import Any, Tuple
-
-from graphql import DocumentNode
-
-from hailtop.batch.job import PythonJob
+from typing import TYPE_CHECKING, Any, Tuple
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
@@ -19,6 +15,11 @@ from cpg_workflows.workflow import (
     stage,
 )
 from metamist.graphql import gql, query
+
+if TYPE_CHECKING:
+    from graphql import DocumentNode
+
+    from hailtop.batch.job import PythonJob
 
 
 @stage(analysis_type="combiner", analysis_keys=["combiner"])
@@ -66,7 +67,7 @@ class Combiner(CohortStage):
         vds_sg_ids: list[str] | None = []
         new_sg_gvcfs: list[str] | None = []
 
-        if combiner_config.get("vds_analysis_ids", None):
+        if input_vds := combiner_config.get("vds_analysis_ids", None):
             for vds_id in combiner_config["vds_analysis_ids"]:
                 query_res: list[str] = self.get_vds_ids_output(vds_id)
                 vds_paths.append(query_res[0])
@@ -86,7 +87,7 @@ class Combiner(CohortStage):
         j.storage(combiner_config["storage"])
         j.call(
             combiner.run_combiner,
-            output_vds_path=output_vds_path,
+            output_vds_path=str(output_vds_path),
             sequencing_type=workflow_config["sequencing_type"],
             tmp_prfx=tmp_prfx,
             gvcf_paths=new_sg_gvcfs,

@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING
 
 from hail.vds import new_combiner
 
-from cpg_utils import Path
 from cpg_utils.hail_batch import init_batch
 
 if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
@@ -12,7 +11,7 @@ if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-
 
 
 def run_combiner(
-    output_vds_path: Path,
+    output_vds_path: str,
     sequencing_type: str,
     tmp_prfx: str,
     gvcf_paths: list[str] | None = None,
@@ -29,7 +28,7 @@ def run_combiner(
         use_exome_default_intervals = True
 
     combiner: VariantDatasetCombiner = new_combiner(
-        output_path=str(output_vds_path),
+        output_path=output_vds_path,
         gvcf_paths=gvcf_paths,
         vds_paths=vds_paths,
         reference_genome="GRCh38",
