@@ -204,11 +204,13 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
 
     raise ValueError('no Clinvar Tables were identified')
 
+
 @stage
 class GeneratePED(DatasetStage):
     """
     revert to just using the metamist/CPG-flow Pedigree generation
     """
+
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
 
@@ -338,7 +340,7 @@ class GeneratePanelData(DatasetStage):
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
         local_phenopacket = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=GeneratePhenopacket, key='phenopackets'))
+            str(inputs.as_path(target=dataset, stage=GeneratePhenopacket, key='phenopackets')),
         )
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
@@ -557,13 +559,9 @@ class ValidateMOI(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
-        job.cpu(
-            config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)
-        ).memory(
-            config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem')
-        ).storage(
-            config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')
-        ).image(image_path('talos'))
+        job.cpu(config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)).memory(
+            config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
+        ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')).image(image_path('talos'))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
