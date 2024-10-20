@@ -562,7 +562,7 @@ class ValidateMOI(DatasetStage):
         ).memory(
             config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem')
         ).storage(
-            config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], 'highmem')
+            config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')
         ).image(image_path('talos'))
 
         # use the new config file
