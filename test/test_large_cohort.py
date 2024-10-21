@@ -97,7 +97,6 @@ def create_config(
             },
             "combiner": {
                 "intervals": ["chr20:start-end", "chrX:start-end", "chrY:start-end"],
-                "seq_type": "genome",
             },
         },
     )
@@ -157,7 +156,7 @@ class TestAllLargeCohortMethods:
         vds_path = str(res_pref / "v01.vds")
         combiner.run_combiner(
             output_vds_path=vds_path,
-            sequencing_type=conf["seq_type"],
+            sequencing_type=conf["workflow"]["seq_type"],
             tmp_prefix=str(res_pref / "tmp"),
         )
 
