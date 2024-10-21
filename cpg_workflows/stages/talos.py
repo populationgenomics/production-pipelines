@@ -309,7 +309,13 @@ class MakePhenopackets(DatasetStage):
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
 
-        job.command(f'MakePhenopackets {query_dataset} {job.output} {seq_type} --hpo {hpo_file}')
+        job.command(
+            'MakePhenopackets '
+            f'--dataset {query_dataset} '
+            f'--output {job.output} '
+            f'--type {seq_type} '
+            f'--hpo {hpo_file}'
+        )
         get_batch().write_output(job.output, str(expected_out['phenopackets']))
         get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out["phenopackets"]}')
 
@@ -347,7 +353,12 @@ class GeneratePanelData(DatasetStage):
         # insert a little stagger
 
         job.command(f'sleep {randint(0, 30)}')
-        job.command(f'GeneratePanelData {local_phenopacket} {job.output} --hpo {hpo_file}')
+        job.command(
+            'GeneratePanelData '
+            f'--input {local_phenopacket} '
+            f'--output {job.output} '
+            f'--hpo {hpo_file}'
+        )
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -375,7 +386,11 @@ class QueryPanelapp(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
-        job.command(f'QueryPanelapp --panels {get_batch().read_input(str(hpo_panel_json))} --out_path {job.output}')
+        job.command(
+            'QueryPanelapp '
+            f'--input {get_batch().read_input(str(hpo_panel_json))} '
+            f'--output {job.output}'
+        )
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -400,7 +415,11 @@ class FindGeneSymbolMap(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
-        job.command(f'FindGeneSymbolMap --panelapp {panel_json} --out_path {job.output}')
+        job.command(
+            'FindGeneSymbolMap '
+            f'--input {panel_json} '
+            f'--output {job.output}'
+        )
 
         get_batch().write_output(job.output, str(expected_out['symbol_lookup']))
 
@@ -474,10 +493,10 @@ class RunHailFiltering(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'RunHailFiltering '
-            f'--mt "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
-            f'--vcf_out {job.output["vcf.bgz"]} '
+            f'--output {job.output["vcf.bgz"]} '
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
             f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" ',
@@ -528,10 +547,10 @@ class RunHailFilteringSV(DatasetStage):
             job.command(f'export TALOS_CONFIG={conf_in_batch}')
             job.command(
                 'RunHailFilteringSV '
-                f'--mt "${{BATCH_TMPDIR}}/{sv_file}" '
+                f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
                 f'--panelapp {panelapp_json} '
                 f'--pedigree {local_ped} '
-                f'--vcf_out {job.output["vcf.bgz"]} ',  # type: ignore
+                f'--output {job.output["vcf.bgz"]} ',  # type: ignore
             )
             get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
             sv_jobs.append(job)
@@ -594,7 +613,7 @@ class ValidateMOI(DatasetStage):
         job.command(
             'ValidateMOI '
             f'--labelled_vcf {labelled_vcf} '
-            f'--out_json {job.output} '
+            f'--output {job.output} '
             f'--panelapp {panel_input} '
             f'--pedigree {pedigree} '
             f'--participant_panels {hpo_panels} '
@@ -639,11 +658,11 @@ class HPOFlagging(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'HPOFlagging '
-            f'--results {results_json} '
+            f'--input {results_json} '
             f'--gene_map {gene_map} '
             f'--gen2phen {gene_to_phenotype} '
             f'--phenio {phenio_db} '
-            f'--out {job.output} '
+            f'--output {job.output} '
             f'--phenout {job.phenout} ',
         )
 
@@ -742,9 +761,9 @@ class MinimiseOutputForSeqr(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'MinimiseOutputForSeqr '
-            f'{input_localised} '
-            f'{job.out_json} '
-            f'{job.pheno_json} '
+            f'--input {input_localised} '
+            f'--output{job.out_json} '
+            f'--pheno {job.pheno_json} '
             f'--external_map {lookup_in_batch}',
         )
 

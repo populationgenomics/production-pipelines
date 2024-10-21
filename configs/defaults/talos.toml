@@ -29,9 +29,11 @@ gnomad_max_homs_recessive = 1
 gnomad_max_ac_dominant = 10
 gnomad_max_hemi = 1
 callset_af_sv_dominant = 0.01
+
 # these categories don't reach the report without also having a gene-phenotype match
 # stripped down form, e.g. 'categoryboolean6' is '6'
 phenotype_match = ['6']
+
 ## all these labels will be removed
 #ignore_categories = ['categoryboolean6']
 
@@ -103,4 +105,4 @@ gene_to_phenotype = 'gs://cpg-common-test/references/aip/genes_to_phenotype.txt'
 [talos_stages.ValidateMOI]
 cpu = 4.0
 memory = 'highmem'
-#storage = '10Gi'
+storage = '10Gi'
