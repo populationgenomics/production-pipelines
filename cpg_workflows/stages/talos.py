@@ -706,7 +706,7 @@ class CreateTalosHTML(DatasetStage):
     analysis_type='custom',
     tolerate_missing_output=True,
 )
-class GenerateSeqrFile(DatasetStage):
+class MinimiseOutputForSeqr(DatasetStage):
     """
     takes the results file from Seqr and produces a minimised form for Seqr ingestion
     """
@@ -741,7 +741,7 @@ class GenerateSeqrFile(DatasetStage):
         lookup_in_batch = get_batch().read_input(seqr_lookup)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
-            'GenerateSeqrFile '
+            'MinimiseOutputForSeqr '
             f'{input_localised} '
             f'{job.out_json} '
             f'{job.pheno_json} '
