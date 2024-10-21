@@ -19,6 +19,7 @@ def annotate_cohort(
     vep_ht_path: str,
     site_only_vqsr_vcf_path=None,
     checkpoint_prefix=None,
+    long_read=False,
 ):
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
@@ -72,6 +73,13 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
+    if long_read:
+        # For long read data, drop the pre-computed AF entry field
+        mt = mt.drop('AF')
+        mt = hl.variant_qc(mt)
+        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
+        mt = mt.drop('variant_qc')
+
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
     for attr in ['AC', 'AF']:
@@ -82,6 +90,22 @@ def annotate_cohort(
 
     if 'AN' not in mt.info:
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+
+    # The problematic rows are where a_index>1 and info.AC or info.AF has length<=1
+    rows = mt.rows()
+    problem_rows = rows.filter(
+        hl.all(
+            rows.a_index == 2,
+            hl.len(rows.info.AC) == 1,
+        ),
+        keep=True,
+    )
+    if problem_rows.count() > 0:
+        logging.warning(f'Found {problem_rows.count()} rows with problematic info.AC or info.AF fields')
+        logging.warning('Showing the first 100 rows')
+        for row in problem_rows.take(100):
+            logging.warning(row)
+
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
