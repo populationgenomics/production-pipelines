@@ -127,10 +127,10 @@ GET_PEDIGREE_QUERY = gql(
 )
 
 
-_metamist: Optional["Metamist"] = None
+_metamist: Optional['Metamist'] = None
 
 
-def get_metamist() -> "Metamist":
+def get_metamist() -> 'Metamist':
     """Return the cohort object"""
     global _metamist
     if not _metamist:
@@ -152,14 +152,14 @@ class AnalysisStatus(Enum):
     https://github.com/populationgenomics/sample-metadata/blob/dev/models/enums/analysis.py#L14-L21
     """
 
-    QUEUED = "queued"
-    IN_PROGRESS = "in-progress"
-    FAILED = "failed"
-    COMPLETED = "completed"
-    UNKNOWN = "unknown"
+    QUEUED = 'queued'
+    IN_PROGRESS = 'in-progress'
+    FAILED = 'failed'
+    COMPLETED = 'completed'
+    UNKNOWN = 'unknown'
 
     @staticmethod
-    def parse(name: str) -> "AnalysisStatus":
+    def parse(name: str) -> 'AnalysisStatus':
         """
         Parse str and create a AnalysisStatus object
         """
@@ -177,23 +177,23 @@ class AnalysisType(Enum):
     the metamist package.
     """
 
-    QC = "qc"
-    JOINT_CALLING = "joint-calling"
-    GVCF = "gvcf"
-    CRAM = "cram"
-    MITO_CRAM = "mito-cram"
-    CUSTOM = "custom"
-    ES_INDEX = "es-index"
-    COMBINER = "combiner"
+    QC = 'qc'
+    JOINT_CALLING = 'joint-calling'
+    GVCF = 'gvcf'
+    CRAM = 'cram'
+    MITO_CRAM = 'mito-cram'
+    CUSTOM = 'custom'
+    ES_INDEX = 'es-index'
+    COMBINER = 'combiner'
 
     @staticmethod
-    def parse(val: str) -> "AnalysisType":
+    def parse(val: str) -> 'AnalysisType':
         """
         Parse str and create a AnalysisStatus object
         """
         d = {v.value: v for v in AnalysisType}
         if val not in d:
-            raise MetamistError(f"Unrecognised analysis type {val}. Available: {list(d.keys())}")
+            raise MetamistError(f'Unrecognised analysis type {val}. Available: {list(d.keys())}')
         return d[val.lower()]
 
 
@@ -214,28 +214,28 @@ class Analysis:
     meta: dict
 
     @staticmethod
-    def parse(data: dict) -> "Analysis":
+    def parse(data: dict) -> 'Analysis':
         """
         Parse data to create an Analysis object.
         """
-        req_keys = ["id", "type", "status"]
+        req_keys = ['id', 'type', 'status']
         if any(k not in data for k in req_keys):
             for key in req_keys:
                 if key not in data:
                     logging.error(f'"Analysis" data does not have {key}: {data}')
-            raise ValueError(f"Cannot parse metamist Sequence {data}")
+            raise ValueError(f'Cannot parse metamist Sequence {data}')
 
-        output = data.get("output")
+        output = data.get('output')
         if output:
             output = to_path(output)
 
         a = Analysis(
-            id=int(data["id"]),
-            type=AnalysisType.parse(data["type"]),
-            status=AnalysisStatus.parse(data["status"]),
-            sequencing_group_ids=set([s["id"] for s in data["sequencingGroups"]]),
+            id=int(data['id']),
+            type=AnalysisType.parse(data['type']),
+            status=AnalysisStatus.parse(data['status']),
+            sequencing_group_ids=set([s['id'] for s in data['sequencingGroups']]),
             output=output,
-            meta=data.get("meta") or {},
+            meta=data.get('meta') or {},
         )
         return a
 
@@ -248,7 +248,7 @@ def sort_sgs_by_project(response_data) -> dict:
     result_dict: dict[str, list[str]] = {}
 
     for sequencing_group in response_data:
-        project_id = sequencing_group["sample"]["project"]["name"]
+        project_id = sequencing_group['sample']['project']['name']
 
         if project_id not in result_dict:
             result_dict[project_id] = []
@@ -264,7 +264,7 @@ class Metamist:
     """
 
     def __init__(self) -> None:
-        self.default_dataset: str = get_config()["workflow"]["dataset"]
+        self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
     @retry(
@@ -286,7 +286,7 @@ class Metamist:
         except ServiceException:
             # raise here so the retry occurs
             logging.warning(
-                f"Retrying {api_func} ...",
+                f'Retrying {api_func} ...',
             )
             raise
 
@@ -302,7 +302,7 @@ class Metamist:
             # log the error and continue
             traceback.print_exc()
             logging.error(
-                f"Error: {e} Call {api_func} failed with payload:\n{str(kwargv)}",
+                f'Error: {e} Call {api_func} failed with payload:\n{str(kwargv)}',
             )
         # TODO: discuss should we catch all here as well?
         # except Exception as e:
@@ -320,14 +320,14 @@ class Metamist:
         """
         Retrieve sequencing group entries for a cohort.
         """
-        entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {"cohort_id": cohort_id})
+        entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
         # Create dictionary keying sequencing groups by project
         # {project_id: [sequencing_group_1, sequencing_group_2, ...], ...}
 
-        if len(entries["cohorts"]) != 1:
-            raise MetamistError("We only support one cohort at a time currently")
-        sequencing_groups = entries["cohorts"][0]["sequencingGroups"]
+        if len(entries['cohorts']) != 1:
+            raise MetamistError('We only support one cohort at a time currently')
+        sequencing_groups = entries['cohorts'][0]['sequencingGroups']
 
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
@@ -339,26 +339,26 @@ class Metamist:
         and filtering options.
         """
         metamist_proj = self.get_metamist_proj(dataset_name)
-        logging.info(f"Getting sequencing groups for dataset {metamist_proj}")
+        logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
-        skip_sgs = get_config()["workflow"].get("skip_sgs", [])
-        only_sgs = get_config()["workflow"].get("only_sgs", [])
-        sequencing_type = get_config()["workflow"].get("sequencing_type")
+        skip_sgs = get_config()['workflow'].get('skip_sgs', [])
+        only_sgs = get_config()['workflow'].get('only_sgs', [])
+        sequencing_type = get_config()['workflow'].get('sequencing_type')
 
         if only_sgs and skip_sgs:
-            raise MetamistError("Cannot specify both only_sgs and skip_sgs in config")
+            raise MetamistError('Cannot specify both only_sgs and skip_sgs in config')
 
         sequencing_group_entries = query(
             GET_SEQUENCING_GROUPS_QUERY,
             variables={
-                "metamist_proj": metamist_proj,
-                "only_sgs": only_sgs,
-                "skip_sgs": skip_sgs,
-                "sequencing_type": sequencing_type,
+                'metamist_proj': metamist_proj,
+                'only_sgs': only_sgs,
+                'skip_sgs': skip_sgs,
+                'sequencing_type': sequencing_type,
             },
         )
 
-        sequencing_groups = sequencing_group_entries["project"]["sequencingGroups"]
+        sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
         return sequencing_groups
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
@@ -390,7 +390,7 @@ class Metamist:
         data = self.make_aapi_call(
             self.aapi.get_latest_complete_analysis_for_type,
             project=metamist_proj,
-            analysis_type=models.AnalysisType("joint-calling"),
+            analysis_type=models.AnalysisType('joint-calling'),
         )
         if data is None:
             return None
@@ -423,15 +423,15 @@ class Metamist:
         analyses = query(
             GET_ANALYSES_QUERY,
             variables={
-                "metamist_proj": metamist_proj,
-                "analysis_type": analysis_type.value,
-                "analysis_status": analysis_status.name,
+                'metamist_proj': metamist_proj,
+                'analysis_type': analysis_type.value,
+                'analysis_status': analysis_status.name,
             },
         )
 
         analysis_per_sid: dict[str, Analysis] = dict()
 
-        for analysis in analyses["project"]["analyses"]:
+        for analysis in analyses['project']['analyses']:
             a = Analysis.parse(analysis)
             if not a:
                 continue
@@ -439,14 +439,14 @@ class Metamist:
             assert a.status == analysis_status, analysis
             assert a.type == analysis_type, analysis
             if len(a.sequencing_group_ids) < 1:
-                logging.warning(f"Analysis has no sequencing group ids. {analysis}")
+                logging.warning(f'Analysis has no sequencing group ids. {analysis}')
                 continue
 
             assert len(a.sequencing_group_ids) == 1, analysis
             analysis_per_sid[list(a.sequencing_group_ids)[0]] = a
 
         logging.info(
-            f"Querying {analysis_type} analysis entries for {metamist_proj}: found {len(analysis_per_sid)}",
+            f'Querying {analysis_type} analysis entries for {metamist_proj}: found {len(analysis_per_sid)}',
         )
         return analysis_per_sid
 
@@ -483,13 +483,13 @@ class Metamist:
         )
         if aid is None:
             logging.error(
-                f"Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}",
+                f'Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
             )
             return None
         else:
             logging.info(
-                f"Created Analysis(id={aid}, type={type_}, status={status}, "
-                f"output={str(output)}) in {metamist_proj}",
+                f'Created Analysis(id={aid}, type={type_}, status={status}, '
+                f'output={str(output)}) in {metamist_proj}',
             )
             return aid
 
@@ -518,7 +518,7 @@ class Metamist:
         @param dataset: the name of the dataset to create a new analysis
         @return: path to the output if it can be reused, otherwise None
         """
-        label = f"type={analysis_type}"
+        label = f'type={analysis_type}'
         if len(sequencing_group_ids) > 1:
             label += f' for {", ".join(sequencing_group_ids)}'
 
@@ -535,40 +535,40 @@ class Metamist:
             if found_output_fpath != expected_output_fpath:
                 logging.error(
                     f'Found a completed analysis {label}, but the "output" path '
-                    f"{found_output_fpath} does not match the expected path "
-                    f"{expected_output_fpath}",
+                    f'{found_output_fpath} does not match the expected path '
+                    f'{expected_output_fpath}',
                 )
                 found_output_fpath = None
             elif not exists(found_output_fpath):
                 logging.error(
-                    f"Found a completed analysis {label}, "
+                    f'Found a completed analysis {label}, '
                     f'but the "output" file {found_output_fpath} does not exist',
                 )
                 found_output_fpath = None
 
         # completed and good exists, can reuse
         if found_output_fpath:
-            logging.info(f"Completed analysis {label} exists, reusing the result {found_output_fpath}")
+            logging.info(f'Completed analysis {label} exists, reusing the result {found_output_fpath}')
             return found_output_fpath
 
         # can't reuse, need to invalidate
         if completed_analysis:
             logging.warning(
                 f'Invalidating the analysis {label} by setting the status to "failure", '
-                f"and resubmitting the analysis.",
+                f'and resubmitting the analysis.',
             )
             self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
 
         # can reuse, need to create a completed one?
         if exists(expected_output_fpath):
             logging.info(
-                f"Output file {expected_output_fpath} already exists, so creating "
-                f"an analysis {label} with status=completed",
+                f'Output file {expected_output_fpath} already exists, so creating '
+                f'an analysis {label} with status=completed',
             )
             self.create_analysis(
                 type_=analysis_type,
                 output=expected_output_fpath,
-                status="completed",
+                status='completed',
                 sequencing_group_ids=sequencing_group_ids,
                 dataset=dataset or self.default_dataset,
             )
@@ -577,7 +577,7 @@ class Metamist:
         # proceeding with the standard workflow (creating status=queued, submitting jobs)
         else:
             logging.info(
-                f"Expected output file {expected_output_fpath} does not exist, so queueing analysis {label}",
+                f'Expected output file {expected_output_fpath} does not exist, so queueing analysis {label}',
             )
             return None
 
@@ -586,9 +586,9 @@ class Metamist:
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
         metamist_proj = self.get_metamist_proj(dataset)
-        entries = query(GET_PEDIGREE_QUERY, variables={"metamist_proj": metamist_proj})
+        entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
 
-        pedigree_entries = entries["project"]["pedigree"]
+        pedigree_entries = entries['project']['pedigree']
 
         return pedigree_entries
 
@@ -597,8 +597,8 @@ class Metamist:
         Return the Metamist project name, appending '-test' if the access level is 'test'.
         """
         metamist_proj = dataset or self.default_dataset
-        if get_config()["workflow"]["access_level"] == "test" and not metamist_proj.endswith("-test"):
-            metamist_proj += "-test"
+        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
+            metamist_proj += '-test'
 
         return metamist_proj
 
@@ -624,29 +624,29 @@ class Assay:
         sg_id: str,
         check_existence: bool = False,
         run_parse_reads: bool = True,
-    ) -> "Assay":
+    ) -> 'Assay':
         """
         Create from a dictionary.
         """
 
-        assay_keys = ["id", "type", "meta"]
+        assay_keys = ['id', 'type', 'meta']
         missing_keys = [key for key in assay_keys if data.get(key) is None]
 
         if missing_keys:
-            raise ValueError(f"Cannot parse metamist Sequence {data}. Missing keys: {missing_keys}")
+            raise ValueError(f'Cannot parse metamist Sequence {data}. Missing keys: {missing_keys}')
 
-        assay_type = str(data["type"])
+        assay_type = str(data['type'])
         assert assay_type, data
         mm_seq = Assay(
-            id=str(data["id"]),
+            id=str(data['id']),
             sequencing_group_id=sg_id,
-            meta=data["meta"],
+            meta=data['meta'],
             assay_type=assay_type,
         )
         if run_parse_reads:
             mm_seq.alignment_input = parse_reads(
                 sequencing_group_id=sg_id,
-                assay_meta=data["meta"],
+                assay_meta=data['meta'],
                 check_existence=check_existence,
             )
         return mm_seq
@@ -662,59 +662,59 @@ def parse_reads(  # pylint: disable=too-many-return-statements
     `check_existence`: check if fastq/crams exist on buckets.
     Default value is pulled from self.metamist and can be overridden.
     """
-    reads_data = assay_meta.get("reads")
-    reads_type = assay_meta.get("reads_type")
-    reference_assembly = assay_meta.get("reference_assembly", {}).get("location")
+    reads_data = assay_meta.get('reads')
+    reads_type = assay_meta.get('reads_type')
+    reference_assembly = assay_meta.get('reference_assembly', {}).get('location')
 
     if not reads_data:
         raise MetamistError(f'{sequencing_group_id}: no "meta/reads" field in meta')
     if not reads_type:
         raise MetamistError(f'{sequencing_group_id}: no "meta/reads_type" field in meta')
-    supported_types = ("fastq", "bam", "cram")
+    supported_types = ('fastq', 'bam', 'cram')
     if reads_type not in supported_types:
         raise MetamistError(
             f'{sequencing_group_id}: ERROR: "reads_type" is expected to be one of {supported_types}',
         )
 
-    if reads_type in ("bam", "cram"):
+    if reads_type in ('bam', 'cram'):
         if len(reads_data) > 1:
-            raise MetamistError(f"{sequencing_group_id}: supporting only single bam/cram input")
+            raise MetamistError(f'{sequencing_group_id}: supporting only single bam/cram input')
 
-        location = reads_data[0]["location"]
-        if not (location.endswith(".cram") or location.endswith(".bam")):
+        location = reads_data[0]['location']
+        if not (location.endswith('.cram') or location.endswith('.bam')):
             raise MetamistError(
-                f"{sequencing_group_id}: ERROR: expected the file to have an extension "
-                f".cram or .bam, got: {location}",
+                f'{sequencing_group_id}: ERROR: expected the file to have an extension '
+                f'.cram or .bam, got: {location}',
             )
-        if get_config()["workflow"]["access_level"] == "test":
-            location = location.replace("-main-upload/", "-test-upload/")
+        if get_config()['workflow']['access_level'] == 'test':
+            location = location.replace('-main-upload/', '-test-upload/')
         if check_existence and not exists(location):
-            raise MetamistError(f"{sequencing_group_id}: ERROR: index file does not exist: {location}")
+            raise MetamistError(f'{sequencing_group_id}: ERROR: index file does not exist: {location}')
 
         # Index:
         index_location = None
-        if reads_data[0].get("secondaryFiles"):
-            index_location = reads_data[0]["secondaryFiles"][0]["location"]
-            if (location.endswith(".cram") and not index_location.endswith(".crai")) or (
-                location.endswith(".bam") and not index_location.endswith(".bai")
+        if reads_data[0].get('secondaryFiles'):
+            index_location = reads_data[0]['secondaryFiles'][0]['location']
+            if (location.endswith('.cram') and not index_location.endswith('.crai')) or (
+                location.endswith('.bam') and not index_location.endswith('.bai')
             ):
                 raise MetamistError(
-                    f"{sequencing_group_id}: ERROR: expected the index file to have an extension "
-                    f".crai or .bai, got: {index_location}",
+                    f'{sequencing_group_id}: ERROR: expected the index file to have an extension '
+                    f'.crai or .bai, got: {index_location}',
                 )
-            if get_config()["workflow"]["access_level"] == "test":
-                index_location = index_location.replace("-main-upload/", "-test-upload/")
+            if get_config()['workflow']['access_level'] == 'test':
+                index_location = index_location.replace('-main-upload/', '-test-upload/')
             if check_existence and not exists(index_location):
-                raise MetamistError(f"{sequencing_group_id}: ERROR: index file does not exist: {index_location}")
+                raise MetamistError(f'{sequencing_group_id}: ERROR: index file does not exist: {index_location}')
 
-        if location.endswith(".cram"):
+        if location.endswith('.cram'):
             return CramPath(
                 location,
                 index_path=index_location,
                 reference_assembly=reference_assembly,
             )
         else:
-            assert location.endswith(".bam")
+            assert location.endswith('.bam')
             return BamPath(location, index_path=index_location)
 
     else:
@@ -723,24 +723,24 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         for lane_pair in reads_data:
             if len(lane_pair) != 2:
                 raise ValueError(
-                    f"Sequence data for sequencing group {sequencing_group_id} is incorrectly "
-                    f"formatted. Expecting 2 entries per lane (R1 and R2 fastqs), "
-                    f"but got {len(lane_pair)}. "
-                    f"Read data: {pprint.pformat(lane_pair)}",
+                    f'Sequence data for sequencing group {sequencing_group_id} is incorrectly '
+                    f'formatted. Expecting 2 entries per lane (R1 and R2 fastqs), '
+                    f'but got {len(lane_pair)}. '
+                    f'Read data: {pprint.pformat(lane_pair)}',
                 )
-            if check_existence and not exists(lane_pair[0]["location"]):
+            if check_existence and not exists(lane_pair[0]['location']):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: read 1 file does not exist: {lane_pair[0]["location"]}',
                 )
-            if check_existence and not exists(lane_pair[1]["location"]):
+            if check_existence and not exists(lane_pair[1]['location']):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: read 2 file does not exist: {lane_pair[1]["location"]}',
                 )
 
             fastq_pairs.append(
                 FastqPair(
-                    to_path(lane_pair[0]["location"]),
-                    to_path(lane_pair[1]["location"]),
+                    to_path(lane_pair[0]['location']),
+                    to_path(lane_pair[1]['location']),
                 ),
             )
 
