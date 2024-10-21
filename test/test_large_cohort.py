@@ -38,7 +38,7 @@ LARGE_COHORT_CONFIG = Path(to_path(__file__).parent.parent / "configs" / "defaul
 
 def create_config(
     tmp_path: Path,
-    seq_type: SequencingType,
+    sequencing_type: SequencingType,
     gnomad_prefix: CPGPath,
     broad_prefix: CPGPath,
 ) -> PipelineConfig:
@@ -46,7 +46,7 @@ def create_config(
         workflow=WorkflowConfig(
             dataset="large-cohort-test",
             access_level="test",
-            sequencing_type=seq_type,
+            sequencing_type=sequencing_type,
             check_intermediates=True,
         ),
         hail=HailConfig(query_backend="spark_local"),
@@ -131,7 +131,7 @@ class TestAllLargeCohortMethods:
         """
         conf = create_config(
             tmp_path=tmp_path,
-            seq_type="genome",
+            sequencing_type="genome",
             gnomad_prefix=gnomad_prefix,
             broad_prefix=broad_prefix,
         )
@@ -156,7 +156,7 @@ class TestAllLargeCohortMethods:
         vds_path = str(res_pref / "v01.vds")
         combiner.run_combiner(
             output_vds_path=vds_path,
-            sequencing_type=conf["workflow"]["seq_type"],
+            sequencing_type=conf["workflow"]["sequencing_type"],
             tmp_prefix=str(res_pref / "tmp"),
         )
 
