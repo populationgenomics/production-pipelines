@@ -95,7 +95,10 @@ def create_config(
             "sample_qc_cutoffs": {
                 "min_n_snps": 2500,
             },
-            "combiner": {"intervals": ["chr20:start-end", "chrX:start-end", "chrY:start-end"]},
+            "combiner": {
+                "intervals": ["chr20:start-end", "chrX:start-end", "chrY:start-end"],
+                "seq_type": "genome",
+            },
         },
     )
 
@@ -152,10 +155,9 @@ class TestAllLargeCohortMethods:
 
         res_pref = tmp_path
         vds_path = str(res_pref / "v01.vds")
-        seq_type = "genome"
         combiner.run_combiner(
             output_vds_path=vds_path,
-            sequencing_type=seq_type,
+            sequencing_type=conf["seq_type"],
             tmp_prefix=str(res_pref / "tmp"),
         )
 
