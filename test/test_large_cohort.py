@@ -152,9 +152,10 @@ class TestAllLargeCohortMethods:
 
         res_pref = tmp_path
         vds_path = str(res_pref / "v01.vds")
+        seq_type = "genome"
         combiner.run_combiner(
             output_vds_path=vds_path,
-            sequencing_type=conf["seq_type"],
+            sequencing_type=seq_type,
             tmp_prefix=str(res_pref / "tmp"),
         )
 
