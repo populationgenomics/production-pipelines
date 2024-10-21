@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
 
-@stage(analysis_type='combiner', analysis_keys=['combiner'])
+@stage(analysis_type='combiner')
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         workflow_config = config_retrieve('workflow')
@@ -32,7 +32,7 @@ class Combiner(CohortStage):
         )
         return cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds'
 
-    def get_vds_ids_output(self, vds_id: int) -> list[str]:
+    def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
         get_vds_analysis_query: DocumentNode = gql(
             """
             query getVDSByAnalysisIds($vds_id: Int!) {
@@ -46,9 +46,9 @@ class Combiner(CohortStage):
         """,
         )
         query_results: dict[str, Any] = query(get_vds_analysis_query, variables={'vds_id': vds_id})
-        vds_path: list[str] = [query_results['analyses'][0]['output']]
-        vds_ids: list[str] = [sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']]
-        return vds_path + vds_ids
+        vds_path: str = query_results['analyses'][0]['output']
+        vds_sgids: list[str] = [sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']]
+        return (vds_path, vds_sgids)
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
@@ -64,23 +64,25 @@ class Combiner(CohortStage):
         )
 
         vds_paths: list[str] | None = None
-        vds_sg_ids: list[str] | None = None
+        sg_ids_in_vds: list[str] | None = None
         new_sg_gvcfs: list[str] | None = None
 
         if combiner_config.get('vds_analysis_ids', None) is not None:
             vds_paths = []
-            vds_sg_ids = []
+            sg_ids_in_vds = []
             for vds_id in combiner_config['vds_analysis_ids']:
-                query_res: list[str] = self.get_vds_ids_output(vds_id)
-                vds_paths.append(query_res[0])
-                vds_sg_ids = vds_sg_ids + query_res[1:]
+                tmp_query_res, tmp_sg_ids_in_vds = self.get_vds_ids_output(vds_id)
+                vds_paths.append(tmp_query_res)
+                sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
 
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         sg_ids: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if vds_sg_ids and sg.id not in vds_sg_ids]
+        new_sg_gvcfs = [str(sg.gvcf) for sg in sg_ids if sg_ids_in_vds and sg.id not in sg_ids_in_vds]
         if len(new_sg_gvcfs) == 0:
             new_sg_gvcfs = None
+            if not vds_paths or len(vds_paths) == 1:
+                return self.make_outputs(cohort, self.expected_outputs(cohort))
 
         j.image(image_path('cpg_workflows'))
         j.memory(combiner_config['memory'])

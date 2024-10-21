@@ -28,16 +28,8 @@ def run(
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
 ) -> None:
-    use_genome_default_intervals: bool = False
-    use_exome_default_intervals: bool = False
-
     if not can_reuse(to_path(output_vds_path)):
         init_batch()
-
-        if sequencing_type == "genome":
-            use_genome_default_intervals = True
-        elif sequencing_type == "exome":
-            use_exome_default_intervals = True
 
         combiner: VariantDatasetCombiner = new_combiner(
             output_path=output_vds_path,
@@ -45,8 +37,8 @@ def run(
             vds_paths=vds_paths,
             reference_genome=genome_build,
             temp_path=tmp_prefix,
-            use_exome_default_intervals=use_exome_default_intervals,
-            use_genome_default_intervals=use_genome_default_intervals,
+            use_exome_default_intervals=sequencing_type == 'exome',
+            use_genome_default_intervals=sequencing_type == 'genome',
             force=True,
         )
 
