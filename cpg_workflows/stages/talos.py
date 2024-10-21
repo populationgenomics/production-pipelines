@@ -354,7 +354,7 @@ class GeneratePanelData(DatasetStage):
         # insert a little stagger
 
         job.command(f'sleep {randint(0, 30)}')
-        job.command('GeneratePanelData ' f'--input {local_phenopacket} ' f'--output {job.output} ' f'--hpo {hpo_file}')
+        job.command(f'GeneratePanelData --input {local_phenopacket} --output {job.output} --hpo {hpo_file}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -382,7 +382,7 @@ class QueryPanelapp(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
-        job.command('QueryPanelapp ' f'--input {get_batch().read_input(str(hpo_panel_json))} ' f'--output {job.output}')
+        job.command(f'QueryPanelapp --input {get_batch().read_input(str(hpo_panel_json))} --output {job.output}')
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -407,7 +407,7 @@ class FindGeneSymbolMap(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
-        job.command('FindGeneSymbolMap ' f'--input {panel_json} ' f'--output {job.output}')
+        job.command(f'FindGeneSymbolMap --input {panel_json} --output {job.output}')
 
         get_batch().write_output(job.output, str(expected_out['symbol_lookup']))
 
@@ -690,7 +690,7 @@ class CreateTalosHTML(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         command_string = (
             'CreateTalosHTML '
-            f'--results {results_json} '
+            f'--input {results_json} '
             f'--panelapp {panel_input} '
             f'--output {str(expected_out["results_html"])} '
             f'--latest {str(expected_out["latest_html"])} '
@@ -750,7 +750,7 @@ class MinimiseOutputForSeqr(DatasetStage):
         job.command(
             'MinimiseOutputForSeqr '
             f'--input {input_localised} '
-            f'--output{job.out_json} '
+            f'--output {job.out_json} '
             f'--pheno {job.pheno_json} '
             f'--external_map {lookup_in_batch}',
         )
