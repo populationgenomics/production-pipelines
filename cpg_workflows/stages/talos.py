@@ -279,6 +279,7 @@ class MakeRuntimeConfig(DatasetStage):
         return self.make_outputs(target=dataset, data=expected_outputs)
 
 
+@stage
 class MakePhenopackets(DatasetStage):
     """
     this calls the script which reads phenotype data from metamist
