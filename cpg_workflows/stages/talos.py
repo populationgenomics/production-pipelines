@@ -314,7 +314,7 @@ class MakePhenopackets(DatasetStage):
             f'--dataset {query_dataset} '
             f'--output {job.output} '
             f'--type {seq_type} '
-            f'--hpo {hpo_file}'
+            f'--hpo {hpo_file}',
         )
         get_batch().write_output(job.output, str(expected_out['phenopackets']))
         get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out["phenopackets"]}')
@@ -353,12 +353,7 @@ class GeneratePanelData(DatasetStage):
         # insert a little stagger
 
         job.command(f'sleep {randint(0, 30)}')
-        job.command(
-            'GeneratePanelData '
-            f'--input {local_phenopacket} '
-            f'--output {job.output} '
-            f'--hpo {hpo_file}'
-        )
+        job.command('GeneratePanelData ' f'--input {local_phenopacket} ' f'--output {job.output} ' f'--hpo {hpo_file}')
         get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -386,11 +381,7 @@ class QueryPanelapp(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
-        job.command(
-            'QueryPanelapp '
-            f'--input {get_batch().read_input(str(hpo_panel_json))} '
-            f'--output {job.output}'
-        )
+        job.command('QueryPanelapp ' f'--input {get_batch().read_input(str(hpo_panel_json))} ' f'--output {job.output}')
         get_batch().write_output(job.output, str(expected_out['panel_data']))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -415,11 +406,7 @@ class FindGeneSymbolMap(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
-        job.command(
-            'FindGeneSymbolMap '
-            f'--input {panel_json} '
-            f'--output {job.output}'
-        )
+        job.command('FindGeneSymbolMap ' f'--input {panel_json} ' f'--output {job.output}')
 
         get_batch().write_output(job.output, str(expected_out['symbol_lookup']))
 
