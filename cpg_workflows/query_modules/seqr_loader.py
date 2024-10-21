@@ -78,6 +78,7 @@ def annotate_cohort(
         mt = mt.drop('AF')
         mt = hl.variant_qc(mt)
         mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
+        mt = mt.drop('variant_qc')
 
     # don't fail if the AC/AF attributes are an inappropriate type
     # don't fail if completely absent either
