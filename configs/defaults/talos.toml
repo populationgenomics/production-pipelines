@@ -58,10 +58,15 @@ spliceai = 0.5
 # for generating the VCF output - these are the fields pulled from the MT, in this order
 csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotype', 'exon', 'hgvsc', 'hgvsp', 'cdna_position', 'cds_position', 'protein_position', 'variant_class', 'ensp', 'lof', 'sift', 'polyphen', 'am_class', 'am_pathogenicity']
 
+# config entries relating to size of VM provisioned for Hail
 [RunHailFiltering.cores]
-# size of VM provisioned for Hail
 sv = 2
 small_variants = 16
+
+# total allocated RAM, String
+[RunHailFiltering.memory]
+small_variants = 'highmem'
+#sv = 2
 
 [RunHailFiltering.storage]
 sv = 10

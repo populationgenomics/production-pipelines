@@ -444,8 +444,9 @@ class RunHailFiltering(DatasetStage):
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'small_variants'], 8)
+        required_mem: str = config_retrieve(['RunHailFiltering', 'memory', 'small_variants'], 'highmem')
         # doubling storage due to the repartitioning
-        job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory('highmem')
+        job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory(required_mem)
 
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
