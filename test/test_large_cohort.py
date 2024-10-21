@@ -163,6 +163,7 @@ class TestAllLargeCohortMethods:
             output_vds_path=vds_path,
             sequencing_type=conf["workflow"]["sequencing_type"],
             tmp_prefix=str(res_pref / "tmp"),
+            genome_build=conf["references"]["genome_build"],
             gvcf_paths=gvcf_paths,
             vds_paths=None,
         )
