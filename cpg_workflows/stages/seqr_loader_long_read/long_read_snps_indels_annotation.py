@@ -69,8 +69,8 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
                 return_dict[sg_id_section['id']] = analysis['output']
                 continue
             if isinstance(analysis['outputs'], dict):
-                if analysis['outputs'].get('path').endswith('SNPs_Indels.phased.vcf.gz'):
-                    return_dict[sg_id_section['id']] = analysis['outputs'].get('path')
+                if analysis['outputs'].get('path', '').endswith('SNPs_Indels.phased.vcf.gz'):
+                    return_dict[sg_id_section['id']] = analysis['outputs'].get('path', '')
                     break
 
     return return_dict
@@ -290,7 +290,6 @@ class VepLRS(MultiCohortStage):
         return self.make_outputs(multicohort, outputs, jobs)
 
 
-
 @stage(required_stages=[MergeLongReadSNPsIndels, VepLRS])
 class AnnotateCohortLRSNPsIndels(MultiCohortStage):
     """
@@ -334,7 +333,9 @@ class AnnotateDatasetLRSNPsIndels(DatasetStage):
         Expected to generate a matrix table
         """
 
-        return {'mt': (dataset.prefix() / 'mt' / f'LongReadSNPsIndels-{get_workflow().output_version}-{dataset.name}.mt')}
+        return {
+            'mt': (dataset.prefix() / 'mt' / f'LongReadSNPsIndels-{get_workflow().output_version}-{dataset.name}.mt'),
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """

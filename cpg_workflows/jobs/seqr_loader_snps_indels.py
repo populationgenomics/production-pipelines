@@ -111,11 +111,6 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             siteonly_vcf_path = out_siteonly_vcf_part_paths[idx]
         else:
             siteonly_vcf_path = tmp_bucket / 'split-merged-vcf-siteonly' / 'parts' / f'part{idx + 1}.vcf.gz'
-            # siteonly_vcf_path = (
-            #     (tmp_bucket / 'split-merged-vcf-siteonly' / 'parts' / f'part{idx + 1}.vcf.gz')
-            #     if scatter_count > 1
-            #     else out_siteonly_vcf_path
-            # )
         vcf_part = b.read_input_group(
             **{
                 'vcf.gz': str(split_vcfs_paths[idx]),

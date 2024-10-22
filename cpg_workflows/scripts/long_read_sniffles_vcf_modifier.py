@@ -57,10 +57,21 @@ def cli_main():
     parser.add_argument('--new_id', help='The Sample ID we want in the output VCF', default=None)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
     parser.add_argument('--sex', help='0=Unknown,1=Male, 2=Female', default=0, type=int)
-    parser.add_argument('--sv', help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels', action='store_true')
+    parser.add_argument(
+        '--sv',
+        help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels',
+        action='store_true',
+    )
     args = parser.parse_args()
 
-    modify_sniffles_vcf(file_in=args.vcf_in, file_out=args.vcf_out, fa=args.fa, new_id=args.new_id, sex=args.sex, sv=args.sv)
+    modify_sniffles_vcf(
+        file_in=args.vcf_in,
+        file_out=args.vcf_out,
+        fa=args.fa,
+        new_id=args.new_id,
+        sex=args.sex,
+        sv=args.sv,
+    )
 
 
 def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True):
@@ -69,7 +80,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
 
     - replaces the External Sample ID with the internal CPG identifier (if both are provided)
 
-    And if the VCF is an SV VCF:
+    And if the VCF contains SVs:
     - replaces the ALT allele with a symbolic "<TYPE>", derived from the SVTYPE INFO field
     - swaps out the REF (huge for deletions, a symbolic "N" for insertions) with the ref base
 

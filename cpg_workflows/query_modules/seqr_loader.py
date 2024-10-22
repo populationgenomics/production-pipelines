@@ -91,22 +91,6 @@ def annotate_cohort(
     if 'AN' not in mt.info:
         mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
 
-    # The problematic rows are where a_index>1 and info.AC or info.AF has length<=1
-    rows = mt.rows()
-    problem_rows = rows.filter(
-        hl.all(
-            rows.a_index == 2,
-            hl.len(rows.info.AC) == 1,
-        ),
-        keep=True,
-    )
-    if problem_rows.count() > 0:
-        logging.warning(f'Found {problem_rows.count()} rows with problematic info.AC or info.AF fields')
-        logging.warning('Showing the first 100 rows')
-        for row in problem_rows.take(100):
-            logging.warning(row)
-
-
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
         AC=mt.info.AC[mt.a_index - 1],

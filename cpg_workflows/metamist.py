@@ -596,10 +596,8 @@ class Metamist:
         Return the Metamist project name, appending '-test' if the access level is 'test'.
         """
         metamist_proj = dataset or self.default_dataset
-        logging.info(f'Using Metamist project: {metamist_proj}')
         if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
             metamist_proj += '-test'
-            logging.info(f'Updated Metamist project: {metamist_proj}')
 
         return metamist_proj
 
