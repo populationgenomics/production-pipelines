@@ -48,7 +48,6 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     scatter_count: int,
     merged_vcf_path: Path,
     tmp_bucket: Path,
-    # out_siteonly_vcf_path: Path,
     out_siteonly_vcf_part_paths: list[Path] | None = None,
     intervals_path: Path | None = None,
     exclude_intervals_path: Path | None = None,
