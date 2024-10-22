@@ -3,6 +3,7 @@ Test large-cohort workflow.
 """
 
 import os
+import pytest
 from os.path import exists
 from pathlib import Path
 
@@ -127,6 +128,8 @@ def _mock_cohort(dataset_id: str):
 
 
 class TestAllLargeCohortMethods:
+
+    @pytest.mark.integration
     def test_with_sample_data(self, mocker: MockFixture, tmp_path: Path):
         """
         Run entire workflow in a local mode.
