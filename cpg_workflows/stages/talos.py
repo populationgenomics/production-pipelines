@@ -79,7 +79,7 @@ SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
 
 
 @lru_cache(maxsize=1)
-def get_date_string()-> str:
+def get_date_string() -> str:
     """
     allows override of the date folder to continue/re-run previous analyses
 
@@ -692,8 +692,10 @@ class CreateTalosHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
             'results_html': dataset.prefix(category='web') / get_date_folder() / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web') / get_date_folder() / f'summary_latest_{get_date_string()}.html',
-            'folder': dataset.prefix(category='web') / get_date_folder()
+            'latest_html': dataset.prefix(category='web')
+            / get_date_folder()
+            / f'summary_latest_{get_date_string()}.html',
+            'folder': dataset.prefix(category='web') / get_date_folder(),
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -752,7 +754,9 @@ class MinimiseOutputForSeqr(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
             'seqr_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{get_date_folder()}_seqr.json',
-            'seqr_pheno_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{get_date_folder()}_seqr_pheno.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis')
+            / 'seqr_files'
+            / f'{get_date_folder()}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
