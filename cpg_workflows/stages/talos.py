@@ -82,6 +82,7 @@ SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
 def get_date_string()-> str:
     """
     allows override of the date folder to continue/re-run previous analyses
+
     Returns:
         either an override in config, or the default (today, YYYY-MM-DD)
     """
@@ -93,7 +94,7 @@ def get_date_folder() -> str:
     """
     allows override of the date folder to continue/re-run previous analyses
     Returns:
-        either an override in config, or the default (today, YYYY-MM-DD)
+        either an override in config, or the default "reanalysis/(today, YYYY-MM-DD)"
     """
     return join('reanalysis', get_date_string())
 
