@@ -61,7 +61,6 @@ from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutpu
 from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
-DATED_FOLDER = join('reanalysis', CHUNKY_DATE)
 MTA_QUERY = gql(
     """
     query MyQuery($dataset: String!, $type: String!) {
@@ -77,6 +76,26 @@ MTA_QUERY = gql(
 )
 # used when building a runtime configuration
 SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
+
+
+@lru_cache(maxsize=1)
+def get_date_string()-> str:
+    """
+    allows override of the date folder to continue/re-run previous analyses
+    Returns:
+        either an override in config, or the default (today, YYYY-MM-DD)
+    """
+    return config_retrieve(['workflow', 'date_folder_override'], CHUNKY_DATE)
+
+
+@lru_cache(1)
+def get_date_folder() -> str:
+    """
+    allows override of the date folder to continue/re-run previous analyses
+    Returns:
+        either an override in config, or the default (today, YYYY-MM-DD)
+    """
+    return join('reanalysis', get_date_string())
 
 
 @lru_cache(maxsize=None)
@@ -212,7 +231,7 @@ class GeneratePED(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'pedigree': dataset.prefix() / DATED_FOLDER / 'pedigree.ped'}
+        return {'pedigree': dataset.prefix() / get_date_folder() / 'pedigree.ped'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
@@ -231,7 +250,7 @@ class MakeRuntimeConfig(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'config': dataset.prefix() / DATED_FOLDER / 'config.toml'}
+        return {'config': dataset.prefix() / get_date_folder() / 'config.toml'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -287,7 +306,7 @@ class MakePhenopackets(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'phenopackets': dataset.prefix() / DATED_FOLDER / 'phenopackets.json'}
+        return {'phenopackets': dataset.prefix() / get_date_folder() / 'phenopackets.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -333,7 +352,7 @@ class GeneratePanelData(DatasetStage):
         """
         only one output, the panel data
         """
-        return {'hpo_panels': dataset.prefix() / DATED_FOLDER / 'hpo_panel_data.json'}
+        return {'hpo_panels': dataset.prefix() / get_date_folder() / 'hpo_panel_data.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
@@ -367,7 +386,7 @@ class QueryPanelapp(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'panel_data': dataset.prefix() / DATED_FOLDER / 'panelapp_data.json'}
+        return {'panel_data': dataset.prefix() / get_date_folder() / 'panelapp_data.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
@@ -392,7 +411,7 @@ class QueryPanelapp(DatasetStage):
 class FindGeneSymbolMap(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'symbol_lookup': dataset.prefix() / DATED_FOLDER / 'symbol_to_ensg.json'}
+        return {'symbol_lookup': dataset.prefix() / get_date_folder() / 'symbol_to_ensg.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
@@ -421,7 +440,7 @@ class RunHailFiltering(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'labelled_vcf': dataset.prefix() / DATED_FOLDER / 'hail_labelled.vcf.bgz'}
+        return {'labelled_vcf': dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
@@ -445,6 +464,7 @@ class RunHailFiltering(DatasetStage):
         )
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'small_variants'], 8)
         required_mem: str = config_retrieve(['RunHailFiltering', 'memory', 'small_variants'], 'highmem')
+
         # doubling storage due to the repartitioning
         job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory(required_mem)
 
@@ -503,7 +523,7 @@ class RunHailFilteringSV(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            filename: dataset.prefix() / DATED_FOLDER / f'label_{filename}.vcf.bgz'
+            filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
             for _path, filename in query_for_sv_mt(dataset.name)
         }
 
@@ -563,7 +583,7 @@ class ValidateMOI(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'summary_json': dataset.prefix() / DATED_FOLDER / 'summary_output.json'}
+        return {'summary_json': dataset.prefix() / get_date_folder() / 'summary_output.json'}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
@@ -622,8 +642,8 @@ class HPOFlagging(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'pheno_annotated': dataset.prefix() / DATED_FOLDER / 'pheno_annotated_report.json',
-            'pheno_filtered': dataset.prefix() / DATED_FOLDER / 'pheno_filtered_report.json',
+            'pheno_annotated': dataset.prefix() / get_date_folder() / 'pheno_annotated_report.json',
+            'pheno_filtered': dataset.prefix() / get_date_folder() / 'pheno_filtered_report.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -670,13 +690,14 @@ class HPOFlagging(DatasetStage):
 class CreateTalosHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'results_html': dataset.prefix(category='web') / DATED_FOLDER / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web') / DATED_FOLDER / f'summary_latest_{CHUNKY_DATE}.html',
+            'results_html': dataset.prefix(category='web') / get_date_folder() / 'summary_output.html',
+            'latest_html': dataset.prefix(category='web') / get_date_folder() / f'summary_latest_{get_date_string()}.html',
+            'folder': dataset.prefix(category='web') / get_date_folder()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos HTML: {dataset.name}')
-        job.image(image_path('talos')).memory('lowmem').cpu(1.0)
+        job.image(image_path('talos')).memory('standard').cpu(1.0)
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
@@ -686,15 +707,23 @@ class CreateTalosHTML(DatasetStage):
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
         expected_out = self.expected_outputs(dataset)
 
+        # this + copy_common_env (called by default) will be enough to do a gcloud copy of the outputs
+        authenticate_cloud_credentials_in_job(job)
+
         # this will write output files directly to GCP
         # report splitting is arbitrary, so can't be reliably done in Hail
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
+
+        # create a new directory for the results
+        job.command('mkdir html_outputs')
+        job.command('cd html_outputs')
+
         command_string = (
             'CreateTalosHTML '
             f'--input {results_json} '
             f'--panelapp {panel_input} '
-            f'--output {str(expected_out["results_html"])} '
-            f'--latest {str(expected_out["latest_html"])} '
+            f'--output {str(expected_out["results_html"].name)} '
+            f'--latest {str(expected_out["latest_html"].name)} '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
@@ -702,8 +731,8 @@ class CreateTalosHTML(DatasetStage):
 
         job.command(command_string)
 
-        # this + copy_common_env (called by default) should be enough to write using cloudpathlib
-        authenticate_cloud_credentials_in_job(job)
+        # copy the results to the bucket
+        job.command(f'gcloud storage cp -r * {str(expected_out["folder"])}')
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -721,8 +750,8 @@ class MinimiseOutputForSeqr(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            'seqr_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{DATED_FOLDER}_seqr.json',
-            'seqr_pheno_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{DATED_FOLDER}_seqr_pheno.json',
+            'seqr_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{get_date_folder()}_seqr.json',
+            'seqr_pheno_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{get_date_folder()}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
