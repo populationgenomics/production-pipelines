@@ -36,6 +36,9 @@ extend-exclude = [
     "dist",
 ]
 
+[tool.ruff.format]
+quote-style = "single"
+
 [tool.ruff.lint]
 # ignore pydocstyle, flake8-boolean-trap (FBT)
 select = ["A", "B", "C",  "E", "F", "G", "I", "N", "Q", "S", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "ERA", "EXE", "ICN", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "UP", "YTT"]
