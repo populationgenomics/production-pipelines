@@ -3,10 +3,10 @@ Test large-cohort workflow.
 """
 
 import os
-import pytest
 from os.path import exists
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockFixture
 
 import cpg_workflows
