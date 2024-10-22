@@ -6,8 +6,11 @@ import os
 from os.path import exists
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockFixture
 
+import cpg_workflows
+import cpg_workflows.inputs
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
 from cpg_utils.hail_batch import start_query_context
@@ -38,7 +41,7 @@ LARGE_COHORT_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'defaul
 
 def create_config(
     tmp_path: Path,
-    seq_type: SequencingType,
+    sequencing_type: SequencingType,
     gnomad_prefix: CPGPath,
     broad_prefix: CPGPath,
 ) -> PipelineConfig:
@@ -46,7 +49,7 @@ def create_config(
         workflow=WorkflowConfig(
             dataset='large-cohort-test',
             access_level='test',
-            sequencing_type=seq_type,
+            sequencing_type=sequencing_type,
             check_intermediates=True,
         ),
         hail=HailConfig(query_backend='spark_local'),
@@ -95,7 +98,9 @@ def create_config(
             'sample_qc_cutoffs': {
                 'min_n_snps': 2500,
             },
-            'combiner': {'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end']},
+            'combiner': {
+                'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
+            },
         },
     )
 
@@ -123,11 +128,18 @@ def _mock_cohort(dataset_id: str):
 
 
 class TestAllLargeCohortMethods:
+
+    @pytest.mark.integration
     def test_with_sample_data(self, mocker: MockFixture, tmp_path: Path):
         """
         Run entire workflow in a local mode.
         """
-        conf = create_config(tmp_path, 'genome', gnomad_prefix, broad_prefix)
+        conf = create_config(
+            tmp_path=tmp_path,
+            sequencing_type='genome',
+            gnomad_prefix=gnomad_prefix,
+            broad_prefix=broad_prefix,
+        )
         set_config(
             conf,
             tmp_path / 'config.toml',
@@ -143,11 +155,21 @@ class TestAllLargeCohortMethods:
         mocker.patch('cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False)
         mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
 
+        test_cohort: MultiCohort = cpg_workflows.inputs.deprecated_create_cohort()
+        gvcf_paths: list[str] = [str(sg.gvcf) for sg in test_cohort.get_sequencing_groups()]
+
         start_query_context()
 
         res_pref = tmp_path
-        vds_path = res_pref / 'v01.vds'
-        combiner.run(out_vds_path=vds_path, tmp_prefix=res_pref / 'tmp')
+        vds_path = str(res_pref / 'v01.vds')
+        combiner.run(
+            output_vds_path=vds_path,
+            sequencing_type=conf['workflow']['sequencing_type'],
+            tmp_prefix=str(res_pref / 'tmp'),
+            genome_build=conf['references']['genome_build'],
+            gvcf_paths=gvcf_paths,
+            vds_paths=None,
+        )
 
         sample_qc_ht_path = res_pref / 'sample_qc.ht'
         sample_qc.run(
