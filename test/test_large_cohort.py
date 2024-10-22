@@ -6,6 +6,7 @@ import os
 from os.path import exists
 from pathlib import Path
 
+import pytest
 from pytest_mock import MockFixture
 
 import cpg_workflows
@@ -127,6 +128,8 @@ def _mock_cohort(dataset_id: str):
 
 
 class TestAllLargeCohortMethods:
+
+    @pytest.mark.integration
     def test_with_sample_data(self, mocker: MockFixture, tmp_path: Path):
         """
         Run entire workflow in a local mode.
