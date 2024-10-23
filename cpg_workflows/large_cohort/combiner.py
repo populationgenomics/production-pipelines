@@ -27,9 +27,28 @@ def run(
     genome_build: str,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
+    specific_intervals: list[str] | None = None,
 ) -> None:
+
+    import logging
+    import hail as hl
+
+    # set up a quick logger inside the job
+    logging.basicConfig(level=logging.INFO)
+
     if not can_reuse(to_path(output_vds_path)):
         init_batch()
+
+        if specific_intervals:
+            logging.info(f'Using specific intervals: {specific_intervals}')
+
+            intervals = hl.eval([
+                hl.parse_locus_interval(interval, reference_genome=genome_build)
+                for interval in specific_intervals
+            ])
+
+        else:
+            intervals = None
 
         combiner: VariantDatasetCombiner = new_combiner(
             output_path=output_vds_path,
@@ -39,6 +58,7 @@ def run(
             temp_path=tmp_prefix,
             use_exome_default_intervals=sequencing_type == 'exome',
             use_genome_default_intervals=sequencing_type == 'genome',
+            intervals=intervals,
             force=True,
         )
 
