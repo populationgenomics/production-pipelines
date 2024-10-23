@@ -314,6 +314,7 @@ def test_ancestry(tmp_path: Path):
             compressed_relateds_to_drop_ht_path,
         ],
     )
+
     # uses get_config()['large_cohort']['min_pop_prob'] & get_config()['large_cohort'].get('pca_samples_to_remove', [])
     ancestry_pca.run(
         dense_mt_path=tmp_path / 'dense.mt',
@@ -359,6 +360,7 @@ def test_ancestry_plots(tmp_path: Path):
         ],
     )
 
+    # uses a few config entries
     ancestry_plots.run(
         out_path_pattern=tmp_path / 'plots' / '{scope}_pc{pci}_{pca_suffix}.{ext}',
         sample_qc_ht_path=tmp_path / 'ancestry_sample_qc.ht',
