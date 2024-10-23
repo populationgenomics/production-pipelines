@@ -31,6 +31,7 @@ def run(
 ) -> None:
 
     import logging
+
     import hail as hl
 
     # set up a quick logger inside the job
@@ -42,10 +43,9 @@ def run(
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
 
-            intervals = hl.eval([
-                hl.parse_locus_interval(interval, reference_genome=genome_build)
-                for interval in specific_intervals
-            ])
+            intervals = hl.eval(
+                [hl.parse_locus_interval(interval, reference_genome=genome_build) for interval in specific_intervals],
+            )
 
         else:
             intervals = None
