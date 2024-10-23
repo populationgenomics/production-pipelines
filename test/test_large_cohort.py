@@ -8,12 +8,9 @@ from zipfile import ZipFile
 
 from pytest_mock import MockFixture
 
-import hail as hl
-
 import cpg_workflows.inputs
 from cpg_utils import Path as CPGPath
 from cpg_utils import to_path
-from cpg_utils.hail_batch import start_query_context
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.large_cohort import (
     ancestry_pca,
@@ -169,11 +166,6 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
     test_cohort: MultiCohort = cpg_workflows.inputs.deprecated_create_cohort()
     gvcf_paths: list[str] = [str(sg.gvcf) for sg in test_cohort.get_sequencing_groups()]
 
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
-
     vds_path = str(tmp_path / 'v01.vds')
 
     # we're passing a specific minority of intervals here, to test that the combiner works on a timely test case
@@ -207,11 +199,6 @@ def test_sample_qc(mocker: MockFixture, tmp_path: Path):
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.combiner.can_reuse', lambda x: False)
 
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
-
     # open that VDS into a job temp location
     decompress_into_job_tmp(tmp_path, [compressed_vds_path])
 
@@ -226,7 +213,7 @@ def test_sample_qc(mocker: MockFixture, tmp_path: Path):
     assert exists_not_cached(sample_qc_ht_path)
 
 
-def test_densify_mt(mocker: MockFixture, tmp_path: Path):
+def test_densify_mt(tmp_path: Path):
     conf = create_config(tmp_path)
     set_config(
         conf,
@@ -234,20 +221,12 @@ def test_densify_mt(mocker: MockFixture, tmp_path: Path):
         merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
     )
 
-    mocker.patch(
-        'cpg_workflows.inputs.deprecated_create_cohort',
-        lambda: _mock_cohort(conf.workflow.dataset),
-    )
-
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
-
     # open that VDS into a job temp location
     decompress_into_job_tmp(tmp_path, [compressed_vds_path])
 
     dense_mt_output_path = tmp_path / 'dense.mt'
+
+    # uses get_config()['references']['ancestry']['sites_table']
     dense_subset.run(
         vds_path=str(tmp_path / 'v01.vds'),
         out_dense_mt_path=str(dense_mt_output_path),
@@ -265,23 +244,16 @@ def test_relatedness(mocker: MockFixture, tmp_path: Path):
         merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
     )
 
-    mocker.patch(
-        'cpg_workflows.inputs.deprecated_create_cohort',
-        lambda: _mock_cohort(conf.workflow.dataset),
-    )
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.relatedness.can_reuse', lambda x: False)
-
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
 
     # decompress the sample QC HT and dense MT
     decompress_into_job_tmp(tmp_path, [compressed_sample_qc_ht_path, compressed_dense_mt_path])
 
     relateds_to_drop_ht_path = tmp_path / 'relateds_to_drop.ht'
     relatedness_ht_path = tmp_path / 'relatedness.ht'
+
+    # uses get_config()['large_cohort']['remove_failed_qc_pca'] and get_config()['large_cohort']['max_kin']
     relatedness.run(
         dense_mt_path=tmp_path / 'dense.mt',
         sample_qc_ht_path=tmp_path / 'sample_qc.ht',
@@ -296,25 +268,9 @@ def test_relatedness(mocker: MockFixture, tmp_path: Path):
 
 
 def test_site_only(mocker: MockFixture, tmp_path: Path):
-    conf = create_config(tmp_path)
-    set_config(
-        conf,
-        tmp_path / 'config.toml',
-        merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
-    )
-
-    mocker.patch(
-        'cpg_workflows.inputs.deprecated_create_cohort',
-        lambda: _mock_cohort(conf.workflow.dataset),
-    )
 
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
-
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
 
     # decompress the sample QC HT, VDS, and relateds to drop HT
     decompress_into_job_tmp(
@@ -335,23 +291,13 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
     assert exists_not_cached(siteonly_vcf_path)
 
 
-def test_ancestry(mocker: MockFixture, tmp_path: Path):
+def test_ancestry(tmp_path: Path):
     conf = create_config(tmp_path)
     set_config(
         conf,
         tmp_path / 'config.toml',
         merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
     )
-
-    mocker.patch(
-        'cpg_workflows.inputs.deprecated_create_cohort',
-        lambda: _mock_cohort(conf.workflow.dataset),
-    )
-
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
 
     scores_ht_path = tmp_path / 'scores.ht'
     eigenvalues_ht_path = tmp_path / 'eigenvalues.ht'
@@ -368,7 +314,7 @@ def test_ancestry(mocker: MockFixture, tmp_path: Path):
             compressed_relateds_to_drop_ht_path,
         ],
     )
-
+    # uses get_config()['large_cohort']['min_pop_prob'] & get_config()['large_cohort'].get('pca_samples_to_remove', [])
     ancestry_pca.run(
         dense_mt_path=tmp_path / 'dense.mt',
         sample_qc_ht_path=tmp_path / 'sample_qc.ht',
@@ -392,23 +338,13 @@ def test_ancestry(mocker: MockFixture, tmp_path: Path):
         assert exists_not_cached(output)
 
 
-def test_ancestry_plots(mocker: MockFixture, tmp_path: Path):
+def test_ancestry_plots(tmp_path: Path):
     conf = create_config(tmp_path)
     set_config(
         conf,
         tmp_path / 'config.toml',
         merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
     )
-
-    mocker.patch(
-        'cpg_workflows.inputs.deprecated_create_cohort',
-        lambda: _mock_cohort(conf.workflow.dataset),
-    )
-
-    try:
-        start_query_context()
-    except hl.utils.java.FatalError as e:
-        pass
 
     # decompress all the inputs tables for plotting ancestry
     decompress_into_job_tmp(
