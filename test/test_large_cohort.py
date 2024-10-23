@@ -162,6 +162,8 @@ class TestAllLargeCohortMethods:
 
         res_pref = tmp_path
         vds_path = str(res_pref / 'v01.vds')
+
+        # we're passing a specific minority of intervals here, to test that the combiner works on a timely test case
         combiner.run(
             output_vds_path=vds_path,
             sequencing_type=conf['workflow']['sequencing_type'],
@@ -169,6 +171,7 @@ class TestAllLargeCohortMethods:
             genome_build=conf['references']['genome_build'],
             gvcf_paths=gvcf_paths,
             vds_paths=None,
+            specific_intervals=conf['large_cohort']['combiner']['intervals'],
         )
 
         sample_qc_ht_path = res_pref / 'sample_qc.ht'
