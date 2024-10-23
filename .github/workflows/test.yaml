@@ -30,7 +30,7 @@ jobs:
         timeout-minutes: 20
         run: |
           PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
-          coverage run -m pytest test -n auto --junitxml=test-execution.xml
+          coverage run -m pytest -n auto test --junitxml=test-execution.xml
 
           rc=$?
           coverage xml
