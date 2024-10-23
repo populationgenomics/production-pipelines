@@ -40,6 +40,7 @@ setup(
     extras_require={
         'test': [
             'pytest',
+            'pytest-xdist',
             'pytest-mock',
             'coverage',
         ],
