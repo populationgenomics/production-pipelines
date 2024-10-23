@@ -97,7 +97,7 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     ]
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
-    split_vcf_j = _add_split_vcf_job(
+    split_vcf_j = add_split_vcf_job(
         b=b,
         input_vcf=merged_vcf,
         intervals=intervals,
@@ -116,7 +116,7 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
                 'vcf.gz.tbi': str(split_vcfs_paths[idx]) + '.tbi',
             },
         )
-        siteonly_j, siteonly_j_vcf = _add_make_sitesonly_job(
+        siteonly_j, siteonly_j_vcf = add_make_sitesonly_job(
             b=b,
             input_vcf=vcf_part,
             output_vcf_path=siteonly_vcf_path,
@@ -135,7 +135,7 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     return jobs
 
 
-def _add_split_vcf_job(
+def add_split_vcf_job(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     intervals: list[str] | list[hb.ResourceFile],
@@ -154,7 +154,7 @@ def _add_split_vcf_job(
         output_vcf_path = output_vcf_paths[idx]
         j.declare_resource_group(
             **{
-                str(idx + 1): {
+                str(idx): {
                     'vcf.gz': '{root}.vcf.gz',
                     'vcf.gz.tbi': '{root}.vcf.gz.tbi',
                 },
@@ -164,11 +164,11 @@ def _add_split_vcf_job(
             gatk --java-options "{res.java_mem_options()}" \\
             SelectVariants \\
             -V {input_vcf['vcf.gz']} \\
-            -O {j[str(idx+1)]['vcf.gz']} \\
+            -O {j[str(idx)]['vcf.gz']} \\
             -L {interval}
         """
         j.command(command(cmd, monitor_space=False, setup_gcp=True, define_retry_function=True))
-        b.write_output(j[str(idx + 1)], str(output_vcf_path).replace('.vcf.gz', ''))
+        b.write_output(j[str(idx)], str(output_vcf_path).replace('.vcf.gz', ''))
 
     # Wait for all parts to be written before returning
     j.command('wait && echo "All parts written"')
@@ -176,7 +176,7 @@ def _add_split_vcf_job(
     return j
 
 
-def _add_make_sitesonly_job(
+def add_make_sitesonly_job(
     b: hb.Batch,
     input_vcf: hb.ResourceGroup,
     output_vcf_path: Path | None = None,

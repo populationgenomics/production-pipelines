@@ -15,6 +15,7 @@ from cpg_workflows.jobs.seqr_loader_snps_indels import (
     split_merged_vcf_and_get_sitesonly_vcfs_for_vep,
 )
 from cpg_workflows.jobs.vep import add_vep_jobs
+from cpg_workflows.resources import joint_calling_scatter_count
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
 from cpg_workflows.utils import get_logger
@@ -24,12 +25,11 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
 from metamist.graphql import gql, query
-
-from ...resources import joint_calling_scatter_count
 
 VCF_QUERY = gql(
     """
@@ -147,7 +147,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
 @stage(required_stages=ReFormatPacBioSNPsIndels)
 class MergeLongReadSNPsIndels(MultiCohortStage):
     """
-    find all the amended VCFs, and do a naive merge into one huge VCF
+    Find all the amended VCFs, and do a naive merge into one huge VCF
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -158,7 +158,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        reuse the gVCF method which does the same? FastCombineVcfs. Nah, not yet - that contains other modifications
+        Use bcftools to merge all the VCFs
         """
 
         outputs = self.expected_outputs(multicohort)
@@ -237,15 +237,13 @@ class SiteOnlyVCFs(MultiCohortStage):
             scatter_count=scatter_count,
             merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
             tmp_bucket=self.tmp_prefix / 'tmp',
-            # out_siteonly_vcf_path=outputs['siteonly'],
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             intervals_path=intervals_path,
             exclude_intervals_path=exclude_intervals_path,
             job_attrs=self.get_job_attrs(),
         )
         jobs.extend(vcf_jobs)
-        for job in jobs:
-            assert job
+
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
@@ -346,9 +344,7 @@ class AnnotateDatasetLRSNPsIndels(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSNPsIndels, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortLRSNPsIndels, key='mt')
 
         outputs = self.expected_outputs(dataset)
 
