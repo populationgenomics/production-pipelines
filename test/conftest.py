@@ -19,6 +19,7 @@ def start_up_query():
     start_query_context()
     yield
 
+
 @pytest.fixture(autouse=True, scope='function')
 def pre_and_post_test():
 
