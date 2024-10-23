@@ -89,11 +89,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     help='Dry run: do not actually communicate with Metamist or Hail Batch, '
     'instead only print a final config and stages to be run',
 )
-@click.option(
-    '--verbose',
-    'verbose',
-    is_flag=True,
-)
+@click.option('--verbose', is_flag=True, help='trigger DEBUG logging')
 def main(
     workflow: str,
     config_paths: list[str],
@@ -105,7 +101,7 @@ def main(
     """
     Run a Hail Batch workflow specified as a positional command line argument [WORKFLOW]
     """
-    fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
+    fmt = '%(asctime)s %(levelname)s (%(pathname)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
 
     if not workflow and not list_workflows:
