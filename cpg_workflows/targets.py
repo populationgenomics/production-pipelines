@@ -168,7 +168,7 @@ class MultiCohort(Target):
                 all_sequencing_groups[sg.id] = sg
         return list(all_sequencing_groups.values())
 
-    def create_cohort(self, id: str):
+    def create_cohort(self, id: str, name: str) -> 'Cohort':
         """
         Create a cohort and add it to the multi-cohort.
         """
@@ -176,7 +176,7 @@ class MultiCohort(Target):
             logging.debug(f'Cohort {id} already exists in the multi-cohort')
             return self._cohorts_by_id[id]
 
-        c = Cohort(id=id, multicohort=self)
+        c = Cohort(id=id, name=name, multicohort=self)
         self._cohorts_by_id[c.id] = c
         return c
 
@@ -240,9 +240,10 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(self, id: str | None = None, multicohort: MultiCohort | None = None) -> None:
+    def __init__(self, id: str | None = None, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
         self.id = id or get_config()['workflow']['dataset']
+        self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
         self.multicohort = multicohort

@@ -126,6 +126,17 @@ GET_PEDIGREE_QUERY = gql(
     """,
 )
 
+GET_COHORT_NAMES_QUERY = gql(
+    """
+    query CohortNamesQuery($cohort_ids: [String!]!) {
+        cohorts(id: { in_: $cohort_ids }) {
+            id
+            name
+        }
+    }
+    """,
+)
+
 
 _metamist: Optional['Metamist'] = None
 
@@ -600,6 +611,18 @@ class Metamist:
             metamist_proj += '-test'
 
         return metamist_proj
+
+    def get_cohort_name_by_ids(self, cohort_ids: list[str]) -> dict[str, str]:
+        """
+        Retrieve cohort names by cohort IDs.
+        """
+        cohort_names = {}
+        entries = query(GET_COHORT_NAMES_QUERY, variables={'cohort_ids': cohort_ids})
+
+        for cohort in entries['cohorts']:
+            cohort_names[cohort['id']] = cohort['name']
+
+        return cohort_names
 
 
 @dataclass
