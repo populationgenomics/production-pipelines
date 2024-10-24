@@ -209,7 +209,7 @@ class SiteOnlyVCFs(MultiCohortStage):
         Generate site-only VCFs from the merged VCF.
         """
         return {
-            # 'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
+            'siteonly': to_path(self.prefix / 'siteonly.vcf.gz'),
             'siteonly_part_pattern': str(self.prefix / 'siteonly_parts' / 'part{idx}.vcf.gz'),
         }
 
