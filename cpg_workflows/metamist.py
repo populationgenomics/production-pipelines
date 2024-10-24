@@ -195,6 +195,7 @@ class AnalysisType(Enum):
     MITO_CRAM = 'mito-cram'
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
+    COMBINER = 'combiner'
 
     @staticmethod
     def parse(val: str) -> 'AnalysisType':

@@ -325,4 +325,20 @@ def tshirt_mt_sizing(sequencing_type: str, cohort_size: int) -> int:
     return 500
 
 
+def get_intervals_from_bed(intervals_path: Path) -> list[str]:
+    """
+    Read genomic intervals from a bed file.
+    Increment the start position of each interval by 1 to match the 1-based
+    coordinate system used by GATK.
+
+    Returns a list of interval strings in the format 'chrN:start-end'.
+    """
+    with intervals_path.open('r') as f:
+        intervals = []
+        for line in f:
+            chrom, start, end = line.strip().split('\t')
+            intervals.append(f'{chrom}:{int(start)+1}-{end}')
+    return intervals
+
+
 ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
