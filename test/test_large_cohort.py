@@ -102,7 +102,7 @@ def create_config(
 
 def _mock_cohort(dataset_id: str):
     mc = MultiCohort()
-    cohort = mc.create_cohort('large-cohort-test')
+    cohort = mc.create_cohort(id='COH1', name='large-cohort-test')
     dataset = cohort.create_dataset(dataset_id)
     mc_dataset = mc.add_dataset(dataset)
     gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'

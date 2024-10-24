@@ -839,7 +839,10 @@ def test_custom_cohort(mocker: MockFixture, tmp_path, monkeypatch):
 
     def mock_query(query, variables):
         # Mocking the return value of the query function
-        return {'cohorts': [{'sequencingGroups': mock_get_sgs_by_cohort()}]}
+        if 'cohort_ids' in variables:
+            return {'cohorts': [{'id': 'COH1', 'name': 'Cohort 1'}]}
+        else:
+            return {'cohorts': [{'sequencingGroups': mock_get_sgs_by_cohort()}]}
 
     # Patching the query function to mock the GraphQL query
     monkeypatch.setattr('cpg_workflows.metamist.query', mock_query)
