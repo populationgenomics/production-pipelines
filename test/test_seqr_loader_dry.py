@@ -2,6 +2,9 @@
 Test seqr-loader workflow.
 """
 
+import shutil
+import uuid
+from os import makedirs
 from pathlib import Path
 from unittest.mock import mock_open
 
@@ -174,11 +177,19 @@ def selective_mock_open(*args, **kwargs):
         return mock_open(read_data='<stub>')(*args, **kwargs)
 
 
-def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
+def test_seqr_loader_dry(mocker: MockFixture):
     """
     Test entire seqr-loader in a dry mode.
     """
-    conf = TOML.format(directory=str(tmp_path))
+
+    # trying to generate a random tmp_path using pytest.tmp_path here fails on CI
+    # as the tmp_path is unbelievably long when running multiple parallel tests
+    tmp_path_string = f'test-seqr-loader-dry_tmp{uuid.uuid4().hex[:6]}'
+    makedirs(tmp_path_string, exist_ok=True)
+
+    conf = TOML.format(directory=tmp_path_string)
+    tmp_path = Path(tmp_path_string)
+
     set_config(conf, tmp_path / 'config.toml', merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG])
 
     mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', _mock_cohort)
@@ -219,3 +230,6 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
         == len(get_multicohort().get_sequencing_groups()) + 1
     )
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50
+
+    # if we got here, it's all good - clean up
+    shutil.rmtree(tmp_path_string)

@@ -2,8 +2,9 @@ pre-commit
 pylint
 bump2version
 black
-pytest
+pytest>8
 pytest_mock
+pytest-xdist>=3.6.0
 mypy
 cpg-utils>=5.0.11
 tenacity
