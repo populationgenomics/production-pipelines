@@ -45,8 +45,7 @@ def add_vep_jobs(
 
     # read all input VCFs as resource groups
     input_vcf_resources: list[hb.ResourceGroup] = [
-        b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'})
-        for path in input_vcfs
+        b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}) for path in input_vcfs
     ]
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
@@ -82,11 +81,7 @@ def add_vep_jobs(
         gather_jobs = [j]
     elif scatter_count != 1:
         assert len(result_part_paths) == scatter_count
-        gather_jobs = gather_vcfs(
-            b=b,
-            input_vcfs=result_part_paths,
-            out_vcf_path=out_path,
-        )
+        gather_jobs = gather_vcfs(b=b, input_vcfs=result_part_paths, out_vcf_path=out_path)
     else:
         print('no need to merge VEP results')
         gather_jobs = []
