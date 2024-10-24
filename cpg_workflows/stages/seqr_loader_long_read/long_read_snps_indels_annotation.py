@@ -278,8 +278,7 @@ class VepLRS(MultiCohortStage):
 
         jobs = add_vep_jobs(
             get_batch(),
-            input_siteonly_vcf_path=inputs.as_path(multicohort, stage=SiteOnlyVCFs, key='siteonly'),
-            input_siteonly_vcf_part_paths=input_siteonly_vcf_part_paths,
+            input_vcfs=input_siteonly_vcf_part_paths,
             out_path=outputs['ht'],
             tmp_prefix=self.tmp_prefix / 'tmp',
             job_attrs=self.get_job_attrs(),
