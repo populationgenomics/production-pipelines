@@ -59,7 +59,8 @@ def create_multicohort() -> MultiCohort:
 
     read_pedigree = config.get('read_pedigree', True)
     for cohort_id in custom_cohort_ids:
-        cohort = multicohort.create_cohort(cohort_id)
+        # TODO: The cohort name should be passed here, not the cohort id
+        cohort = multicohort.create_cohort(id=cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
