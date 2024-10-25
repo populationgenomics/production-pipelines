@@ -117,6 +117,10 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
                     f_out.write('\t'.join(l_split) + '\n')
                     continue
 
+                if 'FORMAT=<ID=AF,Number=1' in line and not sv:
+                    # Correct the AF field to have 'Number=A' for SNPs/Indels, to allow for multiple AF values
+                    line = line.replace('Number=1', 'Number=A')
+
                 f_out.write(line)
                 continue
 
