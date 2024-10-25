@@ -231,6 +231,13 @@ def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     ]
 
 
+def mock_get_cohort_names_by_ids(*args, **kwargs) -> dict:
+    return {
+        'COH123': 'CohortA',
+        'COH456': 'CohortB',
+    }
+
+
 def test_multicohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
@@ -242,6 +249,7 @@ def test_multicohort(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
     mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_cohorts)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_cohort_name_by_ids', mock_get_cohort_names_by_ids)
 
     from cpg_workflows.inputs import get_multicohort
 
@@ -286,6 +294,7 @@ def test_overlapping_multicohort(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
     mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_overlapping_cohorts)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_cohort_name_by_ids', mock_get_cohort_names_by_ids)
 
     from cpg_workflows.inputs import get_multicohort
 
