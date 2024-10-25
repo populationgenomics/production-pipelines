@@ -56,6 +56,8 @@ class Align(SequencingGroupStage):
             / f'{sequencing_group.id}.markduplicates-metrics'
         )
 
+        outputs = self.expected_outputs(sequencing_group)
+
         try:
             jobs = align.align(
                 b=get_batch(),
@@ -65,11 +67,8 @@ class Align(SequencingGroupStage):
                 overwrite=sequencing_group.forced,
                 out_markdup_metrics_path=markdup_metrics_path,
             )
-            return self.make_outputs(
-                sequencing_group,
-                data=self.expected_outputs(sequencing_group),
-                jobs=jobs,
-            )
+            return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
+
         except MissingAlignmentInputException:
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.error(f'No alignment inputs, skipping sequencing group {sequencing_group}')

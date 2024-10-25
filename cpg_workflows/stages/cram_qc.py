@@ -113,20 +113,19 @@ class CramQC(SequencingGroupStage):
         return outs
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
-        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
+
+        align_input = inputs.as_dict(sequencing_group, Align)
+        outputs = self.expected_outputs(sequencing_group)
 
         jobs = []
         # This should run if either the stage or the sequencing group is being forced.
         forced = self.forced or sequencing_group.forced
         for qc in qc_functions():
-            out_path_kwargs = {
-                f'out_{key}_path': self.expected_outputs(sequencing_group)[key] for key in qc.outs.keys()
-            }
+            out_path_kwargs = {f'out_{key}_path': outputs[key] for key in qc.outs.keys()}
             if qc.func:
                 j = qc.func(  # type: ignore
                     get_batch(),
-                    CramPath(cram_path, crai_path),
+                    CramPath(align_input['cram'], align_input['crai']),
                     job_attrs=self.get_job_attrs(sequencing_group),
                     overwrite=forced,
                     **out_path_kwargs,
@@ -134,7 +133,7 @@ class CramQC(SequencingGroupStage):
                 if j:
                     jobs.append(j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=[CramQC])
@@ -168,6 +167,7 @@ class SomalierPedigree(DatasetStage):
         """
         Checks calls job from the pedigree module
         """
+        outputs = self.expected_outputs(dataset)
         verifybamid_by_sgid = {}
         somalier_path_by_sgid = {}
         for sequencing_group in dataset.get_sequencing_groups():
@@ -183,29 +183,29 @@ class SomalierPedigree(DatasetStage):
             somalier_path = inputs.as_path(stage=CramQC, target=sequencing_group, key='somalier')
             somalier_path_by_sgid[sequencing_group.id] = somalier_path
 
-        html_path = self.expected_outputs(dataset)['html']
+        html_path = outputs['html']
         if base_url := dataset.web_url():
             html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
-        if any(sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()):
-            expected_ped_path = dataset.write_ped_file(self.expected_outputs(dataset)['expected_ped'])
+        if not any(sg.pedigree.dad or sg.pedigree.mom for sg in dataset.get_sequencing_groups()):
+            expected_ped_path = dataset.write_ped_file(outputs['expected_ped'])
             jobs = somalier.pedigree(
                 b=get_batch(),
                 dataset=dataset,
                 expected_ped_path=expected_ped_path,
                 somalier_path_by_sgid=somalier_path_by_sgid,
                 verifybamid_by_sgid=verifybamid_by_sgid,
-                out_samples_path=self.expected_outputs(dataset)['samples'],
-                out_pairs_path=self.expected_outputs(dataset)['pairs'],
+                out_samples_path=outputs['samples'],
+                out_pairs_path=outputs['pairs'],
                 out_html_path=html_path,
                 out_html_url=html_url,
-                out_checks_path=self.expected_outputs(dataset)['checks'],
+                out_checks_path=outputs['checks'],
                 job_attrs=self.get_job_attrs(dataset),
                 send_to_slack=True,
             )
-            return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+            return self.make_outputs(dataset, data=outputs, jobs=jobs)
         else:
             return self.make_outputs(dataset, skipped=True)
 
@@ -239,11 +239,10 @@ class CramMultiQC(DatasetStage):
         if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
-        json_path = self.expected_outputs(dataset)['json']
-        html_path = self.expected_outputs(dataset)['html']
-        checks_path = self.expected_outputs(dataset)['checks']
+        outputs = self.expected_outputs(dataset)
+
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
+            html_url = str(outputs['html']).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
@@ -294,14 +293,14 @@ class CramMultiQC(DatasetStage):
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
             dataset=dataset,
-            out_json_path=json_path,
-            out_html_path=html_path,
+            out_json_path=outputs['json'],
+            out_html_path=outputs['html'],
             out_html_url=html_url,
-            out_checks_path=checks_path,
+            out_checks_path=outputs['checks'],
             job_attrs=self.get_job_attrs(dataset),
             sequencing_group_id_map=dataset.rich_id_map(),
             label='CRAM',
             send_to_slack=send_to_slack,
             extra_config=extra_config,
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)

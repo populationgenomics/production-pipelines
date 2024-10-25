@@ -74,22 +74,23 @@ class Stripy(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sequencing_group, Align, 'cram')
-        crai_path = inputs.as_path(sequencing_group, Align, 'crai')
+
+        outputs = self.expected_outputs(sequencing_group)
+        cram_input = inputs.as_path(sequencing_group, Align)
 
         jobs = []
         j = stripy.stripy(
             b=get_batch(),
             sequencing_group=sequencing_group,
-            cram_path=CramPath(cram_path, crai_path),
+            cram_path=CramPath(cram_input['cram'], cram_input['crai']),
             target_loci=get_config()['stripy']['target_loci'],
-            log_path=self.expected_outputs(sequencing_group)['stripy_log'],
+            log_path=outputs['stripy_log'],
             analysis_type=get_config()['stripy']['analysis_type'],
-            out_path=self.expected_outputs(sequencing_group)['stripy_html'],
-            json_path=self.expected_outputs(sequencing_group)['stripy_json'],
+            out_path=outputs['stripy_html'],
+            json_path=outputs['stripy_json'],
             custom_loci_path=get_config()['stripy']['custom_loci_path'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)

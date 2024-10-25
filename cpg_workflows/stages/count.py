@@ -47,8 +47,7 @@ class Count(SequencingGroupStage):
         """
         Queue a job to count the reads with featureCounts.
         """
-        cram_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'cram')
-        crai_path = inputs.as_path(sequencing_group, TrimAlignRNA, 'crai')
+        cram_input = inputs.as_dict(sequencing_group, TrimAlignRNA)
         potential_bam_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam'
         potential_bai_path = sequencing_group.dataset.tmp_prefix() / 'bam' / f'{sequencing_group.id}.bam.bai'
         input_cram_or_bam: BamPath | CramPath | None = None
@@ -60,7 +59,7 @@ class Count(SequencingGroupStage):
             if potential_bam_path.exists() and potential_bai_path.exists():
                 input_cram_or_bam = BamPath(potential_bam_path, potential_bai_path)
             else:
-                input_cram_or_bam = CramPath(cram_path, crai_path)
+                input_cram_or_bam = CramPath(cram_input['cram'], cram_input['crai'])
 
         output_path = self.expected_outputs(sequencing_group)['count']
         summary_path = self.expected_outputs(sequencing_group)['summary']

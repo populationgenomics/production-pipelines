@@ -53,10 +53,11 @@ class SetSGIDOrdering(CohortStage):
         return {'sgid_order': self.get_stage_cohort_prefix(cohort) / 'sgid_order.json'}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
         sorted_sgids = sorted(cohort.get_sequencing_group_ids())
-        with self.expected_outputs(cohort)['sgid_order'].open('w') as f_handler:
+        with outputs['sgid_order'].open('w') as f_handler:
             json.dump(sorted_sgids, f_handler, indent=2)
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort))
+        return self.make_outputs(cohort, data=outputs)
 
 
 @stage

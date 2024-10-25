@@ -48,6 +48,8 @@ class BamToCram(SequencingGroupStage):
         assert (
             sequencing_group.sequencing_type == 'genome'
         ), f'Only genome sequencing type is supported for BAM to CRAM conversion, unavailable for {sequencing_group.id}'
+
+        outputs = self.expected_outputs(sequencing_group)
         input_bam = b.read_input_group(bam=str(sequencing_group.alignment_input))
         job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
@@ -57,6 +59,6 @@ class BamToCram(SequencingGroupStage):
             requested_nthreads=1,
             reference_fasta_path=reference_path('broad/ref_fasta'),
         )
-        b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
+        b.write_output(output_cram, str(outputs['cram']).removesuffix('.cram'))
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[job])
+        return self.make_outputs(sequencing_group, data=outputs, jobs=[job])

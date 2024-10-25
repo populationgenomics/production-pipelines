@@ -97,6 +97,8 @@ class FastQC(SequencingGroupStage):
         if not (fqc_outs := _collect_fastq_outs(sequencing_group)):
             return self.make_outputs(sequencing_group, skipped=True)
 
+        outputs = self.expected_outputs(sequencing_group)
+
         jobs = []
         for fqc_out in fqc_outs:
             j = fastqc.fastqc(
@@ -110,7 +112,7 @@ class FastQC(SequencingGroupStage):
             j.name = f'{j.name}{fqc_out.suffix}'
             jobs.append(j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=FastQC)
@@ -125,10 +127,9 @@ class FastQCMultiQC(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
-        json_path = self.expected_outputs(dataset)['json']
-        html_path = self.expected_outputs(dataset)['html']
+        outputs = self.expected_outputs(dataset)
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
+            html_url = str(outputs['html']).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
@@ -148,11 +149,11 @@ class FastQCMultiQC(DatasetStage):
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'fastqc',
             paths=paths,
             dataset=dataset,
-            out_json_path=json_path,
-            out_html_path=html_path,
+            out_json_path=outputs['json'],
+            out_html_path=outputs['html'],
             out_html_url=html_url,
             job_attrs=self.get_job_attrs(dataset),
             sequencing_group_id_map=sequencing_group_id_map,
             label='FASTQC',
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)

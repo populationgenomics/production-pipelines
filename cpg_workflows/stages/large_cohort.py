@@ -340,18 +340,20 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import vqsr
 
+        outputs = self.expected_outputs(cohort)
+
         vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=vcf_path,
             gvcf_count=len(cohort.get_sequencing_groups()),
-            out_path=self.expected_outputs(cohort)['vcf'],
+            out_path=outputs['vcf'],
             tmp_prefix=self.tmp_prefix,
             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=Vqsr)
@@ -361,6 +363,8 @@ class LoadVqsr(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import load_vqsr
+
+        outputs = self.expected_outputs(cohort)
 
         j = get_batch().new_job(
             'LoadVqsr',
@@ -373,12 +377,12 @@ class LoadVqsr(CohortStage):
                 load_vqsr,
                 load_vqsr.run.__name__,
                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
-                str(self.expected_outputs(cohort)),
+                str(outputs),
                 setup_gcp=True,
             ),
         )
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=outputs, jobs=[j])
 
 
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
@@ -388,6 +392,8 @@ class Frequencies(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import frequencies
+
+        outputs = self.expected_outputs(cohort)
 
         j = get_batch().new_job(
             'Frequencies',
@@ -402,9 +408,9 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Combiner)),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(self.expected_outputs(cohort)),
+                str(outputs),
                 setup_gcp=True,
             ),
         )
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=outputs, jobs=[j])

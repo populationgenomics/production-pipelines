@@ -45,14 +45,15 @@ class Genotype(SequencingGroupStage):
         """
         Use function from the jobs module
         """
+        outputs = self.expected_outputs(sequencing_group)
 
         jobs = genotype.genotype(
             b=get_batch(),
-            output_path=self.expected_outputs(sequencing_group)['gvcf'],
+            output_path=outputs['gvcf'],
             sequencing_group_name=sequencing_group.id,
             cram_path=sequencing_group.cram or sequencing_group.make_cram_path(),
             tmp_prefix=self.tmp_prefix / sequencing_group.id,
             overwrite=sequencing_group.forced,
             job_attrs=self.get_job_attrs(sequencing_group),
         )
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)

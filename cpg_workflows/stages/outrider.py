@@ -25,6 +25,10 @@ class Outrider(CohortStage):
         """
         Generate outrider outputs.
         """
+
+        # TODO this should probably be changed to self.prefix
+        # TODO this only runs on one cohort, and the cohort only has one analysis dataset assc.
+        # TODO 'outrider' would be included in self.prefix, as it's the result of self.name (the stage)
         dataset_prefix = cohort.get_sequencing_groups()[0].dataset.prefix()
         return {cohort.name: dataset_prefix / 'outrider' / f'{cohort.name}.outrider.RData'}
 
@@ -32,15 +36,16 @@ class Outrider(CohortStage):
         """
         Queue a job to run outrider.
         """
+        outputs = self.expected_outputs(cohort)
         count_inputs = [
             inputs.as_path(sequencing_group, Count, 'count') for sequencing_group in cohort.get_sequencing_groups()
         ]
         j = outrider.outrider(
             b=get_batch(),
             input_counts=count_inputs,
-            output_rdata_path=list(self.expected_outputs(cohort).values())[0],
+            output_rdata_path=list(outputs.values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
             overwrite=cohort.forced,
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
+        return self.make_outputs(cohort, data=outputs, jobs=j)

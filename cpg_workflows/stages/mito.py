@@ -132,6 +132,9 @@ class RealignMito(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+
+        outputs = self.expected_outputs(sequencing_group)
+
         # Mitochondrial specific reference files.
         mito_ref = get_mito_references()
         shifted_mito_ref = get_mito_references(shifted=True)
@@ -166,7 +169,7 @@ class RealignMito(SequencingGroupStage):
             b=get_batch(),
             sorted_bam=realign_j.output_cram,
             fasta_reference=mito_ref,
-            output_path=self.expected_outputs(sequencing_group)['non_shifted_cram'],
+            output_path=outputs['non_shifted_cram'],
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=True,
         )
@@ -190,7 +193,7 @@ class RealignMito(SequencingGroupStage):
             b=get_batch(),
             sorted_bam=shifted_realign_j.output_cram,
             fasta_reference=shifted_mito_ref,
-            output_path=self.expected_outputs(sequencing_group)['shifted_cram'],
+            output_path=outputs['shifted_cram'],
             job_attrs=self.get_job_attrs(sequencing_group),
             overwrite=True,
         )
@@ -203,8 +206,8 @@ class RealignMito(SequencingGroupStage):
             b=get_batch(),
             cram=realign_mkdup_j.output_cram,
             reference=mito_ref,
-            metrics=self.expected_outputs(sequencing_group)['coverage_metrics'],
-            theoretical_sensitivity=self.expected_outputs(sequencing_group)['theoretical_sensitivity_metrics'],
+            metrics=outputs['coverage_metrics'],
+            theoretical_sensitivity=outputs['theoretical_sensitivity_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(coverage_metrics_J)
@@ -214,8 +217,8 @@ class RealignMito(SequencingGroupStage):
         extract_coverage_mean_j = mito.extract_coverage_mean(
             b=get_batch(),
             metrics=coverage_metrics_J.metrics,
-            mean_path=self.expected_outputs(sequencing_group)['coverage_mean'],
-            median_path=self.expected_outputs(sequencing_group)['coverage_median'],
+            mean_path=outputs['coverage_mean'],
+            median_path=outputs['coverage_median'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(extract_coverage_mean_j)
@@ -248,12 +251,12 @@ class RealignMito(SequencingGroupStage):
             b=get_batch(),
             non_cr_coverage=non_control_region_coverage_j.per_base_coverage,
             shifted_cr_coverage=shifted_control_region_coverage_j.per_base_coverage,
-            merged_coverage=self.expected_outputs(sequencing_group)['base_level_coverage_metrics'],
+            merged_coverage=outputs['base_level_coverage_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(merge_coverage_j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=[RealignMito, CramQC])
@@ -309,6 +312,9 @@ class GenotypeMito(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+
+        outputs = self.expected_outputs(sequencing_group)
+
         # Mitochondrial specific reference files.
         mito_ref = get_mito_references()
         shifted_mito_ref = get_mito_references(shifted=True)
@@ -410,7 +416,7 @@ class GenotypeMito(SequencingGroupStage):
         get_contamination_j = mito.get_contamination(
             b=get_batch(),
             vcf=split_multiallelics_j.output_vcf,
-            haplocheck_output=self.expected_outputs(sequencing_group)['haplocheck_metrics'],
+            haplocheck_output=outputs['haplocheck_metrics'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(get_contamination_j)
@@ -453,13 +459,13 @@ class GenotypeMito(SequencingGroupStage):
         jobs.append(split_multiallelics_j)
 
         # Write the final vcf to the bucket
-        output_vcf_root = str(self.expected_outputs(sequencing_group)['out_vcf']).replace('.vcf.bgz', '')
+        output_vcf_root = str(outputs['out_vcf']).replace('.vcf.bgz', '')
 
         get_batch().write_output(
             split_multiallelics_j.output_vcf,
             output_vcf_root,
         )
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)
 
 
 @stage(
@@ -488,13 +494,14 @@ class MitoReport(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(sequencing_group)
         mito_ref = get_mito_references()
         jobs = []
 
         vep_j = vep.vep_one(
             get_batch(),
             vcf=inputs.as_path(sequencing_group, GenotypeMito, 'out_vcf'),
-            out_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            out_path=outputs['vep_vcf'],
             out_format='vcf',
             job_attrs=self.get_job_attrs(sequencing_group),
         )
@@ -504,14 +511,14 @@ class MitoReport(SequencingGroupStage):
         mitoreport_j = mito.mitoreport(
             get_batch(),
             sequencing_group=sequencing_group,
-            vcf_path=self.expected_outputs(sequencing_group)['vep_vcf'],
+            vcf_path=outputs['vep_vcf'],
             cram_path=inputs.as_path(sequencing_group, RealignMito, 'non_shifted_cram'),
             mito_ref=mito_ref,
-            output_path=self.expected_outputs(sequencing_group)['mitoreport'],
+            output_path=outputs['mitoreport'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         if mitoreport_j:
             mitoreport_j.depends_on(*jobs)
             jobs.append(mitoreport_j)
 
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
+        return self.make_outputs(sequencing_group, data=outputs, jobs=jobs)

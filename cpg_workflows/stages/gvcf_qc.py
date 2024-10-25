@@ -49,17 +49,18 @@ class GvcfQC(SequencingGroupStage):
         Use function from the jobs module
         """
         gvcf_path = inputs.as_path(sequencing_group, Genotype, 'gvcf')
+        outputs = self.expected_outputs(sequencing_group)
 
         j = vcf_qc(
             b=get_batch(),
             vcf_or_gvcf=GvcfPath(gvcf_path).resource_group(get_batch()),
             is_gvcf=True,
             job_attrs=self.get_job_attrs(sequencing_group),
-            output_summary_path=self.expected_outputs(sequencing_group)['qc_summary'],
-            output_detail_path=self.expected_outputs(sequencing_group)['qc_detail'],
+            output_summary_path=outputs['qc_summary'],
+            output_detail_path=outputs['qc_detail'],
             overwrite=sequencing_group.forced,
         )
-        return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[j])
+        return self.make_outputs(sequencing_group, data=outputs, jobs=[j])
 
 
 @stage(required_stages=Genotype)
@@ -142,11 +143,9 @@ class GvcfMultiQC(DatasetStage):
         if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
-        json_path = self.expected_outputs(dataset)['json']
-        html_path = self.expected_outputs(dataset)['html']
-        checks_path = self.expected_outputs(dataset)['checks']
+        outputs = self.expected_outputs(dataset)
         if base_url := dataset.web_url():
-            html_url = str(html_path).replace(str(dataset.web_prefix()), base_url)
+            html_url = str(outputs['html']).replace(str(dataset.web_prefix()), base_url)
         else:
             html_url = None
 
@@ -190,14 +189,14 @@ class GvcfMultiQC(DatasetStage):
             ending_to_trim=ending_to_trim,
             modules_to_trim_endings=modules_to_trim_endings,
             dataset=dataset,
-            out_json_path=json_path,
-            out_html_path=html_path,
+            out_json_path=outputs['json'],
+            out_html_path=outputs['html'],
             out_html_url=html_url,
-            out_checks_path=checks_path,
+            out_checks_path=outputs['checks'],
             job_attrs=self.get_job_attrs(dataset),
             sequencing_group_id_map=dataset.rich_id_map(),
             extra_config=extra_config,
             send_to_slack=send_to_slack,
             label='GVCF',
         )
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)

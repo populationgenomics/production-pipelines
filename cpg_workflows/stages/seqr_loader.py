@@ -7,19 +7,26 @@ from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_job
 from cpg_workflows.query_modules import seqr_loader
+from cpg_workflows.stages.joint_genotyping import JointGenotyping
+from cpg_workflows.stages.vep import Vep
+from cpg_workflows.stages.vqsr import Vqsr
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
-
-from .joint_genotyping import JointGenotyping
-from .vep import Vep
-from .vqsr import Vqsr
+from cpg_workflows.workflow import (
+    DatasetStage,
+    MultiCohortStage,
+    StageInput,
+    StageOutput,
+    get_multicohort,
+    get_workflow,
+    stage,
+)
 
 
 @stage(required_stages=[JointGenotyping, Vqsr, Vep])
@@ -96,20 +103,20 @@ class AnnotateDataset(DatasetStage):
             get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return None
 
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
+        outputs = self.expected_outputs(dataset)
+
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
             sequencing_group_ids=dataset.get_sequencing_group_ids(),
-            out_mt_path=self.expected_outputs(dataset)['mt'],
+            out_mt_path=outputs['mt'],
             tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
         )
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)
 
 
 @stage(required_stages=[AnnotateDataset], analysis_type='custom', analysis_keys=['vcf'])
@@ -139,17 +146,19 @@ class DatasetVCF(DatasetStage):
         if dataset.name not in eligible_datasets:
             return None
 
+        outputs = self.expected_outputs(dataset)
+
         mt_path = inputs.as_path(target=dataset, stage=AnnotateDataset, key='mt')
 
         job = cohort_to_vcf_job(
             b=get_batch(),
             mt_path=mt_path,
-            out_vcf_path=self.expected_outputs(dataset)['vcf'],
+            out_vcf_path=outputs['vcf'],
             job_attrs=self.get_job_attrs(dataset),
             depends_on=inputs.get_jobs(dataset),
         )
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=job)
+        return self.make_outputs(dataset, data=outputs, jobs=job)
 
 
 def es_password() -> str:

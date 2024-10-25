@@ -38,6 +38,8 @@ class Fraser(CohortStage):
         """
         Queue a job to run FRASER.
         """
+
+        outputs = self.expected_outputs(cohort)
         sequencing_groups = cohort.get_sequencing_groups()
 
         bam_or_cram_inputs: list[tuple[BamPath, None] | tuple[CramPath, Path]] = []
@@ -64,9 +66,9 @@ class Fraser(CohortStage):
         j = fraser.fraser(
             b=get_batch(),
             input_bams_or_crams=bam_or_cram_inputs,
-            output_fds_path=list(self.expected_outputs(cohort).values())[0],
+            output_fds_path=list(outputs.values())[0],
             cohort_name=cohort.name,
             job_attrs=self.get_job_attrs(),
             overwrite=cohort.forced,
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=j)
+        return self.make_outputs(cohort, data=outputs, jobs=j)

@@ -125,12 +125,11 @@ class MakePhenopackets(DatasetStage):
         this actually doesn't run as Jobs, but as a function...
         bit of an anti-pattern in this pipeline?
         """
-
         dataset_families = find_families(dataset)
         expected_out = self.expected_outputs(dataset)
         families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
         make_phenopackets(families_to_process, expected_out)
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[])
+        return self.make_outputs(dataset, data=expected_out, jobs=[])
 
 
 @stage
@@ -234,13 +233,14 @@ class ExomiserSeqrTSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # is there a seqr project?
+        outputs = self.expected_outputs(dataset)
         projects = find_seqr_projects()
         if dataset.name not in projects:
             get_logger(__file__).info(f'No Seqr project found for {dataset.name}, skipping')
-            return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[], skipped=True)
+            return self.make_outputs(dataset, data=outputs, jobs=[], skipped=True)
 
         results = inputs.as_dict(target=dataset, stage=RunExomiser)
 
-        jobs = generate_seqr_summary(results, projects[dataset.name], str(self.expected_outputs(dataset)['tsv']))
+        jobs = generate_seqr_summary(results, projects[dataset.name], str(outputs['tsv']))
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+        return self.make_outputs(dataset, data=outputs, jobs=jobs)
