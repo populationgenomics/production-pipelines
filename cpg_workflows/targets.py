@@ -6,16 +6,15 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from functools import cache
 from typing import Optional
 
 import pandas as pd
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import dataset_path, get_config, reference_path, web_url
-
-from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
-from .metamist import Assay
+from cpg_workflows.filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
+from cpg_workflows.metamist import Assay
+from cpg_workflows.utils import alignment_inputs_hash_mc, cohort_inputs_hash_by_id, dataset_inputs_hash_by_id
 
 
 class Target:
@@ -41,17 +40,12 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
-    @cache
     def alignment_inputs_hash(self) -> str:
         """
         Unique hash string of sample alignment inputs. Useful to decide
         whether the analysis on the target needs to be rerun.
         """
-        s = ' '.join(
-            sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
-        )
-        h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        return f'{h}_{len(self.get_sequencing_group_ids())}'
+        raise NotImplementedError('This method should not be called directly')
 
     @property
     def target_id(self) -> str:
@@ -121,6 +115,13 @@ class MultiCohort(Target):
     def target_id(self) -> str:
         """Unique target ID"""
         return self.name
+
+    def alignment_inputs_hash(self) -> str:
+        """
+        Unique hash string of sample alignment inputs. Useful to decide
+        whether the analysis on the target needs to be rerun.
+        """
+        return alignment_inputs_hash_mc()
 
     def get_cohorts(self, only_active: bool = True) -> list['Cohort']:
         """
@@ -255,6 +256,13 @@ class Cohort(Target):
     def target_id(self) -> str:
         """Unique target ID"""
         return self.name
+
+    def alignment_inputs_hash(self) -> str:
+        """
+        Unique hash string of sample alignment inputs. Useful to decide
+        whether the analysis on the target needs to be rerun.
+        """
+        return cohort_inputs_hash_by_id(self.name)
 
     def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
         """
@@ -405,6 +413,13 @@ class Dataset(Target):
 
     def __str__(self):
         return f'{self.name} ({len(self.get_sequencing_groups())} sequencing groups)'
+
+    def alignment_inputs_hash(self) -> str:
+        """
+        Unique hash string of sample alignment inputs. Useful to decide
+        whether the analysis on the target needs to be rerun.
+        """
+        return dataset_inputs_hash_by_id(self.name)
 
     def _seq_type_subdir(self) -> str:
         """

@@ -2,6 +2,7 @@
 Utility functions and constants.
 """
 
+import hashlib
 import logging
 import re
 import string
@@ -20,8 +21,46 @@ from hailtop.batch import ResourceFile
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
+from cpg_workflows.workflow import get_multicohort
 
 LOGGER: logging.Logger | None = None
+
+
+@lru_cache(1)
+def alignment_inputs_hash_mc() -> str:
+    """
+    Unique hash string of sample alignment inputs. Useful to decide
+    whether the analysis on the target needs to be rerun.
+    """
+    all_sgs = get_multicohort().get_sequencing_groups()
+    s = ' '.join(sorted(' '.join(str(s.alignment_input)) for s in all_sgs if s.alignment_input))
+    return f'{hashlib.sha256(s.encode()).hexdigest()[:38]}_{len(all_sgs)}'
+
+
+@lru_cache
+def cohort_inputs_hash_by_id(cohort_id: str) -> str:
+    """
+    Unique hash string of sample alignment inputs. Useful to decide
+    whether the analysis on the target needs to be rerun.
+    """
+    if (cohort := get_multicohort().get_cohort_by_name(cohort_id)) is None:
+        raise ValueError(f'Cohort {cohort_id} not found')
+    all_sgs = cohort.get_sequencing_groups()
+    s = ' '.join(sorted(' '.join(str(s.alignment_input)) for s in all_sgs if s.alignment_input))
+    return f'{hashlib.sha256(s.encode()).hexdigest()[:38]}_{len(all_sgs)}'
+
+
+@lru_cache
+def dataset_inputs_hash_by_id(dataset_id: str) -> str:
+    """
+    Unique hash string of sample alignment inputs. Useful to decide
+    whether the analysis on the target needs to be rerun.
+    """
+    if (dataset := get_multicohort().get_dataset_by_name(dataset_id)) is None:
+        raise ValueError(f'Dataset {dataset_id} not found')
+    all_sgs = dataset.get_sequencing_groups()
+    s = ' '.join(sorted(' '.join(str(s.alignment_input)) for s in all_sgs if s.alignment_input))
+    return f'{hashlib.sha256(s.encode()).hexdigest()[:38]}_{len(all_sgs)}'
 
 
 def get_logger(logger_name: str | None = None, log_level: int = logging.INFO) -> logging.Logger:
