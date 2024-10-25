@@ -378,7 +378,7 @@ class Stage(Generic[TargetT], ABC):
         # Dependencies. Populated in workflow.run(), after we know all stages.
         self.required_stages: list[Stage] = []
 
-        self.status_reporter = get_workflow().status_reporter
+        self.status_reporter = get_workflow().status_reporter  # type: ignore
         # If `analysis_type` is defined, it will be used to create/update Analysis
         # entries in Metamist.
         self.analysis_type = analysis_type
