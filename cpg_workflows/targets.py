@@ -14,7 +14,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import dataset_path, get_config, reference_path, web_url
 from cpg_workflows.filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from cpg_workflows.metamist import Assay
-from cpg_workflows.utils import alignment_inputs_hash_mc, cohort_inputs_hash_by_id, dataset_inputs_hash_by_id
+from cpg_workflows.workflow import alignment_inputs_hash_mc, cohort_inputs_hash_by_id, dataset_inputs_hash_by_id
 
 
 class Target:
