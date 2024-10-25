@@ -2,11 +2,11 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
-import copy
 import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
+from functools import cache
 from typing import Optional
 
 import pandas as pd
@@ -41,6 +41,7 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
+    @cache
     def alignment_inputs_hash(self) -> str:
         """
         Unique hash string of sample alignment inputs. Useful to decide
