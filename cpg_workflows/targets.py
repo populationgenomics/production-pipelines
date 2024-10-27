@@ -52,7 +52,7 @@ class Target:
             - at this point the targets are malleable (e.g. addition of an additional Cohort may add SGs to Datasets)
         - we then set up the Stages, where alignment input hashes are generated
             - at this point, the alignment inputs are fixed
-            - all calls to alignment_inputs_hash() need to return the same value
+            - all calls to get_alignment_inputs_hash() need to return the same value
         """
         if self.alignment_inputs_hash is None:
             self.set_alignment_inputs_hash()
