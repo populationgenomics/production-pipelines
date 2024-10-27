@@ -28,7 +28,7 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
-        # create a self.alignment_inputs_hash variable to storee the hash of the alignment inputs
+        # create a self.alignment_inputs_hash variable to store the hash of the alignment inputs
         # this begins as None, and is set upon first calling
         self.alignment_inputs_hash: str | None = None
 
@@ -56,8 +56,9 @@ class Target:
         """
         if self.alignment_inputs_hash is None:
             self.set_alignment_inputs_hash()
+        if self.alignment_inputs_hash is None:
+            raise TypeError('Alignment_inputs_hash was not populated by the setter method')
         return self.alignment_inputs_hash
-
 
     def set_alignment_inputs_hash(self):
         """
@@ -69,7 +70,6 @@ class Target:
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
         self.alignment_inputs_hash = f'{h}_{len(self.get_sequencing_group_ids())}'
-
 
     @property
     def target_id(self) -> str:
