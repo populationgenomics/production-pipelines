@@ -2,22 +2,11 @@
 Test workflow status reporter.
 """
 
-from pathlib import Path
-from typing import Any
-
 import pytest
 from pytest_mock import MockFixture
 
 from cpg_utils import to_path
-from cpg_workflows.filetypes import FastqPair
-from cpg_workflows.metamist import (
-    Analysis,
-    AnalysisStatus,
-    AnalysisType,
-    Metamist,
-    MetamistError,
-    parse_reads,
-)
+from cpg_workflows.metamist import Analysis, AnalysisStatus, AnalysisType, Metamist, MetamistError, parse_reads
 from metamist.exceptions import ApiException, ServiceException
 
 from . import set_config

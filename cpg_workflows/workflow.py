@@ -27,16 +27,10 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
-
-from .inputs import get_multicohort
-from .status import MetamistStatusReporter
-from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
-from .utils import (
-    ExpectedResultT,
-    exists,
-    slugify,
-    timestamp,
-)
+from cpg_workflows.inputs import get_multicohort
+from cpg_workflows.status import MetamistStatusReporter
+from cpg_workflows.targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
+from cpg_workflows.utils import ExpectedResultT, exists, slugify, timestamp
 
 StageDecorator = Callable[..., 'Stage']
 

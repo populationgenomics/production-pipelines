@@ -10,22 +10,11 @@ from enum import Enum
 from typing import Any, Callable, Optional
 
 from gql.transport.exceptions import TransportServerError
-from tenacity import (
-    retry,
-    retry_if_exception_type,
-    stop_after_attempt,
-    wait_exponential,
-)
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
-from cpg_workflows.filetypes import (
-    AlignmentInput,
-    BamPath,
-    CramPath,
-    FastqPair,
-    FastqPairs,
-)
+from cpg_workflows.filetypes import AlignmentInput, BamPath, CramPath, FastqPair, FastqPairs
 from cpg_workflows.utils import exists
 from metamist import models
 from metamist.apis import AnalysisApi

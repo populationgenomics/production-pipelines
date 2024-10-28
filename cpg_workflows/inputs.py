@@ -7,9 +7,8 @@ import logging
 from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 from cpg_workflows.metamist import AnalysisType, Assay, MetamistError, get_cohort_sgs, get_metamist, parse_reads
-
-from .targets import Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
-from .utils import exists
+from cpg_workflows.targets import Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
+from cpg_workflows.utils import exists
 
 _multicohort: MultiCohort | None = None
 

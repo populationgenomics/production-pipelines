@@ -7,7 +7,7 @@ import re
 
 from pytest_mock import MockFixture
 
-from cpg_workflows.targets import Cohort, MultiCohort
+from cpg_workflows.targets import MultiCohort
 
 from . import set_config
 

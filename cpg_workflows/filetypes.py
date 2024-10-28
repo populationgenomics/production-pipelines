@@ -9,8 +9,7 @@ from typing import Union
 from hailtop.batch import Batch, ResourceFile, ResourceGroup
 
 from cpg_utils import Path, to_path
-
-from .utils import exists
+from cpg_workflows.utils import exists
 
 
 class AlignmentInput(ABC):

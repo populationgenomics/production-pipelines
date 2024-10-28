@@ -6,15 +6,14 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional, Type
+from typing import Optional
 
 import pandas as pd
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import dataset_path, get_config, reference_path, web_url
-
-from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
-from .metamist import Assay
+from cpg_workflows.filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
+from cpg_workflows.metamist import Assay
 
 
 class Target:
