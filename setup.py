@@ -68,7 +68,6 @@ setup(
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
-            # Generate new intervals from a MatrixTable
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
         ],
     },
