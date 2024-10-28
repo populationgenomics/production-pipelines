@@ -7,13 +7,8 @@ import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config
 from cpg_utils.hail_batch import genome_build
-from cpg_workflows.query_modules.seqr_loader_sv import (
-    download_gencode_gene_id_mapping,
-    get_expr_for_xpos,
-    parse_gtf_from_local,
-)
+from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local
 from cpg_workflows.utils import checkpoint_hail, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
@@ -30,7 +25,7 @@ NON_GENE_PREDICTIONS = {
 }
 
 
-def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
+def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpoint_prefix: str | None = None):
     """
     Translate an annotated gCNV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -40,6 +35,7 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     Args:
         vcf_path (str): Where is the VCF??
         out_mt_path (str): And where do you need output!?
+        gencode_gz (str): The path to a compressed GENCODE GTF file
         checkpoint_prefix (str): CHECKPOINT!@!!
     """
 
@@ -93,8 +89,7 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '46'))
-    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
+    gene_id_mapping = parse_gtf_from_local(gencode_gz)
 
     # find all the column names which contain Gene symbols
     conseq_predicted_gene_cols = [

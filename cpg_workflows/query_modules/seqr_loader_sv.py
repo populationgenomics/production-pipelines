@@ -103,43 +103,6 @@ def get_cpx_interval(x):
     return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
 
 
-def download_gencode_gene_id_mapping(gencode_release: str) -> str:
-    """
-    This is an inefficient stand-in for now. Swap this out with a more permanent
-    location for this file in the resources bucket
-    Not suuuuuuper keen on storing a pickled representation, but a minimised JSON
-    would be a good middle ground. Parsed ~= 62000 {str: str}
-    Args:
-        gencode_release (str | int): Which gencode release do you want?
-    Returns:
-        str - path to localised GTF file
-    """
-
-    # this is the thing
-    local_gtf = 'localfile.gtf.gz'
-
-    # check for presence in config
-    if (config_gtf := get_config().get('gencode_gtf_path')) is not None:
-        # treat as GCP
-        if config_gtf.startswith('gs://'):
-            to_path(config_gtf).copy(local_gtf)
-            gtf_path = local_gtf
-        else:
-            gtf_path = config_gtf
-    else:
-        gtf_path = GENCODE_GTF_URL.format(gencode_release=gencode_release)
-
-    # if it wasn't a local file, download it
-    if gtf_path.startswith(('http://', 'https://')):
-        gz_stream = requests.get(gtf_path, stream=True)
-        with open(local_gtf, 'wb') as f:
-            f.writelines(gz_stream)
-        gz_stream.close()
-
-    # OK - I think that covers all the viable situations for now
-    return local_gtf
-
-
 def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     """
     Read over the localised file and read into a dict
@@ -170,7 +133,7 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
     return hl.literal(gene_id_mapping)
 
 
-def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
+def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpoint_prefix: str | None = None):
     """
     Translate an annotated SV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -180,6 +143,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     Args:
         vcf_path (str): Where is the VCF??
         out_mt_path (str): And where do you need output!?
+        gencode_gz (str): The path to a compressed GENCODE GTF file
         checkpoint_prefix (str): CHECKPOINT!@!!
     """
 
@@ -270,8 +234,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '46'))
-    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
+    gene_id_mapping = parse_gtf_from_local(gencode_gz)
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [

@@ -617,12 +617,15 @@ class AnnotateCohortgCNV(MultiCohortStage):
 
         j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(multicohort))
         j.image(image_path('cpg_workflows'))
+        gencode_gz = config_retrieve(['worfklow', 'gencode_gtf_file'])
+        gencode_gtf_local = get_batch().read_input(str(gencode_gz))
         j.command(
             query_command(
                 seqr_loader_cnv,
                 seqr_loader_cnv.annotate_cohort_gcnv.__name__,
                 str(vcf_path),
                 str(outputs['mt']),
+                str(gencode_gtf_local),
                 str(self.tmp_prefix / 'checkpoints'),
                 setup_gcp=True,
             ),
