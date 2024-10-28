@@ -1,3 +1,4 @@
+# NOTE: Move into the utils of cpg-flow and/or rename
 """
 Extending the Hail's `Batch` class.
 """
