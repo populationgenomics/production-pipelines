@@ -68,32 +68,32 @@ def create_multicohort() -> MultiCohort:
         # first populate these SGs into their Datasets
         # required so that the SG objects can be referenced in the collective Datasets
         # SG.dataset.prefix is meaningful, to correctly store outputs in the project location
-        for sg_dict in cohort_sg_dicts:
-            sg_dataset = sg_dict['sample']['project']['name']
+        for entry in cohort_sg_dicts:
+            sg_dataset = entry['sample']['project']['name']
             dataset = multicohort.create_dataset(sg_dataset)
 
             # scavenge all the metadata from the SG dict (SG/Sample/Participant)
-            metadata = sg_dict.get('meta', {})
-            update_dict(metadata, sg_dict['sample']['participant'].get('meta', {}))
+            metadata = entry.get('meta', {})
+            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
-            update_dict(metadata, {'phenotypes': sg_dict['sample']['participant'].get('phenotypes', {})})
+            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
             # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
-                id=str(sg_dict['id']),
-                external_id=str(sg_dict['sample']['externalId']),
-                participant_id=sg_dict['sample']['participant'].get('externalId'),
+                id=str(entry['id']),
+                external_id=str(entry['sample']['externalId']),
+                participant_id=entry['sample']['participant'].get('externalId'),
                 meta=metadata,
-                sequencing_type=sg_dict['type'],
-                sequencing_technology=sg_dict['technology'],
-                sequencing_platform=sg_dict['platform'],
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
             )
 
-            if reported_sex := sg_dict['sample']['participant'].get('reportedSex'):
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
             # parse the assays and related dict content
-            populate_alignment_inputs(sequencing_group, sg_dict)
+            populate_alignment_inputs(sequencing_group, entry)
 
             # also add the same sequencing group to the cohort
             cohort.add_sequencing_group_object(sequencing_group)
@@ -146,27 +146,27 @@ def deprecated_create_cohort() -> MultiCohort:
         # create the Dataset object
         dataset = multi_cohort.create_dataset(dataset_name)
 
-        for sg_dict in sgs:
-            metadata = sg_dict.get('meta', {})
-            update_dict(metadata, sg_dict['sample']['participant'].get('meta', {}))
+        for entry in sgs:
+            metadata = entry.get('meta', {})
+            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
-            update_dict(metadata, {'phenotypes': sg_dict['sample']['participant'].get('phenotypes', {})})
+            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
 
             # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
-                id=str(sg_dict['id']),
-                external_id=str(sg_dict['sample']['externalId']),
-                participant_id=sg_dict['sample']['participant'].get('externalId'),
-                sequencing_type=sg_dict['type'],
-                sequencing_technology=sg_dict['technology'],
-                sequencing_platform=sg_dict['platform'],
+                id=str(entry['id']),
+                external_id=str(entry['sample']['externalId']),
+                participant_id=entry['sample']['participant'].get('externalId'),
+                sequencing_type=entry['type'],
+                sequencing_technology=entry['technology'],
+                sequencing_platform=entry['platform'],
                 meta=metadata,
             )
 
-            if reported_sex := sg_dict['sample']['participant'].get('reportedSex'):
+            if reported_sex := entry['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            populate_alignment_inputs(sequencing_group, sg_dict)
+            populate_alignment_inputs(sequencing_group, entry)
 
             # add the same SG Object directly to the Cohort as well
             cohort.add_sequencing_group_object(sequencing_group)
