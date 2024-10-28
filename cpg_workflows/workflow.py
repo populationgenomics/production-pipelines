@@ -673,7 +673,6 @@ class Stage(Generic[TargetT], ABC):
                 logging.info(f'{self.name}: {target} [REUSE] (expected outputs exist: {expected_out})')
                 return Action.REUSE
 
-        logging.info(f'{self.name}: {target} [QUEUE]')
         return Action.QUEUE
 
     def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
@@ -688,18 +687,18 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
-            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
+            logging.debug(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
-            logging.info('No expected outputs, assuming outputs exist')
+            logging.debug('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out)
-            logging.info(f'Checking if {paths} from expected output {expected_out} exist')
+            logging.debug(f'Checking if {paths} from expected output {expected_out} exist')
             if not paths:
                 logging.info(f'{expected_out} is not reusable. No paths found.')
                 return False, None
