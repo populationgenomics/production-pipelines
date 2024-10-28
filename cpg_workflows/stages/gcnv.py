@@ -615,8 +615,8 @@ class AnnotateCohortgCNV(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(multicohort))
-        j.image(config_retrieve(['worfklow', 'driver_image']))
-        gencode_gz = config_retrieve(['worfklow', 'gencode_gtf_file'])
+        j.image(config_retrieve(['workflow', 'driver_image']))
+        gencode_gz = config_retrieve(['workflow', 'gencode_gtf_file'])
         gencode_gtf_local = get_batch().read_input(str(gencode_gz))
         j.command(
             'seqr_loader_cnv '

@@ -12,4 +12,4 @@ wget -O gencode.gtf.gz "https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_huma
 
 # don't unzip the file - unzipping inflates from ~50MB to ~1.8GB, and transfer is probably the bottleneck
 # place the file in the place in the CPG bucket
-gsutil cp gencode.gtf "gs://cpg-common-main/references/hg38/v0/gencode_${GENCODE_VERSION}.gtf.gz"
+gcloud storage cp gencode.gtf.gz "gs://cpg-common-main/references/hg38/v0/gencode_${GENCODE_VERSION}.gtf.gz"
