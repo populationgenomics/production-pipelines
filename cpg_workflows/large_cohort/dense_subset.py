@@ -7,10 +7,7 @@ from cpg_utils.config import get_config, reference_path
 from cpg_workflows.utils import can_reuse
 
 
-def run(
-    vds_path: str,
-    out_dense_mt_path: str,
-) -> hl.MatrixTable:
+def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
     """
     Filter a sparse VariantDataset to a set of predetermined QC sites
     and return a dense MatrixTable with split multiallelics.
