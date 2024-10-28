@@ -103,7 +103,7 @@ def annotate_cohort_gcnv(vcf: str, mt_out: str, gencode: str, checkpoint: str, *
         ),
     )
 
-    mt = mt.checkpoint('pre-gene_annotation.mt', overwrite=True)
+    mt = mt.checkpoint(join(checkpoint, 'pre-gene_annotation.mt'))
 
     # this next section is currently failing - the dictionary of genes is too large
     # to be used in an annotation expression. At least... I think it is
@@ -124,7 +124,6 @@ def annotate_cohort_gcnv(vcf: str, mt_out: str, gencode: str, checkpoint: str, *
                 ),
             )
 
-        # # checkpoint this chunk
         mt = mt.checkpoint(join(checkpoint, f'fragment_{i}.mt'))
 
     mt = mt.annotate_rows(
