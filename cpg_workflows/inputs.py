@@ -299,8 +299,8 @@ def populate_pedigree(dataset: Dataset) -> None:
             continue
 
         ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
-        maternal_sg = sg_by_participant_id.get(str(ped_entry['maternal_id']))
-        paternal_sg = sg_by_participant_id.get(str(ped_entry['paternal_id']))
+        maternal_sg = sg_by_participant_id.get(ped_entry['maternal_id'])
+        paternal_sg = sg_by_participant_id.get(ped_entry['paternal_id'])
         sequencing_group.pedigree = PedigreeInfo(
             sequencing_group=sequencing_group,
             fam_id=ped_entry['family_id'],
