@@ -7,7 +7,7 @@ import re
 
 from pytest_mock import MockFixture
 
-from cpg_workflows.inputs import Cohort, MultiCohort
+from cpg_workflows.targets import Cohort, MultiCohort
 
 from . import set_config
 
@@ -335,7 +335,7 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     assert test_sg2.pedigree.sex == Sex.FEMALE
 
     assert test_sg.pedigree.mom is None
-    assert type(test_sg.pedigree.dad) is SequencingGroup
+    assert isinstance(test_sg.pedigree.dad, SequencingGroup)
     assert test_sg.pedigree.dad.participant_id == '14'
 
     # Test _sequencing_group_by_id attribute

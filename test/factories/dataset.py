@@ -1,6 +1,6 @@
 from typing import Sequence
 
-from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
+from cpg_workflows.targets import Dataset, SequencingGroup
 
 from .types import DatasetId
 
@@ -9,7 +9,6 @@ DEFAULT_DATASET_NAME: DatasetId = 'local-test'
 
 def create_dataset(
     name: DatasetId = DEFAULT_DATASET_NAME,
-    cohort: Cohort | None = None,
     sequencing_groups: Sequence[SequencingGroup] | None = None,
     active: bool = True,
     forced: bool = False,
@@ -40,13 +39,11 @@ def create_dataset(
     Returns:
         Dataset
     """
-    dataset = Dataset(name, cohort=cohort)
-    if cohort:
-        cohort.add_dataset(dataset)
+    dataset = Dataset(name)
 
     sequencing_groups = sequencing_groups or []
     for sequencing_group in sequencing_groups:
-        dataset._sequencing_group_by_id[sequencing_group.id] = sequencing_group
+        dataset.add_sequencing_group_object(sequencing_group)
         sequencing_group.dataset = dataset
 
     dataset.active = active

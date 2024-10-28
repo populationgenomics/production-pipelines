@@ -3,7 +3,6 @@ Test reading inputs into a Cohort object.
 """
 
 import logging
-import re
 
 from pytest_mock import MockFixture
 

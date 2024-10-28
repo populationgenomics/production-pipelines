@@ -241,24 +241,6 @@ class Analysis:
         return a
 
 
-def sort_sgs_by_project(response_data) -> dict:
-    """
-    Create dictionary organising sequencing groups by project
-    {project_id: [sequencing_group_1, sequencing_group_2, ...]}
-    """
-    result_dict: dict[str, list[str]] = {}
-
-    for sequencing_group in response_data:
-        project_id = sequencing_group['sample']['project']['name']
-
-        if project_id not in result_dict:
-            result_dict[project_id] = []
-
-        result_dict[project_id].append(sequencing_group)
-
-    return result_dict
-
-
 class Metamist:
     """
     Communication with metamist.
@@ -310,29 +292,6 @@ class Metamist:
         #     # Other exceptions?
 
         return None
-
-    def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
-        """
-        Retrieve the sequencing groups per dataset for a list of cohort IDs.
-        """
-        return {cohort_id: self.get_sgs_by_project_from_cohort(cohort_id) for cohort_id in cohort_ids}
-
-    def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
-        """
-        Retrieve sequencing group entries for a cohort.
-        """
-        entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
-
-        # Create dictionary keying sequencing groups by project
-        # {project_id: [sequencing_group_1, sequencing_group_2, ...], ...}
-
-        if len(entries['cohorts']) != 1:
-            raise MetamistError('We only support one cohort at a time currently')
-        sequencing_groups = entries['cohorts'][0]['sequencingGroups']
-
-        # TODO (mwelland): future optimisation following closure of #860
-        # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
-        return sort_sgs_by_project(sequencing_groups)
 
     @retry(
         stop=stop_after_attempt(3),
@@ -656,6 +615,18 @@ class Assay:
                 check_existence=check_existence,
             )
         return mm_seq
+
+
+def get_cohort_sgs(cohort_id: str) -> list[dict]:
+    """
+    Retrieve sequencing group entries for a single cohort.
+    """
+    entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
+
+    if len(entries['cohorts']) != 1:
+        raise MetamistError('We only support one cohort at a time currently')
+
+    return entries['cohorts'][0]['sequencingGroups']
 
 
 def parse_reads(  # pylint: disable=too-many-return-statements

@@ -6,9 +6,9 @@ import logging
 
 from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
+from cpg_workflows.metamist import AnalysisType, Assay, MetamistError, get_cohort_sgs, get_metamist, parse_reads
 
-from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
-from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
+from .targets import Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
 from .utils import exists
 
 _multicohort: MultiCohort | None = None
@@ -55,74 +55,61 @@ def create_multicohort() -> MultiCohort:
     custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
     multicohort = MultiCohort()
 
-    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids)
-
-    read_pedigree = config.get('read_pedigree', True)
+    # for each Cohort ID
     for cohort_id in custom_cohort_ids:
+        # get the dictionary representation of all SGs in this cohort
+        # dataset_id is sequencing_group_dict['sample']['project']['name']
+        cohort_sg_dicts = get_cohort_sgs(cohort_id)
+        if len(cohort_sg_dicts) == 0:
+            raise MetamistError(f'Cohort {cohort_id} has no sequencing groups')
+
+        # create a new Cohort object
         cohort = multicohort.create_cohort(cohort_id)
-        sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
-        # TODO (mwelland): future optimisation following closure of #860
-        # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
-        # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
-        _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
 
-    # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
-    # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
-    # each of those Dataset objects links to all SequencingGroups in that Dataset, across all Cohorts
-    for cohort in multicohort.get_cohorts():
-        for dataset in cohort.get_datasets():
-            # is this dataset already in the multicohort, if so use it, otherwise add this one
-            mc_dataset = multicohort.add_dataset(dataset)
-            for sg in dataset.get_sequencing_groups():
-                # add each SG object to the MultiCohort level Dataset
-                mc_dataset.add_sequencing_group_object(sg)
+        # first populate these SGs into their Datasets
+        # required so that the SG objects can be referenced in the collective Datasets
+        # SG.dataset.prefix is meaningful, to correctly store outputs in the project location
+        for sg_dict in cohort_sg_dicts:
+            sg_dataset = sg_dict['sample']['project']['name']
+            dataset = multicohort.create_dataset(sg_dataset)
 
-    return multicohort
-
-
-def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
-    """
-    Add datasets in the cohort.
-    TODO (mwelland): future optimisation following closure of #860
-    TODO (mwelland): The Cohort object should not care about the Datasets it contains
-    TODO (mwelland): so we can lose a layer of the structure here
-    """
-    for dataset_name in sgs_by_dataset_for_cohort.keys():
-        dataset = cohort.create_dataset(dataset_name)
-        sgs = sgs_by_dataset_for_cohort[dataset_name]
-
-        for entry in sgs:
-            metadata = entry.get('meta', {})
-            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+            # scavenge all the metadata from the SG dict (SG/Sample/Participant)
+            metadata = sg_dict.get('meta', {})
+            update_dict(metadata, sg_dict['sample']['participant'].get('meta', {}))
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
-            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+            update_dict(metadata, {'phenotypes': sg_dict['sample']['participant'].get('phenotypes', {})})
 
             # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
-                id=str(entry['id']),
-                external_id=str(entry['sample']['externalId']),
-                participant_id=entry['sample']['participant'].get('externalId'),
+                id=str(sg_dict['id']),
+                external_id=str(sg_dict['sample']['externalId']),
+                participant_id=sg_dict['sample']['participant'].get('externalId'),
                 meta=metadata,
-                sequencing_type=entry['type'],
-                sequencing_technology=entry['technology'],
-                sequencing_platform=entry['platform'],
+                sequencing_type=sg_dict['type'],
+                sequencing_technology=sg_dict['technology'],
+                sequencing_platform=sg_dict['platform'],
             )
 
-            if reported_sex := entry['sample']['participant'].get('reportedSex'):
+            if reported_sex := sg_dict['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            _populate_alignment_inputs(sequencing_group, entry)
+            # parse the assays and related dict content
+            populate_alignment_inputs(sequencing_group, sg_dict)
 
-    if not cohort.get_datasets():
-        raise MetamistError('No datasets populated')
+            # also add the same sequencing group to the cohort
+            cohort.add_sequencing_group_object(sequencing_group)
 
-    # TODO (mwelland): future optimisation following closure of #860
-    # TODO (mwelland): this should be done one Dataset at a time, not per Dataset per Cohort
-    # TODO (mwelland): by querying per-dataset per-cohort we increase the number of identical requests
-    _populate_analysis(cohort)
-    if read_pedigree:
-        _populate_pedigree(cohort)
-    assert cohort.get_sequencing_groups()
+    # we've populated all the sequencing groups in the cohorts and datasets
+    # all SequencingGroup objects should be populated uniquely (pointers to instances, so updating Analysis entries
+    # for each SG should update both the Dataset's version and the Cohort's version)
+
+    # only go to metamist once per dataset to get analysis entries
+    for dataset in multicohort.get_datasets():
+        populate_analysis(dataset)
+        if config.get('read_pedigree', True):
+            populate_pedigree(dataset)
+
+    return multicohort
 
 
 def deprecated_create_cohort() -> MultiCohort:
@@ -143,6 +130,7 @@ def deprecated_create_cohort() -> MultiCohort:
         logging.warning('Using dataset will soon be deprecated. Use input_cohorts instead.')
 
     dataset_names = [d for d in dataset_names if d not in skip_datasets]
+    logging.info(f'Found {len(dataset_names)} datasets to process: {", ".join(dataset_names)}')
 
     # create a MultiCohort object to hold the datasets & cohorts
     multi_cohort = MultiCohort()
@@ -153,37 +141,43 @@ def deprecated_create_cohort() -> MultiCohort:
     cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
-        dataset = cohort.create_dataset(dataset_name)
-        mc_dataset = multi_cohort.add_dataset(dataset)
+        # al the sg dictionaries
         sgs = get_metamist().get_sg_entries(dataset_name)
 
-        for entry in sgs:
-            metadata = entry.get('meta', {})
-            update_dict(metadata, entry['sample']['participant'].get('meta', {}))
+        # create the Dataset object
+        dataset = multi_cohort.create_dataset(dataset_name)
+
+        for sg_dict in sgs:
+            metadata = sg_dict.get('meta', {})
+            update_dict(metadata, sg_dict['sample']['participant'].get('meta', {}))
             # phenotypes are managed badly here, need a cleaner way to get them into the SG
-            update_dict(metadata, {'phenotypes': entry['sample']['participant'].get('phenotypes', {})})
+            update_dict(metadata, {'phenotypes': sg_dict['sample']['participant'].get('phenotypes', {})})
 
             # create a SequencingGroup object from its component parts
             sequencing_group = dataset.add_sequencing_group(
-                id=str(entry['id']),
-                external_id=str(entry['sample']['externalId']),
-                participant_id=entry['sample']['participant'].get('externalId'),
-                sequencing_type=entry['type'],
-                sequencing_technology=entry['technology'],
-                sequencing_platform=entry['platform'],
+                id=str(sg_dict['id']),
+                external_id=str(sg_dict['sample']['externalId']),
+                participant_id=sg_dict['sample']['participant'].get('externalId'),
+                sequencing_type=sg_dict['type'],
+                sequencing_technology=sg_dict['technology'],
+                sequencing_platform=sg_dict['platform'],
                 meta=metadata,
             )
 
-            if reported_sex := entry['sample']['participant'].get('reportedSex'):
+            if reported_sex := sg_dict['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            _populate_alignment_inputs(sequencing_group, entry)
+            populate_alignment_inputs(sequencing_group, sg_dict)
 
-            # add the same SG Object directly to the MultiCohort level Dataset
-            # this object exists in both the MC.Cohort and MC.Dataset
-            mc_dataset.add_sequencing_group_object(sequencing_group)
+            # add the same SG Object directly to the Cohort as well
+            cohort.add_sequencing_group_object(sequencing_group)
 
-    if not cohort.get_datasets():
+        # once per dataset (in this loop), get analysis entries
+        populate_analysis(dataset)
+        if config.get('read_pedigree', True):
+            populate_pedigree(dataset)
+
+    if not multi_cohort.get_datasets():
         msg = 'No datasets populated'
         if 'skip_sgs' in config:
             msg += ' (after skipping sequencing groups)'
@@ -191,12 +185,6 @@ def deprecated_create_cohort() -> MultiCohort:
             msg += ' (after picking sequencing groups)'
         raise MetamistError(msg)
 
-    # TODO (mwelland): future optimisation following closure of #860
-    # TODO (mwelland): _populate_analysis should expect a Dataset, not a Cohort
-    # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
-    _populate_analysis(cohort)
-    if config.get('read_pedigree', True):
-        _populate_pedigree(cohort)
     assert multi_cohort.get_sequencing_groups()
     return multi_cohort
 
@@ -215,7 +203,7 @@ def _combine_assay_meta(assays: list[Assay]) -> dict:
     return assays_meta
 
 
-def _populate_alignment_inputs(
+def populate_alignment_inputs(
     sequencing_group: SequencingGroup,
     entry: dict,
     check_existence: bool = False,
@@ -251,88 +239,78 @@ def _populate_alignment_inputs(
     return None
 
 
-def _populate_analysis(cohort: Cohort) -> None:
+def populate_analysis(dataset: Dataset) -> None:
     """
     Populate Analysis entries.
     """
-    for dataset in cohort.get_datasets():
-        gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
-            dataset.get_sequencing_group_ids(),
-            analysis_type=AnalysisType.GVCF,
-            dataset=dataset.name,
-        )
-        cram_by_sgid = get_metamist().get_analyses_by_sgid(
-            dataset.get_sequencing_group_ids(),
-            analysis_type=AnalysisType.CRAM,
-            dataset=dataset.name,
-        )
+    gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
+        dataset.get_sequencing_group_ids(),
+        analysis_type=AnalysisType.GVCF,
+        dataset=dataset.name,
+    )
+    cram_by_sgid = get_metamist().get_analyses_by_sgid(
+        dataset.get_sequencing_group_ids(),
+        analysis_type=AnalysisType.CRAM,
+        dataset=dataset.name,
+    )
 
-        for sequencing_group in dataset.get_sequencing_groups():
-            if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
-                # assert file exists
-                assert exists(analysis.output), (
-                    'gvcf file does not exist',
-                    analysis.output,
-                )
-                sequencing_group.gvcf = GvcfPath(path=analysis.output)
-            elif exists(sequencing_group.make_gvcf_path()):
-                logging.warning(
-                    f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
-                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
-                )
-            if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
-                # assert file exists
-                assert exists(analysis.output), (
-                    'cram file does not exist',
-                    analysis.output,
-                )
-                crai_path = analysis.output.with_suffix('.cram.crai')
-                if not exists(crai_path):
-                    crai_path = None
-                sequencing_group.cram = CramPath(analysis.output, crai_path)
+    for sequencing_group in dataset.get_sequencing_groups():
+        if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
+            # assert file exists
+            assert exists(analysis.output), ('gvcf file does not exist', analysis.output)
+            sequencing_group.gvcf = GvcfPath(path=analysis.output)
+        elif exists(sequencing_group.make_gvcf_path()):
+            logging.warning(
+                f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
+                'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
+            )
+        if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
+            # assert file exists
+            assert exists(analysis.output), ('cram file does not exist', analysis.output)
+            crai_path = analysis.output.with_suffix('.cram.crai')
+            if not exists(crai_path):
+                crai_path = None
+            sequencing_group.cram = CramPath(analysis.output, crai_path)
 
-            elif exists(sequencing_group.make_cram_path()):
-                logging.warning(
-                    f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
-                    'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
-                )
+        elif exists(sequencing_group.make_cram_path()):
+            logging.warning(
+                f'We found a cram file in the expected location {sequencing_group.make_cram_path()},'
+                'but it is not logged in metamist. Skipping. You may want to update the metadata and try again. ',
+            )
 
 
-def _populate_pedigree(cohort: Cohort) -> None:
+def populate_pedigree(dataset: Dataset) -> None:
     """
     Populate pedigree data for sequencing groups.
     """
-    sg_by_participant_id = dict()
-    for sg in cohort.get_sequencing_groups():
-        sg_by_participant_id[sg.participant_id] = sg
 
-    for dataset in cohort.get_datasets():
-        logging.info(f'Reading pedigree for dataset {dataset}')
-        ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
-        ped_entry_by_participant_id = {}
-        for ped_entry in ped_entries:
-            part_id = str(ped_entry['individual_id'])
-            ped_entry_by_participant_id[part_id] = ped_entry
+    logging.info(f'Reading pedigree for dataset {dataset.name}')
+    ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
+    logging.warning(ped_entries)
+    ped_entry_by_participant_id = {}
+    for ped_entry in ped_entries:
+        part_id = str(ped_entry['individual_id'])
+        ped_entry_by_participant_id[part_id] = ped_entry
 
-        sgids_wo_ped = []
-        for sequencing_group in dataset.get_sequencing_groups():
-            if sequencing_group.participant_id not in ped_entry_by_participant_id:
-                sgids_wo_ped.append(sequencing_group.id)
-                continue
+    sgids_wo_ped = []
+    for sequencing_group in dataset.get_sequencing_groups():
+        if sequencing_group.participant_id not in ped_entry_by_participant_id:
+            sgids_wo_ped.append(sequencing_group.id)
+            continue
 
-            ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
-            maternal_sg = sg_by_participant_id.get(str(ped_entry['maternal_id']))
-            paternal_sg = sg_by_participant_id.get(str(ped_entry['paternal_id']))
-            sequencing_group.pedigree = PedigreeInfo(
-                sequencing_group=sequencing_group,
-                fam_id=ped_entry['family_id'],
-                mom=maternal_sg,
-                dad=paternal_sg,
-                sex=Sex.parse(str(ped_entry['sex'])),
-                phenotype=ped_entry['affected'] or '0',
-            )
-        if sgids_wo_ped:
-            logging.warning(
-                f'No pedigree data found for '
-                f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups',
-            )
+        ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
+        maternal_sg = dataset.get_sequencing_group_by_id(str(ped_entry['maternal_id']))
+        paternal_sg = dataset.get_sequencing_group_by_id(str(ped_entry['paternal_id']))
+        sequencing_group.pedigree = PedigreeInfo(
+            sequencing_group=sequencing_group,
+            fam_id=ped_entry['family_id'],
+            mom=maternal_sg,
+            dad=paternal_sg,
+            sex=Sex.parse(str(ped_entry['sex'])),
+            phenotype=ped_entry['affected'] or '0',
+        )
+    if sgids_wo_ped:
+        logging.warning(
+            f'No pedigree data found for '
+            f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups',
+        )

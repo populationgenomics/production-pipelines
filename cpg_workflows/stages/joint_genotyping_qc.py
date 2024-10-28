@@ -84,8 +84,7 @@ class JointVcfHappy(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """Queue jobs"""
-        assert sequencing_group.dataset.cohort
-        vcf_path = inputs.as_path(target=sequencing_group.dataset.cohort, stage=JointGenotyping, key='vcf')
+        vcf_path = inputs.as_path(target=get_multicohort(), stage=JointGenotyping, key='vcf')
 
         jobs = happy(
             b=get_batch(),

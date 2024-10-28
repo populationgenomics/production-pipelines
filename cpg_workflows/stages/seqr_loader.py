@@ -15,7 +15,15 @@ from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.workflow import (
+    DatasetStage,
+    MultiCohortStage,
+    StageInput,
+    StageOutput,
+    get_multicohort,
+    get_workflow,
+    stage,
+)
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -96,9 +104,7 @@ class AnnotateDataset(DatasetStage):
             get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return None
 
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,

@@ -20,6 +20,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -291,9 +292,7 @@ class AnnotateDatasetLRSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSv, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortLRSv, key='mt')
 
         outputs = self.expected_outputs(dataset)
 

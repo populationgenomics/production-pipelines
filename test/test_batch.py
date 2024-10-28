@@ -75,8 +75,7 @@ def mock_create_analysis(_, project, analysis) -> int:
 def mock_deprecated_create_cohort() -> MultiCohort:
     m = MultiCohort()
     c = m.create_cohort('fewgenomes')
-    ds = c.create_dataset('my_dataset')
-    m_ds = m.add_dataset(ds)
+    ds = m.create_dataset('my_dataset')
 
     def add_sg(id, external_id):
         return ds.add_sequencing_group(
@@ -87,10 +86,8 @@ def mock_deprecated_create_cohort() -> MultiCohort:
             sequencing_platform='illumina',
         )
 
-    sg1 = add_sg('CPGAAA', external_id='SAMPLE1')
-    m_ds.add_sequencing_group_object(sg1)
-    sg2 = add_sg('CPGBBB', external_id='SAMPLE2')
-    m_ds.add_sequencing_group_object(sg2)
+    c.add_sequencing_group_object(add_sg('CPGAAA', external_id='SAMPLE1'))
+    c.add_sequencing_group_object(add_sg('CPGBBB', external_id='SAMPLE2'))
     return m
 
 

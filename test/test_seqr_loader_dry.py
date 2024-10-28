@@ -131,8 +131,7 @@ def _mock_cohort():
 
     multi_cohort = MultiCohort()
     cohort = multi_cohort.create_cohort('test-analysis-dataset')
-    ds = cohort.create_dataset('test-analysis-dataset')
-    mc_dataset = multi_cohort.add_dataset(ds)
+    ds = multi_cohort.create_dataset('test-analysis-dataset')
     sg1 = ds.add_sequencing_group(
         'CPGAA',
         external_id='SAMPLE1',
@@ -141,7 +140,7 @@ def _mock_cohort():
         sequencing_platform='illumina',
         alignment_input=BamPath('gs://test-input-dataset-upload/sample1.bam'),
     )
-    mc_dataset.add_sequencing_group_object(sg1)
+    cohort.add_sequencing_group_object(sg1)
     sg2 = ds.add_sequencing_group(
         'CPGBB',
         external_id='SAMPLE2',
@@ -161,7 +160,7 @@ def _mock_cohort():
             ],
         ),
     )
-    mc_dataset.add_sequencing_group_object(sg2)
+    cohort.add_sequencing_group_object(sg2)
 
     return multi_cohort
 

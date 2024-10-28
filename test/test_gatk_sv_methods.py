@@ -48,10 +48,10 @@ def test_check_for_cohort_overlaps(tmp_path):
     set_config(TOML, tmp_path / 'config.toml')
     m = MultiCohort()
     c = m.create_cohort('fewgenomes')
-    ds = c.create_dataset('my_dataset')
+    ds = m.create_dataset('my_dataset')
 
-    add_sg(ds, 'CPGAAA', external_id='SAMPLE1')
-    add_sg(ds, 'CPGBBB', external_id='SAMPLE2')
+    c.add_sequencing_group_object(add_sg(ds, 'CPGAAA', external_id='SAMPLE1'))
+    c.add_sequencing_group_object(add_sg(ds, 'CPGBBB', external_id='SAMPLE2'))
 
     check_for_cohort_overlaps(m)
 
@@ -63,11 +63,15 @@ def test_check_for_cohort_overlaps_fails(tmp_path):
     set_config(TOML, tmp_path / 'config.toml')
     m = MultiCohort()
     c = m.create_cohort('fewgenomes')
-    ds = c.create_dataset('my_dataset')
+    ds = m.create_dataset('my_dataset')
     c2 = m.create_cohort('fewgenomes2')
-    ds2 = c2.create_dataset('my_dataset')
+    ds2 = m.create_dataset('my_dataset')
 
-    add_sg(ds, 'CPGAAA', external_id='SAMPLE1')
+    c.add_sequencing_group_object(add_sg(ds, 'CPGAAA', external_id='SAMPLE1'))
+    c.add_sequencing_group_object(add_sg(ds, 'CPGBBB', external_id='SAMPLE2'))
+
+    # same SG is also added to the other cohort
+    c2.add_sequencing_group_object(add_sg(ds2, 'CPGBBB', external_id='SAMPLE2'))
     add_sg(ds, 'CPGBBB', external_id='SAMPLE2')
     add_sg(ds2, 'CPGBBB', external_id='SAMPLE2')
 

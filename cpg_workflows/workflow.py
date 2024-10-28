@@ -467,15 +467,6 @@ class Stage(Generic[TargetT], ABC):
         Can be a str, a Path object, or a dictionary of str/Path objects.
         """
 
-    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
-        """
-        Queues jobs for each corresponding target, defined by Stage subclass.
-
-        Returns a dictionary of `StageOutput` objects indexed by target unique_id.
-        unused, ready for deletion
-        """
-        return {}
-
     @abstractmethod
     def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """
@@ -1231,54 +1222,6 @@ class SequencingGroupStage(Stage[SequencingGroup], ABC):
         """
         pass
 
-    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
-        """
-        Plug the stage into the workflow.
-        unused, ready for deletion
-        """
-        output_by_target: dict[str, StageOutput | None] = dict()
-
-        if not (datasets := cohort.get_datasets()):
-            logging.warning(
-                f'{len(cohort.get_datasets())}/'
-                f'{len(cohort.get_datasets(only_active=False))} '
-                f'usable (active=True) datasets found in the cohort. Check that '
-                f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`',
-            )
-            return output_by_target
-        if not cohort.get_sequencing_groups():
-            logging.warning(
-                f'{len(cohort.get_sequencing_groups())}/'
-                f'{len(cohort.get_sequencing_groups(only_active=False))} '
-                f'usable (active=True) sequencing groups found. Check logs above for '
-                f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
-                f'via `workflow.skip_sgs` in config, or they all missing stage '
-                f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
-            )
-            return output_by_target
-
-        for dataset in datasets:
-            if not dataset.get_sequencing_groups():
-                logging.warning(
-                    f'{dataset}: '
-                    f'{len(dataset.get_sequencing_groups())}/'
-                    f'{len(dataset.get_sequencing_groups(only_active=False))} '
-                    f'usable (active=True) sequencing groups found. Check logs above for '
-                    f'possible reasons sequencing groups were skipped (e.g. all sequencing groups ignored '
-                    f'via `workflow.skip_sgs` in config, or they all missing stage '
-                    f'inputs and `workflow.skip_sgs_with_missing_input=true` is set)',
-                )
-                continue
-
-            logging.info(f'Dataset {dataset}:')
-            # evaluate_stuff en masse
-            for sequencing_group in dataset.get_sequencing_groups():
-                action = self._get_action(sequencing_group)
-                output_by_target[sequencing_group.target_id] = self._queue_jobs_with_checks(sequencing_group, action)
-
-        return output_by_target
-
     def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """
         Plug the stage into the workflow.
@@ -1317,27 +1260,6 @@ class DatasetStage(Stage, ABC):
         """
         pass
 
-    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
-        """
-        Plug the stage into the workflow.
-        unused, ready for deletion
-        """
-        output_by_target: dict[str, StageOutput | None] = dict()
-        if not (datasets := cohort.get_datasets()):
-            logging.warning(
-                f'{len(cohort.get_datasets())}/'
-                f'{len(cohort.get_datasets(only_active=False))} '
-                f'usable (active=True) datasets found in the cohort. Check that '
-                f'`workflow.input_datasets` or `workflow.input_cohorts` is provided, and not all datasets are skipped '
-                f'via workflow.skip_datasets`',
-            )
-            return output_by_target
-        for dataset_i, dataset in enumerate(datasets):
-            action = self._get_action(dataset)
-            logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
-            output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
-        return output_by_target
-
     def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """
         Plug the stage into the workflow.
@@ -1368,13 +1290,6 @@ class CohortStage(Stage, ABC):
         Override to add Hail Batch jobs.
         """
         pass
-
-    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
-        """
-        Plug the stage into the workflow.
-        unused, ready for deletion
-        """
-        return {cohort.target_id: self._queue_jobs_with_checks(cohort)}
 
     def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """

@@ -108,8 +108,7 @@ def create_config(
 def _mock_cohort(dataset_id: str):
     mc = MultiCohort()
     cohort = mc.create_cohort('large-cohort-test')
-    dataset = cohort.create_dataset(dataset_id)
-    mc_dataset = mc.add_dataset(dataset)
+    dataset = mc.create_dataset(dataset_id)
     gvcf_root = to_path(__file__).parent / 'data' / 'large_cohort' / 'gvcf'
     found_gvcf_paths = list(gvcf_root.glob('*.g.vcf.gz'))
     assert len(found_gvcf_paths) > 0, gvcf_root
@@ -123,7 +122,7 @@ def _mock_cohort(dataset_id: str):
             sequencing_platform='illumina',
         )
         sequencing_group.gvcf = GvcfPath(gvcf_path)
-        mc_dataset.add_sequencing_group_object(sequencing_group)
+        cohort.add_sequencing_group_object(sequencing_group)
     return mc
 
 

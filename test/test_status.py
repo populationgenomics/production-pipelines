@@ -66,8 +66,7 @@ def _common(mocker, tmp_path):
     def mock_create_cohort() -> MultiCohort:
         m = MultiCohort()
         c = m.create_cohort('fewgenomes')
-        ds = c.create_dataset('my_dataset')
-        m_ds = m.add_dataset(ds)
+        ds = m.create_dataset('my_dataset')
 
         def add_sg(id, external_id):
             return ds.add_sequencing_group(
@@ -78,10 +77,8 @@ def _common(mocker, tmp_path):
                 sequencing_platform='illumina',
             )
 
-        sg1 = add_sg('CPGAA', external_id='SAMPLE1')
-        sg2 = add_sg('CPGBB', external_id='SAMPLE2')
-        m_ds.add_sequencing_group_object(sg1)
-        m_ds.add_sequencing_group_object(sg2)
+        c.add_sequencing_group_object(add_sg('CPGAA', external_id='SAMPLE1'))
+        c.add_sequencing_group_object(add_sg('CPGBB', external_id='SAMPLE2'))
         return m
 
     mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_create_cohort)
