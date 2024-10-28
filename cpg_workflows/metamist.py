@@ -1,3 +1,4 @@
+# region KEEP
 """
 Helpers to communicate with the metamist database.
 """
@@ -382,6 +383,7 @@ class Metamist:
         # However this should only be set after the API call is successful
         analysis.status = status
 
+    # region NOT KEEP
     # NOTE: This isn't used anywhere.
     def find_joint_calling_analysis(
         self,
@@ -411,6 +413,10 @@ class Metamist:
             return None
         return a
 
+    # endregion NOT KEEP
+
+    # region MODIFY
+    # NOTE: remove unused variables and fix based on actual usage
     def get_analyses_by_sgid(
         self,
         sg_ids: list[str],
@@ -456,6 +462,8 @@ class Metamist:
         )
         return analysis_per_sid
 
+    # endregion MODIFY
+
     def create_analysis(
         self,
         output: Path | str,
@@ -499,7 +507,8 @@ class Metamist:
             )
             return aid
 
-    # NOTE: I don't think this function is used anywhere ~ vivbak 12/06/2023
+    # region NOT KEEP
+    # rationale: I don't think this function is used anywhere ~ vivbak 12/06/2023
     def process_existing_analysis(
         self,
         sequencing_group_ids: list[str],
@@ -586,6 +595,10 @@ class Metamist:
                 f'Expected output file {expected_output_fpath} does not exist, so queueing analysis {label}',
             )
             return None
+
+    # endregion NOT KEEP
+
+    # region KEEP
 
     def get_ped_entries(self, dataset: str | None = None) -> list[dict[str, str]]:
         """
@@ -751,3 +764,6 @@ def parse_reads(  # pylint: disable=too-many-return-statements
             )
 
         return fastq_pairs
+
+
+# endregion KEEP
