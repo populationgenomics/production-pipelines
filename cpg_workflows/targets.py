@@ -6,7 +6,7 @@ import hashlib
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Optional, Type
 
 import pandas as pd
 
@@ -110,6 +110,459 @@ class Target:
         Map if internal IDs to participant or external IDs, if the latter is provided.
         """
         return {s.id: s.rich_id for s in self.get_sequencing_groups() if s.participant_id != s.id}
+
+
+class MultiCohort(Target):
+    """
+    Represents a "multi-cohort" target - multiple cohorts in the workflow.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+
+        # NOTE: For a cohort, we simply pull the dataset name from the config.
+        input_cohorts = get_config()['workflow'].get('input_cohorts', [])
+        if input_cohorts:
+            self.name = '_'.join(sorted(input_cohorts))
+        else:
+            self.name = get_config()['workflow']['dataset']
+
+        assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
+
+        self._cohorts_by_name: dict[str, Cohort] = {}
+        self._datasets_by_name: dict[str, Dataset] = {}
+        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
+
+    def __repr__(self):
+        return f'MultiCohort({len(self.get_cohorts())} cohorts)'
+
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return self.name
+
+    def create_dataset(self, name: str) -> 'Dataset':
+        """
+        Create a dataset and add it to the cohort.
+        """
+        if name in self._datasets_by_name:
+            logging.debug(f'Dataset {name} already exists in the MultiCohort')
+            return self._datasets_by_name[name]
+
+        if name == self.analysis_dataset.name:
+            ds = self.analysis_dataset
+        else:
+            ds = Dataset(name=name)
+
+        self._datasets_by_name[ds.name] = ds
+        return ds
+
+    def get_cohorts(self, only_active: bool = True) -> list['Cohort']:
+        """
+        Gets list of all cohorts.
+        Include only "active" cohorts (unless only_active is False)
+        """
+        cohorts = list(self._cohorts_by_name.values())
+        if only_active:
+            cohorts = [c for c in cohorts if c.active]
+        return cohorts
+
+    def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
+        """
+        Get cohort by name.
+        Include only "active" cohorts (unless only_active is False)
+        """
+        cohort = self._cohorts_by_name.get(name)
+        if not cohort:
+            logging.warning(f'Cohort {name} not found in the multi-cohort')
+            return None
+        if cohort.active or (not only_active):  # Return cohort if it's active, or we don't care
+            return cohort
+        return None
+
+    def get_datasets(self, only_active: bool = True) -> list['Dataset']:
+        """
+        Gets list of all datasets.
+        Include only "active" datasets (unless only_active is False)
+        """
+        all_datasets = list(self._datasets_by_name.values())
+        if only_active:
+            all_datasets = [d for d in all_datasets if d.active and d.get_sequencing_groups()]
+        return all_datasets
+
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
+        """
+        Gets a flat list of all sequencing groups from all datasets.
+        uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
+        Include only "active" sequencing groups (unless only_active is False)
+        TODO store a top-level dictionary of all SGs, indexed by ID, instead of delegating to the Datasets
+        """
+        all_sequencing_groups: dict[str, SequencingGroup] = {}
+        for dataset in self.get_datasets(only_active):
+            for sg in dataset.get_sequencing_groups(only_active):
+                all_sequencing_groups[sg.id] = sg
+        return list(all_sequencing_groups.values())
+
+    def create_cohort(self, name: str):
+        """
+        Create a cohort and add it to the multi-cohort.
+        """
+        if name in self._cohorts_by_name:
+            logging.debug(f'Cohort {name} already exists in the multi-cohort')
+            return self._cohorts_by_name[name]
+
+        c = Cohort(name=name)
+        self._cohorts_by_name[c.name] = c
+        return c
+
+    def add_dataset(self, d: 'Dataset') -> 'Dataset':
+        """
+        Add a Dataset to the MultiCohort
+        Args:
+            d: Dataset object
+        """
+        if d.name in self._datasets_by_name:
+            logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
+        else:
+            # We need create a new dataset to avoid manipulating the cohort dataset at this point
+            self._datasets_by_name[d.name] = Dataset(d.name)
+        return self._datasets_by_name[d.name]
+
+    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
+        """
+        Get dataset by name.
+        Include only "active" datasets (unless only_active is False)
+        """
+        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
+        return ds_by_name.get(name)
+
+    def get_job_attrs(self) -> dict:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
+            'datasets': [d.name for d in self.get_datasets()],
+            'cohorts': [c.name for c in self.get_cohorts()],
+        }
+
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
+        """
+        Create a PED file for all samples in the whole MultiCohort
+        Duplication of the Cohort method
+        PED is written with no header line to be strict specification compliant
+        """
+        datas = []
+        for sequencing_group in self.get_sequencing_groups():
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
+        if not datas:
+            raise ValueError(f'No pedigree data found for {self.name}')
+        df = pd.DataFrame(datas)
+
+        if out_path is None:
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+
+        if not get_config()['workflow'].get('dry_run', False):
+            with out_path.open('w') as fp:
+                df.to_csv(fp, sep='\t', index=False, header=False)
+        return out_path
+
+
+class Cohort(Target):
+    """
+    Represents a "cohort" target - all sequencing groups from a single CustomCohort
+    (potentially spanning multiple datasets) in the workflow.
+    Analysis dataset name is required and will be used as the default name for the cohort.
+    """
+
+    def __init__(self, name: str | None = None) -> None:
+        super().__init__()
+        self.name = name or get_config()['workflow']['dataset']
+        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
+        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
+
+    def __repr__(self):
+        return f'Cohort("{self.name}", {len(self._sequencing_group_by_id)} SGs)'
+
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return self.name
+
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
+        """
+        Create a PED file for all samples in the whole cohort
+        PED is written with no header line to be strict specification compliant
+        """
+        datas = []
+        for sequencing_group in self.get_sequencing_groups():
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
+        if not datas:
+            raise ValueError(f'No pedigree data found for {self.name}')
+        df = pd.DataFrame(datas)
+
+        if out_path is None:
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+
+        if not get_config()['workflow'].get('dry_run', False):
+            with out_path.open('w') as fp:
+                df.to_csv(fp, sep='\t', index=False, header=False)
+        return out_path
+
+    def add_sequencing_group_object(self, s: 'SequencingGroup', allow_duplicates: bool = True):
+        """
+        Add a sequencing group object to the Cohort.
+        Args:
+            s: SequencingGroup object
+            allow_duplicates: if True, allow adding the same object twice
+        """
+        if s.id in self._sequencing_group_by_id:
+            if allow_duplicates:
+                logging.debug(f'SequencingGroup {s.id} already exists in the Cohort {self.name}')
+                return self._sequencing_group_by_id[s.id]
+            else:
+                raise ValueError(f'SequencingGroup {s.id} already exists in the Cohort {self.name}')
+        self._sequencing_group_by_id[s.id] = s
+
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
+        """
+        Gets a flat list of all sequencing groups from all datasets.
+        Include only "active" sequencing groups (unless only_active is False)
+        """
+        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
+
+    def get_job_attrs(self) -> dict:
+        """
+        TBD what this should be -
+        - we don't want to return the SGs, there's a cap on length of Value there
+        - Cohorts don't have datasets, so we can't return them
+        """
+        return {}
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return ''
+
+    def to_tsv(self) -> str:
+        """
+        Export to a parsable TSV file
+        """
+        assert self.get_sequencing_groups()
+        tsv_path = self.analysis_dataset.tmp_prefix() / 'samples.tsv'
+        df = pd.DataFrame(
+            {
+                's': s.id,
+                'gvcf': s.gvcf or '-',
+                'sex': s.meta.get('sex') or '-',
+                'continental_pop': s.meta.get('continental_pop') or '-',
+                'subcontinental_pop': s.meta.get('subcontinental_pop') or '-',
+            }
+            for s in self.get_sequencing_groups()
+        ).set_index('s', drop=False)
+        with to_path(tsv_path).open('w') as f:
+            df.to_csv(f, index=False, sep='\t', na_rep='NA')
+        return tsv_path
+
+
+class Dataset(Target):
+    """
+    Represents a CPG dataset.
+
+    Each `dataset` at the CPG corresponds to
+    * a GCP project: https://github.com/populationgenomics/team-docs/tree/main/storage_policies
+    * a Pulumi stack: https://github.com/populationgenomics/analysis-runner/tree/main/stack
+    * a metamist project
+    """
+
+    def __init__(self, name: str):
+        super().__init__()
+        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
+        self.name = name
+        self.active = True
+
+    @staticmethod
+    def create(name: str) -> 'Dataset':
+        """
+        Create a dataset.
+        """
+        return Dataset(name=name)
+
+    @property
+    def target_id(self) -> str:
+        """Unique target ID"""
+        return self.name
+
+    def __repr__(self):
+        return f'Dataset("{self.name}", {len(self.get_sequencing_groups())} sequencing groups)'
+
+    def __str__(self):
+        return f'{self.name} ({len(self.get_sequencing_groups())} sequencing groups)'
+
+    def prefix(self, **kwargs) -> Path:
+        """
+        The primary storage path.
+        """
+        return to_path(
+            dataset_path(
+                seq_type_subdir(),
+                dataset=self.name,
+                **kwargs,
+            ),
+        )
+
+    def tmp_prefix(self, **kwargs) -> Path:
+        """
+        Storage path for temporary files.
+        """
+        return to_path(
+            dataset_path(
+                seq_type_subdir(),
+                dataset=self.name,
+                category='tmp',
+                **kwargs,
+            ),
+        )
+
+    def analysis_prefix(self, **kwargs) -> Path:
+        """
+        Storage path for analysis files.
+        """
+        return to_path(
+            dataset_path(
+                seq_type_subdir(),
+                dataset=self.name,
+                category='analysis',
+                **kwargs,
+            ),
+        )
+
+    def web_prefix(self, **kwargs) -> Path:
+        """
+        Path for files served by an HTTP server Matches corresponding URLs returns by
+        self.web_url() URLs.
+        """
+        return to_path(
+            dataset_path(
+                seq_type_subdir(),
+                dataset=self.name,
+                category='web',
+                **kwargs,
+            ),
+        )
+
+    def web_url(self) -> str | None:
+        """
+        URLs matching self.storage_web_path() files serverd by an HTTP server.
+        """
+        return web_url(
+            seq_type_subdir(),
+            dataset=self.name,
+        )
+
+    def add_sequencing_group(
+        self,
+        id: str,  # pylint: disable=redefined-builtin
+        *,
+        sequencing_type: str,
+        sequencing_technology: str,
+        sequencing_platform: str,
+        external_id: str | None = None,
+        participant_id: str | None = None,
+        meta: dict | None = None,
+        sex: Optional['Sex'] = None,
+        pedigree: Optional['PedigreeInfo'] = None,
+        alignment_input: AlignmentInput | None = None,
+    ) -> 'SequencingGroup':
+        """
+        Create a new sequencing group and add it to the dataset.
+        """
+        if id in self._sequencing_group_by_id:
+            logging.debug(f'SequencingGroup {id} already exists in the dataset {self.name}')
+            return self._sequencing_group_by_id[id]
+
+        force_sgs = get_config()['workflow'].get('force_sgs', set())
+        forced = id in force_sgs or external_id in force_sgs or participant_id in force_sgs
+
+        s = SequencingGroup(
+            id=id,
+            dataset=self,
+            external_id=external_id,
+            sequencing_type=sequencing_type,
+            sequencing_technology=sequencing_technology,
+            sequencing_platform=sequencing_platform,
+            participant_id=participant_id,
+            meta=meta,
+            sex=sex,
+            pedigree=pedigree,
+            alignment_input=alignment_input,
+            forced=forced,
+        )
+        self._sequencing_group_by_id[id] = s
+        return s
+
+    def add_sequencing_group_object(self, s: 'SequencingGroup', allow_duplicates: bool = True):
+        """
+        Add a sequencing group object to the dataset.
+        Args:
+            s: SequencingGroup object
+            allow_duplicates: if True, allow adding the same object twice
+        """
+        if s.id in self._sequencing_group_by_id:
+            if allow_duplicates:
+                logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
+                return self._sequencing_group_by_id[s.id]
+            else:
+                raise ValueError(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
+        self._sequencing_group_by_id[s.id] = s
+
+    def get_sequencing_group_by_id(self, id: str) -> Optional['SequencingGroup']:
+        """
+        Get sequencing group by ID
+        """
+        return self._sequencing_group_by_id.get(id)
+
+    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
+        """
+        Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
+        """
+        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
+
+    def get_job_attrs(self) -> dict:
+        """
+        Attributes for Hail Batch job.
+        """
+        return {
+            'dataset': self.name,
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
+        }
+
+    def get_job_prefix(self) -> str:
+        """
+        Prefix job names.
+        """
+        return f'{self.name}: '
+
+    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
+        """
+        Create a PED file for all sequencing groups
+        PED is written with no header line to be strict specification compliant
+        """
+        datas = []
+        for sequencing_group in self.get_sequencing_groups():
+            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
+        if not datas:
+            raise ValueError(f'No pedigree data found for {self.name}')
+        df = pd.DataFrame(datas)
+
+        if out_path is None:
+            out_path = self.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+
+        if not get_config()['workflow'].get('dry_run', False):
+            with out_path.open('w') as fp:
+                df.to_csv(fp, sep='\t', index=False, header=False)
+        return out_path
 
 
 class Sex(Enum):
@@ -358,456 +811,3 @@ def seq_type_subdir() -> str:
     """
     seq_type = get_config()['workflow'].get('sequencing_type')
     return '' if not seq_type or seq_type == 'genome' else seq_type
-
-
-class Dataset(Target):
-    """
-    Represents a CPG dataset.
-
-    Each `dataset` at the CPG corresponds to
-    * a GCP project: https://github.com/populationgenomics/team-docs/tree/main/storage_policies
-    * a Pulumi stack: https://github.com/populationgenomics/analysis-runner/tree/main/stack
-    * a metamist project
-    """
-
-    def __init__(self, name: str):
-        super().__init__()
-        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
-        self.name = name
-        self.active = True
-
-    @staticmethod
-    def create(name: str) -> 'Dataset':
-        """
-        Create a dataset.
-        """
-        return Dataset(name=name)
-
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return self.name
-
-    def __repr__(self):
-        return f'Dataset("{self.name}", {len(self.get_sequencing_groups())} sequencing groups)'
-
-    def __str__(self):
-        return f'{self.name} ({len(self.get_sequencing_groups())} sequencing groups)'
-
-    def prefix(self, **kwargs) -> Path:
-        """
-        The primary storage path.
-        """
-        return to_path(
-            dataset_path(
-                seq_type_subdir(),
-                dataset=self.name,
-                **kwargs,
-            ),
-        )
-
-    def tmp_prefix(self, **kwargs) -> Path:
-        """
-        Storage path for temporary files.
-        """
-        return to_path(
-            dataset_path(
-                seq_type_subdir(),
-                dataset=self.name,
-                category='tmp',
-                **kwargs,
-            ),
-        )
-
-    def analysis_prefix(self, **kwargs) -> Path:
-        """
-        Storage path for analysis files.
-        """
-        return to_path(
-            dataset_path(
-                seq_type_subdir(),
-                dataset=self.name,
-                category='analysis',
-                **kwargs,
-            ),
-        )
-
-    def web_prefix(self, **kwargs) -> Path:
-        """
-        Path for files served by an HTTP server Matches corresponding URLs returns by
-        self.web_url() URLs.
-        """
-        return to_path(
-            dataset_path(
-                seq_type_subdir(),
-                dataset=self.name,
-                category='web',
-                **kwargs,
-            ),
-        )
-
-    def web_url(self) -> str | None:
-        """
-        URLs matching self.storage_web_path() files serverd by an HTTP server.
-        """
-        return web_url(
-            seq_type_subdir(),
-            dataset=self.name,
-        )
-
-    def add_sequencing_group(
-        self,
-        id: str,  # pylint: disable=redefined-builtin
-        *,
-        sequencing_type: str,
-        sequencing_technology: str,
-        sequencing_platform: str,
-        external_id: str | None = None,
-        participant_id: str | None = None,
-        meta: dict | None = None,
-        sex: Optional['Sex'] = None,
-        pedigree: Optional['PedigreeInfo'] = None,
-        alignment_input: AlignmentInput | None = None,
-    ) -> 'SequencingGroup':
-        """
-        Create a new sequencing group and add it to the dataset.
-        """
-        if id in self._sequencing_group_by_id:
-            logging.debug(f'SequencingGroup {id} already exists in the dataset {self.name}')
-            return self._sequencing_group_by_id[id]
-
-        force_sgs = get_config()['workflow'].get('force_sgs', set())
-        forced = id in force_sgs or external_id in force_sgs or participant_id in force_sgs
-
-        s = SequencingGroup(
-            id=id,
-            dataset=self,
-            external_id=external_id,
-            sequencing_type=sequencing_type,
-            sequencing_technology=sequencing_technology,
-            sequencing_platform=sequencing_platform,
-            participant_id=participant_id,
-            meta=meta,
-            sex=sex,
-            pedigree=pedigree,
-            alignment_input=alignment_input,
-            forced=forced,
-        )
-        self._sequencing_group_by_id[id] = s
-        return s
-
-    def add_sequencing_group_object(self, s: 'SequencingGroup', allow_duplicates: bool = True):
-        """
-        Add a sequencing group object to the dataset.
-        Args:
-            s: SequencingGroup object
-            allow_duplicates: if True, allow adding the same object twice
-        """
-        if s.id in self._sequencing_group_by_id:
-            if allow_duplicates:
-                logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
-                return self._sequencing_group_by_id[s.id]
-            else:
-                raise ValueError(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
-        self._sequencing_group_by_id[s.id] = s
-
-    def get_sequencing_group_by_id(self, id: str) -> SequencingGroup | None:
-        """
-        Get sequencing group by ID
-        """
-        return self._sequencing_group_by_id.get(id)
-
-    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
-        """
-        Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
-        """
-        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
-
-    def get_job_attrs(self) -> dict:
-        """
-        Attributes for Hail Batch job.
-        """
-        return {
-            'dataset': self.name,
-            # 'sequencing_groups': self.get_sequencing_group_ids(),
-        }
-
-    def get_job_prefix(self) -> str:
-        """
-        Prefix job names.
-        """
-        return f'{self.name}: '
-
-    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
-        """
-        Create a PED file for all sequencing groups
-        PED is written with no header line to be strict specification compliant
-        """
-        datas = []
-        for sequencing_group in self.get_sequencing_groups():
-            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
-        if not datas:
-            raise ValueError(f'No pedigree data found for {self.name}')
-        df = pd.DataFrame(datas)
-
-        if out_path is None:
-            out_path = self.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
-
-        if not get_config()['workflow'].get('dry_run', False):
-            with out_path.open('w') as fp:
-                df.to_csv(fp, sep='\t', index=False, header=False)
-        return out_path
-
-
-class Cohort(Target):
-    """
-    Represents a "cohort" target - all sequencing groups from a single CustomCohort
-    (potentially spanning multiple datasets) in the workflow.
-    Analysis dataset name is required and will be used as the default name for the cohort.
-    """
-
-    def __init__(self, name: str | None = None) -> None:
-        super().__init__()
-        self.name = name or get_config()['workflow']['dataset']
-        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
-        self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
-
-    def __repr__(self):
-        return f'Cohort("{self.name}", {len(self._sequencing_group_by_id)} SGs)'
-
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return self.name
-
-    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
-        """
-        Create a PED file for all samples in the whole cohort
-        PED is written with no header line to be strict specification compliant
-        """
-        datas = []
-        for sequencing_group in self.get_sequencing_groups():
-            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
-        if not datas:
-            raise ValueError(f'No pedigree data found for {self.name}')
-        df = pd.DataFrame(datas)
-
-        if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
-
-        if not get_config()['workflow'].get('dry_run', False):
-            with out_path.open('w') as fp:
-                df.to_csv(fp, sep='\t', index=False, header=False)
-        return out_path
-
-    def add_sequencing_group_object(self, s: 'SequencingGroup', allow_duplicates: bool = True):
-        """
-        Add a sequencing group object to the Cohort.
-        Args:
-            s: SequencingGroup object
-            allow_duplicates: if True, allow adding the same object twice
-        """
-        if s.id in self._sequencing_group_by_id:
-            if allow_duplicates:
-                logging.debug(f'SequencingGroup {s.id} already exists in the Cohort {self.name}')
-                return self._sequencing_group_by_id[s.id]
-            else:
-                raise ValueError(f'SequencingGroup {s.id} already exists in the Cohort {self.name}')
-        self._sequencing_group_by_id[s.id] = s
-
-    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
-        """
-        Gets a flat list of all sequencing groups from all datasets.
-        Include only "active" sequencing groups (unless only_active is False)
-        """
-        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
-
-    def get_job_attrs(self) -> dict:
-        """
-        TBD what this should be -
-        - we don't want to return the SGs, there's a cap on length of Value there
-        - Cohorts don't have datasets, so we can't return them
-        """
-        return {}
-
-    def get_job_prefix(self) -> str:
-        """
-        Prefix job names.
-        """
-        return ''
-
-    def to_tsv(self) -> str:
-        """
-        Export to a parsable TSV file
-        """
-        assert self.get_sequencing_groups()
-        tsv_path = self.analysis_dataset.tmp_prefix() / 'samples.tsv'
-        df = pd.DataFrame(
-            {
-                's': s.id,
-                'gvcf': s.gvcf or '-',
-                'sex': s.meta.get('sex') or '-',
-                'continental_pop': s.meta.get('continental_pop') or '-',
-                'subcontinental_pop': s.meta.get('subcontinental_pop') or '-',
-            }
-            for s in self.get_sequencing_groups()
-        ).set_index('s', drop=False)
-        with to_path(tsv_path).open('w') as f:
-            df.to_csv(f, index=False, sep='\t', na_rep='NA')
-        return tsv_path
-
-
-class MultiCohort(Target):
-    """
-    Represents a "multi-cohort" target - multiple cohorts in the workflow.
-    """
-
-    def __init__(self) -> None:
-        super().__init__()
-
-        # NOTE: For a cohort, we simply pull the dataset name from the config.
-        input_cohorts = get_config()['workflow'].get('input_cohorts', [])
-        if input_cohorts:
-            self.name = '_'.join(sorted(input_cohorts))
-        else:
-            self.name = get_config()['workflow']['dataset']
-
-        assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
-
-        self._cohorts_by_name: dict[str, Cohort] = {}
-        self._datasets_by_name: dict[str, Dataset] = {}
-        self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
-
-    def __repr__(self):
-        return f'MultiCohort({len(self.get_cohorts())} cohorts)'
-
-    @property
-    def target_id(self) -> str:
-        """Unique target ID"""
-        return self.name
-
-    def create_dataset(self, name: str) -> 'Dataset':
-        """
-        Create a dataset and add it to the cohort.
-        """
-        if name in self._datasets_by_name:
-            logging.debug(f'Dataset {name} already exists in the MultiCohort')
-            return self._datasets_by_name[name]
-
-        if name == self.analysis_dataset.name:
-            ds = self.analysis_dataset
-        else:
-            ds = Dataset(name=name)
-
-        self._datasets_by_name[ds.name] = ds
-        return ds
-
-    def get_cohorts(self, only_active: bool = True) -> list['Cohort']:
-        """
-        Gets list of all cohorts.
-        Include only "active" cohorts (unless only_active is False)
-        """
-        cohorts = list(self._cohorts_by_name.values())
-        if only_active:
-            cohorts = [c for c in cohorts if c.active]
-        return cohorts
-
-    def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
-        """
-        Get cohort by name.
-        Include only "active" cohorts (unless only_active is False)
-        """
-        cohort = self._cohorts_by_name.get(name)
-        if not cohort:
-            logging.warning(f'Cohort {name} not found in the multi-cohort')
-            return None
-        if cohort.active or (not only_active):  # Return cohort if it's active, or we don't care
-            return cohort
-        return None
-
-    def get_datasets(self, only_active: bool = True) -> list['Dataset']:
-        """
-        Gets list of all datasets.
-        Include only "active" datasets (unless only_active is False)
-        """
-        all_datasets = list(self._datasets_by_name.values())
-        if only_active:
-            all_datasets = [d for d in all_datasets if d.active and d.get_sequencing_groups()]
-        return all_datasets
-
-    def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
-        """
-        Gets a flat list of all sequencing groups from all datasets.
-        uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
-        Include only "active" sequencing groups (unless only_active is False)
-        TODO store a top-level dictionary of all SGs, indexed by ID, instead of delegating to the Datasets
-        """
-        all_sequencing_groups: dict[str, SequencingGroup] = {}
-        for dataset in self.get_datasets(only_active):
-            for sg in dataset.get_sequencing_groups(only_active):
-                all_sequencing_groups[sg.id] = sg
-        return list(all_sequencing_groups.values())
-
-    def create_cohort(self, name: str):
-        """
-        Create a cohort and add it to the multi-cohort.
-        """
-        if name in self._cohorts_by_name:
-            logging.debug(f'Cohort {name} already exists in the multi-cohort')
-            return self._cohorts_by_name[name]
-
-        c = Cohort(name=name)
-        self._cohorts_by_name[c.name] = c
-        return c
-
-    def add_dataset(self, d: 'Dataset') -> 'Dataset':
-        """
-        Add a Dataset to the MultiCohort
-        Args:
-            d: Dataset object
-        """
-        if d.name in self._datasets_by_name:
-            logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
-        else:
-            # We need create a new dataset to avoid manipulating the cohort dataset at this point
-            self._datasets_by_name[d.name] = Dataset(d.name)
-        return self._datasets_by_name[d.name]
-
-    def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
-        """
-        Get dataset by name.
-        Include only "active" datasets (unless only_active is False)
-        """
-        ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
-        return ds_by_name.get(name)
-
-    def get_job_attrs(self) -> dict:
-        """
-        Attributes for Hail Batch job.
-        """
-        return {
-            # 'sequencing_groups': self.get_sequencing_group_ids(),
-            'datasets': [d.name for d in self.get_datasets()],
-            'cohorts': [c.name for c in self.get_cohorts()],
-        }
-
-    def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
-        """
-        Create a PED file for all samples in the whole MultiCohort
-        Duplication of the Cohort method
-        PED is written with no header line to be strict specification compliant
-        """
-        datas = []
-        for sequencing_group in self.get_sequencing_groups():
-            datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
-        if not datas:
-            raise ValueError(f'No pedigree data found for {self.name}')
-        df = pd.DataFrame(datas)
-
-        if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
-
-        if not get_config()['workflow'].get('dry_run', False):
-            with out_path.open('w') as fp:
-                df.to_csv(fp, sep='\t', index=False, header=False)
-        return out_path
