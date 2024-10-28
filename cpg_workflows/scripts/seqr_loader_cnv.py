@@ -1,20 +1,16 @@
 """
-Hail Query functions for seqr loader; SV edition.
+Hail Query functions for seqr loader; CNV edition.
 """
 
 import datetime
 import logging
+from argparse import ArgumentParser
+from os.path import join
 
 import hail as hl
 
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
-from cpg_workflows.query_modules.seqr_loader_sv import (
-    download_gencode_gene_id_mapping,
-    get_expr_for_xpos,
-    parse_gtf_from_local,
-)
-from cpg_workflows.utils import checkpoint_hail, read_hail
+from cpg_utils.hail_batch import genome_build, init_batch
+from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 GENE_SYMBOL = 'gene_symbol'
@@ -30,7 +26,7 @@ NON_GENE_PREDICTIONS = {
 }
 
 
-def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
+def annotate_cohort_gcnv(vcf: str, mt_out: str, gencode: str, checkpoint: str, *args, **kwargs):
     """
     Translate an annotated gCNV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -38,17 +34,15 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     Relevant gCNV loader script
     https://github.com/populationgenomics/seqr-loading-pipelines/blob/master/luigi_pipeline/seqr_gcnv_loading.py
     Args:
-        vcf_path (str): Where is the VCF??
-        out_mt_path (str): And where do you need output!?
-        checkpoint_prefix (str): CHECKPOINT!@!!
+        vcf (str): Where is the VCF??
+        mt_out (str): And where do you need output!?
+        gencode (str): The path to a compressed GENCODE GTF file
+        checkpoint (str): location we can write checkpoints to
     """
 
-    logger = logging.getLogger('annotate_cohort_gcnv')
-    logger.setLevel(logging.INFO)
-
-    logger.info(f'Importing SV VCF {vcf_path}')
+    logging.info(f'Importing SV VCF {vcf}')
     mt = hl.import_vcf(
-        vcf_path,
+        vcf,
         array_elements_required=False,
         force_bgz=True,
         reference_genome=genome_build(),
@@ -57,7 +51,7 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
 
     # add attributes required for Seqr
     mt = mt.annotate_globals(
-        sourceFilePath=vcf_path,
+        sourceFilePath=vcf,
         genomeVersion=genome_build().replace('GRCh', ''),
         hail_version=hl.version(),
         datasetType='SV',
@@ -89,13 +83,6 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
         num_exon=hl.agg.max(mt.NP),
     )
 
-    # save those changes
-    mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
-
-    # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '46'))
-    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
-
     # find all the column names which contain Gene symbols
     conseq_predicted_gene_cols = [
         gene_col
@@ -116,15 +103,29 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
         ),
     )
 
+    mt = mt.checkpoint('pre-gene_annotation.mt', overwrite=True)
+
+    # this next section is currently failing - the dictionary of genes is too large
+    # to be used in an annotation expression. At least... I think it is
+    # for i, chunks in enumerate(chunks(gene_id_mapping, 100)):
+
+    # get the Gene-Symbol mapping dict
+    gene_id_mappings = parse_gtf_from_local(gencode, chunk_size=15000)
+
     # overwrite symbols with ENSG IDs in these columns
     # not sure why this is required, I think SV annotation came out
     # with ENSGs from the jump, but this is all symbols
-    for col_name in conseq_predicted_gene_cols:
-        mt = mt.annotate_rows(
-            info=mt.info.annotate(
-                **{col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])},
-            ),
-        )
+    for i, gene_id_mapping in enumerate(gene_id_mappings):
+        logging.info(f'Processing gene ID mapping chunk {i}')
+        for col_name in conseq_predicted_gene_cols:
+            mt = mt.annotate_rows(
+                info=mt.info.annotate(
+                    **{col_name: hl.map(lambda gene: gene_id_mapping.get(gene, gene), mt.info[col_name])},
+                ),
+            )
+
+        # # checkpoint this chunk
+        mt = mt.checkpoint(join(checkpoint, f'fragment_{i}.mt'))
 
     mt = mt.annotate_rows(
         # this expected mt.variant_name to be present, and it's not
@@ -173,21 +174,21 @@ def annotate_cohort_gcnv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str
     )
 
     # write this output
-    mt.write(out_mt_path, overwrite=True)
+    mt.write(mt_out, overwrite=True)
 
 
-def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
+def annotate_dataset_gcnv(mt_in: str, mt_out: str, *args, **kwargs):
     """
     process data specific to samples in this dataset
     do this after sub-setting to specific samples
     Args:
-        mt_path (str): path to the annotated MatrixTable
-        out_mt_path (str): and where do you want it to end up?
+        mt_in (str): path to the annotated MatrixTable
+        mt_out (str): and where do you want it to end up?
     """
 
     logging.info('Annotating genotypes')
 
-    mt = read_hail(mt_path)
+    mt = hl.read_matrix_table(mt_in)
 
     # adding in the GT here, that may cause problems later?
     mt = mt.annotate_rows(
@@ -274,5 +275,41 @@ def annotate_dataset_gcnv(mt_path: str, out_mt_path: str):
     )
     logging.info('Genotype fields annotated')
     mt.describe()
-    mt.write(out_mt_path, overwrite=True)
-    logging.info(f'Written gCNV MT to {out_mt_path}')
+    mt.write(mt_out, overwrite=True)
+    logging.info(f'Written gCNV MT to {mt_out}')
+
+
+def cli_main():
+    """
+    command line entrypoint
+    """
+    # enable Info-level logging
+    logging.basicConfig(level=logging.INFO)
+
+    init_batch()
+
+    # set up an argument parser to allow two separate entrypoints
+    parser = ArgumentParser()
+    # these arguments are used for both entrypoints
+    parser.add_argument('--mt_out', help='Path to the MatrixTable, input or output', required=True)
+    parser.add_argument('--checkpoint', help='Dir to write checkpoints to', required=True)
+    subparsers = parser.add_subparsers()
+
+    # a parser for the AnnotateCohort method
+    cohort_parser = subparsers.add_parser('cohort')
+    cohort_parser.add_argument('--vcf', help='Path to input VCF file')
+    cohort_parser.add_argument('--gencode', help='Path to input gencode GTF file')
+    cohort_parser.set_defaults(func=annotate_cohort_gcnv)
+
+    # a parser for the AnnotateDataset method
+    cohort_parser = subparsers.add_parser('dataset')
+    cohort_parser.add_argument('--mt_in', help='Path to input MT')
+    cohort_parser.set_defaults(func=annotate_dataset_gcnv)
+
+    args = parser.parse_args()
+
+    args.func(**vars(args))
+
+
+if __name__ == '__main__':
+    cli_main()
