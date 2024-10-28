@@ -141,7 +141,7 @@ first_stages = ['MtToEs']
 create_es_index_for_datasets = ['validation']
 ```
 
-The resulting index will be named using the current datestamp, or using `worfklow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy.
+The resulting index will be named using the current datestamp, or using `workflow/output_version` option if it's specified. The Elasticsearch server is configured using the `elasticsearch` section in `configs/defailts/seqr_loader.toml`. The reason for not automatically creating indices for every project is that the Elasticsearch instance can easily run out of disk space, so additional safeguard is handy.
 
 ## Large Cohort Workflow
 

@@ -23,7 +23,7 @@ def annotate_cohort_jobs_sv(
 
     j = get_batch().new_job('Annotate cohort', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
-    gencode_gz = get_config()['worfklow']['gencode_gtf_file']
+    gencode_gz = get_config()['workflow']['gencode_gtf_file']
     gencode_gtf_local = get_batch().read_input(str(gencode_gz))
     j.command(
         query_command(

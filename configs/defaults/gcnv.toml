@@ -14,7 +14,7 @@ gncv_max_events = 320
 gncv_max_pass_events = 30
 
 # update this when cpg_workflows.scripts.get_gencode_gtf.sh is re-run
-gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
+gencode_gtf_file = 'gs://cpg-common-test/references/hg38/v0/gencode_47.gtf.gz'
 
 [images]
 gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2023-07-13-4.4.0.0-43-gd79823f9c-NIGHTLY-SNAPSHOT"
