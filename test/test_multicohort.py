@@ -183,26 +183,18 @@ def mock_get_sgs_by_cohort_project_b(*args, **kwargs) -> list[dict]:
     ]
 
 
-def mock_get_cohorts(*args, **kwargs) -> dict:
+def mock_get_cohorts(cohort_id: str, *args, **kwargs) -> list[dict]:
     return {
-        'COH123': {
-            'projecta': mock_get_sgs_by_cohort_project_a(),
-        },
-        'COH456': {
-            'projectb': mock_get_sgs_by_cohort_project_b(),
-        },
-    }
+        'COH123': mock_get_sgs_by_cohort_project_a(),
+        'COH456': mock_get_sgs_by_cohort_project_b(),
+    }[cohort_id]
 
 
-def mock_get_overlapping_cohorts(*args, **kwargs) -> dict:
+def mock_get_overlapping_cohorts(cohort_id: str, *args, **kwargs) -> list[dict]:
     return {
-        'COH123': {
-            'projecta': [mock_get_sgs_by_cohort_project_a()[0]],
-        },
-        'COH456': {
-            'projecta': [mock_get_sgs_by_cohort_project_a()[1]],
-        },
-    }
+        'COH123': [mock_get_sgs_by_cohort_project_a()[0]],
+        'COH456': [mock_get_sgs_by_cohort_project_a()[1]],
+    }[cohort_id]
 
 
 def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
@@ -240,7 +232,8 @@ def test_multicohort(mocker: MockFixture, tmp_path):
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_cohorts)
+    # don't patch the method location, patch where it's imported/called
+    mocker.patch('cpg_workflows.inputs.get_cohort_sgs', mock_get_cohorts)
 
     from cpg_workflows.inputs import get_multicohort
 
@@ -284,7 +277,7 @@ def test_overlapping_multicohort(mocker: MockFixture, tmp_path):
 
     mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_overlapping_cohorts)
+    mocker.patch('cpg_workflows.inputs.get_cohort_sgs', mock_get_overlapping_cohorts)
 
     from cpg_workflows.inputs import get_multicohort
 
