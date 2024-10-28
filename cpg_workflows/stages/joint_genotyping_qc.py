@@ -2,52 +2,48 @@
 Stage that summarises QC.
 """
 
-from typing import Any
-
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.happy import happy
 from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import vcf_qc
+from cpg_workflows.stages.joint_genotyping import JointGenotyping
+from cpg_workflows.targets import MultiCohort, SequencingGroup
 from cpg_workflows.workflow import (
-    Cohort,
-    CohortStage,
+    MultiCohortStage,
     SequencingGroupStage,
     StageInput,
     StageInputNotFoundError,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
 
-from .. import get_multicohort
-from ..jobs.happy import happy
-from ..targets import SequencingGroup
-from .joint_genotyping import JointGenotyping
-
 
 @stage(required_stages=JointGenotyping)
-class JointVcfQC(CohortStage):
+class JointVcfQC(MultiCohortStage):
     """
     QC joint VCF
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """
         Generate a pVCF and a site-only VCF.
         """
-        qc_prefix = cohort.analysis_dataset.prefix() / 'qc' / 'jc' / get_workflow().output_version / 'picard'
-        d = {
-            'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
-            'qc_detail': to_path(f'{qc_prefix}.variant_calling_detail_metrics'),
+        return {
+            'qc_summary': self.prefix / 'picard.variant_calling_summary_metrics',
+            'qc_detail': self.prefix / 'picard.variant_calling_detail_metrics',
         }
-        return d
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
         Submit jobs.
         """
-        vcf_path = inputs.as_path(target=cohort, stage=JointGenotyping, key='vcf')
+
+        outputs = self.expected_outputs(multicohort)
+        vcf_path = inputs.as_path(target=multicohort, stage=JointGenotyping, key='vcf')
         j = vcf_qc(
             b=get_batch(),
             vcf_or_gvcf=get_batch().read_input_group(
@@ -57,11 +53,11 @@ class JointVcfQC(CohortStage):
                 },
             ),
             is_gvcf=False,
-            job_attrs=self.get_job_attrs(cohort),
-            output_summary_path=self.expected_outputs(cohort)['qc_summary'],
-            output_detail_path=self.expected_outputs(cohort)['qc_detail'],
+            job_attrs=self.get_job_attrs(multicohort),
+            output_summary_path=outputs['qc_summary'],
+            output_detail_path=outputs['qc_detail'],
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(multicohort, data=outputs, jobs=[j])
 
 
 @stage(required_stages=JointGenotyping)
@@ -111,43 +107,40 @@ class JointVcfHappy(SequencingGroupStage):
 
 
 @stage(required_stages=[JointVcfQC, JointVcfHappy], analysis_type='qc', analysis_keys=['json'])
-class JointVcfMultiQC(CohortStage):
+class JointVcfMultiQC(MultiCohortStage):
     """
     Run MultiQC to summarise all GVCF QC.
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
         if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
-        h = get_workflow().output_version
         return {
-            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'jc' / h / 'multiqc.html',
-            'json': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'jc' / h / '.checks',
+            'html': self.web_prefix / 'multiqc.html',
+            'json': self.prefix / 'multiqc_data.json',
+            'checks': self.prefix / '.checks',
         }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
         Collect QC.
         """
-        json_path = self.expected_outputs(cohort)['json']
-        html_path = self.expected_outputs(cohort)['html']
-        checks_path = self.expected_outputs(cohort)['checks']
-        if base_url := cohort.analysis_dataset.web_url():
-            html_url = str(html_path).replace(str(cohort.analysis_dataset.web_prefix()), base_url)
+        outputs = self.expected_outputs(multicohort)
+        if base_url := multicohort.analysis_dataset.web_url():
+            html_url = str(outputs['html']).replace(str(self.web_prefix), base_url)
         else:
             html_url = None
 
         paths = []
         ending_to_trim = set()  # endings to trim to get sample names
 
-        paths.append(inputs.as_path(cohort, JointVcfQC, 'qc_detail'))
+        paths.append(inputs.as_path(multicohort, JointVcfQC, 'qc_detail'))
 
-        for sequencing_group in cohort.get_sequencing_groups():
+        for sequencing_group in multicohort.get_sequencing_groups():
             try:
                 path = inputs.as_path(sequencing_group, JointVcfHappy)
             except StageInputNotFoundError:
@@ -161,14 +154,14 @@ class JointVcfMultiQC(CohortStage):
             tmp_prefix=self.tmp_prefix,
             paths=paths,
             ending_to_trim=ending_to_trim,
-            out_json_path=json_path,
-            out_html_path=html_path,
+            out_json_path=outputs['json'],
+            out_html_path=outputs['html'],
             out_html_url=html_url,
-            out_checks_path=checks_path,
-            job_attrs=self.get_job_attrs(cohort),
-            sequencing_group_id_map=cohort.rich_id_map(),
+            out_checks_path=outputs['checks'],
+            job_attrs=self.get_job_attrs(multicohort),
+            sequencing_group_id_map=multicohort.rich_id_map(),
             extra_config={'table_columns_visible': {'Picard': True}},
-            dataset=cohort.analysis_dataset,
+            dataset=multicohort.analysis_dataset,
             label='Joint VCF',
         )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
