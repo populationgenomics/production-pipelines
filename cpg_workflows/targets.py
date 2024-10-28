@@ -1,8 +1,17 @@
+# NOTE: Split each class into its own file in a targets/ directory
+
+# region KEEP
 """
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
+# endregion KEEP
+
+# region NOT KEEP
 import copy
+# endregion NOT KEEP
+
+# region KEEP
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -79,11 +88,17 @@ class Target:
         """
         raise NotImplementedError
 
+    # endregion KEEP
+    # region NOT KEEP
+
     def get_job_prefix(self) -> str:
         """
         Prefix job names.
         """
         raise NotImplementedError
+
+    # endregion NOT KEEP
+    # region KEEP
 
     def rich_id_map(self) -> dict[str, str]:
         """
@@ -131,6 +146,11 @@ class MultiCohort(Target):
             cohorts = [c for c in cohorts if c.active and c.get_datasets()]
         return cohorts
 
+    # endregion KEEP
+
+    # region NOT KEEP
+    # NOTE: This method is not used in the current implementation
+
     def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
         """
         Get cohort by name.
@@ -145,6 +165,9 @@ class MultiCohort(Target):
         if cohort.active and cohort.get_datasets():
             return cohort
         return None
+
+    # endregion NOT KEEP
+    # region KEEP
 
     def get_datasets(self, only_active: bool = True) -> list['Dataset']:
         """
@@ -180,6 +203,10 @@ class MultiCohort(Target):
         self._cohorts_by_name[c.name] = c
         return c
 
+    # endregion KEEP
+
+    # region MODIFY
+    # NOTE: There is an open ticket to refactor the add_data method
     def add_dataset(self, d: 'Dataset') -> 'Dataset':
         """
         Add a Dataset to the MultiCohort
@@ -193,6 +220,10 @@ class MultiCohort(Target):
             self._datasets_by_name[d.name] = Dataset(d.name, d.cohort)
         return self._datasets_by_name[d.name]
 
+    # endregion MODIFY
+
+    # region NOT KEEP
+
     def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
         """
         Get dataset by name.
@@ -200,6 +231,10 @@ class MultiCohort(Target):
         """
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
+
+    # endregion NOT KEEP
+
+    # region KEEP
 
     def get_job_attrs(self) -> dict:
         """
@@ -285,6 +320,10 @@ class Cohort(Target):
             datasets = [ds for ds in datasets if ds.active and ds.get_sequencing_groups()]
         return datasets
 
+    # endregion KEEP
+
+    # region NOT KEEP
+
     def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
         """
         Get dataset by name.
@@ -292,6 +331,10 @@ class Cohort(Target):
         """
         ds_by_name = {d.name: d for d in self.get_datasets(only_active)}
         return ds_by_name.get(name)
+
+    # endregion NOT KEEP
+
+    # region KEEP
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -314,6 +357,11 @@ class Cohort(Target):
         self._datasets_by_name[dataset.name] = dataset
         return dataset
 
+    # endregion KEEP
+
+    # region MODIFY
+    # NOTE: This may be linked to the modify in MultiCohort.add_dataset
+
     def create_dataset(self, name: str) -> 'Dataset':
         """
         Create a dataset and add it to the cohort.
@@ -330,6 +378,10 @@ class Cohort(Target):
         self._datasets_by_name[ds.name] = ds
         return ds
 
+    # endregion MODIFY
+
+    # region KEEP
+
     def get_job_attrs(self) -> dict:
         """
         Attributes for Hail Batch job.
@@ -338,6 +390,9 @@ class Cohort(Target):
             # 'sequencing_groups': self.get_sequencing_group_ids(),
             'datasets': [d.name for d in self.get_datasets()],
         }
+
+    # endregion KEEP
+    # region NOT KEEP
 
     def get_job_prefix(self) -> str:
         """
@@ -365,6 +420,9 @@ class Cohort(Target):
             df.to_csv(f, index=False, sep='\t', na_rep='NA')
         return tsv_path
 
+    # endregion NOT KEEP
+    # region KEEP
+
 
 class Dataset(Target):
     """
@@ -387,12 +445,18 @@ class Dataset(Target):
         self.cohort = cohort
         self.active = True
 
+    # endregion KEEP
+    # region NOT KEEP
+
     @staticmethod
     def create(name: str) -> 'Dataset':
         """
         Create a dataset.
         """
         return Dataset(name=name)
+
+    # endregion NOT KEEP
+    # region KEEP
 
     @property
     def target_id(self) -> str:
@@ -526,6 +590,7 @@ class Dataset(Target):
             return self._sequencing_group_by_id[s.id]
         self._sequencing_group_by_id[s.id] = s
 
+    # NOTE: remove unused variable
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
@@ -538,14 +603,21 @@ class Dataset(Target):
         """
         return {
             'dataset': self.name,
+            # NOTE: Uncomment when we the CHAR size limit in hail increases
             # 'sequencing_groups': self.get_sequencing_group_ids(),
         }
+
+    # endregion KEEP
+    # region NOT KEEP
 
     def get_job_prefix(self) -> str:
         """
         Prefix job names.
         """
         return f'{self.name}: '
+
+    # endregion NOT KEEP
+    # region KEEP
 
     def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
         """
@@ -708,12 +780,18 @@ class SequencingGroup(Target):
         """
         return self.id + '|' + self.participant_id
 
+    # endregion KEEP
+    # region NOT KEEP
+
     def get_ped_dict(self, use_participant_id: bool = False) -> dict[str, str]:
         """
         Returns a dictionary of pedigree fields for this sequencing group, corresponding
         a PED file entry.
         """
         return self.pedigree.get_ped_dict(use_participant_id)
+
+    # endregion NOT KEEP
+    # region KEEP
 
     def make_cram_path(self) -> CramPath:
         """
@@ -732,6 +810,7 @@ class SequencingGroup(Target):
         """
         return GvcfPath(self.dataset.prefix() / 'gvcf' / f'{self.id}.g.vcf.gz')
 
+    # TODO: This should be revised for v1 and potentially removed
     @property
     def make_sv_evidence_path(self) -> Path:
         """
@@ -765,11 +844,17 @@ class SequencingGroup(Target):
             attrs['participant_id'] = _participant_id
         return attrs
 
+    # endregion KEEP
+    # region NOT KEEP
+
     def get_job_prefix(self) -> str:
         """
         Prefix job names.
         """
         return f'{self.dataset.name}/{self.id}: '
+
+    # endregion NOT KEEP
+    # region KEEP
 
 
 @dataclass
@@ -806,3 +891,6 @@ class PedigreeInfo:
             'Sex': str(self.sex.value),
             'Phenotype': str(self.phenotype),
         }
+
+
+# endregion KEEP
