@@ -281,18 +281,16 @@ def populate_pedigree(dataset: Dataset) -> None:
     Populate pedigree data for sequencing groups.
     """
 
+    sg_by_participant_id = dict()
+    for sg in dataset.get_sequencing_groups():
+        sg_by_participant_id[sg.participant_id] = sg
+
     logging.info(f'Reading pedigree for dataset {dataset.name}')
     ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
     ped_entry_by_participant_id = {}
     for ped_entry in ped_entries:
         part_id = str(ped_entry['individual_id'])
         ped_entry_by_participant_id[part_id] = ped_entry
-
-    # index all the SGs we have by their participant external ID, where available
-    sg_by_participant_id = {}
-    for sg in dataset.get_sequencing_groups():
-        if party_id := sg.participant_id:
-            sg_by_participant_id[party_id] = sg
 
     sgids_wo_ped = []
     for sequencing_group in dataset.get_sequencing_groups():
