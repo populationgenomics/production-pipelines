@@ -13,7 +13,7 @@ from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_comm
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.scripts import seqr_loader_cnv, upgrade_ped_with_inferred
+from cpg_workflows.scripts import upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
 
 
