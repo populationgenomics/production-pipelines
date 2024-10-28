@@ -292,6 +292,12 @@ def populate_pedigree(dataset: Dataset) -> None:
         part_id = str(ped_entry['individual_id'])
         ped_entry_by_participant_id[part_id] = ped_entry
 
+    # index all the SGs we have by their participant external ID, where available
+    sg_by_participant_id = {}
+    for sg in dataset.get_sequencing_groups():
+        if party_id := sg.participant_id:
+            sg_by_participant_id[party_id] = sg
+
     sgids_wo_ped = []
     for sequencing_group in dataset.get_sequencing_groups():
         if sequencing_group.participant_id not in ped_entry_by_participant_id:
@@ -299,8 +305,8 @@ def populate_pedigree(dataset: Dataset) -> None:
             continue
 
         ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
-        maternal_sg = dataset.get_sequencing_group_by_id(str(ped_entry['maternal_id']))
-        paternal_sg = dataset.get_sequencing_group_by_id(str(ped_entry['paternal_id']))
+        maternal_sg = sg_by_participant_id.get(str(ped_entry['maternal_id']))
+        paternal_sg = sg_by_participant_id.get(str(ped_entry['paternal_id']))
         sequencing_group.pedigree = PedigreeInfo(
             sequencing_group=sequencing_group,
             fam_id=ped_entry['family_id'],
