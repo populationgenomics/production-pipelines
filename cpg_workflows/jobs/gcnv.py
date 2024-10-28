@@ -11,9 +11,9 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_command
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
+from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.scripts import upgrade_ped_with_inferred
+from cpg_workflows.scripts import upgrade_ped_with_inferred, seqr_loader_cnv
 from cpg_workflows.utils import can_reuse, chunks
 
 
@@ -670,7 +670,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 def annotate_dataset_jobs_cnv(
     mt_path: Path,
     sgids: list[str],
-    out_mt_path: Path,
+    out_mt_path: str,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -688,7 +688,7 @@ def annotate_dataset_jobs_cnv(
     subset_j: Job | None = None
     if not subset_mt_path.exists():
         subset_j = get_batch().new_job('subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
-        subset_j.image(image_path('cpg_workflows'))
+        subset_j.image(config_retrieve(['workflow', 'driver_image']))
         subset_j.command(
             query_command(
                 seqr_loader,
@@ -701,16 +701,15 @@ def annotate_dataset_jobs_cnv(
         )
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
-    annotate_j.image(image_path('cpg_workflows'))
+    annotate_j.image(config_retrieve(['workflow', 'driver_image']))
     annotate_j.command(
-        query_command(
-            seqr_loader_cnv,
-            seqr_loader_cnv.annotate_dataset_gcnv.__name__,
-            str(subset_mt_path),
-            str(out_mt_path),
-            setup_gcp=True,
-        ),
+        'seqr_loader_cnv '
+        f'--mt_out {out_mt_path} '
+        f'--checkpoint {str(tmp_prefix / "checkpoints")} '
+        'dataset '  # use the annotate_DATASET functionality
+        f'--mt_in {str(subset_mt_path)} '
     )
+
     if subset_j:
         annotate_j.depends_on(subset_j)
         return [subset_j, annotate_j]

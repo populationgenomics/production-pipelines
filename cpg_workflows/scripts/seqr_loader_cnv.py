@@ -1,5 +1,5 @@
 """
-Hail Query functions for seqr loader; SV edition.
+Hail Query functions for seqr loader; CNV edition.
 """
 
 import datetime
@@ -8,10 +8,8 @@ from argparse import ArgumentParser
 from os.path import join
 
 import hail as hl
-
-from cpg_utils.hail_batch import genome_build
+from cpg_utils.hail_batch import genome_build, init_batch
 from cpg_workflows.query_modules.seqr_loader_sv import get_expr_for_xpos, parse_gtf_from_local
-from cpg_workflows.utils import chunks, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 GENE_SYMBOL = 'gene_symbol'
@@ -41,10 +39,7 @@ def annotate_cohort_gcnv(vcf: str, mt_out: str, gencode: str, checkpoint: str, *
         checkpoint (str): location we can write checkpoints to
     """
 
-    logger = logging.getLogger('annotate_cohort_gcnv')
-    logger.setLevel(logging.INFO)
-
-    logger.info(f'Importing SV VCF {vcf}')
+    logging.info(f'Importing SV VCF {vcf}')
     mt = hl.import_vcf(
         vcf,
         array_elements_required=False,
@@ -192,7 +187,7 @@ def annotate_dataset_gcnv(mt_in: str, mt_out: str, *args, **kwargs):
 
     logging.info('Annotating genotypes')
 
-    mt = read_hail(mt_in)
+    mt = hl.read_matrix_table(mt_in)
 
     # adding in the GT here, that may cause problems later?
     mt = mt.annotate_rows(
@@ -283,14 +278,18 @@ def annotate_dataset_gcnv(mt_in: str, mt_out: str, *args, **kwargs):
     logging.info(f'Written gCNV MT to {mt_out}')
 
 
-# add an entrypoint?
-if __name__ == '__main__':
+def cli_main():
+    """
+    command line entrypoint
+    """
     # enable Info-level logging
     logging.basicConfig(level=logging.INFO)
 
+    init_batch()
+
     # set up an argument parser to allow two separate entrypoints
     parser = ArgumentParser()
-    # this argument is used for both entrypoints
+    # these arguments are used for both entrypoints
     parser.add_argument('--mt_out', help='Path to the MatrixTable, input or output', required=True)
     parser.add_argument('--checkpoint', help='Dir to write checkpoints to', required=True)
     subparsers = parser.add_subparsers()
@@ -309,3 +308,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     args.func(**vars(args))
+
+
+if __name__ == '__main__':
+    cli_main()
