@@ -261,15 +261,15 @@ def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
 def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     return [
         {
-            'family_id': 123,
+            'family_id': '123',
             'individual_id': '8',
-            'paternal_id': 14,
+            'paternal_id': '14',
             'maternal_id': None,
             'sex': 1,
             'affected': 1,
         },
         {
-            'family_id': 124,
+            'family_id': '124',
             'individual_id': '14',
             'paternal_id': None,
             'maternal_id': None,

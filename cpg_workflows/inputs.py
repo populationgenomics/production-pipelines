@@ -281,7 +281,7 @@ def populate_pedigree(dataset: Dataset) -> None:
     Populate pedigree data for sequencing groups.
     """
 
-    sg_by_participant_id = dict()
+    sg_by_participant_id = {}
     for sg in dataset.get_sequencing_groups():
         sg_by_participant_id[sg.participant_id] = sg
 
@@ -299,13 +299,11 @@ def populate_pedigree(dataset: Dataset) -> None:
             continue
 
         ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
-        maternal_sg = sg_by_participant_id.get(ped_entry['maternal_id'])
-        paternal_sg = sg_by_participant_id.get(ped_entry['paternal_id'])
         sequencing_group.pedigree = PedigreeInfo(
             sequencing_group=sequencing_group,
             fam_id=ped_entry['family_id'],
-            mom=maternal_sg,
-            dad=paternal_sg,
+            mom=sg_by_participant_id.get(ped_entry['maternal_id']),
+            dad=sg_by_participant_id.get(ped_entry['paternal_id']),
             sex=Sex.parse(str(ped_entry['sex'])),
             phenotype=ped_entry['affected'] or '0',
         )
