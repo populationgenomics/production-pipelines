@@ -1,3 +1,4 @@
+# region KEEP
 """
 Functions to set up Hail Batch resources (cores, memory, storage).
 """
@@ -48,11 +49,17 @@ class MachineType:
         self.price_per_hour = price_per_hour
         self.disk_size_gb = disk_size_gb
 
+    # endregion KEEP
+    # region NOT KEEP
+
     def gcp_name(self):
         """
         Machine type name in the GCP world
         """
         return gcp_machine_name(self.name, self.max_ncpu)
+
+    # endregion NOT KEEP
+    # region KEEP
 
     def max_threads(self) -> int:
         """
