@@ -70,7 +70,6 @@ def create_multicohort() -> MultiCohort:
         # required so that the SG objects can be referenced in the collective Datasets
         # SG.dataset.prefix is meaningful, to correctly store outputs in the project location
         for sg_dict in cohort_sg_dicts:
-            print(sg_dict)
             sg_dataset = sg_dict['sample']['project']['name']
             dataset = multicohort.create_dataset(sg_dataset)
 
@@ -287,7 +286,6 @@ def populate_pedigree(dataset: Dataset) -> None:
 
     logging.info(f'Reading pedigree for dataset {dataset.name}')
     ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
-    logging.warning(ped_entries)
     ped_entry_by_participant_id = {}
     for ped_entry in ped_entries:
         part_id = str(ped_entry['individual_id'])

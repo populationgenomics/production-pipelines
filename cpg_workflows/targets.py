@@ -2,7 +2,6 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
-import copy
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -29,6 +28,10 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
+        # create a self.alignment_inputs_hash variable to store the hash of the alignment inputs
+        # this begins as None, and is set upon first calling
+        self.alignment_inputs_hash: str | None = None
+
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get flat list of all sequencing groups corresponding to this target.
@@ -41,16 +44,33 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
-    def alignment_inputs_hash(self) -> str:
+    def get_alignment_inputs_hash(self) -> str:
+        """
+        If this hash has been set, return it, otherwise set it, then return it
+        This should be safe as it matches the current usage:
+        - we set up the Targets in this workflow (populating SGs, Datasets, Cohorts)
+            - at this point the targets are malleable (e.g. addition of an additional Cohort may add SGs to Datasets)
+        - we then set up the Stages, where alignment input hashes are generated
+            - at this point, the alignment inputs are fixed
+            - all calls to get_alignment_inputs_hash() need to return the same value
+        """
+        if self.alignment_inputs_hash is None:
+            self.set_alignment_inputs_hash()
+        if self.alignment_inputs_hash is None:
+            raise TypeError('Alignment_inputs_hash was not populated by the setter method')
+        return self.alignment_inputs_hash
+
+    def set_alignment_inputs_hash(self):
         """
         Unique hash string of sample alignment inputs. Useful to decide
         whether the analysis on the target needs to be rerun.
         """
+
         s = ' '.join(
             sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        return f'{h}_{len(self.get_sequencing_group_ids())}'
+        self.alignment_inputs_hash = f'{h}_{len(self.get_sequencing_groups())}'
 
     @property
     def target_id(self) -> str:
@@ -501,7 +521,7 @@ class Dataset(Target):
         """
         Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
         """
-        return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active)]
+        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
 
     def get_job_attrs(self) -> dict:
         """
@@ -531,7 +551,7 @@ class Dataset(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -573,7 +593,7 @@ class Cohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -600,7 +620,7 @@ class Cohort(Target):
         Gets a flat list of all sequencing groups from all datasets.
         Include only "active" sequencing groups (unless only_active is False)
         """
-        return list(self._sequencing_group_by_id.values())
+        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
 
     def get_job_attrs(self) -> dict:
         """
@@ -720,6 +740,7 @@ class MultiCohort(Target):
         Gets a flat list of all sequencing groups from all datasets.
         uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
         Include only "active" sequencing groups (unless only_active is False)
+        TODO store a top-level dictionary of all SGs, indexed by ID, instead of delegating to the Datasets
         """
         all_sequencing_groups: dict[str, SequencingGroup] = {}
         for dataset in self.get_datasets(only_active):
@@ -784,7 +805,7 @@ class MultiCohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
