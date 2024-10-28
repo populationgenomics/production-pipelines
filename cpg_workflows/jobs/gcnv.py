@@ -13,7 +13,7 @@ from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_comm
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.scripts import upgrade_ped_with_inferred, seqr_loader_cnv
+from cpg_workflows.scripts import seqr_loader_cnv, upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
 
 
@@ -707,7 +707,7 @@ def annotate_dataset_jobs_cnv(
         f'--mt_out {out_mt_path} '
         f'--checkpoint {str(tmp_prefix / "checkpoints")} '
         'dataset '  # use the annotate_DATASET functionality
-        f'--mt_in {str(subset_mt_path)} '
+        f'--mt_in {str(subset_mt_path)} ',
     )
 
     if subset_j:

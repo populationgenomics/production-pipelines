@@ -143,10 +143,7 @@ def parse_gtf_from_local(gtf_path: str, chunk_size: int | None = None) -> hl.dic
         return [hl.literal(gene_id_mapping)]
 
     # hail can't impute the type of a generator, so do this in baby steps
-    sub_dictionaries = [
-        {key: gene_id_mapping[key] for key in keys}
-        for keys in generator_chunks(all_keys, chunk_size)
-    ]
+    sub_dictionaries = [{key: gene_id_mapping[key] for key in keys} for keys in generator_chunks(all_keys, chunk_size)]
 
     return [hl.literal(each_dict) for each_dict in sub_dictionaries]
 
@@ -250,7 +247,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
 
     # save those changes
     if checkpoint:
-        mt = mt.checkpoint(join(checkpoint,  'initial_annotation_round.mt'))
+        mt = mt.checkpoint(join(checkpoint, 'initial_annotation_round.mt'))
 
     # get the Gene-Symbol mapping dict
     gene_id_mapping = parse_gtf_from_local(gencode_gz)[0]

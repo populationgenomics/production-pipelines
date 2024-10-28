@@ -9,9 +9,8 @@ from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch, query_command
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import gcnv
-from cpg_workflows.scripts import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, Dataset, MultiCohort, SequencingGroup
@@ -625,7 +624,7 @@ class AnnotateCohortgCNV(MultiCohortStage):
             f'--checkpoint {str(self.tmp_prefix / "checkpoints")} '
             f'cohort '  # use the annotate_COHORT functionality
             f'--vcf {vcf_path} '
-            f'--gencode {gencode_gtf_local} '
+            f'--gencode {gencode_gtf_local} ',
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=j)
