@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 
+# region KEEP
+
 """
 Test how Hail Batch attaches disks to instances. Motivation: job.storage(...) option
 does not directly translate into available_storage value that you can see in job logs.
@@ -54,3 +56,5 @@ def main():  # pylint: disable=missing-function-docstring
 
 if __name__ == '__main__':
     main()  # pylint: disable=E1120
+
+# endregion KEEP
