@@ -9,9 +9,8 @@ from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
-from cpg_utils.hail_batch import get_batch, query_command
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import gcnv
-from cpg_workflows.query_modules import seqr_loader_cnv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import get_images, get_references, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, Dataset, MultiCohort, SequencingGroup
@@ -612,20 +611,20 @@ class AnnotateCohortgCNV(MultiCohortStage):
         Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
         """
 
-        vcf_path = inputs.as_path(target=multicohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf')
+        vcf_path = str(inputs.as_path(target=multicohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf'))
         outputs = self.expected_outputs(multicohort)
 
         j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(multicohort))
-        j.image(image_path('cpg_workflows'))
+        j.image(config_retrieve(['workflow', 'driver_image']))
+        gencode_gz = config_retrieve(['workflow', 'gencode_gtf_file'])
+        gencode_gtf_local = get_batch().read_input(str(gencode_gz))
         j.command(
-            query_command(
-                seqr_loader_cnv,
-                seqr_loader_cnv.annotate_cohort_gcnv.__name__,
-                str(vcf_path),
-                str(outputs['mt']),
-                str(self.tmp_prefix / 'checkpoints'),
-                setup_gcp=True,
-            ),
+            'seqr_loader_cnv '
+            f'--mt_out {str(outputs["mt"])} '
+            f'--checkpoint {str(self.tmp_prefix / "checkpoints")} '
+            f'cohort '  # use the annotate_COHORT functionality
+            f'--vcf {vcf_path} '
+            f'--gencode {gencode_gtf_local} ',
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=j)
@@ -657,7 +656,7 @@ class AnnotateDatasetCNV(DatasetStage):
         jobs = gcnv.annotate_dataset_jobs_cnv(
             mt_path=mt_in,
             sgids=dataset.get_sequencing_group_ids(),
-            out_mt_path=outputs['mt'],
+            out_mt_path=str(outputs['mt']),
             tmp_prefix=self.tmp_prefix / dataset.name / 'checkpoints',
             job_attrs=self.get_job_attrs(dataset),
         )
