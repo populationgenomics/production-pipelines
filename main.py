@@ -26,15 +26,17 @@ from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
+from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.talos import CreateTalosHTML, GenerateSeqrFile, ValidateMOI
+from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [AnnotateClinvarDecisions, PM5TableGeneration],
-    'talos': [ValidateMOI, CreateTalosHTML, GenerateSeqrFile],
+    'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
+    'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
     'seqr_loader': [
