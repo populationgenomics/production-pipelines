@@ -4,11 +4,16 @@ in a declarative fashion.
 
 A `Stage` object is responsible for creating Hail Batch jobs and declaring outputs
 (files or metamist analysis objects) that are expected to be produced. Each stage
-acts on a `Target`, which can be of the following a `SequencingGroup`, a `Dataset` (a container
-for sequencing groups), or a `Cohort` (all input datasets together). A `Workflow` object plugs
-stages together by resolving dependencies between different levels accordingly.
+acts on a `Target`, which can be of the following:
 
-Examples of workflows can be found in the `production-workflows` repository.
+    * SequencingGroup - an individual Sequencing Group (e.g. the CRAM of a single sample)
+    * Dataset - a stratification of SGs in this analysis by Metamist Project (e.g. all SGs in acute-care)
+    * Cohort - a stratification of SGs in this analysis by Metamist CustomCohort
+    * MultiCohort - a union of all SGs in this analysis by Metamist CustomCohort
+
+A `Workflow` object plugs stages together by resolving dependencies between different levels accordingly. Stages are
+defined in this package, and chained into Workflows by their inter-Stages dependencies. Workflow names are defined in
+main.py, which provides a way to choose a workflow using a CLI argument.
 """
 
 import functools
