@@ -2,15 +2,18 @@
 Test reading inputs into a Cohort object.
 """
 
+# region MODIFY
 import logging
 import re
 
 from pytest_mock import MockFixture
 
+# NOTE: Unused import
 from cpg_workflows.inputs import Cohort, MultiCohort
 
 from . import set_config
 
+# endregion MODIFY
 LOGGER = logging.getLogger(__name__)
 
 
