@@ -145,7 +145,6 @@ class MultiCohort(Target):
         Create a dataset and add it to the cohort.
         """
         if name in self._datasets_by_name:
-            logging.debug(f'Dataset {name} already exists in the MultiCohort')
             return self._datasets_by_name[name]
 
         if name == self.analysis_dataset.name:
