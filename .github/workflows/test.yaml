@@ -1,3 +1,4 @@
+# region KEEP
 name: Test
 on:
   # Building on pull-requests, manual dispatch, and pushes to main; but restricting
@@ -93,3 +94,5 @@ jobs:
       #   timeout-minutes: 5
       #   env:
       #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+# endregion KEEP
