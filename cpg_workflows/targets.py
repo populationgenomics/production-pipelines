@@ -1,3 +1,4 @@
+# ruff: noqa: I001
 # NOTE: Split each class into its own file in a targets/ directory
 
 # region KEEP
@@ -5,10 +6,12 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
+
 # endregion KEEP
 
 # region NOT KEEP
 import copy
+
 # endregion NOT KEEP
 
 # region KEEP
