@@ -13,7 +13,7 @@ repos:
       - id: detect-private-key
       - id: debug-statements
       - id: check-added-large-files
-        exclude: '\.*.interval_list'
+        exclude: '\.*.interval_list|test/data/large_cohort/compressed_dirs/.*'
 
   - repo: https://github.com/populationgenomics/pre-commits
     rev: "v0.1.3"

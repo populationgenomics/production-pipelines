@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional
 
+from gql.transport.exceptions import TransportServerError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -333,6 +334,12 @@ class Metamist:
         # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
         return sort_sgs_by_project(sequencing_groups)
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
+        retry=retry_if_exception_type(TransportServerError),
+        reraise=True,
+    )
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
         Retrieve sequencing group entries for a dataset, in the context of access level
@@ -358,8 +365,7 @@ class Metamist:
             },
         )
 
-        sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
-        return sequencing_groups
+        return sequencing_group_entries['project']['sequencingGroups']
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
