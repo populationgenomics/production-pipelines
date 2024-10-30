@@ -105,7 +105,7 @@ def main(
     """
     Run a Hail Batch workflow specified as a positional command line argument [WORKFLOW]
     """
-    fmt = '%(asctime)s %(levelname)s (%(pathname)s %(lineno)s): %(message)s'
+    fmt = '%(asctime)s %(levelname)s (%(name)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
 
     if not workflow and not list_workflows:
