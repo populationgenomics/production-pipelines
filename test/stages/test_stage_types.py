@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -274,3 +276,6 @@ def test_mixture_multicohort_and_other_stages(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage.get('DatasetStage2').get('job_n') == len(multicohort.get_datasets())
     assert get_batch().job_by_stage.get('SGStage1').get('job_n') == len(multicohort.get_sequencing_groups())
     assert get_batch().job_by_stage.get('CohortStage1').get('job_n') == len(multicohort.get_cohorts())
+
+
+# endregion KEEP
