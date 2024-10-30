@@ -27,10 +27,6 @@ class Target:
         # If not set, exclude from the workflow:
         self.active: bool = True
 
-        # create a self.alignment_inputs_hash variable to store the hash of the alignment inputs
-        # this begins as None, and is set upon first calling
-        self.alignment_inputs_hash: str | None = None
-
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
         Get flat list of all sequencing groups corresponding to this target.
@@ -43,33 +39,12 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
-    def get_alignment_inputs_hash(self) -> str:
-        """
-        If this hash has been set, return it, otherwise set it, then return it
-        This should be safe as it matches the current usage:
-        - we set up the Targets in this workflow (populating SGs, Datasets, Cohorts)
-            - at this point the targets are malleable (e.g. addition of an additional Cohort may add SGs to Datasets)
-        - we then set up the Stages, where alignment input hashes are generated
-            - at this point, the alignment inputs are fixed
-            - all calls to get_alignment_inputs_hash() need to return the same value
-        """
-        if self.alignment_inputs_hash is None:
-            self.set_alignment_inputs_hash()
-        if self.alignment_inputs_hash is None:
-            raise TypeError('Alignment_inputs_hash was not populated by the setter method')
-        return self.alignment_inputs_hash
-
-    def set_alignment_inputs_hash(self):
-        """
-        Unique hash string of sample alignment inputs. Useful to decide
-        whether the analysis on the target needs to be rerun.
-        """
-
+    def alignment_inputs_hash(self) -> str:
         s = ' '.join(
             sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        self.alignment_inputs_hash = f'{h}_{len(self.get_sequencing_groups())}'
+        return f'{h}_{len(self.get_sequencing_groups())}'
 
     @property
     def target_id(self) -> str:
@@ -258,7 +233,7 @@ class MultiCohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -300,7 +275,7 @@ class Cohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -555,7 +530,7 @@ class Dataset(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
+            out_path = self.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:

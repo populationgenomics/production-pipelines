@@ -62,7 +62,7 @@ def multiqc(
     mqc_j.image(image_path('multiqc'))
     STANDARD.set_resources(mqc_j, ncpu=16)
 
-    file_list_path = tmp_prefix / f'{dataset.get_alignment_inputs_hash()}_multiqc-file-list.txt'
+    file_list_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_multiqc-file-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with file_list_path.open('w') as f:
             f.writelines([f'{p}\n' for p in paths])
@@ -72,7 +72,7 @@ def multiqc(
     modules_conf = ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
 
     if sequencing_group_id_map:
-        sample_map_path = tmp_prefix / f'{dataset.get_alignment_inputs_hash()}_rename-sample-map.tsv'
+        sample_map_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_rename-sample-map.tsv'
         if not get_config()['workflow'].get('dry_run', False):
             _write_sg_id_map(sequencing_group_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))

@@ -128,7 +128,7 @@ class GvcfMultiQC(DatasetStage):
             return {}
 
         # get the unique hash for these Sequencing Groups
-        sg_hash = dataset.get_alignment_inputs_hash()
+        sg_hash = dataset.alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc_data.json',
