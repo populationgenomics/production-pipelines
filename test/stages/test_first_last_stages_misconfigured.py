@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -48,3 +50,6 @@ def test_first_last_stages_misconfigured(mocker: MockFixture, tmp_path):
 
     with pytest.raises(WorkflowError, match='No stages to run'):
         run_workflow(mocker)
+
+
+# endregion KEEP
