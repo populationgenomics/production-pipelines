@@ -6,9 +6,10 @@ import logging
 
 from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
-from cpg_workflows.metamist import AnalysisType, Assay, MetamistError, get_cohort_sgs, get_metamist, parse_reads
-from cpg_workflows.targets import Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
-from cpg_workflows.utils import exists
+
+from .metamist import AnalysisType, Assay, MetamistError, get_cohort_sgs, get_metamist, parse_reads
+from .targets import Dataset, MultiCohort, PedigreeInfo, SequencingGroup, Sex
+from .utils import exists
 
 _multicohort: MultiCohort | None = None
 
@@ -45,7 +46,7 @@ def add_sg_to_dataset(dataset: Dataset, sg_data: dict) -> SequencingGroup:
         sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
     # parse the assays and related dict content
-    populate_alignment_inputs(sequencing_group, sg_data)
+    _populate_alignment_inputs(sequencing_group, sg_data)
 
     return sequencing_group
 
@@ -120,9 +121,9 @@ def create_multicohort() -> MultiCohort:
 
     # only go to metamist once per dataset to get analysis entries
     for dataset in multicohort.get_datasets():
-        populate_analysis(dataset)
+        _populate_analysis(dataset)
         if config.get('read_pedigree', True):
-            populate_pedigree(dataset)
+            _populate_pedigree(dataset)
 
     return multicohort
 
@@ -156,10 +157,9 @@ def deprecated_create_cohort() -> MultiCohort:
     cohort = multi_cohort.create_cohort(analysis_dataset_name)
 
     for dataset_name in dataset_names:
-        # al the sg dictionaries
         sgs = get_metamist().get_sg_entries(dataset_name)
 
-        # create the Dataset object
+        # create or retrieve the Dataset object
         dataset = multi_cohort.create_dataset(dataset_name)
 
         for entry in sgs:
@@ -170,9 +170,9 @@ def deprecated_create_cohort() -> MultiCohort:
             cohort.add_sequencing_group_object(sequencing_group)
 
         # once per dataset (in this loop), get analysis entries
-        populate_analysis(dataset)
+        _populate_analysis(dataset)
         if config.get('read_pedigree', True):
-            populate_pedigree(dataset)
+            _populate_pedigree(dataset)
 
     if not multi_cohort.get_datasets():
         msg = 'No datasets populated'
@@ -200,7 +200,7 @@ def _combine_assay_meta(assays: list[Assay]) -> dict:
     return assays_meta
 
 
-def populate_alignment_inputs(
+def _populate_alignment_inputs(
     sequencing_group: SequencingGroup,
     entry: dict,
     check_existence: bool = False,
@@ -236,7 +236,7 @@ def populate_alignment_inputs(
     return None
 
 
-def populate_analysis(dataset: Dataset) -> None:
+def _populate_analysis(dataset: Dataset) -> None:
     """
     Populate Analysis entries.
     """
@@ -254,7 +254,10 @@ def populate_analysis(dataset: Dataset) -> None:
     for sequencing_group in dataset.get_sequencing_groups():
         if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
             # assert file exists
-            assert exists(analysis.output), ('gvcf file does not exist', analysis.output)
+            assert exists(analysis.output), (
+                'gvcf file does not exist',
+                analysis.output
+            )
             sequencing_group.gvcf = GvcfPath(path=analysis.output)
         elif exists(sequencing_group.make_gvcf_path()):
             logging.warning(
@@ -263,7 +266,10 @@ def populate_analysis(dataset: Dataset) -> None:
             )
         if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
             # assert file exists
-            assert exists(analysis.output), ('cram file does not exist', analysis.output)
+            assert exists(analysis.output), (
+                'cram file does not exist',
+                analysis.output
+            )
             crai_path = analysis.output.with_suffix('.cram.crai')
             if not exists(crai_path):
                 crai_path = None
@@ -276,7 +282,7 @@ def populate_analysis(dataset: Dataset) -> None:
             )
 
 
-def populate_pedigree(dataset: Dataset) -> None:
+def _populate_pedigree(dataset: Dataset) -> None:
     """
     Populate pedigree data for sequencing groups.
     """
@@ -285,7 +291,7 @@ def populate_pedigree(dataset: Dataset) -> None:
     for sg in dataset.get_sequencing_groups():
         sg_by_participant_id[sg.participant_id] = sg
 
-    logging.info(f'Reading pedigree for dataset {dataset.name}')
+    logging.info(f'Reading pedigree for dataset {dataset}')
     ped_entries = get_metamist().get_ped_entries(dataset=dataset.name)
     ped_entry_by_participant_id = {}
     for ped_entry in ped_entries:
@@ -299,11 +305,13 @@ def populate_pedigree(dataset: Dataset) -> None:
             continue
 
         ped_entry = ped_entry_by_participant_id[sequencing_group.participant_id]
+        maternal_sg = sg_by_participant_id.get(str(ped_entry['maternal_id']))
+        paternal_sg = sg_by_participant_id.get(str(ped_entry['paternal_id']))
         sequencing_group.pedigree = PedigreeInfo(
             sequencing_group=sequencing_group,
             fam_id=ped_entry['family_id'],
-            mom=sg_by_participant_id.get(ped_entry['maternal_id']),
-            dad=sg_by_participant_id.get(ped_entry['paternal_id']),
+            mom=maternal_sg,
+            dad=paternal_sg,
             sex=Sex.parse(str(ped_entry['sex'])),
             phenotype=ped_entry['affected'] or '0',
         )
