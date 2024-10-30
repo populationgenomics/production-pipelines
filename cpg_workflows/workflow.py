@@ -32,10 +32,17 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
-from cpg_workflows.inputs import get_multicohort
-from cpg_workflows.status import MetamistStatusReporter
-from cpg_workflows.targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
-from cpg_workflows.utils import ExpectedResultT, exists, slugify, timestamp
+
+
+from .inputs import get_multicohort
+from .status import MetamistStatusReporter
+from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
+from .utils import (
+    ExpectedResultT,
+    exists,
+    slugify,
+    timestamp,
+)
 
 StageDecorator = Callable[..., 'Stage']
 
@@ -466,6 +473,14 @@ class Stage(Generic[TargetT], ABC):
         Can be a str, a Path object, or a dictionary of str/Path objects.
         """
 
+    def deprecated_queue_for_cohort(self, cohort: Cohort) -> dict[str, StageOutput | None]:
+        """
+        Queues jobs for each corresponding target, defined by Stage subclass.
+        Returns a dictionary of `StageOutput` objects indexed by target unique_id.
+        unused, ready for deletion
+        """
+        return {}
+
     @abstractmethod
     def queue_for_multicohort(self, multicohort: MultiCohort) -> dict[str, StageOutput | None]:
         """
@@ -672,6 +687,8 @@ class Stage(Generic[TargetT], ABC):
                 logging.info(f'{self.name}: {target} [REUSE] (expected outputs exist: {expected_out})')
                 return Action.REUSE
 
+        logging.info(f'{self.name}: {target} [QUEUE]')
+
         return Action.QUEUE
 
     def _is_reusable(self, expected_out: ExpectedResultT) -> tuple[bool, Path | None]:
@@ -686,18 +703,18 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
-            logging.debug(f'Assuming outputs exist. Expected output is {expected_out}')
+            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
-            logging.debug('No expected outputs, assuming outputs exist')
+            logging.info('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out)
-            logging.debug(f'Checking if {paths} from expected output {expected_out} exist')
+            logging.info(f'Checking if {paths} from expected output {expected_out} exist')
             if not paths:
                 logging.info(f'{expected_out} is not reusable. No paths found.')
                 return False, None

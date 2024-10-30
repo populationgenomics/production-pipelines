@@ -254,10 +254,7 @@ def _populate_analysis(dataset: Dataset) -> None:
     for sequencing_group in dataset.get_sequencing_groups():
         if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
             # assert file exists
-            assert exists(analysis.output), (
-                'gvcf file does not exist',
-                analysis.output
-            )
+            assert exists(analysis.output), ('gvcf file does not exist', analysis.output)
             sequencing_group.gvcf = GvcfPath(path=analysis.output)
         elif exists(sequencing_group.make_gvcf_path()):
             logging.warning(
@@ -266,10 +263,7 @@ def _populate_analysis(dataset: Dataset) -> None:
             )
         if (analysis := cram_by_sgid.get(sequencing_group.id)) and analysis.output:
             # assert file exists
-            assert exists(analysis.output), (
-                'cram file does not exist',
-                analysis.output
-            )
+            assert exists(analysis.output), ('cram file does not exist', analysis.output)
             crai_path = analysis.output.with_suffix('.cram.crai')
             if not exists(crai_path):
                 crai_path = None

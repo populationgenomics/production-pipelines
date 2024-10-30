@@ -1,6 +1,7 @@
 """
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
+
 import copy
 import hashlib
 import logging
@@ -352,8 +353,8 @@ class Dataset(Target):
     """
 
     def __init__(
-            self,
-            name: str,
+        self,
+        name: str,
     ):
         super().__init__()
         self._sequencing_group_by_id: dict[str, SequencingGroup] = {}

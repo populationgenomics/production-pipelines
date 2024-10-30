@@ -15,7 +15,15 @@ from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_multicohort, get_workflow, stage
+from cpg_workflows.workflow import (
+    DatasetStage,
+    MultiCohortStage,
+    StageInput,
+    StageOutput,
+    get_multicohort,
+    get_workflow,
+    stage,
+)
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
