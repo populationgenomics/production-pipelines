@@ -29,7 +29,6 @@ def run(
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
 ) -> None:
-
     import logging
 
     import hail as hl
@@ -38,7 +37,7 @@ def run(
     logging.basicConfig(level=logging.INFO)
 
     if not can_reuse(to_path(output_vds_path)):
-        init_batch()
+        init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
 
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')

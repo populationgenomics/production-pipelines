@@ -1,6 +1,6 @@
 import logging
 from itertools import chain
-from typing import TYPE_CHECKING, Any, Tuple
+from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
@@ -20,6 +20,9 @@ if TYPE_CHECKING:
     from graphql import DocumentNode
 
     from hailtop.batch.job import PythonJob
+
+
+HAIL_QUERY: Final = 'hail query'
 
 
 @stage(analysis_type='combiner')
@@ -56,7 +59,6 @@ class Combiner(CohortStage):
 
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
-        j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
 
         output_vds_path: Path = self.expected_outputs(cohort)
         tmp_prefix = slugify(
@@ -82,6 +84,7 @@ class Combiner(CohortStage):
         if len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
 
+        j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
         j.memory(combiner_config['memory'])
         j.storage(combiner_config['storage'])
@@ -115,7 +118,7 @@ class SampleQC(CohortStage):
 
         j = get_batch().new_job(
             'Sample QC',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
         j.command(
@@ -148,7 +151,7 @@ class DenseSubset(CohortStage):
 
         j = get_batch().new_job(
             'Dense Subset',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -307,7 +310,7 @@ class MakeSiteOnlyVcf(CohortStage):
 
         j = get_batch().new_job(
             'MakeSiteOnlyVcf',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -362,7 +365,7 @@ class LoadVqsr(CohortStage):
 
         j = get_batch().new_job(
             'LoadVqsr',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -389,7 +392,7 @@ class Frequencies(CohortStage):
 
         j = get_batch().new_job(
             'Frequencies',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
