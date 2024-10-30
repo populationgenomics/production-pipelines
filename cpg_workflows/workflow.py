@@ -643,7 +643,7 @@ class Stage(Generic[TargetT], ABC):
 
         if self.skipped:
             if reusable and not first_missing_path:
-                logging.info(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
+                logging.debug(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
                 return Action.REUSE
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.warning(
@@ -702,13 +702,13 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
-            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
+            logging.debug(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
-            logging.info('No expected outputs, assuming outputs exist')
+            logging.debug('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
