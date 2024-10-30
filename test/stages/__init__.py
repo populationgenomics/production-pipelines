@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -212,3 +214,6 @@ def run_workflow(
 
     stages = stages or [C, C2]
     _run_workflow(stages)  # type: ignore
+
+
+# endregion KEEP
