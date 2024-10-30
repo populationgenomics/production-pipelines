@@ -1,7 +1,7 @@
 """
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
-
+import copy
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -12,8 +12,9 @@ import pandas as pd
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import dataset_path, get_config, reference_path, web_url
-from cpg_workflows.filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
-from cpg_workflows.metamist import Assay
+
+from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
+from .metamist import Assay
 
 
 class Target:
@@ -44,7 +45,7 @@ class Target:
             sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        return f'{h}_{len(self.get_sequencing_groups())}'
+        return f'{h}_{len(self.get_sequencing_group_ids())}'
 
     @property
     def target_id(self) -> str:
@@ -148,8 +149,10 @@ class MultiCohort(Target):
         cohort = self._cohorts_by_name.get(name)
         if not cohort:
             logging.warning(f'Cohort {name} not found in the multi-cohort')
-            return None
-        if cohort.active or (not only_active):  # Return cohort if it's active, or we don't care
+
+        if not only_active:  # Return cohort even if it's inactive
+            return cohort
+        if isinstance(cohort, Cohort) and cohort.active:
             return cohort
         return None
 
@@ -168,7 +171,6 @@ class MultiCohort(Target):
         Gets a flat list of all sequencing groups from all datasets.
         uses a dictionary to avoid duplicates (we could have the same sequencing group in multiple cohorts)
         Include only "active" sequencing groups (unless only_active is False)
-        TODO store a top-level dictionary of all SGs, indexed by ID, instead of delegating to the Datasets
         """
         all_sequencing_groups: dict[str, SequencingGroup] = {}
         for dataset in self.get_datasets(only_active):
@@ -243,9 +245,9 @@ class MultiCohort(Target):
 
 class Cohort(Target):
     """
-    Represents a "cohort" target - all sequencing groups from a single CustomCohort
-    (potentially spanning multiple datasets) in the workflow.
-    Analysis dataset name is required and will be used as the default name for the cohort.
+    Represents a "cohort" target - all sequencing groups from a single CustomCohort (potentially spanning multiple datasets) in the workflow.
+    Analysis dataset name is required and will be used as the default name for the
+    cohort.
     """
 
     def __init__(self, name: str | None = None) -> None:
@@ -306,11 +308,11 @@ class Cohort(Target):
 
     def get_job_attrs(self) -> dict:
         """
-        TBD what this should be -
-        - we don't want to return the SGs, there's a cap on length of Value there
-        - Cohorts don't have datasets, so we can't return them
+        Attributes for Hail Batch job.
         """
-        return {}
+        return {
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
+        }
 
     def get_job_prefix(self) -> str:
         """
@@ -349,7 +351,10 @@ class Dataset(Target):
     * a metamist project
     """
 
-    def __init__(self, name: str):
+    def __init__(
+            self,
+            name: str,
+    ):
         super().__init__()
         self._sequencing_group_by_id: dict[str, SequencingGroup] = {}
         self.name = name
@@ -475,20 +480,16 @@ class Dataset(Target):
         self._sequencing_group_by_id[id] = s
         return s
 
-    def add_sequencing_group_object(self, s: 'SequencingGroup', allow_duplicates: bool = True):
+    def add_sequencing_group_object(self, s: 'SequencingGroup'):
         """
         Add a sequencing group object to the dataset.
         Args:
             s: SequencingGroup object
-            allow_duplicates: if True, allow adding the same object twice
         """
         if s.id in self._sequencing_group_by_id:
-            if allow_duplicates:
-                logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
-                return self._sequencing_group_by_id[s.id]
-            else:
-                raise ValueError(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
-        self._sequencing_group_by_id[s.id] = s
+            logging.debug(f'SequencingGroup {s.id} already exists in the dataset {self.name}')
+        else:
+            self._sequencing_group_by_id[s.id] = s
 
     def get_sequencing_group_by_id(self, id: str) -> Optional['SequencingGroup']:
         """
@@ -500,7 +501,7 @@ class Dataset(Target):
         """
         Get dataset's sequencing groups. Include only "active" sequencing groups, unless only_active=False
         """
-        return [s for s in self._sequencing_group_by_id.values() if (s.active or not only_active)]
+        return [s for sid, s in self._sequencing_group_by_id.items() if (s.active or not only_active)]
 
     def get_job_attrs(self) -> dict:
         """
