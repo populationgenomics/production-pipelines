@@ -33,7 +33,6 @@ from cpg_utils import Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
-
 from .inputs import get_multicohort
 from .status import MetamistStatusReporter
 from .targets import Cohort, Dataset, MultiCohort, SequencingGroup, Target
