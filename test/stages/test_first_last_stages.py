@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -51,3 +53,6 @@ def test_first_last_stages(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_stage['B']['job_n'] == 1
     assert get_batch().job_by_stage['C']['job_n'] == 1
     assert 'D' not in get_batch().job_by_stage
+
+
+# endregion KEEP
