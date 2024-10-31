@@ -21,38 +21,46 @@ from hailtop.batch import ResourceFile
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
 
-LOGGER: logging.Logger | None = None
+DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s'
+LOGGERS: dict[str, logging.Logger] = {}
 
 
-def get_logger(logger_name: str | None = None, log_level: int = logging.INFO) -> logging.Logger:
+def get_logger(
+    logger_name: str = 'cpg_workflows',
+    log_level: int = logging.INFO,
+    fmt_string: str = DEFAULT_LOG_FORMAT,
+) -> logging.Logger:
     """
     creates a logger instance (so as not to use the root logger)
     Args:
         logger_name (str):
         log_level (int): logging level, defaults to INFO
+        fmt_string (str): format string for this logger, defaults to DEFAULT_LOG_FORMAT
     Returns:
-        a logger instance, or the global logger if already defined
+        a logger instance, if required create it first
     """
-    global LOGGER
+    if logger_name not in LOGGERS:
 
-    if LOGGER is None:
-        # this very verbose logging is to ensure that the log level requested (INFO)
+        # TODO optionally install the coloredlogs module (useless in production, useful to debug?)
+
         # create a named logger
-        LOGGER = logging.getLogger(logger_name)
-        LOGGER.setLevel(log_level)
+        new_logger = logging.getLogger(logger_name)
+        new_logger.setLevel(log_level)
 
         # create a stream handler to write output
         stream_handler = logging.StreamHandler(sys.stdout)
         stream_handler.setLevel(log_level)
 
         # create format string for messages
-        formatter = logging.Formatter('%(asctime)s - %(name)s %(lineno)d - %(levelname)s - %(message)s')
+        formatter = logging.Formatter(fmt_string)
         stream_handler.setFormatter(formatter)
 
         # set the logger to use this handler
-        LOGGER.addHandler(stream_handler)
+        new_logger.addHandler(stream_handler)
 
-    return LOGGER
+        LOGGERS[logger_name] = new_logger
+
+    return LOGGERS[logger_name]
 
 
 def chunks(iterable, chunk_size):
