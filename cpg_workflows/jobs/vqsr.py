@@ -16,11 +16,10 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config, image_path, reference_path
 from cpg_utils.hail_batch import command
-from cpg_workflows.jobs.joint_genotyping import get_intervals_from_bed
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, get_intervals_from_bed
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',

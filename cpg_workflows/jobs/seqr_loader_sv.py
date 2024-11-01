@@ -23,12 +23,15 @@ def annotate_cohort_jobs_sv(
 
     j = get_batch().new_job('Annotate cohort', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
+    gencode_gz = get_config()['workflow']['gencode_gtf_file']
+    gencode_gtf_local = get_batch().read_input(str(gencode_gz))
     j.command(
         query_command(
             seqr_loader_sv,
             seqr_loader_sv.annotate_cohort_sv.__name__,
             str(vcf_path),
             str(out_mt_path),
+            str(gencode_gtf_local),
             str(checkpoint_prefix),
             setup_gcp=True,
         ),

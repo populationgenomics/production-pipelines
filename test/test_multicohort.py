@@ -195,6 +195,17 @@ def mock_get_cohorts(*args, **kwargs) -> dict:
     }
 
 
+def mock_get_overlapping_cohorts(*args, **kwargs) -> dict:
+    return {
+        'COH123': {
+            'projecta': [mock_get_sgs_by_cohort_project_a()[0]],
+        },
+        'COH456': {
+            'projecta': [mock_get_sgs_by_cohort_project_a()[1]],
+        },
+    }
+
+
 def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
     return {}
 
@@ -262,3 +273,42 @@ def test_multicohort(mocker: MockFixture, tmp_path):
     assert test_sg_b.external_id == 'NA111111'
     assert test_sg_b.participant_id == '10'
     assert test_sg_b.meta == {'sg_meta': 'is_awesome', 'participant_meta': 'is_here', 'phenotypes': {}}
+
+
+def test_overlapping_multicohort(mocker: MockFixture, tmp_path):
+    """
+    Testing multicohorts where different cohorts have sgs from the same dataset.
+    """
+    set_config(_multicohort_config(tmp_path), tmp_path / 'config.toml')
+
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: False)
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_sgs_for_cohorts', mock_get_overlapping_cohorts)
+
+    from cpg_workflows.inputs import get_multicohort
+
+    multicohort = get_multicohort()
+
+    assert multicohort
+    assert isinstance(multicohort, MultiCohort)
+
+    # Testing Cohort Information
+    assert len(multicohort.get_sequencing_groups()) == 2
+    assert multicohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA']
+
+    # Test the projects they belong to
+    assert multicohort.get_sequencing_groups()[0].dataset.name == 'projecta'
+    assert multicohort.get_sequencing_groups()[1].dataset.name == 'projecta'
+
+    test_sg_a = multicohort.get_sequencing_groups()[0]
+
+    # Test SequenceGroup Population
+    assert test_sg_a.id == 'CPGXXXX'
+    assert test_sg_a.external_id == 'NA12340'
+    assert test_sg_a.participant_id == '8'
+    assert test_sg_a.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
+
+    for cohort in multicohort.get_cohorts():
+        assert len(cohort.get_sequencing_group_ids()) == 1

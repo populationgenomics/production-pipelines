@@ -2,6 +2,7 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
+import copy
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -188,7 +189,8 @@ class MultiCohort(Target):
         if d.name in self._datasets_by_name:
             logging.debug(f'Dataset {d.name} already exists in the MultiCohort {self.name}')
         else:
-            self._datasets_by_name[d.name] = d
+            # We need create a new dataset to avoid manipulating the cohort dataset at this point
+            self._datasets_by_name[d.name] = Dataset(d.name, d.cohort)
         return self._datasets_by_name[d.name]
 
     def get_dataset_by_name(self, name: str, only_active: bool = True) -> Optional['Dataset']:
@@ -204,7 +206,7 @@ class MultiCohort(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'sequencing_groups': self.get_sequencing_group_ids(),
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
             'datasets': [d.name for d in self.get_datasets()],
             'cohorts': [c.name for c in self.get_cohorts()],
         }
@@ -333,7 +335,7 @@ class Cohort(Target):
         Attributes for Hail Batch job.
         """
         return {
-            'sequencing_groups': self.get_sequencing_group_ids(),
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
             'datasets': [d.name for d in self.get_datasets()],
         }
 
@@ -536,7 +538,7 @@ class Dataset(Target):
         """
         return {
             'dataset': self.name,
-            'sequencing_groups': self.get_sequencing_group_ids(),
+            # 'sequencing_groups': self.get_sequencing_group_ids(),
         }
 
     def get_job_prefix(self) -> str:

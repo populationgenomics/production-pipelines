@@ -3,6 +3,15 @@ name = 'gatk_sv'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 status_reporter = 'metamist'
 
+# update this when cpg_workflows.scripts.get_gencode_gtf.sh is re-run
+gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
+
+# Write dataset MTs for these datasets. Required for the AnnotateDatasetSv stage.
+# write_mt_for_datasets = []
+
+# Create Seqr ElasticSearch indices for these datasets. Required for the MtToEsSv stage.
+# create_es_index_for_datasets = []
+
 # switches to deactivate all Metrics workflows. We ran into some resourcing issues when our total
 # cohort size approached ~1600. Response when raised with GATK team:
 #

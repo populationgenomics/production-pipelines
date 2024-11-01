@@ -2,6 +2,7 @@
 name = 'gatk_sv'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 status_reporter = 'metamist'
+time_limit_seconds = 86400  # 24 hrs max runtime
 
 # these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
 # from the same caller, and runs a VCFMetrics comparison of the two
