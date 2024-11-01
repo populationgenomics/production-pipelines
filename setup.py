@@ -67,6 +67,18 @@ setup(
             'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
             # for use in translating a MatrixTable to an ES index, first localising the MT
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
+            # the PCRelate step of LargeCohort - Relatedness
+            'relatedness_pcrelate = cpg_workflows.large_cohort.scripts.relatedness_pcrelate:cli_main',
+            # the Flagging step of LargeCohort - Relatedness
+            'relatedness_flag = cpg_workflows.large_cohort.scripts.relatedness_flag:cli_main',
+            # the Densification of a background population dataset
+            'densify_background_dataset = cpg_workflows.large_cohort.scripts.densify_background_dataset:cli_main',
+            # the Background Stage of Ancestry - LargeCohort
+            'ancestry_add_background = cpg_workflows.large_cohort.scripts.ancestry_add_background:cli_main',
+            # the Background Stage of Ancestry - PCA
+            'ancestry_pca = cpg_workflows.large_cohort.scripts.ancestry_run_pca:cli_main',
+            # the Background Stage of Ancestry - Infer Population Labels
+            'ancestry_infer_labels = cpg_workflows.large_cohort.scripts.ancestry_infer_labels:cli_main',
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
