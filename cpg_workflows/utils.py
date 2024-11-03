@@ -22,10 +22,7 @@ from hailtop.batch import ResourceFile
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
 
-DEFAULT_LOG_FORMAT = config_retrieve(
-    ['workflow', 'log_format'],
-    '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s',
-)
+DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s'
 LOGGERS: dict[str, logging.Logger] = {}
 
 
@@ -38,7 +35,7 @@ def get_logger(
     creates a logger instance (so as not to use the root logger)
     Args:
         logger_name (str):
-        log_level (int): logging level, defaults to INFO
+        log_level (int): logging level, defaults to INFO. Can be overridden by config
         fmt_string (str): format string for this logger, defaults to DEFAULT_LOG_FORMAT
     Returns:
         a logger instance, if required create it first
@@ -46,12 +43,16 @@ def get_logger(
 
     if logger_name not in LOGGERS:
 
+        # allow a log-level & format override on a name basis
+        log_level = config_retrieve(['workflow', 'logger', logger_name, 'level'], log_level)
+        fmt_string = config_retrieve(['workflow', 'logger', logger_name, 'format'], fmt_string)
+
         # create a named logger
         new_logger = logging.getLogger(logger_name)
         new_logger.setLevel(log_level)
 
         # unless otherwise specified, use coloredlogs
-        if config_retrieve(['workflow', 'use_colored_logs'], True):
+        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], True):
             coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
