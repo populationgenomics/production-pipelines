@@ -2,6 +2,7 @@
 Utility functions and constants.
 """
 
+import coloredlogs
 import logging
 import re
 import string
@@ -42,13 +43,16 @@ def get_logger(
     Returns:
         a logger instance, if required create it first
     """
-    if logger_name not in LOGGERS:
 
-        # TODO optionally install the coloredlogs module (useless in production, useful to debug?)
+    if logger_name not in LOGGERS:
 
         # create a named logger
         new_logger = logging.getLogger(logger_name)
         new_logger.setLevel(log_level)
+
+        # unless otherwise specified, use coloredlogs
+        if config_retrieve(['workflow', 'use_colored_logs'], True):
+            coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
         stream_handler = logging.StreamHandler(sys.stdout)
