@@ -300,7 +300,7 @@ def queue_annotate_sv_jobs(
     """
     input_dict: dict[str, Any] = {
         'vcf': input_vcf,
-        'prefix': cohort.name,
+        'prefix': cohort.id,
         'ped_file': make_combined_ped(cohort, cohort_prefix),
         'sv_per_shard': 5000,
         'population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),

@@ -121,7 +121,7 @@ class TestDatasetStage(DatasetStage):
 
 class TestCohortStage(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return to_path(dataset_path(f'{cohort.name}_{self.name}.tsv'))
+        return to_path(dataset_path(f'{cohort.id}_{self.name}.tsv'))
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         j = get_batch().new_job(self.name, attributes=self.get_job_attrs(cohort))

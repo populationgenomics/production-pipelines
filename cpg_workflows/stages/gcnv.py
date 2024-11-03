@@ -497,7 +497,7 @@ class MergeCohortsgCNV(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
         cohort_merges = inputs.as_dict_by_target(FastCombineGCNVs)
-        cohort_vcfs = [str(cohort_merges[cohort.name]['combined_calls']) for cohort in multicohort.get_cohorts()]
+        cohort_vcfs = [str(cohort_merges[cohort.id]['combined_calls']) for cohort in multicohort.get_cohorts()]
 
         pipeline_image = get_images(['sv_pipeline_docker'])['sv_pipeline_docker']
 
