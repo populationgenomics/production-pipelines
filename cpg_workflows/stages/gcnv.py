@@ -546,8 +546,8 @@ class AnnotateCNV(MultiCohortStage):
 
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
         job_or_none = queue_annotate_sv_jobs(
-            cohort=multicohort,
-            cohort_prefix=self.prefix,
+            multicohort=multicohort,
+            prefix=self.prefix,
             input_vcf=inputs.as_dict(multicohort, MergeCohortsgCNV)['merged_vcf'],
             outputs=expected_out,
             labels=billing_labels,

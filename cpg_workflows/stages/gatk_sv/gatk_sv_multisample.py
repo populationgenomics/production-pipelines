@@ -578,7 +578,7 @@ class MergeBatchSites(MultiCohortStage):
         pesr_vcfs = [filter_batch_outputs[cohort.id]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
         depth_vcfs = [filter_batch_outputs[cohort.id]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
-        input_dict: dict = {'cohort': multicohort.id, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
+        input_dict: dict = {'cohort': multicohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
         input_dict |= get_images(['sv_pipeline_docker'])
         expected_d = self.expected_outputs(multicohort)
 
@@ -778,7 +778,7 @@ class MakeCohortVcf(MultiCohortStage):
         median_cov_files = [gatherbatchevidence_outputs[cohort]['median_cov'] for cohort in all_batch_names]
 
         input_dict: dict[str, Any] = {
-            'cohort_name': multicohort.id,
+            'cohort_name': multicohort.name,
             'batches': all_batch_names,
             'ped_file': str(pedigree_input),
             'ref_dict': str(get_fasta().with_suffix('.dict')),
@@ -857,7 +857,7 @@ class FormatVcfForGatk(MultiCohortStage):
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
-            'prefix': multicohort.id,
+            'prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, MakeCohortVcf)['vcf'],
             'ped_file': str(pedigree_input),
         }
@@ -893,7 +893,7 @@ class JoinRawCalls(MultiCohortStage):
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict: dict[str, Any] = {
             'FormatVcfForGatk.formatter_args': '--fix-end',
-            'prefix': multicohort.id,
+            'prefix': multicohort.name,
             'ped_file': str(pedigree_input),
             'reference_fasta': get_fasta(),
             'reference_fasta_fai': str(get_fasta()) + '.fai',
@@ -949,7 +949,7 @@ class SVConcordance(MultiCohortStage):
         """
 
         input_dict: dict[str, Any] = {
-            'output_prefix': multicohort.id,
+            'output_prefix': multicohort.name,
             'reference_dict': str(get_fasta().with_suffix('.dict')),
             'eval_vcf': inputs.as_dict(multicohort, FormatVcfForGatk)['gatk_formatted_vcf'],
             'truth_vcf': inputs.as_dict(multicohort, JoinRawCalls)['joined_raw_calls_vcf'],
@@ -1024,7 +1024,7 @@ class FilterGenotypes(MultiCohortStage):
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
         input_dict = {
-            'output_prefix': multicohort.id,
+            'output_prefix': multicohort.name,
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(multicohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': str(pedigree_input),
@@ -1086,7 +1086,7 @@ class UpdateStructuralVariantIDs(MultiCohortStage):
 
         # run concordance between this and the previous VCF
         input_dict: dict = {
-            'output_prefix': multicohort.id,
+            'output_prefix': multicohort.name,
             'reference_dict': str(get_fasta().with_suffix('.dict')),
             'eval_vcf': inputs.as_path(multicohort, FilterGenotypes, key='filtered_vcf'),
             'truth_vcf': spicy_vcf,

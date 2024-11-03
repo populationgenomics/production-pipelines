@@ -288,8 +288,8 @@ def make_combined_ped(cohort: Cohort | MultiCohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    cohort: Cohort | MultiCohort,
-    cohort_prefix: Path,
+    multicohort: MultiCohort,
+    prefix: Path,
     input_vcf: Path,
     outputs: dict,
     labels: dict[str, str] | None = None,
@@ -300,8 +300,8 @@ def queue_annotate_sv_jobs(
     """
     input_dict: dict[str, Any] = {
         'vcf': input_vcf,
-        'prefix': cohort.id,
-        'ped_file': make_combined_ped(cohort, cohort_prefix),
+        'prefix': multicohort.name,
+        'ped_file': make_combined_ped(multicohort, prefix),
         'sv_per_shard': 5000,
         'population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
         'ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
@@ -320,7 +320,7 @@ def queue_annotate_sv_jobs(
     # images!
     input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker'])
     jobs = add_gatk_sv_jobs(
-        dataset=cohort.analysis_dataset,
+        dataset=multicohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=outputs,
