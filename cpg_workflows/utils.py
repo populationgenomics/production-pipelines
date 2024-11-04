@@ -2,7 +2,6 @@
 Utility functions and constants.
 """
 
-import coloredlogs
 import logging
 import re
 import string
@@ -15,6 +14,8 @@ from itertools import chain, islice
 from os.path import basename, dirname, join
 from random import choices
 from typing import Union, cast
+
+import coloredlogs
 
 import hail as hl
 from hailtop.batch import ResourceFile
