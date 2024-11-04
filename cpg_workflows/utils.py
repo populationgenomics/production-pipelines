@@ -23,7 +23,10 @@ from hailtop.batch import ResourceFile
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
 
-DEFAULT_LOG_FORMAT = '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s'
+DEFAULT_LOG_FORMAT = config_retrieve(
+    ['workflow', 'logger', 'default_format'],
+    '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s',
+)
 LOGGERS: dict[str, logging.Logger] = {}
 
 
