@@ -289,7 +289,11 @@ def annotate_localised_vcfs(
     return ordered_annotated, annotation_jobs
 
 
-def split_and_annotate_vcf(vcf_in: str | ResourceFile, out_vcf: str, minimal: bool = True) -> tuple[ResourceFile, list[BashJob]]:
+def split_and_annotate_vcf(
+    vcf_in: str | ResourceFile,
+    out_vcf: str,
+    minimal: bool = True,
+) -> tuple[ResourceFile, list[BashJob]]:
     """
     take a path to a VCF (in GCP), or a ResourceFile (with implicit accompanying index)
     split that VCF into separate chromosomes (dumb split, but fine for small inputs)
@@ -314,7 +318,8 @@ def split_and_annotate_vcf(vcf_in: str | ResourceFile, out_vcf: str, minimal: bo
 
     # split the whole vcf into chromosomes, but keep accurate ordering for all chunks
     ordered_output_vcfs, bcftools_job = split_vcf_by_chromosome(
-        localised_vcf=vcf_in_batch, output_dir=vcf_fragments_dir,
+        localised_vcf=vcf_in_batch,
+        output_dir=vcf_fragments_dir,
     )
 
     # new path, also in tmp
