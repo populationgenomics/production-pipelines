@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING
 
 from hail.vds import new_combiner
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, to_path
 
 if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
@@ -38,6 +40,8 @@ def run(
 
     if not can_reuse(to_path(output_vds_path)):
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+        if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+            override_jar_spec(jar_spec)
 
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
