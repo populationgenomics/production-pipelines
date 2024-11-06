@@ -2,6 +2,9 @@
 Extending the Hail's `Batch` class.
 """
 
+from hail.backend.service_backend import ServiceBackend
+from hail.utils.java import Env
+
 
 def make_job_name(
     name: str,
@@ -22,3 +25,22 @@ def make_job_name(
     if part:
         name += f', {part}'
     return name
+
+
+_override_revision = None
+
+
+class OverrideServiceBackend(ServiceBackend):
+    @property
+    def jar_spec(self) -> dict:
+        return {'type': 'git_revision', 'value': _override_revision}
+
+
+def override_jar_spec(revision):
+    global _override_revision
+    print(f'In override, {revision=}')
+    if revision is not None:
+        _override_revision = revision
+        print(f'In override, {_override_revision=}')
+        backend = Env.backend()
+        backend.__class__ = OverrideServiceBackend
