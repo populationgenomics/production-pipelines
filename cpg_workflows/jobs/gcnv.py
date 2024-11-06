@@ -540,7 +540,9 @@ def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict
     localised_vcf = get_batch().read_input_group(**{'vcf.gz': sg_vcf, 'vcf.gz.tbi': f'{sg_vcf}.tbi'})['vcf.gz']
     autosomes = ' '.join([f'chr{i}' for i in range(1, 23)])
     job.command('set -euo pipefail')
-    job.command(f'bcftools view {localised_vcf} {autosomes} | bgzip -c > {job.output["vcf.bgz"]}')  # type: ignore
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    job.command(f'bcftools view -Oz -o {job.output["vcf.bgz"]} {localised_vcf} {autosomes}')  # type: ignore
     job.command(f'tabix {job.output["vcf.bgz"]}')  # type: ignore
     get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
     return job
@@ -592,7 +594,7 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
         merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
 
     # now normlise the result, splitting multiallelics
-    merge_job.command(f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}')
+    merge_job.command(f'bcftools norm -m -any -Oz -o {merge_job.tmp_vcf_split} {merge_job.tmp_vcf}')
 
     # create a python job to do the file content updates
     pyjob = get_batch().new_python_job('Update VCF content')
@@ -603,7 +605,9 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')  # type: ignore
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    third_job.command(f'bcftools view -Oz -o {third_job.output["vcf.bgz"]} {pyjob.output}')  # type: ignore
     third_job.command(f'tabix {third_job.output["vcf.bgz"]}')  # type: ignore
 
     # dependency setting between jobs should be implicit due to temp file passing
