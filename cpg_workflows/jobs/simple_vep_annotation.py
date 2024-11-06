@@ -298,7 +298,7 @@ def split_and_annotate_vcf(vcf_in: str | ResourceFile, out_vcf: str, minimal: bo
     Args:
         vcf_in (str): path to an input VCF file, or a pre-localised ResourceFile
         out_vcf (str): path to final output
-        minimal (bool): whether to use the minimal annotation set
+        minimal (bool): whether to use the minimal annotation set, default is True (for ClinvArbitration)
     """
 
     # allow for situations where this VCF was already a localised Resource
