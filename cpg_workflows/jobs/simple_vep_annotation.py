@@ -161,6 +161,16 @@ def annotate_localised_vcfs(
         vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
         vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
 
+        loftee_conf = {
+            'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
+            'human_ancestor_fa': f'{vep_dir}/human_ancestor.fa.gz',
+            'conservation_file': f'{vep_dir}/loftee.sql',
+            'loftee_path': '$VEP_DIR_PLUGINS',
+        }
+
+        # sexy new plugin - only present in 110 build
+        alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
+
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
         vep_job.command(
             f'vep '
@@ -179,7 +189,10 @@ def annotate_localised_vcfs(
             f'--cache '
             f'--offline '
             f'--assembly GRCh38 '
-            f'--fa ${{FASTA}}',
+            f'--fa ${{FASTA}} '
+            f'{alpha_missense_plugin} '
+            f'--plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())} '
+            f'--plugin UTRAnnotator,file=$UTR38 '
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')
 
