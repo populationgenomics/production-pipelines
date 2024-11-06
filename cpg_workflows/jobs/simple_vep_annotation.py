@@ -187,6 +187,7 @@ def annotate_localised_vcfs(
             --protein
             --af_gnomadg
             --af_gnomade
+            --mane_select
             --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz
             --plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())}
             --plugin UTRAnnotator,file=$UTR38
