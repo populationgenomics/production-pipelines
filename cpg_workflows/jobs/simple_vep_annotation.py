@@ -171,25 +171,25 @@ def annotate_localised_vcfs(
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
         vep_job.command(
             f"""
-            vep
-            --format vcf
-            -i {vcf}
-            --vcf
-            --compress_output bgzip
-            --no_stats
-            --dir_cache {vep_dir}/vep/
-            --species homo_sapiens
-            --cache
-            --offline
-            --assembly GRCh38
-            --fa ${{FASTA}}
-            -o {vep_job.vcf["vcf.bgz"]}
-            --protein
-            --af_gnomadg
-            --af_gnomade
-            --mane_select
-            --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz
-            --plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())}
+            vep \
+            --format vcf \
+            -i {vcf} \
+            --vcf \
+            --compress_output bgzip \
+            --no_stats \
+            --dir_cache {vep_dir}/vep/ \
+            --species homo_sapiens \
+            --cache \
+            --offline \
+            --assembly GRCh38 \
+            --fa ${{FASTA}} \
+            -o {vep_job.vcf["vcf.bgz"]} \
+            --protein \
+            --af_gnomadg \
+            --af_gnomade \
+            --mane_select \
+            --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz \
+            --plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())} \
             --plugin UTRAnnotator,file=$UTR38
             """,
         )
