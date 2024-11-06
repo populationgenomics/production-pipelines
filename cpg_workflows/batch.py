@@ -38,7 +38,13 @@ class OverrideServiceBackend(ServiceBackend):
 
 def override_jar_spec(revision: str) -> None:
     global _override_revision
+    #print(f'In override, {revision=}')
     _override_revision = revision
+    #print(f'In override, {_override_revision=}')
     backend = Env.backend()
     if isinstance(backend, ServiceBackend):
+        #print('Ja, isinstance')
         backend.__class__ = OverrideServiceBackend
+    else:
+        #print('Nope')
+        pass

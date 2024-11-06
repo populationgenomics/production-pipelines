@@ -1,0 +1,5 @@
+[workflow]
+#jar_spec_revision = 'abcdef'
+
+[hail]
+#pool_label = 'large-cohort'
