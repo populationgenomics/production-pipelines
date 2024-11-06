@@ -182,7 +182,6 @@ def annotate_localised_vcfs(
             f'--dir_cache {vep_dir}/vep/ '
             f'-o {vep_job.vcf["vcf.bgz"]} '
             f'--protein '
-            f'--variant_class '
             f'--af_gnomadg '                  # add gnomAD Genomes AF
             f'--af_gnomade '                  # add gnomAD Exomes AF
             f'--species homo_sapiens '
