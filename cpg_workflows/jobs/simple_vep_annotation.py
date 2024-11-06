@@ -2,14 +2,14 @@
 
 
 """
-This is a VV simple VEP annotation process, annotating a VCF with a minimal number of annotations
+This is a simplified VEP annotation process, annotating a VCF with a minimal number of annotations
 This is to facilitate the migration of the clinvar re-summary process out of AIP/ClinvArbitration
 Minimal annotation set to improve runtimes
 
 Long-running/whole-genome VEP tasks could be improved by localising and unpacking the VEP cache inside the VM
 """
 import logging
-import os.path
+from os.path import join
 from argparse import ArgumentParser
 
 from hailtop.batch import ResourceFile
@@ -64,7 +64,7 @@ def split_vcf_by_chromosome(
         # if a location to write to was used, check if we already made this (workflow resumption)
         if isinstance(output_dir, str):
             # the name for this chunk of annotation
-            result_path = os.path.join(output_dir, f'{chrom}.vcf.bgz')
+            result_path = join(output_dir, f'{chrom}.vcf.bgz')
 
             # check if it exists already, if so read it in
             if result_path in existing_fragments:
@@ -90,7 +90,7 @@ def split_vcf_by_chromosome(
 
         if isinstance(output_dir, str):
             # write the fragment & index to GCP
-            get_batch().write_output(bcftools_job[chrom], os.path.join(output_dir, chrom))
+            get_batch().write_output(bcftools_job[chrom], join(output_dir, chrom))
 
         # and add to the sorted list for this batch
         ordered_output_vcfs.append(bcftools_job[chrom]['vcf.bgz'])
@@ -136,7 +136,7 @@ def annotate_localised_vcfs(
 
         if isinstance(output_dir, str):
             # the name for this chunk of annotation
-            result_path = os.path.join(output_dir, f'{job_number}.vcf.bgz')
+            result_path = join(output_dir, f'{job_number}.vcf.bgz')
             # do we already have it generated?
             if result_path in existing_outputs:
                 logging.info(f'{result_path} already exists')
@@ -168,35 +168,33 @@ def annotate_localised_vcfs(
             'loftee_path': '$VEP_DIR_PLUGINS',
         }
 
-        # sexy new plugin - only present in 110 build
-        alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
-
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
-        vep_job.command(
-            f'vep '
-            f'--format vcf '                 # output format
-            f'-i {vcf} '                     # input VCF
-            f'--vcf '                        # input format
-            f'--compress_output bgzip '
-            f'--no_stats '
-            f'--dir_cache {vep_dir}/vep/ '
-            f'-o {vep_job.vcf["vcf.bgz"]} '
-            f'--protein '
-            f'--af_gnomadg '                  # add gnomAD Genomes AF
-            f'--af_gnomade '                  # add gnomAD Exomes AF
-            f'--species homo_sapiens '
-            f'--cache '
-            f'--offline '
-            f'--assembly GRCh38 '
-            f'--fa ${{FASTA}} '
-            f'{alpha_missense_plugin} '
-            f'--plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())} '
-            f'--plugin UTRAnnotator,file=$UTR38 '
+        vep_job.command(f"""
+            vep 
+            '--format vcf 
+            -i {vcf} 
+            --vcf 
+            --compress_output bgzip 
+            --no_stats 
+            --dir_cache {vep_dir}/vep/ 
+            --species homo_sapiens 
+            --cache 
+            --offline 
+            --assembly GRCh38 
+            --fa ${{FASTA}} 
+            -o {vep_job.vcf["vcf.bgz"]} 
+            --protein 
+            --af_gnomadg 
+            --af_gnomade 
+            --plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz
+            --plugin LoF,{",".join(f"{k}:{v}" for k, v in loftee_conf.items())} 
+            --plugin UTRAnnotator,file=$UTR38 
+            """
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')
 
         if isinstance(output_dir, str):
-            get_batch().write_output(vep_job.vcf, os.path.join(output_dir, str(job_number)))
+            get_batch().write_output(vep_job.vcf, join(output_dir, str(job_number)))
 
         annotation_jobs.append(vep_job)
         # keep a list of the in-batch VCF paths
