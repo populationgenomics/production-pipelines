@@ -552,6 +552,8 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     It then throws in a python script to add in two additional header lines
     and edit the SVLEN and SVTYPE attributes into each row
 
+    Escape here for single-VCF merges - the merge command is invalid, so we pass through the first step
+
     Args:
         sg_vcfs (list[str]): paths to all individual VCFs
         docker_image (str): docker image to use
@@ -576,13 +578,18 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz'],
         )
 
-    # option breakdown:
-    # -Oz: bgzip output
-    # -o: output file
-    # --threads: number of threads to use
-    # -m: merge strategy
-    # -0: compression level
-    merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
+    if len(batch_vcfs) == 0:
+        raise ValueError('No VCFs to merge')
+    elif len(batch_vcfs) == 1:
+        merge_job.command(f'mv {batch_vcfs[0]} {merge_job.tmp_vcf}')
+    else:
+        # option breakdown:
+        # -Oz: bgzip output
+        # -o: output file
+        # --threads: number of threads to use
+        # -m: merge strategy
+        # -0: compression level
+        merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
 
     # now normlise the result, splitting multiallelics
     merge_job.command(f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}')
