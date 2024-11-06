@@ -15,7 +15,7 @@ from os.path import join
 from hailtop.batch import ResourceFile
 from hailtop.batch.job import BashJob
 
-from cpg_utils import to_path
+from cpg_utils import to_path, Path
 from cpg_utils.config import image_path, output_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.bcftools import naive_concat_vcfs
@@ -25,6 +25,32 @@ CHROM_LIST: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY
 
 VCF_BGZ_SUFFIX: str = 'vcf.bgz'
 VCF_BGZ_TBI_SUFFIX: str = 'vcf.bgz.tbi'
+
+
+def create_vep_job_and_mount_data(job_number: int = 1) -> tuple[BashJob, Path]:
+    """
+
+    Args:
+        job_number ():
+
+    Returns:
+
+    """
+    # annotate that fragment, making a VCF output
+    vep_job = get_batch().new_job(f'Annotate part {job_number} with VEP')
+
+    # declare a resource group for this annotated VCF output
+    vep_job.declare_resource_group(vcf={VCF_BGZ_SUFFIX: '{root}.vcf.bgz', VCF_BGZ_TBI_SUFFIX: '{root}.vcf.bgz.tbi'})
+
+    # configure the required resources
+    vep_job.image(image_path('vep_110')).cpu(4).memory('highmem')
+
+    # gcsfuse works only with the root bucket, without prefix:
+    vep_mount_path = to_path(reference_path('vep_110_mount'))
+    data_mount = to_path(f'/{vep_mount_path.drive}')
+    vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
+    vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
+    return vep_job, vep_dir
 
 
 def split_vcf_by_chromosome(
@@ -145,19 +171,7 @@ def minimal_annotation(
             continue
 
         # annotate that fragment, making a VCF output
-        vep_job = get_batch().new_job(f'Annotate part {job_number} with VEP')
-
-        # declare a resource group for this annotated VCF output
-        vep_job.declare_resource_group(vcf={VCF_BGZ_SUFFIX: '{root}.vcf.bgz', VCF_BGZ_TBI_SUFFIX: '{root}.vcf.bgz.tbi'})
-
-        # configure the required resources
-        vep_job.image(image_path('vep_110')).cpu(4).memory('highmem')
-
-        # gcsfuse works only with the root bucket, without prefix:
-        vep_mount_path = to_path(reference_path('vep_110_mount'))
-        data_mount = to_path(f'/{vep_mount_path.drive}')
-        vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
-        vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
+        vep_job, vep_dir = create_vep_job_and_mount_data(job_number)
 
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
         vep_job.command(
@@ -231,19 +245,7 @@ def annotate_localised_vcfs(
             continue
 
         # annotate that fragment, making a VCF output
-        vep_job = get_batch().new_job(f'Annotate part {job_number} with VEP')
-
-        # declare a resource group for this annotated VCF output
-        vep_job.declare_resource_group(vcf={VCF_BGZ_SUFFIX: '{root}.vcf.bgz', VCF_BGZ_TBI_SUFFIX: '{root}.vcf.bgz.tbi'})
-
-        # configure the required resources
-        vep_job.image(image_path('vep_110')).cpu(4).memory('highmem')
-
-        # gcsfuse works only with the root bucket, without prefix:
-        vep_mount_path = to_path(reference_path('vep_110_mount'))
-        data_mount = to_path(f'/{vep_mount_path.drive}')
-        vep_job.cloudfuse(vep_mount_path.drive, str(data_mount), read_only=True)
-        vep_dir = data_mount / '/'.join(vep_mount_path.parts[2:])
+        vep_job, vep_dir = create_vep_job_and_mount_data(job_number)
 
         loftee_conf = {
             'gerp_bigwig': f'{vep_dir}/gerp_conservation_scores.homo_sapiens.GRCh38.bw',
