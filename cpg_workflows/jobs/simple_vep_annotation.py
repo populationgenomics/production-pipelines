@@ -15,7 +15,7 @@ from os.path import join
 from hailtop.batch import ResourceFile
 from hailtop.batch.job import BashJob
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import image_path, output_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.bcftools import naive_concat_vcfs
@@ -194,9 +194,7 @@ def minimal_annotation(
             """,
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf[VCF_BGZ_SUFFIX]}')
-
-        if isinstance(output_dir, str):
-            get_batch().write_output(vep_job.vcf, join(output_dir, str(job_number)))
+        get_batch().write_output(vep_job.vcf, join(output_dir, str(job_number)))
 
         annotation_jobs.append(vep_job)
         # keep a list of the in-batch VCF paths
@@ -280,9 +278,7 @@ def annotate_localised_vcfs(
             """,
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf[VCF_BGZ_SUFFIX]}')
-
-        if isinstance(output_dir, str):
-            get_batch().write_output(vep_job.vcf, join(output_dir, str(job_number)))
+        get_batch().write_output(vep_job.vcf, join(output_dir, str(job_number)))
 
         annotation_jobs.append(vep_job)
         # keep a list of the in-batch VCF paths
