@@ -163,9 +163,23 @@ def annotate_localised_vcfs(
 
         vep_job.command(f'FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz && echo $FASTA')
         vep_job.command(
-            f'vep --format vcf --vcf --compress_output bgzip --no_stats --fork 4 --dir_cache {vep_dir}/vep/ '
+            f'vep '
+            f'--format vcf '                 # output format
+            f'-i {vcf} '                     # input VCF
+            f'--vcf '                        # input format
+            f'--compress_output bgzip '
+            f'--no_stats '
+            f'--dir_cache {vep_dir}/vep/ '
             f'-o {vep_job.vcf["vcf.bgz"]} '
-            f'-i {vcf} --protein --species homo_sapiens --cache --offline --assembly GRCh38 --fa ${{FASTA}}',
+            f'--protein '
+            f'--variant_class '
+            f'--af_gnomadg '                  # add gnomAD Genomes AF
+            f'--af_gnomade '                  # add gnomAD Exomes AF
+            f'--species homo_sapiens '
+            f'--cache '
+            f'--offline '
+            f'--assembly GRCh38 '
+            f'--fa ${{FASTA}}',
         )
         vep_job.command(f'tabix -p vcf {vep_job.vcf["vcf.bgz"]}')
 
