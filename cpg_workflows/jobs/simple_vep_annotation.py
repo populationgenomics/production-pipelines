@@ -172,7 +172,7 @@ def annotate_localised_vcfs(
         vep_job.command(
             f"""
             vep
-            '--format vcf
+            --format vcf
             -i {vcf}
             --vcf
             --compress_output bgzip
