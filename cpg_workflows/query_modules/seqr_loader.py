@@ -81,12 +81,7 @@ def annotate_cohort(
         mt = mt.drop('variant_qc')
 
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=mt.info.AF[mt.a_index - 1],
-            AC=mt.info.AC[mt.a_index - 1]
-        )
-    )
+    mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.info.AF[mt.a_index - 1], AC=mt.info.AC[mt.a_index - 1]))
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
