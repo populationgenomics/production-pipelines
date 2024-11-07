@@ -82,7 +82,7 @@ class Combiner(CohortStage):
             cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
             new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
 
-        if len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
+        if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
