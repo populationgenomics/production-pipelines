@@ -57,7 +57,13 @@ def annotate_cohort(
     if long_read:
         mt = mt.drop('AF')
         mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
+        mt = mt.annotate_rows(
+            info=mt.info.annotate(
+                AF=mt.variant_qc.AF,
+                AN=mt.variant_qc.AN,
+                AC=mt.variant_qc.AC,
+            ),
+        )
         mt = mt.drop('variant_qc')
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
