@@ -75,11 +75,12 @@ class Combiner(CohortStage):
                 vds_paths.append(tmp_query_res)
                 sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
 
-        # Get SG IDs from the cohort object itself, rather than call Metamist.
-        # Get VDS IDs first and filter out from this list
-        cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
+        if not config_retrieve(['combiner', 'merge_only_vds'], None):
+            # Get SG IDs from the cohort object itself, rather than call Metamist.
+            # Get VDS IDs first and filter out from this list
+            cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
 
-        new_sg_gvcfs: list[str] = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
+            new_sg_gvcfs: list[str] = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
 
         if len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
