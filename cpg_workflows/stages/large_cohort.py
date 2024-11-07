@@ -68,7 +68,7 @@ class Combiner(CohortStage):
         # create these as empty lists instead of None, they have the same truthiness
         vds_paths: list[str] = []
         sg_ids_in_vds: list[str] = []
-        new_sg_gvcfs: list[str] = []
+        new_sg_gvcfs: list[str] | None = None
 
         if combiner_config.get('vds_analysis_ids', None) is not None:
             for vds_id in combiner_config['vds_analysis_ids']:
@@ -82,7 +82,7 @@ class Combiner(CohortStage):
             cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
             new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
 
-        if len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
+        if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
@@ -97,7 +97,7 @@ class Combiner(CohortStage):
             sequencing_type=workflow_config['sequencing_type'],
             tmp_prefix=tmp_prefix,
             genome_build=genome_build(),
-            gvcf_paths=new_sg_gvcfs,  # this is a list or None, and in new_combiner None is made into []
+            gvcf_paths=new_sg_gvcfs,  # test None as default
             vds_paths=vds_paths,
         )
 
