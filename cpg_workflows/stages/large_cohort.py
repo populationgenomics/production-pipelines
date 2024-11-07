@@ -68,6 +68,7 @@ class Combiner(CohortStage):
         # create these as empty lists instead of None, they have the same truthiness
         vds_paths: list[str] = []
         sg_ids_in_vds: list[str] = []
+        new_sg_gvcfs: list[str] = []
 
         if combiner_config.get('vds_analysis_ids', None) is not None:
             for vds_id in combiner_config['vds_analysis_ids']:
@@ -79,8 +80,7 @@ class Combiner(CohortStage):
             # Get SG IDs from the cohort object itself, rather than call Metamist.
             # Get VDS IDs first and filter out from this list
             cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-
-            new_sg_gvcfs: list[str] = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
+            new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.id not in sg_ids_in_vds]
 
         if len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
