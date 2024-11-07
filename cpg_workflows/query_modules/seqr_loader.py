@@ -90,17 +90,19 @@ def annotate_cohort(
     logging.info('Annotating with seqr-loader fields: round 1')
 
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
+    # these elements become a 1-element array
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AF=mt.info.AF[mt.a_index - 1],
-            AC=mt.info.AC[mt.a_index - 1],
+            AF=[mt.info.AF[mt.a_index - 1]],
+            AC=[mt.info.AC[mt.a_index - 1]],
         ),
     )
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
-        AC=mt.info.AC,
-        AF=mt.info.AF,
+        # still taking just a single value here for downstream compatibility in Seqr
+        AC=mt.info.AC[0],
+        AF=mt.info.AF[0],
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
