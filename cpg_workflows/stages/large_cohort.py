@@ -68,7 +68,7 @@ class Combiner(CohortStage):
         # create these as empty lists instead of None, they have the same truthiness
         vds_paths: list[str] = []
         sg_ids_in_vds: list[str] = []
-        new_sg_gvcfs: list[str] = []
+        new_sg_gvcfs: list[str] | None = None
 
         if combiner_config.get('vds_analysis_ids', None) is not None:
             for vds_id in combiner_config['vds_analysis_ids']:
@@ -97,7 +97,7 @@ class Combiner(CohortStage):
             sequencing_type=workflow_config['sequencing_type'],
             tmp_prefix=tmp_prefix,
             genome_build=genome_build(),
-            gvcf_paths=new_sg_gvcfs,  # this is a list or None, and in new_combiner None is made into []
+            gvcf_paths=new_sg_gvcfs,  # test None as default
             vds_paths=vds_paths,
         )
 
