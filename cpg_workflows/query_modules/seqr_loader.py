@@ -50,6 +50,22 @@ def annotate_cohort(
     )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
+    # in our long-read VCFs, AF is present as an Entry field, so we need to drop it from entries,
+    # and then recompute AC/AF/AN correctly from the variant QC table
+    # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
+    # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
+    if long_read:
+        mt = mt.drop('AF')
+        mt = hl.variant_qc(mt)
+        mt = mt.annotate_rows(
+            info=mt.info.annotate(
+                AF=mt.variant_qc.AF,
+                AN=mt.variant_qc.AN,
+                AC=mt.variant_qc.AC,
+            ),
+        )
+        mt = mt.drop('variant_qc')
+
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
@@ -73,28 +89,18 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    if long_read:
-        # For long read data, drop the pre-computed AF entry field
-        mt = mt.drop('AF')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
-        mt = mt.drop('variant_qc')
-
-    # don't fail if the AC/AF attributes are an inappropriate type
-    # don't fail if completely absent either
-    for attr in ['AC', 'AF']:
-        if attr not in mt.info:
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
-        elif not isinstance(mt.info[attr], hl.ArrayExpression):
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
-
-    if 'AN' not in mt.info:
-        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+    # split the AC/AF attributes into separate entries, overwriting the array in INFO
+    mt = mt.annotate_rows(
+        info=mt.info.annotate(
+            AF=mt.info.AF[mt.a_index - 1],
+            AC=mt.info.AC[mt.a_index - 1],
+        ),
+    )
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
-        AC=mt.info.AC[mt.a_index - 1],
-        AF=mt.info.AF[mt.a_index - 1],
+        AC=mt.info.AC,
+        AF=mt.info.AF,
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
