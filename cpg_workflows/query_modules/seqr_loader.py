@@ -220,39 +220,18 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
     mt_sample_ids = set(mt.s.collect())
 
     if sample_ids_not_in_mt := unique_sids - mt_sample_ids:
-        raise Exception(
+        raise ValueError(
             f'Found {len(sample_ids_not_in_mt)}/{len(unique_sids)} IDs in the requested subset not in the callset.\n'
             f'IDs that aren\'t in the callset: {sample_ids_not_in_mt}\n'
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    # work out the proportion of the original sample count that we'll keep
-    downsample = len(mt_sample_ids) // len(unique_sids)
-    # calculate the proportional number of partitions to generate
-    downsample_partitions = mt.n_partitions() // downsample
-
     logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(unique_sids)} samples.')
-    logging.info(f'Re-reading the MT with {downsample_partitions} partitions, reduced from {mt.n_partitions()}')
-    # re-read instead of a repartition/naive_coalesce
-    # naive coalesce could produce really unbalanced partitions, and repartitioning might be more expensive
-    # "it's basically free to read with different partitioning than you wrote with"
-    # https://hail.zulipchat.com/#narrow/stream/123010-Hail-Query-0.2E2-support/topic/Reading.20many.20HTs/near/438846215
-    mt = hl.read_matrix_table(mt_path, _n_partitions=downsample_partitions)
-
-    n_rows_before = mt.count_rows()
 
     mt = mt.filter_cols(hl.literal(unique_sids).contains(mt.s))
     mt = mt.filter_rows(hl.agg.any(mt.GT.is_non_ref()))
     mt.write(out_mt_path, overwrite=True)
-
-    # read again to get the metadata
-    mt = hl.read_matrix_table(out_mt_path)
-    # log with row/col counts as a no-op as we read the fresh metadata
-    logging.info(
-        f'Finished subsetting to {len(unique_sids)} samples, written to {out_mt_path}. '
-        f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
-        f'{mt.count_rows()}/{n_rows_before} rows',
-    )
+    logging.info(f'Finished subsetting to {len(unique_sids)} samples, written to {out_mt_path}.')
 
 
 def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
