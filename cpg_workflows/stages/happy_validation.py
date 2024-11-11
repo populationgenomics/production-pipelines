@@ -84,6 +84,10 @@ class ValidationHappyOnVcf(SequencingGroupStage):
     analysis_type='validation',
 )
 class ValidationParseHappy(SequencingGroupStage):
+    """
+    this stage shouldn't exist - we can just parse the results
+    of the previous stage using a metadata wrapper
+    """
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
             'json_summary': sequencing_group.dataset.prefix()
