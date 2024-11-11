@@ -4,53 +4,38 @@
 Content relating to the hap.py validation process
 """
 
-import logging
-
-from cpg_utils.config import get_config
+from cpg_utils.config import get_config, config_retrieve
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf, validation_mt_to_vcf_job
+from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf
+from cpg_workflows.stages.talos import query_for_latest_mt
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
 
-@stage(analysis_type='custom', analysis_keys=['vcf'])
+@stage()
 class ValidationMtToVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
-        return {
-            'vcf': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.vcf.bgz'
-            ),
-            'index': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.vcf.bgz.tbi'
-            ),
-        }
+        return (
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.id}.vcf.bgz'
+        )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
+        if not config_retrieve(['references', sequencing_group.external_id], False):
             return None
 
-        # generate the MT path from config
-        input_hash = get_config()['inputs']['sample_hash']
-        mt_path = sequencing_group.dataset.prefix() / 'mt' / f'{input_hash}-{sequencing_group.dataset.name}.mt'
+        # borrow the talos method to get the latest MT based on analysis entries
+        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(sequencing_group.dataset.name))
+        exp_output = self.expected_outputs(sequencing_group)
 
-        exp_outputs = self.expected_outputs(sequencing_group)
+        job = get_batch().new_job(f'{sequencing_group.id} VCF from dataset MT')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(f'ss_vcf_from_mt {input_mt} {sequencing_group.id} {str(exp_output)}')
 
-        job = validation_mt_to_vcf_job(
-            b=get_batch(),
-            mt_path=str(mt_path),
-            sequencing_group_id=sequencing_group.id,
-            out_vcf_path=str(exp_outputs['vcf']),
-            job_attrs=self.get_job_attrs(sequencing_group),
-        )
-
-        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
+        return self.make_outputs(sequencing_group, data=exp_output, jobs=job)
 
 
 @stage(required_stages=ValidationMtToVcf, analysis_type='qc', analysis_keys=['happy_csv'])
@@ -71,8 +56,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
-            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
+        if not config_retrieve(['references', sequencing_group.external_id], False):
             return None
 
         # get the input vcf for this sequence group
@@ -85,17 +69,19 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
         exp_outputs = self.expected_outputs(sequencing_group)
         job = run_happy_on_vcf(
-            b=get_batch(),
             vcf_path=str(input_vcf),
             sequencing_group_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
-            job_attrs=self.get_job_attrs(sequencing_group),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
 
 
-@stage(required_stages=[ValidationMtToVcf, ValidationHappyOnVcf])
+@stage(
+    required_stages=[ValidationMtToVcf, ValidationHappyOnVcf],
+    analysis_keys=['json_summary'],
+    analysis_type='validation',
+)
 class ValidationParseHappy(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
@@ -107,8 +93,7 @@ class ValidationParseHappy(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
-            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
+        if not config_retrieve(['references', sequencing_group.external_id], False):
             return None
 
         # get the input vcf for this sequence group

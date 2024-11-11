@@ -70,6 +70,9 @@ setup(
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
+            'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
+            # used in the validation workflow, pulls a single SG VCF representation from a MT
+            'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
         ],
     },
 )
