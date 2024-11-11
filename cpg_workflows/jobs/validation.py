@@ -8,7 +8,6 @@ from csv import DictReader
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import fasta_res_group, get_batch
-
 from cpg_workflows.metamist import AnalysisStatus, get_metamist
 
 SUMMARY_KEYS = {

@@ -5,7 +5,7 @@ Content relating to the hap.py validation process
 """
 
 from cpg_utils import to_path
-from cpg_utils.config import get_config, config_retrieve
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf
 from cpg_workflows.stages.talos import query_for_latest_mt
@@ -88,6 +88,7 @@ class ValidationParseHappy(SequencingGroupStage):
     this stage shouldn't exist - we can just parse the results
     of the previous stage using a metadata wrapper
     """
+
     def expected_outputs(self, sequencing_group: SequencingGroup):
         return {
             'json_summary': sequencing_group.dataset.prefix()
