@@ -4,6 +4,7 @@
 Content relating to the hap.py validation process
 """
 
+from cpg_utils import to_path
 from cpg_utils.config import get_config, config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf
@@ -45,13 +46,13 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
         )
         return {
-            'vcf': f'{output_prefix}.happy.vcf.bgz',
-            'index': f'{output_prefix}.happy.vcf.bgz.tbi',
-            'happy_csv': f'{output_prefix}.happy_extended.csv',
-            'happy_roc': f'{output_prefix}.happy_roc.all.csv.gz',
-            'happy_metrics': f'{output_prefix}.happy_metrics.json.gz',
-            'happy_runinfo': f'{output_prefix}.happy_runinfo.json',
-            'happy_summary': f'{output_prefix}.summary.csv',
+            'vcf': to_path(f'{output_prefix}.happy.vcf.bgz'),
+            'index': to_path(f'{output_prefix}.happy.vcf.bgz.tbi'),
+            'happy_csv': to_path(f'{output_prefix}.happy_extended.csv'),
+            'happy_roc': to_path(f'{output_prefix}.happy_roc.all.csv.gz'),
+            'happy_metrics': to_path(f'{output_prefix}.happy_metrics.json.gz'),
+            'happy_runinfo': to_path(f'{output_prefix}.happy_runinfo.json'),
+            'happy_summary': to_path(f'{output_prefix}.summary.csv'),
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
