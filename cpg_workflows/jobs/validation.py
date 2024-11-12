@@ -2,19 +2,9 @@
 jobs relating to the validation steps of the pipeline
 """
 
-import json
-from csv import DictReader
-
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import fasta_res_group, get_batch
-from cpg_workflows.metamist import AnalysisStatus, get_metamist
-
-SUMMARY_KEYS = {
-    'TRUTH.TOTAL': 'true_variants',
-    'METRIC.Recall': 'recall',
-    'METRIC.Precision': 'precision',
-}
 
 
 def get_sample_truth_data(sequencing_group_id: str):
@@ -104,65 +94,3 @@ def run_happy_on_vcf(
 
     get_batch().write_output(happy_j.output, out_prefix)
     return happy_j
-
-
-def parse_and_post_results(
-    vcf_path: str,
-    sequencing_group_id: str,
-    sequencing_group_ext_id: str,
-    happy_csv: str,
-    out_file: str,
-):
-    """
-    Read the Hap.py results, and update Metamist
-    This whole method is called as a scheduled PythonJob
-
-    Args:
-        vcf_path (str): path to the single-sample VCF
-        sequencing_group_id (str): the SG ID
-        sequencing_group_ext_id (str): the SG external ID
-        happy_csv (str): CSV results from Hap.py
-        out_file (str): where to write the JSON file
-
-    Returns:
-        this job
-    """
-
-    # handler for the CSV file
-    happy_handle = to_path(happy_csv)
-
-    ref_data = get_sample_truth_data(sequencing_group_id=sequencing_group_ext_id)
-
-    # populate a dictionary of results for this sequencing group
-    summary_data = {
-        'type': 'validation_result',
-        'query_vcf': vcf_path,
-        'truth_vcf': ref_data['vcf'],
-        'truth_bed': ref_data['bed'],
-    }
-
-    if stratification := get_config()['references']['stratification']:
-        summary_data['stratified'] = stratification
-
-    # read in the summary CSV file
-    with happy_handle.open() as handle:
-        summary_reader = DictReader(handle)
-        for line in summary_reader:
-            if line['Filter'] != 'PASS' or line['Subtype'] != '*':
-                continue
-
-            summary_key = f'{line["Type"]}_{line["Subset"]}'
-            for sub_key, sub_value in SUMMARY_KEYS.items():
-                summary_data[f'{summary_key}::{sub_value}'] = str(line[sub_key])
-
-    with to_path(out_file).open('w', encoding='utf-8') as handle:
-        json.dump(summary_data, handle)
-
-    get_metamist().create_analysis(
-        dataset=get_config()['workflow']['dataset'],
-        status=AnalysisStatus('completed'),
-        sequencing_group_ids=[sequencing_group_id],
-        type_='qc',
-        output=str(happy_handle.parent),
-        meta=summary_data,
-    )
