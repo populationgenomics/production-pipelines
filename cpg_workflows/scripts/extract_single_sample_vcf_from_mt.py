@@ -12,7 +12,7 @@ from cpg_utils.hail_batch import init_batch
 
 def single_sample_vcf_from_dataset_vcf(input_mt: str, sample_id: str, out_path: str) -> None:
     """
-    takes the validation datatset VCF, filters to single sample
+    takes the validation datatset MatrixTable, filters to single sample
     removes variants not relevant to this sample, and writes to VCF
     Args:
         input_mt (str): where to read the MT
