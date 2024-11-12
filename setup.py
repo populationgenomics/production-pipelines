@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.30.4',
+    version='1.30.5',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -70,6 +70,8 @@ setup(
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
+            # used in the validation workflow, pulls a single SG VCF representation from a MT
+            'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
         ],
     },
 )
