@@ -313,10 +313,17 @@ class TrimOffSexChromosomes(CohortStage):
         germline_calls = inputs.as_dict_by_target(GermlineCNVCalls)
         jobs = []
         for sgid, new_vcf in expected.items():
-            if sgid == 'placeholder':
+            if sgid == 'placeholder' or sgid not in cohort.get_sequencing_group_ids():
                 continue
             sg_vcf = germline_calls[sgid]['segments']
-            jobs.append(gcnv.trim_sex_chromosomes(sgid, str(sg_vcf), str(new_vcf), self.get_job_attrs(cohort)))
+            jobs.append(
+                gcnv.trim_sex_chromosomes(
+                    sgid,
+                    str(sg_vcf),
+                    str(new_vcf),
+                    self.get_job_attrs(cohort),
+                ),
+            )
         return self.make_outputs(cohort, data=expected, jobs=jobs)  # type: ignore
 
 
