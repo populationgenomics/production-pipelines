@@ -120,14 +120,14 @@ def pca_runner(file_path):
         ),
     )
 
-    mt = mt.annotate_rows(min_DS=hl.agg.min(mt.DS), max_DS=hl.agg.max(mt.DS))
-    mt = mt.annotate_entries(DS_rescaled=(mt.DS - mt.min_DS) / (mt.max_DS - mt.min_DS) * 2)
+    #mt = mt.annotate_rows(min_DS=hl.agg.min(mt.DS), max_DS=hl.agg.max(mt.DS))
+    #mt = mt.annotate_entries(DS_rescaled=(mt.DS - mt.min_DS) / (mt.max_DS - mt.min_DS) * 2)
     # clean up mt (drop unnecessary fields)
-    mt = mt.drop('DS', 'min_DS', 'max_DS')
+    #mt = mt.drop('DS', 'min_DS', 'max_DS')
 
     # rename DS_rescaled as DS
-    mt = mt.annotate_entries(DS=mt.DS_rescaled)
-    mt = mt.drop('DS_rescaled')
+    #mt = mt.annotate_entries(DS=mt.DS_rescaled)
+    #mt = mt.drop('DS_rescaled')
 
     # table_geno_pcs = hl.import_table(
     #    'gs://cpg-bioheart-test/str/anndata/saige-qtl/input_files/covariates/sex_age_geno_pcs_tob_bioheart.csv',
@@ -217,16 +217,16 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.DS_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/pca_DS_rescaled/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/pca/n2412-default-filters/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/pca_DS_rescaled/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/pca/n2412-default-filters/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/polymorphic_run_n1055_tob_only/pca_DS_rescaled/eigenvalues.txt').open(
+    with to_path('gs://cpg-bioheart-test/str/pca/n2412-default-filters/eigenvalues.txt').open(
         'w',
     ) as f:
         for item in eigenvalues_list:
