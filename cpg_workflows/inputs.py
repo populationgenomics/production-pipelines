@@ -58,24 +58,22 @@ def create_multicohort() -> MultiCohort:
     custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
 
     # get a unique set of cohort IDs
-    custom_cohort_ids_set = set(custom_cohort_ids)
+    custom_cohort_ids_unique = sorted(set(custom_cohort_ids))
 
     # if use of set removed any cohorts due to repetition, log them
-    if len(custom_cohort_ids_set) != len(custom_cohort_ids):
+    if len(custom_cohort_ids_unique) != len(custom_cohort_ids):
         get_logger(__file__).warning(
-            f'Removed {len(custom_cohort_ids) - len(custom_cohort_ids_set)} non-unique cohort IDs',
+            f'Removed {len(custom_cohort_ids) - len(custom_cohort_ids_unique)} non-unique cohort IDs',
         )
-        duplicated_cohort_ids = ', '.join(
-            {str(key) for key, value in Counter(custom_cohort_ids).items() if value > 1}
-        )
+        duplicated_cohort_ids = ', '.join({str(key) for key, value in Counter(custom_cohort_ids).items() if value > 1})
         get_logger(__file__).warning(f'Non-unique cohort IDs: {duplicated_cohort_ids}')
 
     multicohort = MultiCohort()
 
-    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids_set)
+    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids_unique)
 
     read_pedigree = config.get('read_pedigree', True)
-    for cohort_id in custom_cohort_ids_set:
+    for cohort_id in custom_cohort_ids_unique:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
         # TODO (mwelland): future optimisation following closure of #860
