@@ -686,7 +686,7 @@ class HPOFlagging(DatasetStage):
 )
 class CreateTalosHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        date_folder_prefix =  dataset.prefix(category='web') /get_date_folder()
+        date_folder_prefix = dataset.prefix(category='web') / get_date_folder()
         return {
             'results_html': date_folder_prefix / 'summary_output.html',
             'latest_html': date_folder_prefix / f'summary_latest_{get_date_string()}.html',
@@ -750,7 +750,7 @@ class MinimiseOutputForSeqr(DatasetStage):
         analysis_folder_prefix = dataset.prefix(category='analysis') / 'seqr_files'
         return {
             'seqr_file': analysis_folder_prefix / f'{get_date_folder()}_seqr.json',
-            'seqr_pheno_file': analysis_folder_prefix/ f'{get_date_folder()}_seqr_pheno.json',
+            'seqr_pheno_file': analysis_folder_prefix / f'{get_date_folder()}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
