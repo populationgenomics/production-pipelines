@@ -66,7 +66,7 @@ def create_multicohort() -> MultiCohort:
             f'Removed {len(custom_cohort_ids) - len(custom_cohort_ids_set)} non-unique cohort IDs',
         )
         duplicated_cohort_ids = ', '.join(
-            {str(value) for key, value in Counter(custom_cohort_ids).items() if value > 1}
+            {str(key) for key, value in Counter(custom_cohort_ids).items() if value > 1}
         )
         get_logger(__file__).warning(f'Non-unique cohort IDs: {duplicated_cohort_ids}')
 
