@@ -6,8 +6,9 @@ import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config, reference_path
+from cpg_utils.config import config_retrieve, get_config, reference_path
 from cpg_utils.hail_batch import genome_build
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
@@ -25,6 +26,12 @@ def annotate_cohort(
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
     annotations.
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     # tune the logger correctly
     logging.getLogger().setLevel(logging.INFO)
@@ -203,6 +210,13 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
         exclusion_file (str, optional): path to a file containing samples to remove from the
                                         subset prior to extracting
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     logging.basicConfig(level=logging.INFO)
 
     mt = hl.read_matrix_table(mt_path)
@@ -245,6 +259,12 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
         out_vcf_path (str): path of the vcf.bgz to generate
     """
 
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     mt = hl.read_matrix_table(mt_path)
     logging.info(f'Dataset MT dimensions: {mt.count()}')
     hl.export_vcf(mt, out_vcf_path, tabix=True)
@@ -255,6 +275,13 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
     """
     Add dataset-level annotations.
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     mt = hl.read_matrix_table(mt_path)
 
     # Convert the mt genotype entries into num_alt, gq, ab, dp, and sample_id.
