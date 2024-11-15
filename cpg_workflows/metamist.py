@@ -311,7 +311,7 @@ class Metamist:
 
         return None
 
-    def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
+    def get_sgs_for_cohorts(self, cohort_ids: set[str]) -> dict[str, dict[str, Any]]:
         """
         Retrieve the sequencing groups per dataset for a list of cohort IDs.
         """
