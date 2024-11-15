@@ -3,13 +3,14 @@ Metamist wrapper to get input sequencing groups.
 """
 
 import logging
+from collections import Counter
 
 from cpg_utils.config import config_retrieve, update_dict
 from cpg_workflows.filetypes import CramPath, GvcfPath
 
 from .metamist import AnalysisType, Assay, MetamistError, get_metamist, parse_reads
 from .targets import Cohort, MultiCohort, PedigreeInfo, SequencingGroup, Sex
-from .utils import exists
+from .utils import exists, get_logger
 
 _multicohort: MultiCohort | None = None
 
@@ -52,13 +53,27 @@ def create_multicohort() -> MultiCohort:
     Add cohorts in the multicohort.
     """
     config = config_retrieve(['workflow'])
+
+    # pull the list of cohort IDs from the config
     custom_cohort_ids = config_retrieve(['workflow', 'input_cohorts'], [])
+
+    # get a unique set of cohort IDs
+    custom_cohort_ids_unique = sorted(set(custom_cohort_ids))
+
+    # if use of set removed any cohorts due to repetition, log them
+    if len(custom_cohort_ids_unique) != len(custom_cohort_ids):
+        get_logger(__file__).warning(
+            f'Removed {len(custom_cohort_ids) - len(custom_cohort_ids_unique)} non-unique cohort IDs',
+        )
+        duplicated_cohort_ids = ', '.join({str(key) for key, value in Counter(custom_cohort_ids).items() if value > 1})
+        get_logger(__file__).warning(f'Non-unique cohort IDs: {duplicated_cohort_ids}')
+
     multicohort = MultiCohort()
 
-    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids)
+    datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids_unique)
 
     read_pedigree = config.get('read_pedigree', True)
-    for cohort_id in custom_cohort_ids:
+    for cohort_id in custom_cohort_ids_unique:
         cohort = multicohort.create_cohort(cohort_id)
         sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
         # TODO (mwelland): future optimisation following closure of #860

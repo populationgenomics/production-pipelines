@@ -252,7 +252,7 @@ def test_multicohort(mocker: MockFixture, tmp_path):
 
     # Testing Cohort Information
     assert len(multicohort.get_sequencing_groups()) == 4
-    assert multicohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA', 'CPGCCCCCC', 'CPGDDDDDD']
+    assert sorted(multicohort.get_sequencing_group_ids()) == ['CPGAAAA', 'CPGCCCCCC', 'CPGDDDDDD', 'CPGXXXX']
 
     # Test the projects they belong to
     assert multicohort.get_sequencing_groups()[0].dataset.name == 'projecta'
