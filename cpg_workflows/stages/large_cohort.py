@@ -25,15 +25,18 @@ if TYPE_CHECKING:
 HAIL_QUERY: Final = 'hail query'
 
 
-@stage(analysis_type='combiner')
+@stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict:
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
             f"{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
-        return cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds'
+        return {
+            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
+            'combiner_plan': str(self.tmp_prefix / 'combiner_plan.json'),
+        }
 
     def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
         get_vds_analysis_query: DocumentNode = gql(
@@ -60,7 +63,7 @@ class Combiner(CohortStage):
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
 
-        output_vds_path: Path = self.expected_outputs(cohort)
+        output_paths = self.expected_outputs(cohort)
         tmp_prefix = slugify(
             f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
@@ -83,10 +86,7 @@ class Combiner(CohortStage):
             new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
 
         if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
-            return self.make_outputs(cohort, self.expected_outputs(cohort))
-
-        # Maybe restore from a save point?
-        save_path: str | None = combiner_config.get('save_path', None)
+            return self.make_outputs(cohort, output_paths)
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
@@ -96,16 +96,16 @@ class Combiner(CohortStage):
         # Default to GRCh38 for reference if not specified
         j.call(
             combiner.run,
-            output_vds_path=str(output_vds_path),
+            output_vds_path=str(output_paths['vds']),
             sequencing_type=workflow_config['sequencing_type'],
             tmp_prefix=tmp_prefix,
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
-            save_path=save_path,
+            save_path=output_paths['combiner_plan'],
         )
 
-        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+        return self.make_outputs(cohort, output_paths, [j])
 
 
 @stage(required_stages=[Combiner])
