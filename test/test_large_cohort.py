@@ -148,7 +148,6 @@ def decompress_into_job_tmp(tmp_path: Path, compressed_paths: list[str]):
 
 
 def test_combiner(mocker: MockFixture, tmp_path: Path):
-
     conf = create_config(tmp_path)
     set_config(
         conf,
@@ -176,6 +175,7 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
         genome_build=conf['references']['genome_build'],
         gvcf_paths=gvcf_paths,
         vds_paths=None,
+        save_path=None,
         specific_intervals=conf['large_cohort']['combiner']['intervals'],
     )
 
@@ -268,7 +268,6 @@ def test_relatedness(mocker: MockFixture, tmp_path: Path):
 
 
 def test_site_only(mocker: MockFixture, tmp_path: Path):
-
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
 
