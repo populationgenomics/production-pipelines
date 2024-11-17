@@ -85,6 +85,9 @@ class Combiner(CohortStage):
         if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
             return self.make_outputs(cohort, self.expected_outputs(cohort))
 
+        # Maybe restore from a save point?
+        save_path: str | None = combiner_config.get('save_path', None)
+
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
         j.memory(combiner_config['memory'])
@@ -99,6 +102,7 @@ class Combiner(CohortStage):
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
+            save_path=save_path,
         )
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
