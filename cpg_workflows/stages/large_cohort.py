@@ -33,9 +33,16 @@ class Combiner(CohortStage):
         output_vds_name: str = slugify(
             f"{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
+
+        # include the list of all VDS IDs in the plan name
+        if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
+            ids_list_as_string = '_'.join(sorted(vds_ids))
+            combiner_plan_name = f'combiner_{ids_list_as_string}'
+        else:
+            combiner_plan_name = 'combiner'
         return {
             'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
-            'combiner_plan': str(self.tmp_prefix / 'combiner_plan.json'),
+            'combiner_plan': str(self.tmp_prefix / f'{combiner_plan_name}.json'),
         }
 
     def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
