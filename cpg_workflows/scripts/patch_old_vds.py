@@ -1,4 +1,14 @@
-"""Patch a VDS created prior to Hail 0.2.131 to include LGT calls in reference data."""
+"""
+Patch a VDS created prior to Hail 0.2.131 to include LGT calls in reference data.
+
+Example usage:
+    analysis-runner --dataset bioheart \
+    --access-level \
+    --output-dir vds-patch \
+    --description 'Patch old VDS' \
+    python3 patch_old_vds.py gs://cpg-bioheart-main/vds/tenk10k1-0.vds
+
+"""
 
 import argparse
 from typing import TYPE_CHECKING
