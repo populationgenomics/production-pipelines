@@ -1,5 +1,4 @@
 import logging
-from itertools import chain
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
@@ -27,7 +26,7 @@ HAIL_QUERY: Final = 'hail query'
 
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
