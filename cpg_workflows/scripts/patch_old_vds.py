@@ -36,7 +36,7 @@ def main(vds_path: str) -> None:
 
     # Patch the VDS to contain LGT calls as explained here: https://hail.zulipchat.com/#narrow/channel/123010-Hail-Query-0.2E2-support/topic/Error.20with.20multi_way_zip_join.20when.20combining.20two.20VDS
     vds.reference_data = vds.reference_data.annotate_entries(
-        LGT=hl.if_else(hl.Call.is_haploid, hl.call(0), hl.call(0, 0)),
+        LGT=hl.call(0, 0),
     )
     vds.reference_data.write(tmp_output_path)
 
