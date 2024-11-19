@@ -38,7 +38,7 @@ class Combiner(CohortStage):
             ids_list_as_string = '_'.join(sorted(vds_ids))
             combiner_plan_name = f'combiner_{ids_list_as_string}'
         else:
-            combiner_plan_name = 'combiner'
+            combiner_plan_name = f'combiner-{cohort.name}'
         return {
             'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
             'combiner_plan': str(self.tmp_prefix / f'{combiner_plan_name}.json'),
