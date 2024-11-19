@@ -1,6 +1,7 @@
 """
 Patch a VDS created prior to Hail 0.2.131 to include LGT calls in reference data.
 
+
 If the sample is female (calculated by hail.impute_sex()), or the reference block is
 within the PAR regions, the LGT is set to (0,0). Otherwise, it is set to (0)
 
