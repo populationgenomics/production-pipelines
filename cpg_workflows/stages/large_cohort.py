@@ -41,7 +41,7 @@ class Combiner(CohortStage):
             combiner_plan_name = f'combiner-{cohort.name}'
         return {
             'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
-            'combiner_plan': str(self.tmp_prefix / f'{combiner_plan_name}.json'),
+            'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
         }
 
     def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
