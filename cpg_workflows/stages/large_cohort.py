@@ -31,7 +31,7 @@ class Combiner(CohortStage):
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f"{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
+            f"{cohort.name}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
         return cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds'
 
