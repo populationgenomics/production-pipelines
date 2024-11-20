@@ -35,8 +35,8 @@ class Combiner(CohortStage):
 
         # include the list of all VDS IDs in the plan name
         if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
-            ids_list_as_string = '_'.join(sorted(vds_ids))
-            combiner_plan_name = f'combiner_{ids_list_as_string}'
+            ids_list_as_string: str = '_'.join([str(id) for id in sorted(vds_ids)])
+            combiner_plan_name: str = f'combiner_{ids_list_as_string}'
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
         return {
