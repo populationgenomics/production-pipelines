@@ -120,6 +120,8 @@ class DenseMTFromVDS(MultiCohortStage):
             'mt': self.prefix / f'{multicohort.name}.mt',
             # this will be the write path for fragments of sites-only VCF
             'vcf_dir': str(self.prefix / f'{multicohort.name}.vcf.bgz'),
+            # this will be the file which contains the name of all fragments
+            'shard_manifest': str(self.prefix / f'{multicohort.name}.vcf.bgz' / 'shard_manifest.txt'),
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
