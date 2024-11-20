@@ -134,6 +134,6 @@ class DenseMTFromVDS(MultiCohortStage):
             'mt_from_vds '
             f'--input {str(inputs.as_path(multicohort, GVCFCombiner))} '
             f'--output {str(output["mt"])} '
-            f'--sites_only {output["vcf_dir"]}'
+            f'--sites_only {output["vcf_dir"]}',
         )
         return self.make_outputs(multicohort, output, [j])
