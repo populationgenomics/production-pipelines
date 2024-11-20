@@ -1,15 +1,12 @@
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
-from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.resources import joint_calling_scatter_count
-from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
+from cpg_utils.config import config_retrieve, genome_build
+from cpg_utils.hail_batch import get_batch
+from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
-    CohortStage,
     MultiCohortStage,
     StageInput,
     StageOutput,
-    get_workflow,
     stage,
 )
 from metamist.graphql import gql, query
@@ -136,6 +133,5 @@ class DenseMTFromVDS(MultiCohortStage):
             f'--input {str(inputs.as_path(multicohort, GVCFCombiner))} '
             f'--output {str(output["mt"])} '
             f'--sites_only {output["vcf_dir"]}'
-            f'--partitions {joint_calling_scatter_count(len(multicohort.get_sequencing_groups()))}',
         )
         return self.make_outputs(multicohort, output, [j])
