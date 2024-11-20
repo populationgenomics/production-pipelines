@@ -24,7 +24,7 @@ def main(
     dense_mt_out: str,
     partitions: int | None = None,
     sites_only: str | None = None,
-) -> hl.MatrixTable:
+) -> None:
     """
     Load a sparse VariantDataset
     Write a dense MatrixTable with split multiallelics
@@ -57,7 +57,7 @@ def main(
     # not sure if we need this either
     # naive coalesce just lumps adjacent partitions together, so this could create wildly unbalanced partitions
     if partitions:
-        mt = mt.naive_coalesce(partitions)
+        mt = mt.repartition(partitions)
 
     mt.write(dense_mt_out, overwrite=True)
 

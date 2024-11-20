@@ -68,13 +68,16 @@ def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | N
 
 @stage(analysis_type='combiner')
 class GVCFCombiner(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return self.prefix / f'{multicohort.name}.vds'
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
+        return {
+            'vds': self.prefix / f'{multicohort.name}.vds',
+            'combiner_plan': str(self.tmp_prefix / 'combiner_plan.json'),
+        }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import combiner
 
-        output_vds_path: Path = self.expected_outputs(multicohort)
+        outputs: Path = self.expected_outputs(multicohort)
 
         # create these as empty lists instead of None, they have the same truthiness
         vds_path: str | None = None
@@ -91,7 +94,7 @@ class GVCFCombiner(MultiCohortStage):
         ]
 
         if not new_sg_gvcfs:
-            return self.make_outputs(multicohort, output_vds_path)
+            return self.make_outputs(multicohort, outputs)
 
         j = get_batch().new_python_job('Combiner', self.get_job_attrs())
         j.image(config_retrieve(['workflow', 'driver_image']))
@@ -101,7 +104,8 @@ class GVCFCombiner(MultiCohortStage):
         # Default to GRCh38 for reference if not specified
         j.call(
             combiner.run,
-            output_vds_path=str(output_vds_path),
+            output_vds_path=str(outputs['vds']),
+            save_path=outputs['combiner_plan'],
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             tmp_prefix=str(self.tmp_prefix / 'temp_dir'),
             genome_build=genome_build(),
@@ -109,7 +113,7 @@ class GVCFCombiner(MultiCohortStage):
             vds_paths=[vds_path],
         )
 
-        return self.make_outputs(multicohort, output_vds_path, j)
+        return self.make_outputs(multicohort, outputs, j)
 
 
 @stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt', 'vcf_dir'])
@@ -135,62 +139,3 @@ class DenseMTFromVDS(MultiCohortStage):
             f'--partitions {joint_calling_scatter_count(len(multicohort.get_sequencing_groups()))}',
         )
         return self.make_outputs(multicohort, output, [j])
-
-
-@stage(required_stages=DenseMTFromVDS)
-class Vqsr(CohortStage):
-    """
-    Exciting. A chance to try this out.
-
-    The parallel export of VCFs exports a collection of VCFs and indexes,
-    and a manifest file.
-    By reading this manifest file as a python Job, we can find the single VCF by name relevant to each interval
-    We can localise it in a second job, pass it into the next job to run VQSR on it.
-    We can use the same logic to grab the same VCFs for VEP
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
-            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.jobs import vqsr
-
-        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
-        jobs = vqsr.make_vqsr_jobs(
-            b=get_batch(),
-            input_siteonly_vcf_path=vcf_path,
-            gvcf_count=len(cohort.get_sequencing_groups()),
-            out_path=self.expected_outputs(cohort)['vcf'],
-            tmp_prefix=self.tmp_prefix,
-            use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
-            intervals_path=get_config()['workflow'].get('intervals_path'),
-            job_attrs=self.get_job_attrs(),
-        )
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
-
-
-@stage(required_stages=Vqsr)
-class LoadVqsr(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'vqsr.ht'
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import load_vqsr
-
-        j = get_batch().new_job('LoadVqsr', self.get_job_attrs())
-        j.image(image_path('cpg_workflows'))
-
-        j.command(
-            query_command(
-                load_vqsr,
-                load_vqsr.run.__name__,
-                str(inputs.as_path(cohort, Vqsr, key='vcf')),
-                str(self.expected_outputs(cohort)),
-                setup_gcp=True,
-            ),
-        )
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
