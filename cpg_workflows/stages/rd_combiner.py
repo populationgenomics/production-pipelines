@@ -16,6 +16,7 @@ LATEST_ANALYSIS_QUERY = gql(
     query LatestAnalysisEntry($dataset: String!, $type: String!) {
         project(name: $dataset) {
             analyses(active: {eq: true}, type: {eq: $type}, status: {eq: COMPLETED}) {
+                meta
                 output
                 sequencingGroups {
                     id
