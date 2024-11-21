@@ -74,7 +74,7 @@ class GVCFCombiner(MultiCohortStage):
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import combiner
 
-        outputs: Path = self.expected_outputs(multicohort)
+        outputs: dict[str, str | Path] = self.expected_outputs(multicohort)
 
         # create these as empty lists instead of None, they have the same truthiness
         vds_path: str | None = None
