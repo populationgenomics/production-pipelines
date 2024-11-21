@@ -197,7 +197,7 @@ class PackageForRelease(MultiCohortStage):
             gcloud storage cp -r {str(pm5["clinvar_pm5"])} clinvarbitration_data
             gcloud storage cp {str(pm5["pm5_json"])} clinvarbitration_data
             gcloud storage cp -r {str(clinvar_decisions)} clinvarbitration_data
-            gcloud storage cp -r "{vcf}*" clinvarbitration_data
+            gcloud storage cp "{vcf}*" clinvarbitration_data
             tar -czf {job.output} clinvarbitration_data
         """,
         )
