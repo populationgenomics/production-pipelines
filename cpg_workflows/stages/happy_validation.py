@@ -34,7 +34,12 @@ class ValidationMtToVcf(SequencingGroupStage):
 
         job = get_batch().new_job(f'{sequencing_group.id} VCF from dataset MT')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'ss_vcf_from_mt {input_mt} {sequencing_group.id} {str(exp_output)}')
+        job.command(
+            f'ss_vcf_from_mt '
+            f'--input {input_mt} '
+            f'--sample_id{sequencing_group.id} '
+            f'--output{str(exp_output)} ',
+        )
 
         return self.make_outputs(sequencing_group, data=exp_output, jobs=job)
 
