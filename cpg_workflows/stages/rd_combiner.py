@@ -64,7 +64,7 @@ def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | N
     return analyses_by_date[sorted(analyses_by_date)[-1]]
 
 
-@stage(analysis_type='combiner')
+@stage(analysis_type='combiner', analysis_keys=['vds'])
 class GVCFCombiner(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
         return {
@@ -119,7 +119,7 @@ class GVCFCombiner(MultiCohortStage):
         return self.make_outputs(multicohort, outputs, j)
 
 
-@stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt', 'vcf_dir'])
+@stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
 class DenseMTFromVDS(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         return {
@@ -138,7 +138,7 @@ class DenseMTFromVDS(MultiCohortStage):
         j.image(config_retrieve(['workflow', 'driver_image']))
         j.command(
             'mt_from_vds '
-            f'--input {str(inputs.as_path(multicohort, GVCFCombiner))} '
+            f'--input {str(inputs.as_dict(multicohort, GVCFCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
             f'--sites_only {output["vcf_dir"]}',
         )
