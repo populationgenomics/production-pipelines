@@ -110,7 +110,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
             return None
 
         # get the input vcf for this sequence group
-        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf, key='vcf')
+        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf)
 
         # set the prefix to write outputs to
         output_prefix = (
