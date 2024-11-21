@@ -136,7 +136,7 @@ class SampleQC(CohortStage):
             query_command(
                 sample_qc,
                 sample_qc.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
                 setup_gcp=True,
