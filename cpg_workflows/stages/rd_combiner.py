@@ -80,9 +80,12 @@ class GVCFCombiner(MultiCohortStage):
         vds_path: str | None = None
         sg_ids_in_vds: list[str] = []
 
-        if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
-            vds_path = existing_vds_analysis_entry['output']
-            sg_ids_in_vds = [sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']]
+        if config_retrieve(['workflow', 'check_for_existing_vds'], True):
+            # check for existing VDS
+            get_logger(__file__).info('Checking for existing VDS')
+            if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
+                vds_path = existing_vds_analysis_entry['output']
+                sg_ids_in_vds = [sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']]
 
         new_sg_gvcfs: list[str] = [
             str(sg.gvcf)
@@ -91,6 +94,8 @@ class GVCFCombiner(MultiCohortStage):
         ]
 
         if not new_sg_gvcfs:
+            get_logger(__file__).info('No GVCFs to combine')
+            get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
         j = get_batch().new_python_job('Combiner', self.get_job_attrs())
