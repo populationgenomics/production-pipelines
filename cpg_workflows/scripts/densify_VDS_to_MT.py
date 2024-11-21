@@ -52,7 +52,7 @@ def main(
     mt = hl.vds.to_dense_mt(vds)
 
     # remove any monoallelic or non-ref-in-any-sample sites
-    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
+    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.GT.is_non_ref())))
 
     # not sure if we need this either
     # naive coalesce just lumps adjacent partitions together, so this could create wildly unbalanced partitions
@@ -63,18 +63,7 @@ def main(
 
     if sites_only:
         mt = hl.read_matrix_table(dense_mt_out)
-        info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
-        info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
-        info_ht = adjust_vcf_incompatible_types(
-            info_ht,
-            # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
-            # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
-            # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-            # it as an array with a single string value "|132.1|140.2", leading to
-            # an IndexOutOfBound exception when trying to access value for second allele)
-            pipe_delimited_annotations=[],
-        )
-        hl.export_vcf(info_ht, sites_only, tabix=True, parallel='header_per_shard')
+        hl.export_vcf(mt.drop('gvcf_info').rows(), sites_only, tabix=True, parallel='header_per_shard')
 
 
 def cli_main():
@@ -108,5 +97,4 @@ def cli_main():
 
 
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
     cli_main()
