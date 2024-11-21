@@ -95,8 +95,8 @@ class GVCFCombiner(MultiCohortStage):
 
         j = get_batch().new_python_job('Combiner', self.get_job_attrs())
         j.image(config_retrieve(['workflow', 'driver_image']))
-        j.memory(config_retrieve(['workflow', 'memory']))
-        j.storage(config_retrieve(['workflow', 'storage']))
+        j.memory(config_retrieve(['combiner', 'memory']))
+        j.storage(config_retrieve(['combiner', 'storage']))
 
         # Default to GRCh38 for reference if not specified
         j.call(
