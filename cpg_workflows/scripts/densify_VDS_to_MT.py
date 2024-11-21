@@ -52,7 +52,7 @@ def main(
     mt = hl.vds.to_dense_mt(vds)
 
     # remove any monoallelic or non-ref-in-any-sample sites
-    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
+    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.GT.is_non_ref())))
 
     # not sure if we need this either
     # naive coalesce just lumps adjacent partitions together, so this could create wildly unbalanced partitions
