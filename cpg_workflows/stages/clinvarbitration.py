@@ -108,12 +108,9 @@ class AnnotateClinvarDecisions(MultiCohortStage):
     take the vcf output from the clinvar stage, and apply VEP annotations
     """
 
-    def expected_outputs(self, mc: MultiCohort) -> dict[str, Path]:
+    def expected_outputs(self, mc: MultiCohort) -> Path:
         common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
-        return {
-            'vcf': to_path(join(common_folder, 'annotated_snv.vcf.bgz')),
-            'index': to_path(join(common_folder, 'annotated_snv.vcf.bgz.tbi')),
-        }
+        return to_path(join(common_folder, 'annotated_snv.vcf.bgz'))
 
     def queue_jobs(self, mc: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(mc)
@@ -121,7 +118,7 @@ class AnnotateClinvarDecisions(MultiCohortStage):
         # delegate the splitting, annotation, and re-merging to this existing method
         _out_file, jobs = split_and_annotate_vcf(
             vcf_in=str(inputs.as_path(mc, GenerateNewClinvarSummary, 'snv_vcf')),
-            out_vcf=str(outputs['vcf']),
+            out_vcf=str(outputs),
         )
 
         return self.make_outputs(target=mc, jobs=jobs, data=outputs)
@@ -163,3 +160,46 @@ class PM5TableGeneration(MultiCohortStage):
         get_batch().write_output(clinvarbitrate_pm5.output, str(outputs['pm5_json']))
 
         return self.make_outputs(target=mc, data=outputs, jobs=clinvarbitrate_pm5)
+
+
+@stage(
+    required_stages=[GenerateNewClinvarSummary, AnnotateClinvarDecisions, PM5TableGeneration],
+    analysis_type='custom',
+)
+class PackageForRelease(MultiCohortStage):
+    """
+    takes the data created so far, and packages it up for release
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+
+        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        return to_path(join(common_folder, 'clinvarbitration.tar.gz'))
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Localise all the previously generated data into a folder
+        tarball it, and write out as a single file
+        """
+        tar_output = self.make_outputs(multicohort)
+
+        # find paths to the previous outputs
+        vcf = inputs.as_path(multicohort, AnnotateClinvarDecisions)
+        pm5 = inputs.as_dict(multicohort, PM5TableGeneration)
+        clinvar_decisions = inputs.as_path(multicohort, GenerateNewClinvarSummary, 'clinvar_decisions')
+
+        job = get_batch().new_job('package clinvarbitration for release')
+        job.storage('10G')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(
+            f"""
+            mkdir clinvarbitration_data
+            gcloud storage cp -r {str(pm5["clinvar_pm5"])} clinvarbitration_data
+            gcloud storage cp {str(pm5["pm5_json"])} clinvarbitration_data
+            gcloud storage cp -r {str(clinvar_decisions)} clinvarbitration_data
+            gcloud storage cp "{vcf}*" clinvarbitration_data
+            tar -czf {job.output} clinvarbitration_data
+        """,
+        )
+        job.write_output(job.output, tar_output)
+        return self.make_outputs(multicohort, data=tar_output, jobs=job)
