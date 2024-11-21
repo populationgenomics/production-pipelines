@@ -113,7 +113,7 @@ class GVCFCombiner(MultiCohortStage):
             tmp_prefix=str(self.tmp_prefix / 'temp_dir'),
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
-            vds_paths=[vds_path],
+            vds_paths=[vds_path] if vds_path else None,
         )
 
         return self.make_outputs(multicohort, outputs, j)
