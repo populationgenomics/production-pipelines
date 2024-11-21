@@ -103,7 +103,7 @@ def cli_main():
         vds_in=args.input,
         dense_mt_out=args.output,
         partitions=args.partitions,
-        sites_only=args.site_only,
+        sites_only=args.sites_only,
     )
 
 
