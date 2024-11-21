@@ -1,0 +1,7 @@
+[workflow]
+name = 'rd_combiner'
+status_reporter = 'metamist'
+
+[combiner]
+memory = "8Gi"
+storage = "10Gi"

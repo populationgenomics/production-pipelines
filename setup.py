@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg-workflows',
     # This tag is automatically updated by bumpversion
-    version='1.30.8',
+    version='1.31.0',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -74,6 +74,8 @@ setup(
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
             # used in the validation workflow, pulls a single SG VCF representation from a MT
             'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
+            # script to create a dense MatrixTable from a VDS input
+            'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
         ],
     },
 )
