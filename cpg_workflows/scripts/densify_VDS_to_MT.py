@@ -51,7 +51,7 @@ def main(
     get_logger(__file__).info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
 
-    # remove
+    # remove any monoallelic or non-ref-in-any-sample sites
     mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
 
     # not sure if we need this either
