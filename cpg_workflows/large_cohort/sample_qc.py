@@ -15,7 +15,7 @@ from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
-    if can_reuse(out_sample_qc_ht_path, overwrite=True):
+    if can_reuse(out_sample_qc_ht_path):
         return []
 
     ht = initialise_sample_table()
@@ -29,7 +29,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
 
     # Run Hail sample-QC stats:
     sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path, overwrite=True):
+    if can_reuse(sqc_ht_path):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
@@ -84,7 +84,7 @@ def impute_sex(
     Impute sex based on coverage.
     """
     checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path), overwrite=True):
+    if can_reuse(str(checkpoint_path)):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
@@ -103,14 +103,18 @@ def impute_sex(
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
-            # remove all rows where the locus falls within a defined interval
-            tmp_variant_data = vds.variant_data.filter_rows(
-                hl.is_defined(interval_table[vds.variant_data.locus]),
-                keep=False,
-            )
-            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                str(tmp_prefix / f'{name}_checkpoint.vds'),
-            )
+            vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
+            if can_reuse(vds_tmp_path):
+                vds = hl.vds.read_vds(str(vds_tmp_path))
+            else:
+                # remove all rows where the locus falls within a defined interval
+                tmp_variant_data = vds.variant_data.filter_rows(
+                    hl.is_defined(interval_table[vds.variant_data.locus]),
+                    keep=False,
+                )
+                vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+                    str(vds_tmp_path),
+                )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
