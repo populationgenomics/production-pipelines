@@ -103,7 +103,7 @@ def impute_sex(
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
         interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
-            vds_tmp_path = to_path(tmp_prefix) / f'{name}_checkpoint.vds'
+            vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
             if can_reuse(vds_tmp_path):
                 vds = hl.vds.read_vds(str(vds_tmp_path))
             else:
@@ -113,7 +113,7 @@ def impute_sex(
                     keep=False,
                 )
                 vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                    str(tmp_prefix / f'{name}_checkpoint.vds'),
+                    str(vds_tmp_path),
                 )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
