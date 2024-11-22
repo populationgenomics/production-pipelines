@@ -29,7 +29,7 @@ def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
 
     # Run Hail sample-QC stats:
     sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path, overwrite=True):
+    if can_reuse(sqc_ht_path):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
