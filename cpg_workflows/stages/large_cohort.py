@@ -170,7 +170,7 @@ class DenseSubset(CohortStage):
             query_command(
                 dense_subset,
                 dense_subset.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
@@ -329,7 +329,7 @@ class MakeSiteOnlyVcf(CohortStage):
             query_command(
                 site_only_vcf,
                 site_only_vcf.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
@@ -411,7 +411,7 @@ class Frequencies(CohortStage):
             query_command(
                 frequencies,
                 frequencies.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)),
