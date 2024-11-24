@@ -493,12 +493,12 @@ class GctaPCA(CohortStage):
             query_command(
                 gcta_PCA,
                 gcta_PCA.run_PCA.__name__,
-                b=get_batch(),
-                grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
-                output_path=str(self.expected_outputs(cohort)['pca_dir']),
-                version=gcta_version(),
-                n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
-                relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
+                get_batch(),
+                str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
+                str(self.expected_outputs(cohort)['pca_dir']),
+                gcta_version(),
+                config_retrieve(['large_cohort', 'n_pcs']),
+                str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
                 setup_gcp=True,
             ),
         )
