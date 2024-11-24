@@ -42,12 +42,14 @@ def cli_main():
 
 def create_GRM(
     b: hb.Batch,
+    input_path: str,
     output_path: str,
 ):
 
     # Read in PLINK files created by Hail
+    logging.info(f'input_path: {input_path}')
     logging.info(f'output_path: {output_path}')
-    bfile = b.read_input_group(bed=f'{output_path}.bed', bim=f'{output_path}.bim', fam=f'{output_path}.fam')
+    bfile = b.read_input_group(bed=f'{input_path}.bed', bim=f'{input_path}.bim', fam=f'{input_path}.fam')
 
     # Create GRM using GCTA
     create_GRM_j = b.new_job('Create GRM')

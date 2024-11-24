@@ -470,6 +470,7 @@ class GctaGRM(CohortStage):
 
         create_GRM_j = gcta_GRM.create_GRM(
             b=get_batch(),
+            input_path=str(inputs.as_path(cohort, MakePlink, key='plink_dir')),
             output_path=str(self.expected_outputs(cohort)['grm_dir']),
         )
 
