@@ -51,6 +51,7 @@ def read_grm_bin(prefix, all_n=False, size=4):
 def cli_main():
 
     parser = ArgumentParser()
+    parser.add_argument('--grm-directory', help='Path to folder containing GRM files')
     parser.add_argument('--output-path', help='Path to folder containingGRM files')
     parser.add_argument('--version', help='Version of the plink files')
     parser.add_argument('--n-pcs', help='Number of PCs to compute', default=10)
@@ -58,6 +59,7 @@ def cli_main():
     args = parser.parse_args()
 
     run_PCA(
+        grm_directory=args.grm_directory,
         output_path=args.output_path,
         version=args.version,
         n_pcs=args.n_pcs,
