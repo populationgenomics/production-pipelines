@@ -481,7 +481,6 @@ class MakePlink(CohortStage):
 class GctaGRM(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM' / gcta_version(),
             grm_bin=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.bin',
             grm_id=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.id',
             grm_N_bin=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.N.bin',
@@ -495,7 +494,7 @@ class GctaGRM(CohortStage):
             bed_file_path=str(inputs.as_path(cohort, MakePlink, key='bed')),
             bim_file_path=str(inputs.as_path(cohort, MakePlink, key='bim')),
             fam_file_path=str(inputs.as_path(cohort, MakePlink, key='fam')),
-            output_path=str(self.expected_outputs(cohort)['grm_dir']),
+            output_path=str(self.expected_outputs(cohort)['grm_bin'].parent),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[create_GRM_j])
@@ -524,7 +523,7 @@ class GctaPCA(CohortStage):
         run_PCA_j.command('set -eux pipefail')
 
         # Localise the GRM files
-        grm_dir = str(inputs.as_path(cohort, GctaGRM, 'grm_dir'))
+        grm_dir = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
         gcta_relateds_to_drop_file = str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop_gcta'))
         relateds_name = gcta_relateds_to_drop_file.split('/')[-1]
         run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r "{grm_dir}*" $BATCH_TMPDIR')
