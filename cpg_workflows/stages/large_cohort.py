@@ -4,6 +4,8 @@ from itertools import chain
 from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+from sympy import root
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -451,7 +453,10 @@ class MakePlink(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            plink_dir=get_workflow().prefix / 'gcta_pca' / 'PLINK' / gcta_version(),
+            root=get_workflow().prefix / 'gcta_pca' / 'PLINK' / gcta_version(),
+            bed=get_workflow().prefix / 'gcta_pca' / 'PLINK' / f'{gcta_version()}.bed',
+            bim=get_workflow().prefix / 'gcta_pca' / 'PLINK' / f'{gcta_version()}.bim',
+            fam=get_workflow().prefix / 'gcta_pca' / 'PLINK' / f'{gcta_version()}.fam',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -465,7 +470,7 @@ class MakePlink(CohortStage):
                 make_plink,
                 make_plink.export_plink.__name__,
                 str(inputs.as_path(cohort, DenseSubset)),
-                str(self.expected_outputs(cohort)['plink_dir']),
+                str(self.expected_outputs(cohort)['root']),
                 setup_gcp=True,
             ),
         )
@@ -525,10 +530,10 @@ class GctaPCA(CohortStage):
 
         run_PCA_j.command(
             'gcta_pca '
-            '--grm_dir "${BATCH_TMPDIR}" '
-            f'--output_path {run_PCA_j.output} '
-            f'--n_pcs {config_retrieve(["large_cohort", "n_pcs"])} '
-            f'--relateds_to_drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
+            '--grm-dir "${BATCH_TMPDIR}" '
+            f'--output-path {run_PCA_j.output} '
+            f'--n-pcs {config_retrieve(["large_cohort", "n_pcs"])} '
+            f'--relateds-to-drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
         )
 
         # Delocalise the output
