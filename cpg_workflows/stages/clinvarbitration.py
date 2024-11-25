@@ -179,7 +179,13 @@ class PackageForRelease(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
 
-        common_folder = to_path(join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING))
+        common_folder = to_path(
+            join(
+                config_retrieve(['storage', 'common', 'analysis']),
+                'clinvarbitration',
+                DATE_STRING,
+            ),
+        )
         return common_folder / 'clinvarbitration.tar.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
