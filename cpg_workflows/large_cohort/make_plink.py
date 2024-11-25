@@ -9,7 +9,7 @@ def export_plink(
 ):
 
     if can_reuse(output_path):
-        return None
+        return []
 
     dense_mt = hl.read_matrix_table(dense_mt_path)
     return hl.export_plink(dense_mt, output_path, ind_id=dense_mt.s)
