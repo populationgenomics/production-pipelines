@@ -595,7 +595,7 @@ class AncestryPCA(CohortStage):
         else:
             dense_mt_path = str(inputs.as_path(cohort, DenseSubset))
 
-        related = str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'))
+        related = str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop_ht'))
 
         job = get_batch().new_bash_job('Run Ancestry PCA')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -710,7 +710,7 @@ class Ancestry(CohortStage):
             function_path_args=dict(
                 dense_mt_path=inputs.as_path(cohort, DenseSubset),
                 sample_qc_ht_path=inputs.as_path(cohort, SampleQC),
-                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'),
+                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop_ht'),
                 tmp_prefix=self.tmp_prefix,
                 out_scores_ht_path=self.expected_outputs(cohort)['scores'],
                 out_eigenvalues_ht_path=self.expected_outputs(cohort)['eigenvalues'],
@@ -766,7 +766,7 @@ class AncestryPlots(CohortStage):
                     Ancestry,
                     key='inferred_pop',
                 ),
-                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop'),
+                relateds_to_drop_ht_path=inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop_ht'),
             ),
             depends_on=inputs.get_jobs(cohort),
         )
@@ -796,7 +796,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 site_only_vcf.run.__name__,
                 str(inputs.as_path(cohort, Combiner)),
                 str(inputs.as_path(cohort, SampleQC)),
-                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop')),
+                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop_ht')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
                 setup_gcp=True,
@@ -878,7 +878,7 @@ class Frequencies(CohortStage):
                 frequencies.run.__name__,
                 str(inputs.as_path(cohort, Combiner)),
                 str(inputs.as_path(cohort, SampleQC)),
-                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop')),
+                str(inputs.as_path(cohort, RelatednessFlag, key='relateds_to_drop_ht')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
