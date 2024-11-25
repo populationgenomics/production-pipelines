@@ -1,6 +1,7 @@
 import logging
 from functools import cache
 from itertools import chain
+from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path, to_path
@@ -279,8 +280,14 @@ class RelatednessPCRelate(CohortStage):
 class RelatednessFlag(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return {
-            'relateds_to_drop': (
+            'relateds_to_drop_ht': (
                 cohort.analysis_dataset.prefix() / get_workflow().name / relatedness_version() / 'relateds_to_drop.ht'
+            ),
+            'relateds_to_drop_gcta': (
+                cohort.analysis_dataset.prefix()
+                / get_workflow().name
+                / relatedness_version()
+                / 'gcta_relateds_remove.indi.list'
             ),
         }
 
@@ -316,12 +323,18 @@ class RelatednessFlag(CohortStage):
             'relatedness_flag '
             f'--relatedness "${{BATCH_TMPDIR}}/{prcrelate_mt_name}" '
             f'--qc "${{BATCH_TMPDIR}}/{sample_qc_ht_name}" '
-            f'--out {job.output} '
+            f'--ht-out {job.relateds_to_drop_ht} '
+            f'--gcta-out {job.relateds_to_drop_gcta} '
             f'--checkpoint "${{BATCH_TMPDIR}}" ',
         )
 
         # Delocalise the output HT
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {job.output} {str(outputs["relateds_to_drop"])}')
+        job.command(
+            f'gcloud --no-user-output-enabled storage cp -r {job.relateds_to_drop_ht} {str(outputs["relateds_to_drop"])}',
+        )
+        job.command(
+            f'gcloud --no-user-output-enabled storage cp -r {job.relateds_to_drop_gcta} {str(outputs["relateds_to_drop_gcta"])}',
+        )
 
         return self.make_outputs(cohort, outputs, job)
 
@@ -488,6 +501,38 @@ class GctaPCA(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import gcta_PCA
 
+        outputs = self.expected_outputs(cohort)
+
+        t_shirt_size_value = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
+        )
+        required_storage = f'{t_shirt_size_value * 2}Gi'
+
+        run_PCA_j = get_batch().new_job(f'Run GCTA PCA: {cohort.name}')
+        run_PCA_j.image(config_retrieve(['workflow', 'driver_image']))
+        run_PCA_j.command('set -eux pipefail')
+
+        # Localise the GRM files
+        grm_dir = str(inputs.as_path(cohort, GctaGRM, 'grm_dir'))
+        gcta_relateds_to_drop_file = str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop_gcta'))
+        relateds_name = gcta_relateds_to_drop_file.split('/')[-1]
+        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {grm_dir} $BATCH_TMPDIR')
+        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {gcta_relateds_to_drop_file} $BATCH_TMPDIR')
+
+        required_cpu: int = config_retrieve(['GctaPCA', 'cores'], 8)
+        run_PCA_j.storage(required_storage).memory('highmem')
+
+        run_PCA_j.command(
+            'gcta_pca ',
+            '--grm_dir "${{BATCH_TMPDIR}}" ',
+            f'--output_path {run_PCA_j.output} ',
+            f'--n_pcs {config_retrieve(["large_cohort", "n_pcs"])} ',
+            f'--relateds_to_drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
+        )
+
+        # Delocalise the output
+        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {run_PCA_j.output} {str(outputs["pca_dir"])}')
         # j = get_batch().new_job('Run GCTA PCA', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
         # j.image(image_path('cpg_workflows'))
         # j.command(
@@ -503,14 +548,14 @@ class GctaPCA(CohortStage):
         #         setup_gcp=True,
         #     ),
         # )
-        run_PCA_j = gcta_PCA.run_PCA(
-            b=get_batch(),
-            grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
-            output_path=str(self.expected_outputs(cohort)['pca_dir']),
-            version=gcta_version(),
-            n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
-            relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
-        )
+        # run_PCA_j = gcta_PCA.run_PCA(
+        #     b=get_batch(),
+        #     grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
+        #     output_path=str(self.expected_outputs(cohort)['pca_dir']),
+        #     version=gcta_version(),
+        #     n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
+        #     relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
+        # )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[run_PCA_j])
         # create_PCA_j = gcta_PCA.run_PCA(
         #     b=get_batch(),

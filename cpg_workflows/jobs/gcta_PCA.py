@@ -94,13 +94,13 @@ def run_PCA(
         },
     )
 
-    if relateds_to_drop := hl.read_table(relateds_to_drop):
-        sgids_to_remove = set(relateds_to_drop.s.collect())
+    # Check if there are relateds to drop
+    if relateds_to_drop:
+        with open(relateds_to_drop, 'r') as f:
+            sgids_to_remove = set(line.strip() for line in f)
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
-        # Write each sg id on new line to a file
         id_data = np.loadtxt(bfile['grm.id'], dtype=str)
-        # grm_data = read_grm_bin(bfile, all_n=True)
         remove_contents = ''
         for fam_id, sg_id in id_data:
             if sg_id in sgids_to_remove:
