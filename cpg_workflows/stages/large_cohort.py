@@ -330,7 +330,7 @@ class RelatednessFlag(CohortStage):
 
         # Delocalise the output HT
         job.command(
-            f'gcloud --no-user-output-enabled storage cp -r {job.relateds_to_drop_ht} {str(outputs["relateds_to_drop"])}',
+            f'gcloud --no-user-output-enabled storage cp -r {job.relateds_to_drop_ht} {str(outputs["relateds_to_drop_ht"])}',
         )
         job.command(
             f'gcloud --no-user-output-enabled storage cp -r {job.relateds_to_drop_gcta} {str(outputs["relateds_to_drop_gcta"])}',
