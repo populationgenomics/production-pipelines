@@ -482,6 +482,9 @@ class GctaGRM(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
             grm_dir=get_workflow().prefix / 'gcta_pca' / 'GRM' / gcta_version(),
+            grm_bin=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.bin',
+            grm_id=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.id',
+            grm_N_bin=get_workflow().prefix / 'gcta_pca' / 'GRM' / f'{gcta_version()}.grm.N.bin',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
