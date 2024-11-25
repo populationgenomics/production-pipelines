@@ -517,7 +517,7 @@ class GctaPCA(CohortStage):
         grm_dir = str(inputs.as_path(cohort, GctaGRM, 'grm_dir'))
         gcta_relateds_to_drop_file = str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop_gcta'))
         relateds_name = gcta_relateds_to_drop_file.split('/')[-1]
-        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {grm_dir} $BATCH_TMPDIR')
+        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r "{grm_dir}*" $BATCH_TMPDIR')
         run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {gcta_relateds_to_drop_file} $BATCH_TMPDIR')
 
         required_cpu: int = config_retrieve(['GctaPCA', 'cores'], 8)
