@@ -6,7 +6,6 @@ densifies the VDS into a MatrixTable
 Writes the MT to the output path
 """
 
-import logging
 from argparse import ArgumentParser
 
 import hail as hl
@@ -15,8 +14,6 @@ from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import get_logger
-from gnomad.utils.sparse_mt import default_compute_info
-from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
 
 def main(
@@ -36,7 +33,6 @@ def main(
         partitions (int): if specified, write data as this many partitions
         sites_only (str): optional, if used write a sites-only VCF directory to this location
     """
-
     init_batch()
 
     # if we need to manually specify a non-standard Hail QoB JAR file
@@ -54,16 +50,20 @@ def main(
     # remove any monoallelic or non-ref-in-any-sample sites
     mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.GT.is_non_ref())))
 
-    # not sure if we need this either
     # naive coalesce just lumps adjacent partitions together, so this could create wildly unbalanced partitions
+    # if this is not used we'll retain the original partitions
     if partitions:
-        mt = mt.repartition(partitions)
+        mt = mt.naive_coalesce(partitions)
+
+    # by default, drop the GVCF info
+    if "gvcf_info" in mt.entry:
+        mt = mt.drop('gvcf_info')
 
     mt.write(dense_mt_out, overwrite=True)
 
     if sites_only:
         mt = hl.read_matrix_table(dense_mt_out)
-        hl.export_vcf(mt.drop('gvcf_info').rows(), sites_only, tabix=True, parallel='header_per_shard')
+        hl.export_vcf(mt, sites_only, tabix=True, parallel='header_per_shard')
 
 
 def cli_main():
