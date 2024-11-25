@@ -7,25 +7,25 @@ from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import fasta_res_group, get_batch
 
 
-def get_sample_truth_data(sequencing_group_id: str):
+def get_sample_truth_data(sample_ext_id: str):
     """
     retrieve the reference truth specific to this individual
 
     Args:
-        sequencing_group_id (str):
+        sample_ext_id (str):
 
     Returns:
         The specific truth data from config
     """
 
-    ref_data = config_retrieve(['references', sequencing_group_id])
+    ref_data = config_retrieve(['references', sample_ext_id])
     assert all(key in ref_data for key in ['vcf', 'index', 'bed'])
     return ref_data
 
 
 def run_happy_on_vcf(
     vcf_path: str,
-    sequencing_group_ext_id: str,
+    sample_ext_id: str,
     out_prefix: str,
 ):
     """
@@ -34,21 +34,21 @@ def run_happy_on_vcf(
 
     Args:
         vcf_path (str): path to the single-sample VCF
-        sequencing_group_ext_id (str): external ID to find reference data
+        sample_ext_id (str): external ID to find reference data
         out_prefix (str): where to export happy outputs
 
     Returns:
         This Job or None
     """
 
-    happy_j = get_batch().new_job(f'Run Happy on {sequencing_group_ext_id} VCF')
+    happy_j = get_batch().new_job(f'Run Happy on {sample_ext_id} VCF')
     happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
 
     # region: read input data into batch
     vcf_input = get_batch().read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
 
     # read in sample-specific truth data from config
-    ref_data = get_sample_truth_data(sequencing_group_ext_id)
+    ref_data = get_sample_truth_data(sample_ext_id)
     truth_input = get_batch().read_input_group(vcf=ref_data['vcf'], index=ref_data['index'], bed=ref_data['bed'])
 
     happy_j.declare_resource_group(

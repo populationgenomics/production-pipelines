@@ -62,9 +62,9 @@ def update_happy_meta(output_path: str) -> dict:
     }
 
     happy_handle = to_path(output_path)
-    cpg_id: str = happy_handle.name.split('.')[0]
+    sample_ext_id: str = happy_handle.name.split('__')[0]
 
-    ref_data = get_sample_truth_data(sequencing_group_id=cpg_id)
+    ref_data = get_sample_truth_data(sample_ext_id=sample_ext_id)
 
     # populate a dictionary of results for this sequencing group
     summary_data = {
@@ -98,7 +98,10 @@ def update_happy_meta(output_path: str) -> dict:
 class ValidationHappyOnVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         output_prefix = (
-            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.external_id}__{sequencing_group.id}'
         )
         return {
             'vcf': to_path(f'{output_prefix}.happy.vcf.bgz'),
@@ -120,13 +123,16 @@ class ValidationHappyOnVcf(SequencingGroupStage):
 
         # set the prefix to write outputs to
         output_prefix = (
-            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.external_id}__{sequencing_group.id}'
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
         job = run_happy_on_vcf(
             vcf_path=str(input_vcf),
-            sequencing_group_ext_id=sequencing_group.external_id,
+            sample_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
         )
 
