@@ -68,6 +68,7 @@ def cli_main():
 
 
 def run_PCA(
+    b: hb.Batch,
     grm_directory: str,
     output_path: str,
     version: str,
@@ -75,7 +76,8 @@ def run_PCA(
     relateds_to_drop: str,
 ):
 
-    b = init_batch()
+    init_batch()
+    b = get_batch()
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
