@@ -525,7 +525,7 @@ class GctaPCA(CohortStage):
 
         run_PCA_j.command(
             'gcta_pca '
-            '--grm_dir "${{BATCH_TMPDIR}}" '
+            '--grm_dir "${BATCH_TMPDIR}" '
             f'--output_path {run_PCA_j.output} '
             f'--n_pcs {config_retrieve(["large_cohort", "n_pcs"])} '
             f'--relateds_to_drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
