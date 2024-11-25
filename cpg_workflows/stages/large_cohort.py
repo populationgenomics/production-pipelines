@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Any, Final, Tuple
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.jobs.gcta_PCA import run_PCA
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.utils import slugify, tshirt_mt_sizing
 from cpg_workflows.workflow import (
@@ -487,22 +488,30 @@ class GctaPCA(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import gcta_PCA
 
-        j = get_batch().new_job('Run GCTA PCA', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
-        j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                gcta_PCA,
-                gcta_PCA.run_PCA.__name__,
-                get_batch(),
-                str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
-                str(self.expected_outputs(cohort)['pca_dir']),
-                gcta_version(),
-                config_retrieve(['large_cohort', 'n_pcs']),
-                str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
-                setup_gcp=True,
-            ),
+        # j = get_batch().new_job('Run GCTA PCA', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
+        # j.image(image_path('cpg_workflows'))
+        # j.command(
+        #     query_command(
+        #         gcta_PCA,
+        #         gcta_PCA.run_PCA.__name__,
+        #         get_batch(),
+        #         str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
+        #         str(self.expected_outputs(cohort)['pca_dir']),
+        #         gcta_version(),
+        #         config_retrieve(['large_cohort', 'n_pcs']),
+        #         str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
+        #         setup_gcp=True,
+        #     ),
+        # )
+        run_PCA_j = gcta_PCA.run_PCA(
+            b=get_batch(),
+            grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
+            output_path=str(self.expected_outputs(cohort)['pca_dir']),
+            version=gcta_version(),
+            n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
+            relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
         )
-        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[run_PCA_j])
         # create_PCA_j = gcta_PCA.run_PCA(
         #     b=get_batch(),
         #     grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
