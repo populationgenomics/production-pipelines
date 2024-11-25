@@ -173,15 +173,15 @@ class PackageForRelease(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
 
-        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
-        return to_path(join(common_folder, 'clinvarbitration.tar.gz'))
+        common_folder = to_path(join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING,),)
+        return common_folder / 'clinvarbitration.tar.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
         Localise all the previously generated data into a folder
         tarball it, and write out as a single file
         """
-        tar_output = self.make_outputs(multicohort)
+        tar_output = self.expected_outputs(multicohort)
 
         # find paths to the previous outputs
         vcf = inputs.as_path(multicohort, AnnotateClinvarDecisions)
@@ -201,5 +201,5 @@ class PackageForRelease(MultiCohortStage):
             tar -czf {job.output} clinvarbitration_data
         """,
         )
-        job.write_output(job.output, tar_output)
+        get_batch().write_output(job.output, str(tar_output))
         return self.make_outputs(multicohort, data=tar_output, jobs=job)
