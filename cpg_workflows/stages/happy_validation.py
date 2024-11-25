@@ -38,7 +38,8 @@ class ValidationMtToVcf(SequencingGroupStage):
             f'ss_vcf_from_mt '
             f'--input {input_mt} '
             f'--sample_id {sequencing_group.id} '
-            f'--output {str(exp_output)} ',
+            f'--output {str(exp_output)} '
+            '--clean ',
         )
 
         return self.make_outputs(sequencing_group, data=exp_output, jobs=job)
