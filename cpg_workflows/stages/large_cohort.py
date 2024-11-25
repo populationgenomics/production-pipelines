@@ -274,7 +274,7 @@ class RelatednessPCRelate(CohortStage):
 
 @stage(
     required_stages=[SampleQC, RelatednessPCRelate],
-    analysis_keys=['relateds_to_drop'],
+    analysis_keys=['relateds_to_drop_ht'],
     analysis_type='custom',
 )
 class RelatednessFlag(CohortStage):
