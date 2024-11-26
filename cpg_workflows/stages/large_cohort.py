@@ -559,7 +559,7 @@ class GctaPCA(CohortStage):
         #     ),
         # )
         b = get_batch()
-        grm_directory = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
+        # grm_directory = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
         bfile = b.read_input_group(
             **{
                 'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
@@ -567,19 +567,17 @@ class GctaPCA(CohortStage):
                 'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
             },
         )
-        logging.info(
-            {
-                'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
-                'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
-                'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
-            },
-        )
+        grm_directory = {
+            'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
+            'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
+            'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
+        }
         logging.info(
             f'GRM files LARGE COHORT: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}',
         )
         run_PCA_j = gcta_PCA.run_PCA(
             b=b,
-            grm_directory=bfile,
+            grm_directory=grm_directory,
             output_path=str(self.expected_outputs(cohort)['pca_dir']),
             version=gcta_version(),
             n_pcs=config_retrieve(['large_cohort', 'n_pcs']),

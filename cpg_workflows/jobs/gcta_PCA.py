@@ -70,7 +70,7 @@ def cli_main():
 
 def run_PCA(
     b: hb.Batch,
-    grm_directory: hb.ResourceGroup,
+    grm_directory: dict[str, str],
     output_path: str,
     version: str,
     n_pcs: int,
@@ -85,6 +85,7 @@ def run_PCA(
     logging.info(
         f'GRM files: bin: {grm_directory["grm.bin"]}, id: {grm_directory["grm.id"]}, N: {grm_directory["grm.N.bin"]}',
     )
+    run_PCA_j.declare_resource_group(grm_directory=grm_directory)
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
@@ -109,7 +110,7 @@ def run_PCA(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {grm_directory} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {run_PCA_j.grm_directory} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(run_PCA_j.ofile, f'{output_path}')
