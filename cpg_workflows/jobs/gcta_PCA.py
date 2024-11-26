@@ -70,7 +70,7 @@ def cli_main():
 
 def run_PCA(
     b: hb.Batch,
-    grm_directory: str,
+    grm_directory: hb.ResourceGroup,
     output_path: str,
     version: str,
     n_pcs: int,
@@ -81,14 +81,10 @@ def run_PCA(
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
     # Read GRM files
-    bfile = b.read_input_group(
-        **{
-            'grm.bin': f'{grm_directory}.grm.bin',
-            'grm.id': f'{grm_directory}.grm.id',
-            'grm.N.bin': f'{grm_directory}.grm.N.bin',
-        },
+
+    logging.info(
+        f'GRM files: bin: {grm_directory["grm.bin"]}, id: {grm_directory["grm.id"]}, N: {grm_directory["grm.N.bin"]}',
     )
-    logging.info(f'GRM files: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}')
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
@@ -102,7 +98,7 @@ def run_PCA(
             sgids_to_remove = set(line.strip() for line in f)
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
-        id_data = np.loadtxt(bfile['grm.id'], dtype=str)
+        id_data = np.loadtxt(grm_directory['grm.id'], dtype=str)
         remove_contents = ''
         for fam_id, sg_id in id_data:
             if sg_id in sgids_to_remove:
@@ -113,7 +109,7 @@ def run_PCA(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {bfile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {grm_directory} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     b.write_output(run_PCA_j.ofile, f'{output_path}')

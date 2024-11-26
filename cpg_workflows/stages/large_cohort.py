@@ -558,9 +558,18 @@ class GctaPCA(CohortStage):
         #         setup_gcp=True,
         #     ),
         # )
+        b = get_batch()
+        grm_directory = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
+        bfile = b.read_input_group(
+            **{
+                'grm.bin': f'{grm_directory}.grm.bin',
+                'grm.id': f'{grm_directory}.grm.id',
+                'grm.N.bin': f'{grm_directory}.grm.N.bin',
+            },
+        )
         run_PCA_j = gcta_PCA.run_PCA(
             b=get_batch(),
-            grm_directory=str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent),
+            grm_directory=bfile,
             output_path=str(self.expected_outputs(cohort)['pca_dir']),
             version=gcta_version(),
             n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
