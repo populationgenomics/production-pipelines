@@ -1,6 +1,7 @@
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -27,6 +28,7 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
+SHARD_MANIFEST = 'shard_manifest.txt'
 
 
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
@@ -134,11 +136,11 @@ class DenseMTFromVDS(MultiCohortStage):
             # this will be the write path for fragments of sites-only VCF (header-per-shard)
             'hps_vcf_dir': str(prefix / f'{multicohort.name}.vcf.bgz'),
             # this will be the file which contains the name of all fragments (header-per-shard)
-            'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / 'shard_manifest.txt',
+            'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST,
             # this will be the write path for fragments of sites-only VCF (separate header)
             'separate_header_vcf_dir': str(prefix / f'{multicohort.name}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments (separate header)
-            'separate_header_manifest': prefix / f'{multicohort.name}_separate.vcf.bgz' / 'shard_manifest.txt',
+            'separate_header_manifest': prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -155,3 +157,58 @@ class DenseMTFromVDS(MultiCohortStage):
             f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
         return self.make_outputs(multicohort, output, [j])
+
+
+@stage(analysis_keys=['vcf'], analysis_type='vcf')
+class ComposeFragmentsToSingleVCF(MultiCohortStage):
+    """
+    Takes a manifest of VCF fragments, and produces a single VCF file
+    This is disconnected from the previous stage, but requires it to be run first
+    So we check for the exact same output, and fail if we're not ready to start
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Submit jobs to take a manifest of VCF fragments, and produce a single VCF file
+        The VCF being composed here has a single header in a separate file, the first entry in the manifest
+        This means we can combine the VCF header and data fragments through concatenation
+        and the result will be a spec-compliant VCF
+        """
+
+        manifest_file = self.prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the previous workflow')
+
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = gcloud_compose_vcf_from_manifest(str(manifest_file), str(self.tmp_prefix), str(outputs['vcf']))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=[ComposeFragmentsToSingleVCF])
+class VQSROnCombinerData(MultiCohortStage):
+    """
+    Run VQSR on the combiner data
+    This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Submit jobs to run VQSR on the combiner data
+        This requires the manifest file of the VCF fragments written with headers-per-shard
+        This means the VQSR logic should be far simpler - we don't need to subdivide the input by regions
+        """
+
+        _manifest_file = self.prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST
+
+        outputs = self.expected_outputs(multicohort)
+
+        return self.make_outputs(multicohort, data=outputs, jobs=[])
