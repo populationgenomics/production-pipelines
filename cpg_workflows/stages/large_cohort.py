@@ -504,7 +504,8 @@ class GctaGRM(CohortStage):
 class GctaPCA(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return dict(
-            pca_dir=get_workflow().prefix / 'gcta_pca' / 'PCA' / gcta_version(),
+            gcta_eigenval=get_workflow().prefix / 'gcta_pca' / 'PCA' / f'{gcta_version()}.eigenval',
+            gcta_eigenvec=get_workflow().prefix / 'gcta_pca' / 'PCA' / f'{gcta_version()}.eigenvec',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -547,9 +548,13 @@ class GctaPCA(CohortStage):
         #     f'--n-pcs {config_retrieve(["large_cohort", "n_pcs"])} '
         #     f'--relateds-to-drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
         # )
-        run_PCA_j.command(f'ls -l {run_PCA_j.output}')
         # Delocalise the output
-        run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {run_PCA_j.output} {str(outputs["pca_dir"])}')
+        run_PCA_j.command(
+            f'gcloud --no-user-output-enabled storage cp -r "{run_PCA_j.output}.eigenval" {str(outputs["gcta_eigenval"])}',
+        )
+        run_PCA_j.command(
+            f'gcloud --no-user-output-enabled storage cp -r "{run_PCA_j.output}.eigenvec" {str(outputs["gcta_eigenvec"])}',
+        )
 
         #################################
         ######### QUERY COMMAND #########
