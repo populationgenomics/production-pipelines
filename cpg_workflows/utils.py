@@ -53,7 +53,6 @@ def get_logger(
 
         # create a named logger
         new_logger = logging.getLogger(logger_name)
-        new_logger.setLevel(log_level)
 
         # unless otherwise specified, use coloredlogs
         if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], True):
