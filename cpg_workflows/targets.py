@@ -18,6 +18,25 @@ from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from .metamist import Assay
 
 
+def hash_from_list_of_strings(string_list: list[str], hash_length: int = 10, suffix: str | None = None) -> str:
+    """
+    Create a hash from a list of strings
+    Args:
+        string_list ():
+        hash_length (int): how many characters to use from the hash
+        suffix (str): optional, clarify the type of value which was hashed
+
+    Returns:
+
+    """
+    hash_portion = hashlib.sha256(' '.join(string_list).encode()).hexdigest()[:hash_length]
+    full_hash = f'{hash_portion}_{len(string_list)}'
+
+    if suffix:
+        full_hash += f'_{suffix}'
+    return full_hash
+
+
 class Target:
     """
     Defines a target that a stage can act upon.
@@ -100,10 +119,13 @@ class MultiCohort(Target):
     def __init__(self) -> None:
         super().__init__()
 
-        # NOTE: For a cohort, we simply pull the dataset name from the config.
+        # previously MultiCohort.name was an underscore-delimited string of all the input cohorts
+        # this was expanding to the point where filenames including this String were too long for *nix
+        # instead we can create a hash of the input cohorts, and use that as the name
+        # the exact cohorts can be obtained from the config associated with the ar-guid
         input_cohorts = get_config()['workflow'].get('input_cohorts', [])
         if input_cohorts:
-            self.name = '_'.join(sorted(input_cohorts))
+            self.name = hash_from_list_of_strings(sorted(input_cohorts), suffix='cohorts')
         else:
             self.name = get_config()['workflow']['dataset']
 
