@@ -92,14 +92,19 @@ def run_PCA(
             'eigenval': '{root}.eigenval',
         },
     )
-
+    logging.info(
+        f'{run_PCA_j.grm_directory}'
+        f'{run_PCA_j.grm_directory["grm.bin"]}'
+        f'{run_PCA_j.grm_directory["grm.id"]}'
+        f'{run_PCA_j.grm_directory["grm.N.bin"]}',
+    )
     # Check if there are relateds to drop
     if relateds_to_drop:
         with to_path(relateds_to_drop).open('r') as f:
             sgids_to_remove = set(line.strip() for line in f)
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
-        id_data = np.loadtxt(grm_directory['grm.id'], dtype=str)
+        id_data = np.loadtxt(run_PCA_j.grm_directory['grm.id'], dtype=str)
         remove_contents = ''
         for fam_id, sg_id in id_data:
             if sg_id in sgids_to_remove:
