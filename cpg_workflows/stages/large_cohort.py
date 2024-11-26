@@ -568,6 +568,13 @@ class GctaPCA(CohortStage):
             },
         )
         logging.info(
+            {
+                'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
+                'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
+                'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
+            },
+        )
+        logging.info(
             f'GRM files LARGE COHORT: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}',
         )
         run_PCA_j = gcta_PCA.run_PCA(
