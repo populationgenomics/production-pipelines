@@ -122,12 +122,23 @@ class GVCFCombiner(MultiCohortStage):
 @stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
 class DenseMTFromVDS(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
+        """
+        the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
+        the VCFs are written as a directory, rather than a single VCF, so we can't check its existence well
+        """
+        # generate hashes once
+        prefix = self.prefix
+
         return {
-            'mt': self.prefix / f'{multicohort.name}.mt',
-            # this will be the write path for fragments of sites-only VCF
-            'vcf_dir': str(self.prefix / f'{multicohort.name}.vcf.bgz'),
-            # this will be the file which contains the name of all fragments
-            'shard_manifest': str(self.prefix / f'{multicohort.name}.vcf.bgz' / 'shard_manifest.txt'),
+            'mt': prefix / f'{multicohort.name}.mt',
+            # this will be the write path for fragments of sites-only VCF (header-per-shard)
+            'hps_vcf_dir': str(prefix / f'{multicohort.name}.vcf.bgz'),
+            # this will be the file which contains the name of all fragments (header-per-shard)
+            'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / 'shard_manifest.txt',
+            # this will be the write path for fragments of sites-only VCF (separate header)
+            'separate_header_vcf_dir': str(prefix / f'{multicohort.name}_separate.vcf.bgz'),
+            # this will be the file which contains the name of all fragments (separate header)
+            'separate_header_manifest': prefix / f'{multicohort.name}_separate.vcf.bgz' / 'shard_manifest.txt',
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -140,6 +151,7 @@ class DenseMTFromVDS(MultiCohortStage):
             'mt_from_vds '
             f'--input {str(inputs.as_dict(multicohort, GVCFCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
-            f'--sites_only {output["vcf_dir"]}',
+            f'--sites_only {output["hps_vcf_dir"]} '
+            f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
         return self.make_outputs(multicohort, output, [j])
