@@ -562,9 +562,9 @@ class GctaPCA(CohortStage):
         grm_directory = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
         bfile = b.read_input_group(
             **{
-                'grm.bin': f'{grm_directory}.grm.bin',
-                'grm.id': f'{grm_directory}.grm.id',
-                'grm.N.bin': f'{grm_directory}.grm.N.bin',
+                'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
+                'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
+                'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
             },
         )
         logging.info(
