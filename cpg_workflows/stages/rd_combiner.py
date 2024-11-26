@@ -2,8 +2,9 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels
 from cpg_workflows.targets import MultiCohort
-from cpg_workflows.utils import get_logger, ExpectedResultT
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
@@ -198,43 +199,50 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
 
 
 @stage(required_stages=[ComposeFragmentsToSingleVCF])
-class TrainVQSRModelOnCombinerData(MultiCohortStage):
+class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
     """
     Train VQSR model on the combiner data
     This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+        return {
+            'indel_recalibrations': self.prefix / 'indel_recalibrations',
+            'indel_tranches': self.prefix / 'indel_tranches',
+        }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
         Submit jobs to train VQSR on the combiner data
         """
 
-        _recomposed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
         outputs = self.expected_outputs(multicohort)
-
-        return self.make_outputs(multicohort, data=outputs, jobs=[])
-
-
-@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRModelOnCombinerData)
-class RunVQSROnCombinerData(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        # should this be one per fragment?
-        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'DenseMTFromVDS'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
+        indel_calibration_job = train_vqsr_indels(
+            sites_only_vcf=str(composed_sitesonly_vcf),
+            indel_recal=str(outputs['indel_recalibrations']),
+            indel_tranches=str(outputs['indel_tranches']),
         )
+        return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
 
-        if not manifest_file.exists():
-            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
-        ...
+
+# @stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRIndelModelOnCombinerData)
+# class RunVQSROnCombinerData(MultiCohortStage):
+#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+#         # should this be one per fragment?
+#         return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+#
+#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+#
+#         manifest_file = (
+#             multicohort.analysis_dataset.prefix()
+#             / 'rd_combiner'
+#             / get_workflow().output_version
+#             / 'DenseMTFromVDS'
+#             / f'{multicohort.name}.vcf.bgz'
+#             / SHARD_MANIFEST
+#         )
+#
+#         if not manifest_file.exists():
+#             raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+#         ...

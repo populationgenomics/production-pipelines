@@ -4,7 +4,6 @@ Create and run jobs relating to VQSR for the RD combiner
 
 from cpg_utils.config import reference_path
 from cpg_utils.hail_batch import get_batch
-
 from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job
 
 
@@ -49,6 +48,8 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
     get_batch().write_output(indel_recalibrator_j.recalibration_idx, indel_recal + '.idx')
     get_batch().write_output(indel_recalibrator_j.tranches, indel_tranches)
     return indel_recalibrator_j
+
+
 def train_vqsr_snps(sites_only_vcf: str, snp_model: str):
     """
     Train VQSR indels on the sites-only VCF
