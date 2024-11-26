@@ -6,7 +6,7 @@ from os.path import join
 
 import hailtop.batch as hb
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path
 from cpg_workflows.utils import chunks, get_logger
@@ -78,15 +78,11 @@ def gcloud_compose_vcf_from_manifest(
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
     """
-    get_logger().info(f'Using Manifest file path: {manifest_path}')
-    get_logger().info(f'Using Manifest parent: {manifest_path.parent}')
 
     # prefix these shard names to get full GCP path for each
     fragment_files = [
         join(str(manifest_path.parent), fragment.strip()) for fragment in manifest_path.open().readlines()
     ]
-
-    get_logger().info(f'First fragment: {fragment_files[0]}')
 
     # rolling squash of the chunks, should enable infinite-ish scaling
     temp_chunk_prefix_num = 1
