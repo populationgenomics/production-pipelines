@@ -78,7 +78,7 @@ def gcloud_compose_vcf_from_manifest(
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
     """
-    manifest_directory = to_path(intermediates_path).parent
+    manifest_directory = to_path(manifest_path).parent
 
     # prefix these shard names to get full GCP path for each
     fragment_files = [

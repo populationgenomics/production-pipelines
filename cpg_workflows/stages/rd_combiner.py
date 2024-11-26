@@ -3,7 +3,7 @@ from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.targets import MultiCohort
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_logger, ExpectedResultT
 from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
@@ -198,9 +198,9 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
 
 
 @stage(required_stages=[ComposeFragmentsToSingleVCF])
-class VQSROnCombinerData(MultiCohortStage):
+class TrainVQSRModelOnCombinerData(MultiCohortStage):
     """
-    Run VQSR on the combiner data
+    Train VQSR model on the combiner data
     This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
     """
 
@@ -209,10 +209,22 @@ class VQSROnCombinerData(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
-        Submit jobs to run VQSR on the combiner data
-        This requires the manifest file of the VCF fragments written with headers-per-shard
-        This means the VQSR logic should be far simpler - we don't need to subdivide the input by regions
+        Submit jobs to train VQSR on the combiner data
         """
+
+        _recomposed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
+        outputs = self.expected_outputs(multicohort)
+
+        return self.make_outputs(multicohort, data=outputs, jobs=[])
+
+
+@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRModelOnCombinerData)
+class RunVQSROnCombinerData(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        # should this be one per fragment?
+        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
 
         manifest_file = (
             multicohort.analysis_dataset.prefix()
@@ -225,7 +237,4 @@ class VQSROnCombinerData(MultiCohortStage):
 
         if not manifest_file.exists():
             raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
-
-        outputs = self.expected_outputs(multicohort)
-
-        return self.make_outputs(multicohort, data=outputs, jobs=[])
+        ...
