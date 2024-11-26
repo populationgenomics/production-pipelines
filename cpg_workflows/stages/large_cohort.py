@@ -522,7 +522,7 @@ class GctaPCA(CohortStage):
         required_storage = f'{t_shirt_size_value * 2}Gi'
 
         run_PCA_j: BashJob = get_batch().new_job(f'Run GCTA PCA: {cohort.name}')
-        run_PCA_j.image(config_retrieve(['workflow', 'driver_image']))
+        run_PCA_j.image(image_path('gcta'))
         run_PCA_j.command('set -eux pipefail')
 
         # Localise the GRM files
@@ -536,7 +536,7 @@ class GctaPCA(CohortStage):
         run_PCA_j.storage(required_storage).memory('highmem')
 
         run_PCA_j.command(
-            f'gcta --grm $BATCH_TMPDIR --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out $BATCH_TMPDIR/{run_PCA_j.output}',
+            f'gcta --grm $BATCH_TMPDIR --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out {run_PCA_j.output}',
         )
         # run_PCA_j.command(
         #     'gcta_pca '
