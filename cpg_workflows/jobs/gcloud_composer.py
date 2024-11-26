@@ -95,8 +95,9 @@ def gcloud_compose_vcf_from_manifest(
             condense_temp,
         )
         if condense_jobs:
-            condense_job.depends_on(*condense_jobs)
-            condense_jobs.append(condense_job)
+            condense_job.depends_on(condense_jobs[-1])
+
+        condense_jobs.append(condense_job)
 
     # one final job - read the final vcf in, index it, move the index, and write it out
     input_vcf = get_batch().read_input(fragment_files[0])
