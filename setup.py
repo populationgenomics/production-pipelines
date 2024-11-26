@@ -3,7 +3,7 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='cpg-workflows',
+    name='cpg_workflows',
     # This tag is automatically updated by bumpversion
     version='1.31.7',
     description='CPG workflows for Hail Batch',
