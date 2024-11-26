@@ -193,7 +193,11 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
 
         outputs = self.expected_outputs(multicohort)
 
-        jobs = gcloud_compose_vcf_from_manifest(str(manifest_file), str(self.tmp_prefix), str(outputs['vcf']))
+        jobs = gcloud_compose_vcf_from_manifest(
+            manifest_path=manifest_file,
+            intermediates_path=str(self.tmp_prefix),
+            output_path=str(outputs['vcf']),
+        )
 
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 

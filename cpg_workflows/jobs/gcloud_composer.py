@@ -6,7 +6,7 @@ from os.path import join
 
 import hailtop.batch as hb
 
-from cpg_utils import to_path
+from cpg_utils import to_path, Path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch, image_path
 from cpg_workflows.utils import chunks
@@ -59,7 +59,7 @@ def compose_condense_fragments(
 
 
 def gcloud_compose_vcf_from_manifest(
-    manifest_path: str,
+    manifest_path: Path,
     intermediates_path: str,
     output_path: str,
 ) -> list[hb.batch.job.Job]:
@@ -78,11 +78,11 @@ def gcloud_compose_vcf_from_manifest(
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
     """
-    manifest_directory = to_path(manifest_path).parent
+    print(f'Using Manifest file path: {manifest_path}')
 
     # prefix these shard names to get full GCP path for each
     fragment_files = [
-        join(manifest_directory, str(fragment).strip()) for fragment in to_path(manifest_path).open().readlines()
+        join(manifest_path.parent, str(fragment).strip()) for fragment in to_path(manifest_path).open().readlines()
     ]
 
     # rolling squash of the chunks, should enable infinite-ish scaling
