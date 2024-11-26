@@ -9,6 +9,7 @@ import hail as hl
 import hailtop.batch as hb
 from hailtop.batch.resource import ResourceGroup
 
+from cpg_utils import to_path
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch, init_batch
 
@@ -97,7 +98,7 @@ def run_PCA(
 
     # Check if there are relateds to drop
     if relateds_to_drop:
-        with open(relateds_to_drop, 'r') as f:
+        with to_path(relateds_to_drop).open('r') as f:
             sgids_to_remove = set(line.strip() for line in f)
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
