@@ -7,8 +7,9 @@ import logging
 import hail as hl
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, reference_path
+from cpg_utils.config import config_retrieve, get_config, reference_path
 from cpg_utils.hail_batch import genome_build
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.inputs import get_multicohort
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
@@ -17,6 +18,9 @@ from gnomad.sample_qc.pipeline import annotate_sex
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
     if can_reuse(out_sample_qc_ht_path):
         return []
+
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     ht = initialise_sample_table()
 
