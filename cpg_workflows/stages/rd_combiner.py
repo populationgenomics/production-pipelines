@@ -2,7 +2,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
-from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels
+from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels, train_vqsr_snps
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -201,7 +201,7 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
 @stage(required_stages=[ComposeFragmentsToSingleVCF])
 class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
     """
-    Train VQSR model on the combiner data
+    Train VQSR Indel model on the combiner data
     This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
     """
 
@@ -224,6 +224,32 @@ class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
             indel_tranches=str(outputs['indel_tranches']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
+
+
+@stage(required_stages=[ComposeFragmentsToSingleVCF])
+class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
+    """
+    Train VQSR SNP model on the combiner data
+    This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {
+            'snp_model': self.prefix / 'snp_model',
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Submit jobs to train VQSR on the combiner data
+        """
+
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
+        outputs = self.expected_outputs(multicohort)
+        snp_calibration_job = train_vqsr_snps(
+            sites_only_vcf=str(composed_sitesonly_vcf),
+            snp_model=str(outputs['snp_model']),
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
 
 
 # @stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRIndelModelOnCombinerData)
