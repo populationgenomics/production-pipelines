@@ -4,6 +4,15 @@
 takes a path to a VDS, and an output path
 densifies the VDS into a MatrixTable
 Writes the MT to the output path
+
+Additional arguments:
+    --partitions: if specified, write data as this many partitions
+    --sites_only: optional, if used write a sites-only VCF directory to this location
+                  it's far more efficient for Hail to write out a VCF per-partition, rather than a single VCF
+                  this also prevents the need for writing out a single VCF, then fragmenting that to run VEP, VQSR
+    --separate_header: optional, if used write a sites-only VCF directory with a separate header to this location
+                  this makes the VCF write more efficient, and is easily rejoined into a single VCF using compose
+                  for situations where we need a single whole-genome/exome VCF (e.g. VQSR training)
 """
 
 from argparse import ArgumentParser
@@ -21,6 +30,7 @@ def main(
     dense_mt_out: str,
     partitions: int | None = None,
     sites_only: str | None = None,
+    separate_header: str | None = None,
 ) -> None:
     """
     Load a sparse VariantDataset
@@ -32,6 +42,7 @@ def main(
         dense_mt_out (str):
         partitions (int): if specified, write data as this many partitions
         sites_only (str): optional, if used write a sites-only VCF directory to this location
+        sites_only (str): optional, if used write a sites-only VCF directory with a separate header to this location
     """
     init_batch()
 
@@ -61,9 +72,22 @@ def main(
 
     mt.write(dense_mt_out, overwrite=True)
 
+    if not sites_only or separate_header:
+        return
+
+    # read the dense MT and obtain the sites-only HT
+    mt = hl.read_matrix_table(dense_mt_out)
+    sites_only_ht = mt.rows()
+
+    # write a directory containing all the per-partition VCF fragments, each with a VCF header
     if sites_only:
-        mt = hl.read_matrix_table(dense_mt_out)
-        hl.export_vcf(mt, sites_only, tabix=True, parallel='header_per_shard')
+        get_logger(__file__).info('Writing sites-only VCF, header-per-shard')
+        hl.export_vcf(sites_only_ht, sites_only, tabix=True, parallel='header_per_shard')
+
+    # write a directory containing all the per-partition VCF fragments, with a separate VCF header file
+    if separate_header:
+        get_logger(__file__).info('Writing sites-only VCF, separate-header')
+        hl.export_vcf(sites_only_ht, separate_header, tabix=True, parallel='separate_header')
 
 
 def cli_main():
@@ -87,12 +111,17 @@ def cli_main():
         '--sites_only',
         help='Specify an output path for a sites-only VCF, or None',
     )
+    parser.add_argument(
+        '--separate_header',
+        help='Specify an output path for a sites-only VCF, with a separate header file, or None',
+    )
     args = parser.parse_args()
     main(
         vds_in=args.input,
         dense_mt_out=args.output,
         partitions=args.partitions,
         sites_only=args.sites_only,
+        separate_header=args.separate_header,
     )
 
 
