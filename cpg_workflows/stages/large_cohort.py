@@ -536,7 +536,7 @@ class GctaPCA(CohortStage):
         run_PCA_j.storage(required_storage).memory('highmem')
         run_PCA_j.command('ls -l $BATCH_TMPDIR')
         run_PCA_j.command(
-            f'gcta --grm $BATCH_TMPDIR --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out {run_PCA_j.output}',
+            f'gcta --grm $BATCH_TMPDIR/GRM --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out {run_PCA_j.output}',
         )
         # run_PCA_j.command(
         #     'gcta_pca '
