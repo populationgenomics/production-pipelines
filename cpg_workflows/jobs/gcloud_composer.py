@@ -4,7 +4,6 @@ All jobs required to take a shard manifest (containing paths to VCF fragments) a
 
 from os.path import join
 
-import hail as hl
 import hailtop.batch as hb
 
 from cpg_utils import to_path
@@ -83,7 +82,7 @@ def gcloud_compose_vcf_from_manifest(
 
     # prefix these shard names to get full GCP path for each
     fragment_files = [
-        join(manifest_directory, str(fragment).strip()) for fragment in hl.hadoop_open(manifest_path).readlines()
+        join(manifest_directory, str(fragment).strip()) for fragment in to_path(manifest_path).open().readlines()
     ]
 
     # rolling squash of the chunks, should enable infinite-ish scaling
