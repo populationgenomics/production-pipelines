@@ -52,10 +52,10 @@ def main(
 
     vds = hl.vds.read_vds(vds_in)
 
-    get_logger(__file__).info('Splitting multiallelics')
+    get_logger().info('Splitting multiallelics')
     vds = hl.vds.split_multi(vds)
 
-    get_logger(__file__).info('Densifying data...')
+    get_logger().info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
 
     # remove any monoallelic or non-ref-in-any-sample sites
@@ -81,12 +81,12 @@ def main(
 
     # write a directory containing all the per-partition VCF fragments, each with a VCF header
     if sites_only:
-        get_logger(__file__).info('Writing sites-only VCF, header-per-shard')
+        get_logger().info('Writing sites-only VCF, header-per-shard')
         hl.export_vcf(sites_only_ht, sites_only, tabix=True, parallel='header_per_shard')
 
     # write a directory containing all the per-partition VCF fragments, with a separate VCF header file
     if separate_header:
-        get_logger(__file__).info('Writing sites-only VCF, separate-header')
+        get_logger().info('Writing sites-only VCF, separate-header')
         hl.export_vcf(sites_only_ht, separate_header, tabix=True, parallel='separate_header')
 
 

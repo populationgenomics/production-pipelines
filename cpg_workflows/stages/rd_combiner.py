@@ -29,7 +29,7 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
-SHARD_MANIFEST = 'shard_manifest.txt'
+SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
