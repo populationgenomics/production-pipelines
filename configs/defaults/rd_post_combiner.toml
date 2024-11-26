@@ -1,0 +1,3 @@
+[workflow]
+name = 'rd_post_combiner'
+status_reporter = 'metamist'
