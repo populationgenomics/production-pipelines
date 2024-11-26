@@ -547,7 +547,7 @@ class GctaPCA(CohortStage):
         #     f'--n-pcs {config_retrieve(["large_cohort", "n_pcs"])} '
         #     f'--relateds-to-drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
         # )
-
+        run_PCA_j.command(f'ls -l $BATCH_TMPDIR/{run_PCA_j.output}')
         # Delocalise the output
         run_PCA_j.command(f'gcloud --no-user-output-enabled storage cp -r {run_PCA_j.output} {str(outputs["pca_dir"])}')
 
