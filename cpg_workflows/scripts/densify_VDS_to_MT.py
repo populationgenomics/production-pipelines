@@ -72,7 +72,7 @@ def main(
 
     mt.write(dense_mt_out, overwrite=True)
 
-    if not sites_only or separate_header:
+    if not (sites_only or separate_header):
         return
 
     # read the dense MT and obtain the sites-only HT

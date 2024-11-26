@@ -188,7 +188,7 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
         )
 
         if not manifest_file.exists():
-            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the previous workflow')
+            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
 
         outputs = self.expected_outputs(multicohort)
 
@@ -214,7 +214,7 @@ class VQSROnCombinerData(MultiCohortStage):
         This means the VQSR logic should be far simpler - we don't need to subdivide the input by regions
         """
 
-        _manifest_file = (
+        manifest_file = (
             multicohort.analysis_dataset.prefix()
             / 'rd_combiner'
             / get_workflow().output_version
@@ -222,6 +222,9 @@ class VQSROnCombinerData(MultiCohortStage):
             / f'{multicohort.name}.vcf.bgz'
             / SHARD_MANIFEST
         )
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
 
         outputs = self.expected_outputs(multicohort)
 
