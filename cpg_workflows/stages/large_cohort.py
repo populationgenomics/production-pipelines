@@ -534,7 +534,7 @@ class GctaPCA(CohortStage):
 
         required_cpu: int = config_retrieve(['GctaPCA', 'cores'], 8)
         run_PCA_j.storage(required_storage).memory('highmem')
-
+        run_PCA_j.command('ls -l $BATCH_TMPDIR')
         run_PCA_j.command(
             f'gcta --grm $BATCH_TMPDIR --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out {run_PCA_j.output}',
         )
