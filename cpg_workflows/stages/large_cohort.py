@@ -567,6 +567,9 @@ class GctaPCA(CohortStage):
                 'grm.N.bin': f'{grm_directory}.grm.N.bin',
             },
         )
+        logging.info(
+            f'GRM files LARGE COHORT: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}',
+        )
         run_PCA_j = gcta_PCA.run_PCA(
             b=get_batch(),
             grm_directory=bfile,
