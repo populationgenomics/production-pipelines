@@ -178,8 +178,14 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
         This means we can combine the VCF header and data fragments through concatenation
         and the result will be a spec-compliant VCF
         """
-
-        manifest_file = get_workflow().prefix / 'rd_combiner' / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST
+        manifest_file = (
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'DenseMTFromVDS'
+            / f'{multicohort.name}_separate.vcf.bgz'
+            / SHARD_MANIFEST
+        )
 
         if not manifest_file.exists():
             raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the previous workflow')
@@ -208,7 +214,14 @@ class VQSROnCombinerData(MultiCohortStage):
         This means the VQSR logic should be far simpler - we don't need to subdivide the input by regions
         """
 
-        _manifest_file = get_workflow().prefix / 'rd_combiner' / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST
+        _manifest_file = (
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'DenseMTFromVDS'
+            / f'{multicohort.name}.vcf.bgz'
+            / SHARD_MANIFEST
+        )
 
         outputs = self.expected_outputs(multicohort)
 

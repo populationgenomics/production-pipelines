@@ -60,7 +60,9 @@ def compose_condense_fragments(
 
 
 def gcloud_compose_vcf_from_manifest(
-    manifest_path: str, intermediates_path: str, output_path: str,
+    manifest_path: str,
+    intermediates_path: str,
+    output_path: str,
 ) -> list[hb.batch.job.Job]:
     """
     compose a series gcloud commands to condense a list of VCF fragments into a single VCF
