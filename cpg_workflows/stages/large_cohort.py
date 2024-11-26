@@ -571,7 +571,7 @@ class GctaPCA(CohortStage):
             f'GRM files LARGE COHORT: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}',
         )
         run_PCA_j = gcta_PCA.run_PCA(
-            b=get_batch(),
+            b=b,
             grm_directory=bfile,
             output_path=str(self.expected_outputs(cohort)['pca_dir']),
             version=gcta_version(),
