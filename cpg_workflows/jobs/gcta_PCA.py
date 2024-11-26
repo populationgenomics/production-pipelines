@@ -76,8 +76,6 @@ def run_PCA(
     relateds_to_drop: str,
 ):
 
-    init_batch()
-    b = get_batch()
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
