@@ -8,6 +8,7 @@ from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
     StageOutput,
+    get_workflow,
     stage,
 )
 from metamist.graphql import gql, query
@@ -178,7 +179,7 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
         and the result will be a spec-compliant VCF
         """
 
-        manifest_file = self.prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST
+        manifest_file = get_workflow().prefix / 'rd_combiner' / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST
 
         if not manifest_file.exists():
             raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the previous workflow')
@@ -207,7 +208,7 @@ class VQSROnCombinerData(MultiCohortStage):
         This means the VQSR logic should be far simpler - we don't need to subdivide the input by regions
         """
 
-        _manifest_file = self.prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST
+        _manifest_file = get_workflow().prefix / 'rd_combiner' / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST
 
         outputs = self.expected_outputs(multicohort)
 
