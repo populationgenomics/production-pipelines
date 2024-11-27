@@ -6,7 +6,6 @@ densifies the VDS into a MatrixTable
 Writes the MT to the output path
 
 Additional arguments:
-    --partitions: if specified, write data as this many partitions
     --sites_only: optional, if used write a sites-only VCF directory to this location
                   it's far more efficient for Hail to write out a VCF per-partition, rather than a single VCF
                   this also prevents the need for writing out a single VCF, then fragmenting that to run VEP, VQSR
@@ -19,6 +18,9 @@ from argparse import ArgumentParser
 
 import hail as hl
 
+from gnomad.utils.sparse_mt import default_compute_info
+from gnomad.utils.vcf import adjust_vcf_incompatible_types
+
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 from cpg_workflows.batch import override_jar_spec
@@ -28,7 +30,6 @@ from cpg_workflows.utils import get_logger
 def main(
     vds_in: str,
     dense_mt_out: str,
-    partitions: int | None = None,
     sites_only: str | None = None,
     separate_header: str | None = None,
 ) -> None:
@@ -40,9 +41,8 @@ def main(
     Args:
         vds_in (str):
         dense_mt_out (str):
-        partitions (int): if specified, write data as this many partitions
         sites_only (str): optional, if used write a sites-only VCF directory to this location
-        sites_only (str): optional, if used write a sites-only VCF directory with a separate header to this location
+        separate_header (str): optional, if used write a sites-only VCF directory with a separate header to this location
     """
     init_batch()
 
@@ -58,17 +58,32 @@ def main(
     get_logger().info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
 
+    # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
     # remove any monoallelic or non-ref-in-any-sample sites
     mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.GT.is_non_ref())))
 
-    # naive coalesce just lumps adjacent partitions together, so this could create wildly unbalanced partitions
-    # if this is not used we'll retain the original partitions
-    if partitions:
-        mt = mt.naive_coalesce(partitions)
+    # annotate site-level DP to avoid name collision
+    mt = mt.annotate_rows(
+        site_dp=hl.agg.sum(mt.DP),
+        ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
+    )
 
-    # by default, drop the GVCF info
-    if "gvcf_info" in mt.entry:
-        mt = mt.drop('gvcf_info')
+    # content shared with large_cohort.site_only_vcf.py
+    info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
+    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
+
+    info_ht = adjust_vcf_incompatible_types(
+        info_ht,
+        # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
+        # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
+        # which breaks VQSR parser (it doesn't recognise the delimiter and treats
+        # it as an array with a single string value "|132.1|140.2", leading to
+        # an IndexOutOfBound exception when trying to access value for second allele)
+        pipe_delimited_annotations=[],
+    )
+
+    # annotate this info back into the main MatrixTable
+    mt = mt.annotate_rows(info=info_ht[mt.row_key])
 
     mt.write(dense_mt_out, overwrite=True)
 
@@ -103,11 +118,6 @@ def cli_main():
         required=True,
     )
     parser.add_argument(
-        '--partitions',
-        help='Number of partitions to write the MT as',
-        type=int,
-    )
-    parser.add_argument(
         '--sites_only',
         help='Specify an output path for a sites-only VCF, or None',
     )
@@ -119,7 +129,6 @@ def cli_main():
     main(
         vds_in=args.input,
         dense_mt_out=args.output,
-        partitions=args.partitions,
         sites_only=args.sites_only,
         separate_header=args.separate_header,
     )

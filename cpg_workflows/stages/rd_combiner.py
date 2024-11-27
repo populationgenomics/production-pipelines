@@ -129,8 +129,9 @@ class DenseMTFromVDS(MultiCohortStage):
         """
         the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
         the VCFs are written as a directory, rather than a single VCF, so we can't check its existence well
+
+        Needs a range of INFO fields to be present in the VCF
         """
-        # generate hashes once
         prefix = self.prefix
 
         return {
