@@ -131,6 +131,15 @@ class SampleQC(CohortStage):
             'Sample QC',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in workflow_config:
+            init_batch_args['driver_cores'] = workflow_config['driver_cores']
+
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
@@ -139,6 +148,7 @@ class SampleQC(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )
