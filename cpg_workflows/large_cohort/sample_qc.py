@@ -119,7 +119,8 @@ def impute_sex(
                     keep=False,
                 )
                 vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                    str(vds_tmp_path),overwrite=True
+                    str(vds_tmp_path),
+                    overwrite=True,
                 )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
