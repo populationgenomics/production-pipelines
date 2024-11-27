@@ -15,25 +15,6 @@ from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
 
 
-def can_reuse_dataset(path: str):
-    """
-    checks for existence of a Path
-    if the path is a MT or VDS, checks for the success file
-    """
-
-    if not path:
-        return False
-
-    path_as_path = to_path(path)
-
-    if path_as_path.suffix in ['.mt', '.ht']:
-        path_as_path /= '_SUCCESS'
-    if path_as_path.suffix in ['.vds']:
-        path_as_path /= 'variant_data/_SUCCESS'
-
-    return path_as_path.exists()
-
-
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
     logging.basicConfig(level=logging.INFO)
     if can_reuse(out_sample_qc_ht_path):
@@ -128,7 +109,8 @@ def impute_sex(
         interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
             vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
-            if can_reuse_dataset(vds_tmp_path):
+            if can_reuse(vds_tmp_path):
+                logging.info(f'Loading {name} filtered tmp vds')
                 vds = hl.vds.read_vds(str(vds_tmp_path))
             else:
                 # remove all rows where the locus falls within a defined interval
