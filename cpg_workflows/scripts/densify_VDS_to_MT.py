@@ -57,7 +57,7 @@ def main(
 
     # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
     # remove any monoallelic or non-ref-in-any-sample sites
-    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.GT.is_non_ref())))
+    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
 
     # annotate site-level DP to avoid name collision
     mt = mt.annotate_rows(
