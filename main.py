@@ -3,6 +3,7 @@
 """
 Entry point to run workflows.
 """
+
 import os
 
 import click
@@ -11,6 +12,7 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
+from cpg_workflows.stages.align_genotype_with_dragen import DownloadDataFromIca
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
@@ -59,6 +61,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
+    'align_genotype_with_dragen': [DownloadDataFromIca],
 }
 
 
