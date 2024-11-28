@@ -191,8 +191,8 @@ def train_vqsr_snp_tranches(
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
           -V input.vcf.bgz \\
-          -O {snps_recal_path} \\
-          --tranches-file {snps_tranche_path} \\
+          -O {snps_recal_j.recalibration} \\
+          --tranches-file {snps_recal_j.tranches} \\
           --trust-all-polymorphic \\
           {tranche_cmdl} \\
           {an_cmdl} \\
