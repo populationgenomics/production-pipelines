@@ -11,7 +11,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job, snps_recalibrator_scattered, snps_gather_tranches_job, SNP_RECALIBRATION_TRANCHE_VALUES, SNP_ALLELE_SPECIFIC_FEATURES
-from cpg_workflows.resources import HIGHMEM, joint_calling_scatter_count
+from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse
 
 
@@ -173,23 +173,26 @@ def train_vqsr_snp_tranches(
         snps_recal_j = get_batch().new_job('VQSR: SNPsVariantRecalibratorScattered', {'part': f'{idx + 1}/{fragment_count}'})
         snps_recal_j.image(image_path('gatk'))
 
-        res = HIGHMEM.set_resources(j, ncpu=4, storage_gb=50)
+        res = HIGHMEM.set_resources(snps_recal_j, ncpu=4, storage_gb=50)
 
         tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
         an_cmdl = ' '.join(
             [f'-an {v}' for v in SNP_ALLELE_SPECIFIC_FEATURES],
         )
-        j.command(
+        snps_recal_j.command(
             f"""set -euo pipefail
 
         MODEL_REPORT={snp_model_in_batch}
+        
+        mv {vcf_resources[idx]['vcf.gz']} input.vcf.bgz
+        mv {vcf_resources[idx]['vcf.gz.tbi']} input.vcf.bgz.tbi
 
         gatk --java-options \
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
-          -V {vcf_resources[idx]['vcf.gz']} \\
-          -O {j.recalibration} \\
-          --tranches-file {j.tranches} \\
+          -V input.vcf.bgz \\
+          -O {snps_recal_path} \\
+          --tranches-file {snps_tranche_path} \\
           --trust-all-polymorphic \\
           {tranche_cmdl} \\
           {an_cmdl} \\
