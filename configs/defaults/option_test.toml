@@ -1,2 +1,5 @@
 [workflow]
 name = 'option_test'
+
+# this can be either 'continue' or 'replace'
+second_stage = 'continue'
