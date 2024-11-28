@@ -10,7 +10,13 @@ from hailtop.batch.job import Job
 from cpg_utils import Path, to_path
 from cpg_utils.config import image_path, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job, snps_recalibrator_scattered, snps_gather_tranches_job, SNP_RECALIBRATION_TRANCHE_VALUES, SNP_ALLELE_SPECIFIC_FEATURES
+from cpg_workflows.jobs.vqsr import (
+    indel_recalibrator_job,
+    snps_recalibrator_create_model_job,
+    snps_gather_tranches_job,
+    SNP_RECALIBRATION_TRANCHE_VALUES,
+    SNP_ALLELE_SPECIFIC_FEATURES,
+)
 from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import can_reuse
 
@@ -184,7 +190,7 @@ def train_vqsr_snp_tranches(
             f"""set -euo pipefail
 
         MODEL_REPORT={snp_model_in_batch}
-        
+
         mv {vcf_resources[idx]['vcf.gz']} input.vcf.bgz
         mv {vcf_resources[idx]['vcf.gz.tbi']} input.vcf.bgz.tbi
 
@@ -210,18 +216,6 @@ def train_vqsr_snp_tranches(
         """,
         )
 
-        # snps_recal_j = snps_recalibrator_scattered(
-        #     get_batch(),
-        #     siteonly_vcf=vcf_resources[idx],
-        #     model_file=snp_model_in_batch,
-        #     hapmap_resource_vcf=resources['hapmap'],
-        #     omni_resource_vcf=resources['omni'],
-        #     one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
-        #     dbsnp_resource_vcf=resources['dbsnp'],
-        #     disk_size=50,
-        #     use_as_annotations=True,
-        #     job_attrs={'part': f'{idx + 1}/{fragment_count}'},
-        # )
         scatter_jobs.append(snps_recal_j)
 
         # write the results out to GCP
