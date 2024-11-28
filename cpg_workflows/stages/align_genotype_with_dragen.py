@@ -1,20 +1,21 @@
 import json
-from typing import Literal
+from typing import Final, Literal
 
 from google.cloud import secretmanager
 
 from hailtop.batch.job import PythonJob
 
-from cpg_utils.config import config_retrieve, image_path
+from cpg_utils.config import config_retrieve, get_gcp_project, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import StageOutput, stage
 
-ICA_REST_ENDPOINT: str = 'https://ica.illumina.com/ica/rest'
+ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-SECRET_PROJECT = '1051897107465'  # 'cpg-common'
+SECRET_PROJECT = 'fewgenomes'  # get_gcp_project()  # config_retrieve(['workflow']['project'])  # 'cpg-common'
 SECRET_NAME = 'illumina_cpg_workbench_api'
+SECRET_VERSION = 'latest'
 
 
 def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
@@ -22,7 +23,7 @@ def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
         secret_path: str = SECRET_CLIENT.secret_version_path(
             project=SECRET_PROJECT,
             secret=SECRET_NAME,
-            secret_version='latest',
+            secret_version=SECRET_VERSION,
         )
         response: secretmanager.AccessSecretVersionResponse = SECRET_CLIENT.access_secret_version(
             request={'name': secret_path},
