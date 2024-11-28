@@ -103,7 +103,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
-        j = get_batch().new_python_job('Combiner', self.get_job_attrs())
+        j = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', self.get_job_attrs())
         j.image(config_retrieve(['workflow', 'driver_image']))
         j.memory(config_retrieve(['combiner', 'memory']))
         j.storage(config_retrieve(['combiner', 'storage']))
@@ -150,7 +150,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
-        j = get_batch().new_job('Dense Subset')
+        j = get_batch().new_job('CreateDenseMtFromVdsWithHail')
         j.image(config_retrieve(['workflow', 'driver_image']))
         j.command(
             'mt_from_vds '
@@ -198,6 +198,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
             manifest_path=manifest_file,
             intermediates_path=str(self.prefix / 'temporary_compose_intermediates'),
             output_path=str(outputs['vcf']),
+            job_name=self.name,
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
