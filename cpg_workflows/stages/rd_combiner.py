@@ -124,7 +124,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
 
 @stage(required_stages=[CreateVdsFromGvcfsWithHailCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
-class CreateCreateDenseMtFromVdsWithHailWithHail(MultiCohortStage):
+class CreateDenseMtFromVdsWithHail(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """
         the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
