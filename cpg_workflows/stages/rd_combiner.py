@@ -275,7 +275,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             / 'rd_combiner'
             / get_workflow().output_version
             / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}_separate.vcf.bgz'
+            / f'{multicohort.name}.vcf.bgz'
             / SHARD_MANIFEST
         )
 
