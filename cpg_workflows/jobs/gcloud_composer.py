@@ -95,8 +95,8 @@ def gcloud_compose_vcf_from_manifest(
         condense_temp = join(intermediates_path, f'temp_chunk_{temp_chunk_prefix_num}')
         temp_chunk_prefix_num += 1
         fragment_files, condense_job = compose_condense_fragments(
-            fragment_files,
-            condense_temp,
+            path_list=fragment_files,
+            temp_prefix=condense_temp,
             job_name=job_name,
         )
         if condense_jobs:
