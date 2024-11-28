@@ -124,7 +124,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
 
 @stage(required_stages=[CreateVdsFromGvcfsWithHailCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
-class CreateDenseMtFromVdsWithHail(MultiCohortStage):
+class CreateCreateDenseMtFromVdsWithHailWithHail(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """
         the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
@@ -184,7 +184,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
             multicohort.analysis_dataset.prefix()
             / 'rd_combiner'
             / get_workflow().output_version
-            / 'DenseMTFromVDS'
+            / 'CreateDenseMtFromVdsWithHail'
             / f'{multicohort.name}_separate.vcf.bgz'
             / SHARD_MANIFEST
         )
@@ -207,7 +207,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
 class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
     """
     Train VQSR Indel model on the combiner data
-    This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
+    This is disconnected from the CreateDenseMtFromVdsWithHail stage, but requires it to be run first
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -235,7 +235,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
 class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
     """
     Train VQSR SNP model on the combiner data
-    This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
+    This is disconnected from the CreateDenseMtFromVdsWithHail stage, but requires it to be run first
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -273,7 +273,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             multicohort.analysis_dataset.prefix()
             / 'rd_combiner'
             / get_workflow().output_version
-            / 'DenseMTFromVDS'
+            / 'CreateDenseMtFromVdsWithHail'
             / f'{multicohort.name}_separate.vcf.bgz'
             / SHARD_MANIFEST
         )
@@ -306,7 +306,7 @@ class RunTrainedVqsrOnCombinerFragments(MultiCohortStage):
             multicohort.analysis_dataset.prefix()
             / 'rd_combiner'
             / get_workflow().output_version
-            / 'DenseMTFromVDS'
+            / 'CreateDenseMtFromVdsWithHail'
             / f'{multicohort.name}.vcf.bgz'
             / SHARD_MANIFEST
         )
