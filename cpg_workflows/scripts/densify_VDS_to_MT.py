@@ -65,7 +65,7 @@ def main(
     # annotate site-level DP to avoid name collision
     mt = mt.annotate_rows(
         site_dp=hl.agg.sum(mt.DP),
-        ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
+        ANS=hl.agg.count_where(hl.is_defined(mt.GT)) * 2,
     )
 
     # content shared with large_cohort.site_only_vcf.py
