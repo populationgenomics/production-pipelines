@@ -128,10 +128,11 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str):
 
 
 def train_vqsr_snp_tranches(
-    manifest_file:Path,
-    snp_model_path:str,
-    output_path:str,
-    temp_path:Path,
+    manifest_file: Path,
+    snp_model_path: str,
+    output_path: str,
+    temp_path: Path,
+    job_name: str = 'TrainVqsrSnpTranches',
 ) -> list[Job]:
     """
     train vqsr tranches for SNPs, in a scattered manner
@@ -170,7 +171,7 @@ def train_vqsr_snp_tranches(
             snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
             continue
 
-        snps_recal_j = get_batch().new_job('VQSR: SNPsVariantRecalibratorScattered', {'part': f'{idx + 1}/{fragment_count}'})
+        snps_recal_j = get_batch().new_job(job_name, {'part': f'{idx + 1}/{fragment_count}'})
         snps_recal_j.image(image_path('gatk'))
 
         res = HIGHMEM.set_resources(snps_recal_j, ncpu=4, storage_gb=50)
