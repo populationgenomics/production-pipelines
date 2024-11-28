@@ -1,5 +1,6 @@
 [workflow]
 name = 'option_test'
+sequencing_type = 'genome'
 
 # this can be either 'continue' or 'replace'
 second_stage = 'continue'
