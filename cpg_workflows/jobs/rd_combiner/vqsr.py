@@ -8,13 +8,14 @@ from hailtop.batch.resource import ResourceGroup
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import reference_path
+from cpg_utils.config import image_path, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job, snps_recalibrator_scattered, snps_gather_tranches_job
+from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job, snps_recalibrator_scattered, snps_gather_tranches_job, SNP_RECALIBRATION_TRANCHE_VALUES, SNP_ALLELE_SPECIFIC_FEATURES
+from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
 
 
-@lru_cache(100)
+@lru_cache(2)
 def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
     """
     read the manifest file, and return all the fragment resources as an ordered list
@@ -35,7 +36,6 @@ def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
             resource_objects.append(
                 get_batch().read_input_group(**{'vcf.gz': vcf_path, 'vcf.gz.tbi': f'{vcf_path}.tbi'}),
             )
-
     return resource_objects
 
 
@@ -170,23 +170,59 @@ def train_vqsr_snp_tranches(
             snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
             continue
 
-        snps_recal_j = snps_recalibrator_scattered(
-            get_batch(),
-            siteonly_vcf=vcf_resources[idx],
-            model_file=snp_model_in_batch,
-            hapmap_resource_vcf=resources['hapmap'],
-            omni_resource_vcf=resources['omni'],
-            one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
-            dbsnp_resource_vcf=resources['dbsnp'],
-            disk_size=50,
-            use_as_annotations=True,
-            job_attrs={'part': f'{idx + 1}/{fragment_count}'},
+        snps_recal_j = get_batch().new_job('VQSR: SNPsVariantRecalibratorScattered', {'part': f'{idx + 1}/{fragment_count}'})
+        snps_recal_j.image(image_path('gatk'))
+
+        res = HIGHMEM.set_resources(j, ncpu=4, storage_gb=50)
+
+        tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
+        an_cmdl = ' '.join(
+            [f'-an {v}' for v in SNP_ALLELE_SPECIFIC_FEATURES],
         )
+        j.command(
+            f"""set -euo pipefail
+
+        MODEL_REPORT={snp_model_in_batch}
+
+        gatk --java-options \
+          "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
+          VariantRecalibrator \\
+          -V {vcf_resources[idx]['vcf.gz']} \\
+          -O {j.recalibration} \\
+          --tranches-file {j.tranches} \\
+          --trust-all-polymorphic \\
+          {tranche_cmdl} \\
+          {an_cmdl} \\
+          -mode SNP \\
+          --use-allele-specific-annotations \\
+          --input-model {snp_model_in_batch} --output-tranches-for-scatter \\
+          --max-gaussians 6 \\
+          -resource:hapmap,known=false,training=true,truth=true,prior=15 {resources['hapmap'].base} \\
+          -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
+          -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
+          -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
+
+        mv {snps_recal_j.recalibration}.idx {snps_recal_j.recalibration_idx}
+        """,
+        )
+
+        # snps_recal_j = snps_recalibrator_scattered(
+        #     get_batch(),
+        #     siteonly_vcf=vcf_resources[idx],
+        #     model_file=snp_model_in_batch,
+        #     hapmap_resource_vcf=resources['hapmap'],
+        #     omni_resource_vcf=resources['omni'],
+        #     one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
+        #     dbsnp_resource_vcf=resources['dbsnp'],
+        #     disk_size=50,
+        #     use_as_annotations=True,
+        #     job_attrs={'part': f'{idx + 1}/{fragment_count}'},
+        # )
         scatter_jobs.append(snps_recal_j)
 
         # write the results out to GCP
         get_batch().write_output(snps_recal_j.recalibration, str(snps_recal_paths[idx]))
-        get_batch().write_output(snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx')
+        get_batch().write_output(snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx')  # tidy this up
         get_batch().write_output(snps_recal_j.tranches, str(snps_tranches_paths[idx]))
 
     gather_tranches_j = snps_gather_tranches_job(
