@@ -42,9 +42,10 @@ def main(vds_path: str) -> None:
     # Patch the VDS to contain LGT calls as explained here: https://hail.zulipchat.com/#narrow/channel/123010-Hail-Query-0.2E2-support/topic/Error.20with.20multi_way_zip_join.20when.20combining.20two.20VDS
     chrx: VariantDataset = hl.vds.filter_chromosomes(vds, keep=['chrX'])
     biallelic_chrx: VariantDataset = chrx.variant_data.filter_rows(hl.len(chrx.variant_data.alleles) > 2, keep=False)
-    imputed_sex: hl.Table = hl.impute_sex(biallelic_chrx.LGT)
+    imputed_sex: hl.Table = hl.impute_sex(biallelic_chrx.LGT, male_threshold=0.2)
     vds.reference_data = vds.reference_data.annotate_entries(
         LGT=hl.case()
+        .when(~hl.is_defined(imputed_sex[vds.reference_data.s].is_female), hl.call(0, 0))
         .when(imputed_sex[vds.reference_data.s].is_female, hl.call(0, 0))
         .when(vds.reference_data.locus.in_autosome_or_par(), hl.call(0, 0))
         .default(hl.call(0)),
