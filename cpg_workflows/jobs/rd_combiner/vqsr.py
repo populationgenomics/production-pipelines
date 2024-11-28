@@ -222,6 +222,7 @@ def train_vqsr_snp_tranches(
         get_batch().write_output(snps_recal_j.recalibration, str(snps_recal_paths[idx]))
         get_batch().write_output(snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx')  # tidy this up
         get_batch().write_output(snps_recal_j.tranches, str(snps_tranches_paths[idx]))
+        snp_tranche_fragments.append(snps_recal_j.tranches)
 
     gather_tranches_j = snps_gather_tranches_job(
         get_batch(),
