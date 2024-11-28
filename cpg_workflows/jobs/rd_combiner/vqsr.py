@@ -33,7 +33,7 @@ def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
         for line in f:
             vcf_path = manifest_folder / line.strip()
             resource_objects.append(
-                get_batch().read_input_group(**{'vcf.bgz': vcf_path, 'vcf.bgz.tbi': f'{vcf_path}.tbi'}),
+                get_batch().read_input_group(**{'vcf.gz': vcf_path, 'vcf.gz.tbi': f'{vcf_path}.tbi'}),
             )
 
     return resource_objects
