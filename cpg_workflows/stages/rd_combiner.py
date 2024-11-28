@@ -2,7 +2,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
-from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels, train_vqsr_snps
+from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels, train_vqsr_snp_tranches, train_vqsr_snps
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -255,3 +255,62 @@ class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
             snp_model=str(outputs['snp_model']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
+
+
+@stage(required_stages=TrainVQSRSNPModelOnCombinerData)
+class TrainVqsrSnpTranches(MultiCohortStage):
+    """
+    Scattered training of VQSR tranches for SNPs
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+
+        return {'tranches': self.prefix / 'snp_tranches'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+
+        manifest_file = (
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'DenseMTFromVDS'
+            / f'{multicohort.name}_separate.vcf.bgz'
+            / SHARD_MANIFEST
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
+
+        outputs = self.expected_outputs(multicohort)
+        snp_model_path = inputs.as_path(target=multicohort, stage=TrainVQSRSNPModelOnCombinerData, key='snp_model')
+        temp_path = self.tmp_prefix / 'vqsr_snp_tranches'
+
+        jobs = train_vqsr_snp_tranches(
+            manifest_file=manifest_file,
+            snp_model_path=str(snp_model_path),
+            output_path=str(outputs['tranches']),
+            temp_path=temp_path,
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRIndelModelOnCombinerData)
+class RunVQSROnCombinerData(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        # should this be one per fragment?
+        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+
+        manifest_file = (
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'DenseMTFromVDS'
+            / f'{multicohort.name}.vcf.bgz'
+            / SHARD_MANIFEST
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+        ...
