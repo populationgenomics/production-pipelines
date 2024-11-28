@@ -591,8 +591,9 @@ class AnnotateCNVVcfWithStrvctvre(MultiCohortStage):
         strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
 
         strv_job.image(image_path('strvctvre'))
-        strv_job.storage('20Gi')
-        strv_job.memory('8Gi')
+        strv_job.cpu(config_retrieve(['strvctvre_resources', 'cpu'], 2))
+        strv_job.memory(config_retrieve(['strvctvre_resources', 'memory'], '20Gi'))
+        strv_job.storage(config_retrieve(['strvctvre_resources', 'storage'], '20Gi'))
 
         strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
         assert isinstance(strvctvre_phylop, str)

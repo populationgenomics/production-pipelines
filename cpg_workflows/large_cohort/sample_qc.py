@@ -16,6 +16,7 @@ from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
+    logging.basicConfig(level=logging.INFO)
     if can_reuse(out_sample_qc_ht_path):
         return []
 
@@ -109,6 +110,7 @@ def impute_sex(
         if interval_table.count() > 0:
             vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
             if can_reuse(vds_tmp_path):
+                logging.info(f'Loading {name} filtered tmp vds')
                 vds = hl.vds.read_vds(str(vds_tmp_path))
             else:
                 # remove all rows where the locus falls within a defined interval
@@ -118,6 +120,7 @@ def impute_sex(
                 )
                 vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
                     str(vds_tmp_path),
+                    overwrite=True,
                 )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
