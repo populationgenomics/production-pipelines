@@ -255,25 +255,3 @@ class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
             snp_model=str(outputs['snp_model']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
-
-
-# @stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRIndelModelOnCombinerData)
-# class RunVQSROnCombinerData(MultiCohortStage):
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-#         # should this be one per fragment?
-#         return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
-#
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-#
-#         manifest_file = (
-#             multicohort.analysis_dataset.prefix()
-#             / 'rd_combiner'
-#             / get_workflow().output_version
-#             / 'DenseMTFromVDS'
-#             / f'{multicohort.name}.vcf.bgz'
-#             / SHARD_MANIFEST
-#         )
-#
-#         if not manifest_file.exists():
-#             raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
-#         ...
