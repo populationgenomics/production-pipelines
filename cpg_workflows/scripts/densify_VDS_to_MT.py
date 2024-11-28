@@ -52,9 +52,6 @@ def main(
 
     vds = hl.vds.read_vds(vds_in)
 
-    get_logger().info('Splitting multiallelics')
-    vds = hl.vds.split_multi(vds)
-
     get_logger().info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
 
@@ -65,7 +62,7 @@ def main(
     # annotate site-level DP to avoid name collision
     mt = mt.annotate_rows(
         site_dp=hl.agg.sum(mt.DP),
-        ANS=hl.agg.count_where(hl.is_defined(mt.GT)) * 2,
+        ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
     )
 
     # content shared with large_cohort.site_only_vcf.py
@@ -84,6 +81,9 @@ def main(
 
     # annotate this info back into the main MatrixTable
     mt = mt.annotate_rows(info=info_ht[mt.row_key])
+
+    get_logger().info('Splitting multiallelics')
+    mt = hl.split_multi_hts(mt)
 
     mt.write(dense_mt_out, overwrite=True)
 
