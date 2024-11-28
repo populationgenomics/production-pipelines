@@ -38,7 +38,6 @@ setup(
         'click',
         'tenacity',
         'toml',
-        'icasdk',
     ],
     extras_require={
         'test': [
