@@ -82,6 +82,10 @@ def main(
     # annotate this info back into the main MatrixTable
     mt = mt.annotate_rows(info=info_ht[mt.row_key])
 
+    # unpack mt.info.info back into mt.info
+    mt = mt.transmute_rows(**mt.info)
+    mt = mt.drop('gvcf_info')
+
     get_logger().info('Splitting multiallelics')
     mt = hl.split_multi_hts(mt)
 
