@@ -11,7 +11,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import indel_recalibrator_job, snps_recalibrator_create_model_job, snps_recalibrator_scattered, snps_gather_tranches_job, SNP_RECALIBRATION_TRANCHE_VALUES, SNP_ALLELE_SPECIFIC_FEATURES
-from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
+from cpg_workflows.resources import HIGHMEM, joint_calling_scatter_count
 from cpg_workflows.utils import can_reuse
 
 
