@@ -13,7 +13,7 @@ from cpg_workflows.workflow import StageOutput, stage
 
 ICA_REST_ENDPOINT: str = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-SECRET_PROJECT = 'cpg-common'
+SECRET_PROJECT = '1051897107465'  # 'cpg-common'
 SECRET_NAME = 'illumina_cpg_workbench_api'
 
 
@@ -25,7 +25,7 @@ def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
             secret_version='latest',
         )
         response: secretmanager.AccessSecretVersionResponse = SECRET_CLIENT.access_secret_version(
-            request={'name': secret_path}
+            request={'name': secret_path},
         )
         return json.loads(response.payload.data.decode('UTF-8'))
     except Exception as e:
@@ -43,7 +43,8 @@ class UploadDataToIca(SequencingGroup):
 
     def queue_jobs(self, sequencing_group: SequencingGroup) -> StageOutput:
         upload_job: PythonJob = get_batch().new_python_job(
-            'UploadDataToIca', (self.get_job_attrs() or {}) | {'tool': 'ICA'}
+            'UploadDataToIca',
+            (self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         upload_job.image(image=image_path('cpg_workflows'))
         upload_job.call(
