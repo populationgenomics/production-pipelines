@@ -69,7 +69,7 @@ def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | N
 
 
 @stage(analysis_type='combiner', analysis_keys=['vds'])
-class GVCFCombiner(MultiCohortStage):
+class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
         return {
             'vds': self.prefix / f'{multicohort.name}.vds',
@@ -123,8 +123,8 @@ class GVCFCombiner(MultiCohortStage):
         return self.make_outputs(multicohort, outputs, j)
 
 
-@stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
-class DenseMTFromVDS(MultiCohortStage):
+@stage(required_stages=[CreateVdsFromGvcfsWithHailCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
+class CreateDenseMtFromVdsWithHail(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """
         the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
@@ -154,7 +154,7 @@ class DenseMTFromVDS(MultiCohortStage):
         j.image(config_retrieve(['workflow', 'driver_image']))
         j.command(
             'mt_from_vds '
-            f'--input {str(inputs.as_dict(multicohort, GVCFCombiner)["vds"])} '
+            f'--input {str(inputs.as_dict(multicohort, CreateVdsFromGvcfsWithHailCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
             f'--sites_only {output["hps_vcf_dir"]} '
             f'--separate_header {output["separate_header_vcf_dir"]} ',
@@ -163,7 +163,7 @@ class DenseMTFromVDS(MultiCohortStage):
 
 
 @stage(analysis_keys=['vcf'], analysis_type='vcf')
-class ComposeFragmentsToSingleVCF(MultiCohortStage):
+class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
     Takes a manifest of VCF fragments, and produces a single VCF file
     This is disconnected from the previous stage, but requires it to be run first
@@ -203,8 +203,8 @@ class ComposeFragmentsToSingleVCF(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=[ComposeFragmentsToSingleVCF])
-class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
+@stage(required_stages=[ConcatenateVcfFragmentsWithGcloud])
+class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
     """
     Train VQSR Indel model on the combiner data
     This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
@@ -221,7 +221,7 @@ class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
         outputs = self.expected_outputs(multicohort)
         indel_calibration_job = train_vqsr_indels(
             sites_only_vcf=str(composed_sitesonly_vcf),
@@ -231,8 +231,8 @@ class TrainVQSRIndelModelOnCombinerData(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
 
 
-@stage(required_stages=[ComposeFragmentsToSingleVCF])
-class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
+@stage(required_stages=[ConcatenateVcfFragmentsWithGcloud])
+class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
     """
     Train VQSR SNP model on the combiner data
     This is disconnected from the DenseMTFromVDS stage, but requires it to be run first
@@ -248,7 +248,7 @@ class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ComposeFragmentsToSingleVCF, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
         outputs = self.expected_outputs(multicohort)
         snp_calibration_job = train_vqsr_snps(
             sites_only_vcf=str(composed_sitesonly_vcf),
@@ -257,7 +257,7 @@ class TrainVQSRSNPModelOnCombinerData(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
 
 
-@stage(required_stages=TrainVQSRSNPModelOnCombinerData)
+@stage(required_stages=TrainVqsrSnpModelOnCombinerData)
 class TrainVqsrSnpTranches(MultiCohortStage):
     """
     Scattered training of VQSR tranches for SNPs
@@ -282,7 +282,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
 
         outputs = self.expected_outputs(multicohort)
-        snp_model_path = inputs.as_path(target=multicohort, stage=TrainVQSRSNPModelOnCombinerData, key='snp_model')
+        snp_model_path = inputs.as_path(target=multicohort, stage=TrainVqsrSnpModelOnCombinerData, key='snp_model')
         temp_path = self.tmp_prefix / 'vqsr_snp_tranches'
 
         jobs = train_vqsr_snp_tranches(
@@ -294,8 +294,8 @@ class TrainVqsrSnpTranches(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVQSRIndelModelOnCombinerData)
-class RunVQSROnCombinerData(MultiCohortStage):
+@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVqsrIndelModelOnCombinerData)
+class RunTrainedVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         # should this be one per fragment?
         return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
