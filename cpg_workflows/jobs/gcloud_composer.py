@@ -47,7 +47,7 @@ def compose_condense_fragments(
         list of paths to the condensed objects
     """
 
-    job_name = job_attrs.get('name', 'ChunkBuster')
+    job_name = job_attrs.get('name', 'ChunkBuster') if job_attrs else 'ChunkBuster'
     chunk_job = get_batch().new_job(name=f'{job_name}_{len(path_list)}', attributes=job_attrs)
     chunk_job.image(config_retrieve(['workflow', 'driver_image']))
     authenticate_cloud_credentials_in_job(chunk_job)
