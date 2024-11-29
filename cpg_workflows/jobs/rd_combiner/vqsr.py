@@ -173,6 +173,8 @@ def train_vqsr_snp_tranches(
     # if we start this as -1, we can increment at the start of the loop, making the index counting easier to track
     top_level_counter = -1
 
+    chunk_counter = 0
+
     # iterate over all fragments, but in chunks of FRAGMENTS_PER_JOB
     for fragment_chunk in chunks(vcf_resources, FRAGMENTS_PER_JOB):
         # NB this VQSR training stage is scattered, and we have a high number of very small VCF fragments
@@ -181,7 +183,10 @@ def train_vqsr_snp_tranches(
         # we can batch fragments into fewer jobs, each stacking multiple fragments together but only requiring
         # one block of reference data to be loaded.
         # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
-        one_job_to_rule_them_all = get_batch().new_job(f'{job_name}, Chunk 1')
+
+        chunk_counter += 1
+
+        one_job_to_rule_them_all = get_batch().new_job(f'{job_name}, Chunk {chunk_counter}')
         one_job_to_rule_them_all.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
