@@ -424,7 +424,8 @@ def apply_recalibration_indels(
     """
 
     snp_vcf_in_batch = get_batch().read_input_group(
-        **{VCF_GZ: str(snp_annotated_vcf), VCF_GZ_TBI: f'{str(snp_annotated_vcf)}.tbi'},
+        vcf=str(snp_annotated_vcf),
+        vcf_index=f'{str(snp_annotated_vcf)}.tbi',
     )
     indel_recalibration_in_batch = get_batch().read_input(str(indel_recalibration))
     indel_tranches_in_batch = get_batch().read_input_group(
@@ -446,7 +447,7 @@ def apply_recalibration_indels(
     ApplyVQSR \\
     --tmp-dir $BATCH_TMPDIR \\
     -O {indel_recal_job.output[VCF_GZ]} \\
-    -V {snp_vcf_in_batch[VCF_GZ]} \\
+    -V {snp_vcf_in_batch.vcf} \\
     --recal-file {indel_recalibration_in_batch} \\
     --tranches-file {indel_tranches_in_batch.tranches} \\
     --truth-sensitivity-filter-level {filter_level} \\
