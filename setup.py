@@ -78,6 +78,8 @@ setup(
             'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
             # aggregate VEP results into a single HT
             'vep_json_to_ht = cpg_workflows.scripts.vep_json_to_ht:cli_main',
+            # AnnotateCohort, small variants
+            'annotate_cohort_small = cpg_workflows.scripts.annotate_cohort_small_vars:cli_main',
         ],
     },
 )
