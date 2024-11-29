@@ -242,7 +242,8 @@ def train_vqsr_snp_tranches(
                   {an_cmdl} \\
                   -mode SNP \\
                   --use-allele-specific-annotations \\
-                  --input-model {snp_model_in_batch} --output-tranches-for-scatter \\
+                  --input-model {snp_model_in_batch} \\
+                  --output-tranches-for-scatter \\
                   --max-gaussians 6 \\
                   -resource:hapmap,known=false,training=true,truth=true,prior=15 {resources['hapmap'].base} \\
                   -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
@@ -253,15 +254,15 @@ def train_vqsr_snp_tranches(
 
             # write the results out to GCP
             get_batch().write_output(
-                one_job_to_rule_them_all[counter_string]['recal'],
+                one_job_to_rule_them_all[counter_string].recal,
                 str(snps_recal_paths[top_level_counter]),
             )
             get_batch().write_output(
-                one_job_to_rule_them_all[counter_string]['recal_idx'],
+                one_job_to_rule_them_all[counter_string].recal_idx,
                 str(snps_recal_paths[top_level_counter]) + '.idx',
             )
             get_batch().write_output(
-                one_job_to_rule_them_all[counter_string]['tranches'],
+                one_job_to_rule_them_all[counter_string].tranches,
                 str(snps_tranches_paths[top_level_counter]),
             )
             snp_tranche_fragments.append(one_job_to_rule_them_all[counter_string].tranches)
