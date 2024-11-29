@@ -336,6 +336,7 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
             manifest_file=manifest_file,
             temp_path=to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path')),
             output_path=str(outputs['gathered_tranches']),
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 

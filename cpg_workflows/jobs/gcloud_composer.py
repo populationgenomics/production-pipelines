@@ -33,7 +33,7 @@ def compose_condense_fragments(
     path_list: list[str],
     temp_prefix: str,
     chunk_size: int = 30,
-    job_name: str = 'ChunkBuster',
+    job_attrs: dict | None = None,
 ) -> tuple[list[str], hb.batch.job.Job]:
     """
     takes a list of things to condense, creates jobs to condense them. Returns a list of the result paths
@@ -42,12 +42,13 @@ def compose_condense_fragments(
         path_list (list[str]): all the paths to condense
         temp_prefix ():
         chunk_size (): number of objects to condense at once
-        job_name (str): name of the job
+        job_attrs (dict): job attributes
     Returns:
         list of paths to the condensed objects
     """
 
-    chunk_job = get_batch().new_job(name=f'{job_name}_{len(path_list)}')
+    job_name = job_attrs.get('name', 'ChunkBuster')
+    chunk_job = get_batch().new_job(name=f'{job_name}_{len(path_list)}', attributes=job_attrs)
     chunk_job.image(config_retrieve(['workflow', 'driver_image']))
     authenticate_cloud_credentials_in_job(chunk_job)
 
@@ -64,7 +65,7 @@ def gcloud_compose_vcf_from_manifest(
     manifest_path: Path,
     intermediates_path: str,
     output_path: str,
-    job_name: str,
+    job_attrs: dict,
 ) -> list[hb.batch.job.Job]:
     """
     compose a series gcloud commands to condense a list of VCF fragments into a single VCF
@@ -77,7 +78,7 @@ def gcloud_compose_vcf_from_manifest(
         manifest_path (Path): path to a file in GCP, one GCP file path per line
         intermediates_path (str): path to a bucket, where intermediate files will be written
         output_path (str): path to write the final file to. Must be in the same bucket as the manifest
-        job_name (str): name of the job
+        job_attrs (dict): job attributes
 
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
@@ -97,7 +98,7 @@ def gcloud_compose_vcf_from_manifest(
         fragment_files, condense_job = compose_condense_fragments(
             path_list=fragment_files,
             temp_prefix=condense_temp,
-            job_name=job_name,
+            job_attrs=job_attrs,
         )
         if condense_jobs:
             condense_job.depends_on(condense_jobs[-1])
