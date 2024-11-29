@@ -446,14 +446,14 @@ def apply_recalibration_indels(
     gatk --java-options "{res.java_mem_options()}" \\
     ApplyVQSR \\
     --tmp-dir $BATCH_TMPDIR \\
-    -O {indel_recal_job.output['vcf.gz']} \\
-    -V {snp_vcf_in_batch['vcf.gz']} \\
+    -O {indel_recal_job.output[VCF_GZ]} \\
+    -V {snp_vcf_in_batch[VCF_GZ]} \\
     --recal-file {indel_recalibration_in_batch} \\
     --tranches-file {indel_tranches_in_batch.tranches} \\
     --truth-sensitivity-filter-level {filter_level} \\
     --use-allele-specific-annotations \\
     -mode INDEL
-    tabix -p vcf -f {indel_recal_job.output_vcf['vcf.gz']}
+    tabix -p vcf -f {indel_recal_job.output_vcf[VCF_GZ]}
     """,
     )
     get_batch().write_output(indel_recal_job.output_vcf, str(output_path).removesuffix('.vcf.gz'))
