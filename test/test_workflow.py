@@ -1,3 +1,5 @@
+# endregion KEEP
+
 """
 Test building Workflow object.
 """
@@ -142,3 +144,6 @@ def test_path_walk():
     }
     act = path_walk(exp)
     assert act == {to_path('this.txt'), to_path('that.txt'), to_path('the_other.txt')}
+
+
+# endregion KEEP

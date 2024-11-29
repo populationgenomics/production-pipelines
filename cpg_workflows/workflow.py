@@ -1,3 +1,6 @@
+# region MODIFY
+# NOTE: We're going to move the code unchanged, but split it between workflow.py code
+# and any stage.py code.
 """
 Provides a `Workflow` class and a `@stage` decorator that allow to define workflows
 in a declarative fashion.
@@ -1416,3 +1419,6 @@ class MultiCohortStage(Stage, ABC):
         logging.info(f'{self.name}: {multicohort} [{action.name}]')
         output_by_target[multicohort.target_id] = self._queue_jobs_with_checks(multicohort, action)
         return output_by_target
+
+
+# endregion MODIFY

@@ -2,6 +2,7 @@
 Test reading inputs into a Cohort object.
 """
 
+# region MODIFY
 import logging
 import re
 
@@ -14,6 +15,7 @@ from . import set_config
 LOGGER = logging.getLogger(__name__)
 
 
+# endregion MODIFY
 def _multicohort_config(tmp_path) -> str:
     conf = f"""
     [workflow]

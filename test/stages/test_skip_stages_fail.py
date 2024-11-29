@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -53,3 +55,6 @@ def test_skip_stages_fail(mocker: MockFixture, tmp_path):
         match='A2: stage is required, but is skipped, and the following expected outputs',
     ):
         run_workflow(mocker)
+
+
+# endregion KEEP

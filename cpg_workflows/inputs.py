@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Metamist wrapper to get input sequencing groups.
 """
@@ -23,12 +25,23 @@ def actual_get_multicohort() -> MultiCohort:
     return _multicohort
 
 
+# endregion KEEP
+# region NOT KEEP
+
+
 def deprecated_get_cohort() -> MultiCohort:
     """Return the cohort object"""
     global _multicohort
     if not _multicohort:
         _multicohort = deprecated_create_cohort()
     return _multicohort
+
+
+# endregion NOT KEEP
+
+
+# region MODIFY
+# NOTE: Remove the deprecated call to deprecated_get_cohort() and replace it with get_multicohort()
 
 
 def get_multicohort() -> MultiCohort:
@@ -46,6 +59,10 @@ def get_multicohort() -> MultiCohort:
             raise ValueError('input_cohorts must be a list')
         return actual_get_multicohort()
     return deprecated_get_cohort()
+
+
+# endregion MODIFY
+# region KEEP
 
 
 def create_multicohort() -> MultiCohort:
@@ -140,6 +157,10 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     assert cohort.get_sequencing_groups()
 
 
+# endregion KEEP
+# region NOT KEEP
+
+
 def deprecated_create_cohort() -> MultiCohort:
     """
     Add datasets in the cohort. There exists only one cohort for the workflow run.
@@ -214,6 +235,10 @@ def deprecated_create_cohort() -> MultiCohort:
         _populate_pedigree(cohort)
     assert multi_cohort.get_sequencing_groups()
     return multi_cohort
+
+
+# endregion NOT KEEP
+# region KEEP
 
 
 def _combine_assay_meta(assays: list[Assay]) -> dict:
@@ -351,3 +376,6 @@ def _populate_pedigree(cohort: Cohort) -> None:
                 f'No pedigree data found for '
                 f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups',
             )
+
+
+# endregion KEEP

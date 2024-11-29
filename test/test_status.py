@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test workflow status reporter.
 """
@@ -220,3 +222,6 @@ def test_status_reporter_fails(mocker: MockFixture, tmp_path):
 
     with pytest.raises(WorkflowError):
         run_workflow(stages=[MyQcStage])
+
+
+# endregion KEEP

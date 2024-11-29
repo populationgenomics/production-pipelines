@@ -1,3 +1,5 @@
+# region KEEP
+
 import logging
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
@@ -83,3 +85,6 @@ def set_config(
         f.flush()
 
     return set_config_paths([*[str(s) for s in (merge_with or [])], str(path)])
+
+
+# endregion KEEP

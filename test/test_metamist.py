@@ -2,6 +2,8 @@
 Test workflow status reporter.
 """
 
+# region MODIFY
+# NOTE: Unused import
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +25,7 @@ from metamist.exceptions import ApiException, ServiceException
 from . import set_config
 
 
+# endregion MODIFY
 class TimeOutCounter:
     """
     This is a little helper to count attempts in the mock function
@@ -437,9 +440,7 @@ class TestMetamist:
                 },
                 check_existence=False,
             )
-        assert (
-            str(exc_info.value) == 'SG01: ERROR: "reads_type" is expected to be one of (\'fastq\', \'bam\', \'cram\')'
-        )
+        assert str(exc_info.value) == "SG01: ERROR: \"reads_type\" is expected to be one of ('fastq', 'bam', 'cram')"
 
         # test incorrectly formatted error
         with pytest.raises(ValueError) as exc_info:
@@ -454,7 +455,7 @@ class TestMetamist:
         assert str(exc_info.value) == (
             'Sequence data for sequencing group SG01 is incorrectly formatted. '
             'Expecting 2 entries per lane (R1 and R2 fastqs), but got 1. '
-            'Read data: {\'location\': \'test.fastq.gz\'}'
+            "Read data: {'location': 'test.fastq.gz'}"
         )
 
         # test file does not exist error

@@ -1,3 +1,5 @@
+# region KEEP
+
 """
 Test building stages DAG.
 """
@@ -100,3 +102,6 @@ def test_raises_workflow_error_when_output_from_parent_stage_is_missing(mocker: 
 
     with pytest.raises(WorkflowError, match='A: stage is required, but is skipped'):
         run_workflow(mocker, stages=[C1, C2])
+
+
+# endregion KEEP

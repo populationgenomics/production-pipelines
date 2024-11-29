@@ -1,3 +1,4 @@
+# region KEEP
 """
 Utility functions and constants.
 """
@@ -317,7 +318,7 @@ def rich_sequencing_group_id_seds(
     cmd = ''
     for sgid, rich_sgid in rich_id_map.items():
         for fname in file_names:
-            cmd += f'sed -iBAK \'s/{sgid}/{rich_sgid}/g\' {fname}'
+            cmd += f"sed -iBAK 's/{sgid}/{rich_sgid}/g' {fname}"
             cmd += '\n'
     return cmd
 
@@ -362,3 +363,5 @@ def get_intervals_from_bed(intervals_path: Path) -> list[str]:
 
 
 ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
+
+# endregion KEEP
