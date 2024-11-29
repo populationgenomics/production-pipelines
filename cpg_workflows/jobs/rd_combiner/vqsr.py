@@ -234,6 +234,8 @@ def train_vqsr_snp_tranches(
                 gatk --java-options \
                   "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
                   VariantRecalibrator \\
+                  --verbosity WARNING \\
+                  --QUIET \\
                   -V input.vcf.bgz \\
                   -O {chunk_job[counter_string]['recal']} \\
                   --tranches-file {chunk_job[counter_string]['tranches']} \\
