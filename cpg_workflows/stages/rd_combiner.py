@@ -431,7 +431,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     Annotate VCF with VEP.
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
         """
         Should this be in tmp? We'll never use it again maybe?
         """
