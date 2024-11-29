@@ -4,21 +4,23 @@ Create and run jobs relating to VQSR for the RD combiner
 
 from functools import lru_cache
 
-from hailtop.batch.resource import ResourceGroup
 from hailtop.batch.job import Job
+from hailtop.batch.resource import ResourceFile, ResourceGroup
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.config import image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import (
-    indel_recalibrator_job,
-    snps_recalibrator_create_model_job,
-    snps_gather_tranches_job,
-    SNP_RECALIBRATION_TRANCHE_VALUES,
     SNP_ALLELE_SPECIFIC_FEATURES,
+    SNP_RECALIBRATION_TRANCHE_VALUES,
+    indel_recalibrator_job,
+    snps_gather_tranches_job,
+    snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, chunks, VCF_GZ, VCF_GZ_TBI
+
+FRAGMENTS_PER_JOB: int = 100
 
 
 @lru_cache(2)
@@ -40,7 +42,7 @@ def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
         for line in f:
             vcf_path = manifest_folder / line.strip()
             resource_objects.append(
-                get_batch().read_input_group(**{'vcf.gz': vcf_path, 'vcf.gz.tbi': f'{vcf_path}.tbi'}),
+                get_batch().read_input_group(**{VCF_GZ: vcf_path, VCF_GZ_TBI: f'{vcf_path}.tbi'}),
             )
     return resource_objects
 
@@ -80,8 +82,8 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
     resources = get_localised_resources_for_vqsr()
     siteonly_vcf = get_batch().read_input_group(
         **{
-            'vcf.gz': str(sites_only_vcf),
-            'vcf.gz.tbi': str(sites_only_vcf) + '.tbi',
+            VCF_GZ: str(sites_only_vcf),
+            VCF_GZ_TBI: str(sites_only_vcf) + '.tbi',
         },
     )
 
@@ -112,8 +114,8 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str):
     resources = get_localised_resources_for_vqsr()
     siteonly_vcf = get_batch().read_input_group(
         **{
-            'vcf.gz': str(sites_only_vcf),
-            'vcf.gz.tbi': str(sites_only_vcf) + '.tbi',
+            VCF_GZ: str(sites_only_vcf),
+            VCF_GZ_TBI: str(sites_only_vcf) + '.tbi',
         },
     )
 
@@ -165,64 +167,94 @@ def train_vqsr_snp_tranches(
     # the list of all jobs (per-fragment, and the summary)
     scatter_jobs: list[Job] = []
 
-    # to hold the resulting parts, as ResourceFiles
-    snp_tranche_fragments = []
+    # to hold the resulting parts, as Resources
+    snp_tranche_fragments: list[ResourceFile] = []
 
-    # iterate over all fragments, make
-    for idx in range(fragment_count):
-        snps_recal_path = snps_recal_paths[idx]
-        snps_tranche_path = snps_tranches_paths[idx]
+    # if we start this as -1, we can increment at the start of the loop, making the index counting easier to track
+    top_level_counter = -1
 
-        if can_reuse(snps_recal_path) and can_reuse(snps_tranche_path):
-            snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
-            continue
+    # iterate over all fragments, but in chunks of FRAGMENTS_PER_JOB
+    for fragment_chunk in chunks(vcf_resources, FRAGMENTS_PER_JOB):
+        # NB this VQSR training stage is scattered, and we have a high number of very small VCF fragments
+        # 99.5% of the time and cost of this task was pulling the docker image and loading reference data
+        # the actual work took 5 seconds at negligible cost. Instead of running one job per VCF fragment,
+        # we can batch fragments into fewer jobs, each stacking multiple fragments together but only requiring
+        # one block of reference data to be loaded.
+        # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
+        one_job_to_rule_them_all = get_batch().new_job(f'{job_name}, Chunk 1')
+        one_job_to_rule_them_all.image(image_path('gatk'))
 
-        snps_recal_j = get_batch().new_job(job_name, {'part': f'{idx + 1}/{fragment_count}'})
-        snps_recal_j.image(image_path('gatk'))
+        # add this job to the list of scatter jobs
+        scatter_jobs.append(one_job_to_rule_them_all)
 
-        res = HIGHMEM.set_resources(snps_recal_j, ncpu=4, storage_gb=50)
+        res = HIGHMEM.set_resources(one_job_to_rule_them_all, ncpu=4, storage_gb=50)
 
-        tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
-        an_cmdl = ' '.join(
-            [f'-an {v}' for v in SNP_ALLELE_SPECIFIC_FEATURES],
-        )
-        snps_recal_j.command(
-            f"""set -euo pipefail
+        # iterate over the fragment VCF resource groups
+        for vcf_resource in fragment_chunk:
+            top_level_counter += 1
 
-        MODEL_REPORT={snp_model_in_batch}
+            snps_recal_path = snps_recal_paths[top_level_counter]
+            snps_tranche_path = snps_tranches_paths[top_level_counter]
 
-        mv {vcf_resources[idx]['vcf.gz']} input.vcf.bgz
-        mv {vcf_resources[idx]['vcf.gz.tbi']} input.vcf.bgz.tbi
+            if can_reuse(snps_recal_path) and can_reuse(snps_tranche_path):
+                snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
+                continue
 
-        gatk --java-options \
-          "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
-          VariantRecalibrator \\
-          -V input.vcf.bgz \\
-          -O {snps_recal_j.recalibration} \\
-          --tranches-file {snps_recal_j.tranches} \\
-          --trust-all-polymorphic \\
-          {tranche_cmdl} \\
-          {an_cmdl} \\
-          -mode SNP \\
-          --use-allele-specific-annotations \\
-          --input-model {snp_model_in_batch} --output-tranches-for-scatter \\
-          --max-gaussians 6 \\
-          -resource:hapmap,known=false,training=true,truth=true,prior=15 {resources['hapmap'].base} \\
-          -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
-          -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
-          -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
+            tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
+            an_cmdl = ' '.join(
+                [f'-an {v}' for v in SNP_ALLELE_SPECIFIC_FEATURES],
+            )
 
-        mv {snps_recal_j.recalibration}.idx {snps_recal_j.recalibration_idx}
-        """,
-        )
+            # create a counter string to uniquely reference all job outputs
+            counter_string = str(top_level_counter)
 
-        scatter_jobs.append(snps_recal_j)
+            # create a resource group for the recalibration output and its index
+            one_job_to_rule_them_all.declare_resource_group(
+                **{
+                    counter_string: {
+                        'recal': '{root}',
+                        'recal_idx': '{root}.idx',
+                    },
+                },
+            )
 
-        # write the results out to GCP
-        get_batch().write_output(snps_recal_j.recalibration, str(snps_recal_paths[idx]))
-        get_batch().write_output(snps_recal_j.recalibration_idx, str(snps_recal_paths[idx]) + '.idx')  # tidy this up
-        get_batch().write_output(snps_recal_j.tranches, str(snps_tranches_paths[idx]))
-        snp_tranche_fragments.append(snps_recal_j.tranches)
+            one_job_to_rule_them_all.command(
+                f"""
+                set -euo pipefail
+
+                MODEL_REPORT={snp_model_in_batch}
+                mv {vcf_resource[VCF_GZ]} input.vcf.bgz
+                mv {vcf_resource[VCF_GZ_TBI]} input.vcf.bgz.tbi
+                gatk --java-options \
+                  "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
+                  VariantRecalibrator \\
+                  -V input.vcf.bgz \\
+                  -O {one_job_to_rule_them_all[counter_string].recal} \\
+                  --tranches-file {one_job_to_rule_them_all[counter_string].tranches} \\
+                  --trust-all-polymorphic \\
+                  {tranche_cmdl} \\
+                  {an_cmdl} \\
+                  -mode SNP \\
+                  --use-allele-specific-annotations \\
+                  --input-model {snp_model_in_batch} --output-tranches-for-scatter \\
+                  --max-gaussians 6 \\
+                  -resource:hapmap,known=false,training=true,truth=true,prior=15 {resources['hapmap'].base} \\
+                  -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
+                  -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
+                  -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
+                """,
+            )
+
+            # write the results out to GCP
+            get_batch().write_output(
+                one_job_to_rule_them_all[counter_string].recal,
+                str(snps_recal_paths[top_level_counter]),
+            )
+            get_batch().write_output(
+                one_job_to_rule_them_all[counter_string].tranches,
+                str(snps_tranches_paths[top_level_counter]),
+            )
+            snp_tranche_fragments.append(one_job_to_rule_them_all.tranches)
 
     gather_tranches_j = snps_gather_tranches_job(
         get_batch(),
