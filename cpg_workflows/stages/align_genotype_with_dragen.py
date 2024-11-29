@@ -13,7 +13,7 @@ from cpg_workflows.workflow import StageOutput, stage
 
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-SECRET_PROJECT = 'cpg-common'  # get_gcp_project()  # config_retrieve(['workflow']['project'])  # 'cpg-common'
+SECRET_PROJECT = get_gcp_project()  # config_retrieve(['workflow']['project'])  # 'cpg-common'
 SECRET_NAME = 'illumina_cpg_workbench_api'
 SECRET_VERSION = 'latest'
 
@@ -50,7 +50,7 @@ class UploadDataToIca(SequencingGroup):
         upload_job.image(image=image_path('cpg_workflows'))
         upload_job.call(
             upload_data_to_ica.run,
-            sg_name=sequencing_group.name,
+            sg_name=sequencing_group.id,
             sg_path=sequencing_group.cram,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
             api_root=ICA_REST_ENDPOINT,
