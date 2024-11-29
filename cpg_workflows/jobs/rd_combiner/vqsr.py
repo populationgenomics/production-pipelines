@@ -171,7 +171,7 @@ def train_vqsr_snp_tranches(
     snp_tranche_fragments: list[ResourceFile] = []
 
     # if we start this as -1, we can increment at the start of the loop, making the index counting easier to track
-    top_level_counter = -1
+    vcf_counter = -1
 
     chunk_counter = 0
 
@@ -186,20 +186,20 @@ def train_vqsr_snp_tranches(
 
         chunk_counter += 1
 
-        one_job_to_rule_them_all = get_batch().new_job(f'{job_name}, Chunk {chunk_counter}')
-        one_job_to_rule_them_all.image(image_path('gatk'))
+        chunk_job = get_batch().new_job(f'{job_name}, Chunk {chunk_counter}')
+        chunk_job.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
-        scatter_jobs.append(one_job_to_rule_them_all)
+        scatter_jobs.append(chunk_job)
 
-        res = HIGHMEM.set_resources(one_job_to_rule_them_all, ncpu=4, storage_gb=50)
+        res = HIGHMEM.set_resources(chunk_job, ncpu=4, storage_gb=50)
 
         # iterate over the fragment VCF resource groups
         for vcf_resource in fragment_chunk:
-            top_level_counter += 1
+            vcf_counter += 1
 
-            snps_recal_path = snps_recal_paths[top_level_counter]
-            snps_tranche_path = snps_tranches_paths[top_level_counter]
+            snps_recal_path = snps_recal_paths[vcf_counter]
+            snps_tranche_path = snps_tranches_paths[vcf_counter]
 
             if can_reuse(snps_recal_path) and can_reuse(snps_tranche_path):
                 snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
@@ -211,10 +211,10 @@ def train_vqsr_snp_tranches(
             )
 
             # create a counter string to uniquely reference all job outputs
-            counter_string = str(top_level_counter)
+            counter_string = str(vcf_counter)
 
             # create a resource group for the recalibration output and its index
-            one_job_to_rule_them_all.declare_resource_group(
+            chunk_job.declare_resource_group(
                 **{
                     counter_string: {
                         'recal': '{root}',
@@ -224,7 +224,7 @@ def train_vqsr_snp_tranches(
                 },
             )
 
-            one_job_to_rule_them_all.command(
+            chunk_job.command(
                 f"""
                 set -euo pipefail
 
@@ -235,8 +235,8 @@ def train_vqsr_snp_tranches(
                   "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
                   VariantRecalibrator \\
                   -V input.vcf.bgz \\
-                  -O {one_job_to_rule_them_all[counter_string]['recal']} \\
-                  --tranches-file {one_job_to_rule_them_all[counter_string]['tranches']} \\
+                  -O {chunk_job[counter_string]['recal']} \\
+                  --tranches-file {chunk_job[counter_string]['tranches']} \\
                   --trust-all-polymorphic \\
                   {tranche_cmdl} \\
                   {an_cmdl} \\
@@ -249,32 +249,47 @@ def train_vqsr_snp_tranches(
                   -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
                   -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
                   -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
-                touch {one_job_to_rule_them_all[counter_string]['recal_idx']}
+                touch {chunk_job[counter_string]['recal_idx']}
                 """,
             )
 
             # write the results out to GCP
-            print(one_job_to_rule_them_all[counter_string])
-            get_batch().write_output(
-                one_job_to_rule_them_all[counter_string].recal,
-                str(snps_recal_paths[top_level_counter]),
-            )
-            get_batch().write_output(
-                one_job_to_rule_them_all[counter_string].recal_idx,
-                str(snps_recal_paths[top_level_counter]) + '.idx',
-            )
-            get_batch().write_output(
-                one_job_to_rule_them_all[counter_string].tranches,
-                str(snps_tranches_paths[top_level_counter]),
-            )
-            snp_tranche_fragments.append(one_job_to_rule_them_all[counter_string].tranches)
+            get_batch().write_output(chunk_job[counter_string].recal, str(snps_recal_paths[vcf_counter]))
+            get_batch().write_output(chunk_job[counter_string].recal_idx, str(snps_recal_paths[vcf_counter]) + '.idx')
+            get_batch().write_output(chunk_job[counter_string].tranches, str(snps_tranches_paths[vcf_counter]))
+            snp_tranche_fragments.append(chunk_job[counter_string].tranches)
+
+    # one final job to write the success indicator
+    final_job = get_batch().new_bash_job('Completion message')
+    final_job.command(f'echo "All tranches trained" > {final_job.output}')
+    final_job.depends_on(*scatter_jobs)
+    scatter_jobs.append(final_job)
+    get_batch().write_output(final_job.output, output_path)
+
+    return scatter_jobs
+
+
+def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> Job:
+    """
+    The previous approach ran into hard limits on the size of the batch spec
+    There was too much metadata around which resource groups the tranches were part of etc etc
+    Splitting out data generating from data aggregating should hopefully help
+
+    Args:
+        manifest_file (Path): path to the manifest file
+        temp_path (Path): path to the temp directory (same as previous stage)
+        output_path (str): path to write the tranches aggregate to
+    """
+
+    vcf_resources = get_all_fragments_from_manifest(manifest_file)
+    snp_tranche_paths = [
+        get_batch().read_input(str(temp_path / f'snp_tranches_{i}')) for i in range(len(vcf_resources))
+    ]
 
     gather_tranches_j = snps_gather_tranches_job(
         get_batch(),
-        tranches=snp_tranche_fragments,
+        tranches=snp_tranche_paths,
         disk_size=100,
     )
-    gather_tranches_j.depends_on(*scatter_jobs)
-    scatter_jobs.append(gather_tranches_j)
     get_batch().write_output(gather_tranches_j.out_tranches, output_path)
-    return scatter_jobs
+    return gather_tranches_j

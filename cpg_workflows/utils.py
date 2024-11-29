@@ -35,7 +35,6 @@ VCF_GZ = 'vcf.gz'
 VCF_GZ_TBI = 'vcf.gz.tbi'
 
 
-
 def get_logger(
     logger_name: str = 'cpg_workflows',
     log_level: int = logging.INFO,
