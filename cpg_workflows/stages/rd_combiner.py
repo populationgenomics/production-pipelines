@@ -460,7 +460,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
         vep_jobs = add_vep_jobs(
             input_vcfs=input_vcfs,
-            out_path=outputs['ht'],
+            final_out_path=outputs['ht'],
             tmp_prefix=self.tmp_prefix / 'tmp',
             job_attrs=self.get_job_attrs(),
         )
