@@ -79,11 +79,13 @@ def quick_and_easy_bcftools_concat(
 
     # declare a resource group for the concatenated output
     j.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
-    j.command(f"""
+    j.command(
+        f"""
     bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
     -Oz -o {j.output['vcf.gz']}
     tabix -p vcf {j.output['vcf.gz']}
-    """)
+    """,
+    )
     return j
 
 

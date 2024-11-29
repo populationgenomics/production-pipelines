@@ -27,9 +27,7 @@ from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
     CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
-    GatherTrainedVqsrSnpTranches,
-    RunTrainedSnpVqsrOnCombinerFragments,
-    TrainVqsrIndelModelOnCombinerData,
+    RunTrainedIndelVqsrOnCombinedVcf,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
@@ -48,9 +46,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
     'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail],
     'rd_post_combiner': [
-        TrainVqsrIndelModelOnCombinerData,
-        GatherTrainedVqsrSnpTranches,
-        RunTrainedSnpVqsrOnCombinerFragments,
+        RunTrainedIndelVqsrOnCombinedVcf,
     ],
     'seqr_loader': [
         DatasetVCF,

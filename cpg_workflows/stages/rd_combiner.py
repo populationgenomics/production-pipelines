@@ -3,6 +3,7 @@ from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
+    apply_recalibration_indels,
     apply_snp_vqsr_to_fragments,
     gather_tranches,
     train_vqsr_indels,
@@ -342,9 +343,11 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 
 
 @stage(
-    # analysis_keys=['vcf'],
-    # analysis_type='qc',
-    required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches],
+    required_stages=[
+        GatherTrainedVqsrSnpTranches,
+        TrainVqsrSnpModelOnCombinerData,
+        TrainVqsrSnpTranches,
+    ],
 )
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -376,3 +379,44 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage(
+    analysis_keys=['vcf'],
+    analysis_type='qc',
+    required_stages=[
+        GatherTrainedVqsrSnpTranches,
+        RunTrainedSnpVqsrOnCombinerFragments,
+        TrainVqsrIndelModelOnCombinerData,
+    ],
+)
+class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
+    """
+    Run Indel VQSR on the reconstituted, SNP-annotated, VCF
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'vqsr_snps_and_indels.vcf.gz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        annotated_vcf = inputs.as_path(target=multicohort, stage=RunTrainedSnpVqsrOnCombinerFragments, key='vcf')
+        indel_recalibrations = inputs.as_path(
+            target=multicohort,
+            stage=TrainVqsrIndelModelOnCombinerData,
+            key='indel_recalibrations',
+        )
+        indel_tranches = inputs.as_path(
+            target=multicohort,
+            stage=TrainVqsrIndelModelOnCombinerData,
+            key='indel_tranches',
+        )
+
+        indel_recal_job = apply_recalibration_indels(
+            snp_annotated_vcf=annotated_vcf,
+            indel_recalibration=indel_recalibrations,
+            indel_tranches=indel_tranches,
+            output_path=outputs['vcf'],
+            job_attrs={'stage': self.name},
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)

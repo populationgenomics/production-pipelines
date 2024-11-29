@@ -390,7 +390,11 @@ def apply_snp_vqsr_to_fragments(
             chunk_vcfs.append(chunk_job[counter_string])
 
         # concatenates all VCFs in this chunk
-        chunk_concat_job = quick_and_easy_bcftools_concat(chunk_vcfs, storage_gb=10, job_attrs=job_attrs,)
+        chunk_concat_job = quick_and_easy_bcftools_concat(
+            chunk_vcfs,
+            storage_gb=10,
+            job_attrs=job_attrs,
+        )
         chunk_concat_job.depends_on(chunk_job)
         applied_recalibration_jobs.append(chunk_concat_job)
         recalibrated_snp_vcfs.append(chunk_concat_job.output)
@@ -406,3 +410,51 @@ def apply_snp_vqsr_to_fragments(
 
     get_batch().write_output(final_gather_job.output, output_path.removesuffix('vcf.gz'))
     return applied_recalibration_jobs
+
+
+def apply_recalibration_indels(
+    snp_annotated_vcf: Path,
+    indel_recalibration: Path,
+    indel_tranches: Path,
+    output_path: Path,
+    job_attrs: dict | None = None,
+):
+    """
+    Apply indel recalibration to the annotated SNP VCF
+    """
+
+    snp_vcf_in_batch = get_batch().read_input_group(
+        VCF_GZ=str(snp_annotated_vcf),
+        VCF_GZ_TBI=f'{str(snp_annotated_vcf)}.tbi',
+    )
+    indel_recalibration_in_batch = get_batch().read_input(str(indel_recalibration))
+    indel_tranches_in_batch = get_batch().read_input_group(
+        tranches=str(indel_tranches),
+        tranches_idx=f'{str(indel_tranches)}.idx',
+    )
+
+    indel_recal_job = get_batch().new_bash_job(f'Apply indel recalibration to {snp_annotated_vcf}', job_attrs or {})
+    indel_recal_job.image(image_path('gatk'))
+    res = STANDARD.set_resources(indel_tranches_in_batch, ncpu=2, storage_gb=10)
+
+    indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})
+
+    filter_level = config_retrieve(['vqsr', 'indel_filter_level'])
+
+    indel_recal_job.command(
+        f"""
+    gatk --java-options "{res.java_mem_options()}" \\
+    ApplyVQSR \\
+    --tmp-dir $BATCH_TMPDIR \\
+    -O {indel_recal_job.output['vcf.gz']} \\
+    -V {snp_vcf_in_batch['vcf.gz']} \\
+    --recal-file {indel_recalibration_in_batch} \\
+    --tranches-file {indel_tranches_in_batch.tranches} \\
+    --truth-sensitivity-filter-level {filter_level} \\
+    --use-allele-specific-annotations \\
+    -mode INDEL
+    tabix -p vcf -f {indel_recal_job.output_vcf['vcf.gz']}
+    """,
+    )
+    get_batch().write_output(indel_recal_job.output_vcf, str(output_path).removesuffix('.vcf.gz'))
+    return indel_recal_job
