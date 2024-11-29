@@ -5,7 +5,6 @@ from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
     apply_snp_vqsr_to_fragments,
-    gather_tranches,
     train_vqsr_indels,
     train_vqsr_snp_tranches,
     train_vqsr_snps,
@@ -140,7 +139,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         Needs a range of INFO fields to be present in the VCF
         """
         prefix = self.prefix
-
+        tmp_prefix = self.tmp_prefix
         return {
             'mt': prefix / f'{multicohort.name}.mt',
             # this will be the write path for fragments of sites-only VCF (header-per-shard)
@@ -148,9 +147,9 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
             # this will be the file which contains the name of all fragments (header-per-shard)
             'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST,
             # this will be the write path for fragments of sites-only VCF (separate header)
-            'separate_header_vcf_dir': str(prefix / f'{multicohort.name}_separate.vcf.bgz'),
+            'separate_header_vcf_dir': str(tmp_prefix / f'{multicohort.name}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments (separate header)
-            'separate_header_manifest': prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
+            'separate_header_manifest': tmp_prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
@@ -188,7 +187,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
         and the result will be a spec-compliant VCF
         """
         manifest_file = (
-            multicohort.analysis_dataset.prefix()
+            multicohort.analysis_dataset.tmp_prefix()
             / 'rd_combiner'
             / get_workflow().output_version
             / 'CreateDenseMtFromVdsWithHail'
@@ -203,7 +202,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
 
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=manifest_file,
-            intermediates_path=str(self.prefix / 'temporary_compose_intermediates'),
+            intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
             output_path=str(outputs['vcf']),
             job_attrs={'stage': self.name},
         )
