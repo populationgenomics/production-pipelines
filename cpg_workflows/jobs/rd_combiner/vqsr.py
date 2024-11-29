@@ -10,18 +10,19 @@ from hailtop.batch.resource import ResourceFile, ResourceGroup
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.jobs.vqsr import (
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
-    apply_recalibration_snps,
     indel_recalibrator_job,
     snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks
+from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
 
 FRAGMENTS_PER_JOB: int = 100
+RECALIBRATION_FRAGMENTS_PER_JOB: int = 30
 
 
 @lru_cache(2)
@@ -150,6 +151,7 @@ def train_vqsr_snp_tranches(
         snp_model_path ():
         output_path ():
         temp_path ():
+        job_name ():
 
     Returns:
         all jobs required to get where we're going
@@ -300,8 +302,9 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> J
 
 def apply_snp_vqsr_to_fragments(
     manifest_file: Path,
-    output_path: str,
+    tranche_file: str,
     temp_path: Path,
+    output_path: Path,
     job_name: str = 'RunTrainedSnpVqsrOnCombinerFragments',
 ):
     """
@@ -311,13 +314,11 @@ def apply_snp_vqsr_to_fragments(
     Gather results into a single file
 
     Args:
-        manifest_file ():
+        manifest_file (Path): path to the manifest file, locating all VCF fragments
+        tranche_file ():
+        temp_path (): Path to the temp from TrainVqsrSnpTranches
         output_path ():
-        temp_path ():
         job_name ():
-
-    Returns:
-
     """
 
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
@@ -331,5 +332,72 @@ def apply_snp_vqsr_to_fragments(
             idx=str(temp_path / f'snp_recalibrations_{i}.idx')
         ) for i in range(fragment_count)
     ]
+
+    tranches_in_batch = get_batch().read_input(tranche_file)
+
+    applied_recalibration_jobs: list[Job] = []
+    recalibrated_snp_vcfs: list[ResourceGroup] = []
+
+    chunk_counter = 0
+    vcf_counter = -1
+    snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
+
+    for vcfs_recals in generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB):
+
+        # increment relevant counters
+        chunk_counter += 1
+
+        chunk_job = get_batch().new_bash_job(f'{job_name}, Chunk {chunk_counter}')
+        chunk_job.image(image_path('gatk'))
+
+        # add this job to the list of scatter jobs
+        applied_recalibration_jobs.append(chunk_job)
+
+        res = HIGHMEM.set_resources(chunk_job, ncpu=2, storage_gb=100)
+
+        # iterate over the zipped resource groups
+        for vcf_resource, recal_resource in vcfs_recals:
+            vcf_counter += 1
+            # used in namespacing the outputs
+            counter_string = str(vcf_counter)
+
+            # create a resource group for the recalibration output and its index
+            chunk_job.declare_resource_group(
+                **{
+                    counter_string: {
+                        VCF_GZ: '{root}.vcf.gz',
+                        VCF_GZ_TBI: '{root}.vcf.gz.tbi',
+                    },
+                },
+            )
+
+            chunk_job.command(f"""
+            gatk --java-options "{res.java_mem_options()}" \\
+            ApplyVQSR \\
+            -O {chunk_job[counter_string]['vcf.gz']} \\
+            -V {vcf_resource['vcf.gz']} \\
+            --recal-file {recal_resource.recal} \\
+            --tranches-file {tranches_in_batch} \\
+            --truth-sensitivity-filter-level {snp_filter_level} \\
+            --use-allele-specific-annotations \\
+            -mode SNP
+
+            tabix -p vcf -f {chunk_job[counter_string]['vcf.gz']}
+            """)
+            recalibrated_snp_vcfs.append(chunk_job[counter_string])
+
+    # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
+    snps_applied_gathered_jobs = gather_vcfs(
+        b=get_batch(),
+        input_vcfs=recalibrated_snp_vcfs,
+        site_only=True,
+        sequencing_group_count=66,  # these sites-only VCFs surely don't need a 3000GB vm to combine
+        out_vcf_path=output_path,
+    )
+    for each_job in snps_applied_gathered_jobs:
+        each_job.depends_on(*applied_recalibration_jobs)
+    applied_recalibration_jobs.extend(snps_applied_gathered_jobs)
+    return applied_recalibration_jobs
+
 
 

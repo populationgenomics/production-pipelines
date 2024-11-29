@@ -29,6 +29,7 @@ from cpg_workflows.stages.rd_combiner import (
     CreateVdsFromGvcfsWithHailCombiner,
     GatherTrainedVqsrSnpTranches,
     TrainVqsrIndelModelOnCombinerData,
+    RunTrainedSnpVqsrOnCombinerFragments
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
@@ -46,7 +47,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
     'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail],
-    'rd_post_combiner': [TrainVqsrIndelModelOnCombinerData, GatherTrainedVqsrSnpTranches],
+    'rd_post_combiner': [TrainVqsrIndelModelOnCombinerData, GatherTrainedVqsrSnpTranches, RunTrainedSnpVqsrOnCombinerFragments],
     'seqr_loader': [
         DatasetVCF,
         AnnotateDataset,

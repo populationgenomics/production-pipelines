@@ -3,6 +3,7 @@ from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
+    apply_snp_vqsr_to_fragments,
     gather_tranches,
     train_vqsr_indels,
     train_vqsr_snp_tranches,
@@ -331,15 +332,15 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
         jobs = gather_tranches(
             manifest_file=manifest_file,
             temp_path=to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path')),
-            output_path=str(outputs['tranches']),
+            output_path=str(outputs['gathered_tranches']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData])
+@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches])
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+        return {'vcf': self.prefix / 'vqsr.vcf.gz'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
 
@@ -355,6 +356,15 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
         if not manifest_file.exists():
             raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
 
+        outputs = self.expected_outputs(multicohort)
+        tranche_recal_temp = to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path'))
         tranche_file = inputs.as_path(target=multicohort, stage=GatherTrainedVqsrSnpTranches, key='gathered_tranches')
 
-
+        jobs = apply_snp_vqsr_to_fragments(
+            manifest_file=manifest_file,
+            tranche_file=str(tranche_file),
+            temp_path=tranche_recal_temp,
+            output_path=outputs['vcf'],
+            job_name=self.name,
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
