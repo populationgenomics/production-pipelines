@@ -708,13 +708,13 @@ class Stage(Generic[TargetT], ABC):
 
         if get_config()['workflow'].get('check_expected_outputs'):
             paths = path_walk(expected_out)
-            logging.info(f'Checking if {paths} from expected output {expected_out} exist')
+            logging.debug(f'Checking if {paths} from expected output {expected_out} exist')
             if not paths:
-                logging.info(f'{expected_out} is not reusable. No paths found.')
+                logging.debug(f'{expected_out} is not reusable. No paths found.')
                 return False, None
 
             if first_missing_path := next((p for p in paths if not exists(p)), None):
-                logging.info(f'{expected_out} is not reusable, {first_missing_path} is missing')
+                logging.debug(f'{expected_out} is not reusable, {first_missing_path} is missing')
                 return False, first_missing_path
 
             return True, None
