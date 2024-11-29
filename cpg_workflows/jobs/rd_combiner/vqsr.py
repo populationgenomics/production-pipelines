@@ -408,7 +408,7 @@ def apply_snp_vqsr_to_fragments(
     final_gather_job.depends_on(*applied_recalibration_jobs)
     applied_recalibration_jobs.append(final_gather_job)
 
-    get_batch().write_output(final_gather_job.output, output_path.removesuffix('vcf.gz'))
+    get_batch().write_output(final_gather_job.output, output_path.removesuffix('.vcf.gz'))
     return applied_recalibration_jobs
 
 
@@ -456,5 +456,5 @@ def apply_recalibration_indels(
     tabix -p vcf -f {indel_recal_job.output[VCF_GZ]}
     """,
     )
-    get_batch().write_output(indel_recal_job.output_vcf, str(output_path).removesuffix('.vcf.gz'))
+    get_batch().write_output(indel_recal_job.output, str(output_path).removesuffix('.vcf.gz'))
     return indel_recal_job
