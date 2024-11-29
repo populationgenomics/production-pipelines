@@ -59,7 +59,7 @@ def add_vep_jobs(
         job_attrs=job_attrs,
     )
     j.depends_on(*jobs)
-    jobs.extend(j)
+    jobs.append(j)
     return jobs
 
 
