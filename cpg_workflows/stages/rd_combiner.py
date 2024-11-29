@@ -342,8 +342,8 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 
 
 @stage(
-    analysis_keys=['vcf'],
-    analysis_type='qc',
+    # analysis_keys=['vcf'],
+    # analysis_type='qc',
     required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches],
 )
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
