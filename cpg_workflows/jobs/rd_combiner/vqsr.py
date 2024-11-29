@@ -18,11 +18,11 @@ from cpg_workflows.jobs.vqsr import (
     snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
 )
-from cpg_workflows.resources import HIGHMEM
+from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
 
 FRAGMENTS_PER_JOB: int = 100
-RECALIBRATION_FRAGMENTS_PER_JOB: int = 30
+RECALIBRATION_FRAGMENTS_PER_JOB: int = 60
 
 
 @lru_cache(2)
@@ -195,7 +195,7 @@ def train_vqsr_snp_tranches(
         # add this job to the list of scatter jobs
         scatter_jobs.append(chunk_job)
 
-        res = HIGHMEM.set_resources(chunk_job, ncpu=4, storage_gb=50)
+        res = STANDARD.set_resources(chunk_job, ncpu=2, storage_gb=10)
 
         # iterate over the fragment VCF resource groups
         for vcf_resource in fragment_chunk:
@@ -354,7 +354,7 @@ def apply_snp_vqsr_to_fragments(
         # stores all the annotated VCFs in this chunk
         chunk_vcfs = []
 
-        res = HIGHMEM.set_resources(chunk_job, ncpu=2, storage_gb=100)
+        res = STANDARD.set_resources(chunk_job, ncpu=1, storage_gb=10)
 
         # iterate over the zipped resource groups
         for vcf_resource, recal_resource in vcfs_recals:
