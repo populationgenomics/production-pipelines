@@ -180,18 +180,14 @@ def train_vqsr_snp_tranches(
     # if we start this as -1, we can increment at the start of the loop, making the index counting easier to track
     vcf_counter = -1
 
-    chunk_counter = 0
-
     # iterate over all fragments, but in chunks of FRAGMENTS_PER_JOB
-    for fragment_chunk in chunks(vcf_resources, FRAGMENTS_PER_JOB):
+    for chunk_counter, fragment_chunk in enumerate(chunks(vcf_resources, FRAGMENTS_PER_JOB)):
         # NB this VQSR training stage is scattered, and we have a high number of very small VCF fragments
         # 99.5% of the time and cost of this task was pulling the docker image and loading reference data
         # the actual work took 5 seconds at negligible cost. Instead of running one job per VCF fragment,
         # we can batch fragments into fewer jobs, each stacking multiple fragments together but only requiring
         # one block of reference data to be loaded.
         # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
-
-        chunk_counter += 1
 
         chunk_job = get_batch().new_job(f'{job_attrs["name"]}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
@@ -350,7 +346,6 @@ def apply_snp_vqsr_to_fragments(
     for chunk_counter, vcfs_recals in enumerate(
         generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB),
     ):
-
 
         chunk_job = get_batch().new_bash_job(f'{job_attrs["name"]}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
