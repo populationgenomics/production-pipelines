@@ -28,8 +28,8 @@ from cpg_workflows.stages.rd_combiner import (
     CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
     GatherTrainedVqsrSnpTranches,
-    TrainVqsrIndelModelOnCombinerData,
     RunTrainedSnpVqsrOnCombinerFragments,
+    TrainVqsrIndelModelOnCombinerData,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram

@@ -334,7 +334,7 @@ def apply_snp_vqsr_to_fragments(
     # we're creating these paths in expectation that they were written by the tranches stage
     snps_recal_resources = [
         get_batch().read_input_group(
-            recal=str(temp_path / f'snp_recalibrations_{i}'), idx=str(temp_path / f'snp_recalibrations_{i}.idx')
+            recal=str(temp_path / f'snp_recalibrations_{i}'), idx=str(temp_path / f'snp_recalibrations_{i}.idx'),
         )
         for i in range(fragment_count)
     ]
@@ -344,14 +344,13 @@ def apply_snp_vqsr_to_fragments(
     applied_recalibration_jobs: list[Job] = []
     recalibrated_snp_vcfs: list[ResourceGroup] = []
 
-    chunk_counter = 0
     vcf_counter = -1
     snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
 
-    for vcfs_recals in generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB):
+    for chunk_counter, vcfs_recals in enumerate(
+        generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB),
+    ):
 
-        # increment relevant counters
-        chunk_counter += 1
 
         chunk_job = get_batch().new_bash_job(f'{job_attrs["name"]}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
@@ -390,7 +389,7 @@ def apply_snp_vqsr_to_fragments(
             -mode SNP
 
             tabix -p vcf -f {chunk_job[counter_string]['vcf.gz']}
-            """
+            """,
             )
             recalibrated_snp_vcfs.append(chunk_job[counter_string])
 
