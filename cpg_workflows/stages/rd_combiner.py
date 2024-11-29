@@ -342,8 +342,8 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 
 
 @stage(
-    # analysis_keys=['vcf'],
-    # analysis_type='qc',
+    analysis_keys=['vcf'],
+    analysis_type='qc',
     required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches],
 )
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
@@ -372,7 +372,7 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
             manifest_file=manifest_file,
             tranche_file=str(tranche_file),
             temp_path=tranche_recal_temp,
-            output_path=outputs['vcf'],
+            output_path=str(outputs['vcf']),
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)

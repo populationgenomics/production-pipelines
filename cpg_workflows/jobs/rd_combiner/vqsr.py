@@ -5,12 +5,12 @@ Create and run jobs relating to VQSR for the RD combiner
 from functools import lru_cache
 
 from hailtop.batch.job import Job
-from hailtop.batch.resource import ResourceFile, ResourceGroup
+from hailtop.batch.resource import Resource, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.vcf import gather_vcfs
+from cpg_workflows.jobs.vcf import quick_and_easy_bcftools_concat
 from cpg_workflows.jobs.vqsr import (
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
@@ -306,7 +306,7 @@ def apply_snp_vqsr_to_fragments(
     manifest_file: Path,
     tranche_file: str,
     temp_path: Path,
-    output_path: Path,
+    output_path: str,
     job_attrs: dict,
 ):
     """
@@ -319,7 +319,7 @@ def apply_snp_vqsr_to_fragments(
         manifest_file (Path): path to the manifest file, locating all VCF fragments
         tranche_file ():
         temp_path (): Path to the temp from TrainVqsrSnpTranches
-        output_path ():
+        output_path (str):
         job_attrs ():
     """
 
@@ -339,7 +339,7 @@ def apply_snp_vqsr_to_fragments(
     tranches_in_batch = get_batch().read_input(tranche_file)
 
     applied_recalibration_jobs: list[Job] = []
-    recalibrated_snp_vcfs: list[ResourceGroup] = []
+    recalibrated_snp_vcfs: list[Resource] = []
 
     vcf_counter = -1
     snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
@@ -351,8 +351,8 @@ def apply_snp_vqsr_to_fragments(
         chunk_job = get_batch().new_bash_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
-        # add this job to the list of scatter jobs
-        applied_recalibration_jobs.append(chunk_job)
+        # stores all the annotated VCFs in this chunk
+        chunk_vcfs = []
 
         res = HIGHMEM.set_resources(chunk_job, ncpu=2, storage_gb=100)
 
@@ -387,18 +387,22 @@ def apply_snp_vqsr_to_fragments(
             tabix -p vcf -f {chunk_job[counter_string]['vcf.gz']}
             """,
             )
-            recalibrated_snp_vcfs.append(chunk_job[counter_string])
+            chunk_vcfs.append(chunk_job[counter_string])
+
+        # concatenates all VCFs in this chunk
+        chunk_concat_job = quick_and_easy_bcftools_concat(chunk_vcfs, storage_gb=10, job_attrs=job_attrs,)
+        chunk_concat_job.depends_on(chunk_job)
+        applied_recalibration_jobs.append(chunk_concat_job)
+        recalibrated_snp_vcfs.append(chunk_concat_job.output)
 
     # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
-    snps_applied_gathered_jobs = gather_vcfs(
-        b=get_batch(),
-        input_vcfs=recalibrated_snp_vcfs,
-        site_only=True,
-        sequencing_group_count=66,  # these sites-only VCFs surely don't need a 3000GB vm to combine
-        out_vcf_path=output_path,
+    final_gather_job = quick_and_easy_bcftools_concat(
+        recalibrated_snp_vcfs,
+        storage_gb=10,
         job_attrs=job_attrs,
     )
-    for each_job in snps_applied_gathered_jobs:
-        each_job.depends_on(*applied_recalibration_jobs)
-    applied_recalibration_jobs.extend(snps_applied_gathered_jobs)
+    final_gather_job.depends_on(*applied_recalibration_jobs)
+    applied_recalibration_jobs.extend(final_gather_job)
+
+    get_batch().write_output(final_gather_job.output, output_path.removesuffix('vcf.gz'))
     return applied_recalibration_jobs

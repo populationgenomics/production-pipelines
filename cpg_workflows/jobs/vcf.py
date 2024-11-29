@@ -9,7 +9,7 @@ from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import image_path
-from cpg_utils.hail_batch import command, fasta_res_group
+from cpg_utils.hail_batch import command, fasta_res_group, get_batch
 from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 
@@ -54,6 +54,36 @@ def subset_vcf(
     )
     if output_vcf_path:
         b.write_output(j.output_vcf, str(output_vcf_path).replace('.vcf.gz', ''))
+    return j
+
+
+def quick_and_easy_bcftools_concat(
+    input_vcfs: list[hb.ResourceGroup | hb.Resource],
+    storage_gb: int = 10,
+    job_attrs: dict | None = None,
+) -> Job:
+    """
+    A quick and easy way to concatenate VCFs
+
+    Args:
+        input_vcfs (list[hb.ResourceGroup]): list of VCFs to concatenate, requires the 'vcf.gz' attribute
+        storage_gb (int): storage size for the job
+        job_attrs (dict): job attributes, or None
+
+    Returns:
+        a ResourceGroup with the concatenated VCF, with the 'vcf.gz', and 'vcf.gz.tbi' attributes
+    """
+    j = get_batch().new_job(f'Concat {len(input_vcfs)} VCFs', (job_attrs or {}) | {'tool': 'bcftools concat'})
+    j.image(image_path('bcftools'))
+    res = STANDARD.set_resources(j, storage_gb=storage_gb)
+
+    # declare a resource group for the concatenated output
+    j.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+    j.command(f"""
+    bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in input_vcfs)} \
+    -Oz -o {j.output['vcf.gz']}
+    tabix -p vcf {j.output['vcf.gz']}
+    """)
     return j
 
 
