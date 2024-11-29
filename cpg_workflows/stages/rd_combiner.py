@@ -425,7 +425,7 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
 
 
-@stage(required_stages=[CreateDenseMtFromVdsWithHail])
+@stage()
 class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     """
     Annotate VCF with VEP.
@@ -439,6 +439,8 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
+
+        # can't directly use the manifest file, as it's not in the same workflow
         manifest_file = (
                 multicohort.analysis_dataset.prefix()
                 / 'rd_combiner'
