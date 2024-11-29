@@ -231,11 +231,15 @@ def _run_pca_ancestry_analysis(
     samples_to_use = mt.count_cols()
     logging.info(f'Total sample number in the matrix table: {samples_to_use}')
     if sample_to_drop_ht is not None:
-        samples_to_drop = sample_to_drop_ht.count()
-        logging.info(f'Determined {samples_to_drop} relateds to drop')
-        samples_to_use -= samples_to_drop
+        samples_to_drop_list = sample_to_drop_ht.s.collect()
+        samples_to_use_list = mt.s.collect()
+        # Only drop samples that are in the matrix table
+        sample_to_drop_ht = sample_to_drop_ht.filter(hl.literal(samples_to_use_list).contains(sample_to_drop_ht.s))
+        num_samples_drop = len([sample for sample in samples_to_drop_list if sample in samples_to_use_list])
+        logging.info(f'Determined {num_samples_drop} relateds to drop: {samples_to_drop_list}')
+        samples_to_use -= num_samples_drop
         logging.info(
-            f'Removing the {samples_to_drop} relateds from the list of samples used '
+            f'Removing the {num_samples_drop} relateds from the list of samples used '
             f'for PCA, got remaining {samples_to_use} samples',
         )
 
