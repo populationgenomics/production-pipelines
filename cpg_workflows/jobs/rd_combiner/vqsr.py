@@ -402,7 +402,7 @@ def apply_snp_vqsr_to_fragments(
         job_attrs=job_attrs,
     )
     final_gather_job.depends_on(*applied_recalibration_jobs)
-    applied_recalibration_jobs.extend(final_gather_job)
+    applied_recalibration_jobs.append(final_gather_job)
 
     get_batch().write_output(final_gather_job.output, output_path.removesuffix('vcf.gz'))
     return applied_recalibration_jobs
