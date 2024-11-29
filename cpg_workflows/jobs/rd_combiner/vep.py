@@ -3,6 +3,7 @@
 """
 Creates a Hail Batch job to run the command line VEP tool.
 """
+
 from textwrap import dedent
 
 import hailtop.batch as hb
@@ -12,23 +13,23 @@ from hailtop.batch.resource import ResourceGroup
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.utils import can_reuse, VCF_GZ
+from cpg_workflows.utils import VCF_GZ, can_reuse
 
 
 def add_vep_jobs(
     input_vcfs: list[ResourceGroup],
     tmp_prefix: Path,
-    out_path: Path,
+    final_out_path: Path,
     job_attrs: dict | None = None,
 ) -> list[Job]:
     """
     Runs VEP on provided VCF. Writes annotations as JSON output
 
     Args:
-        input_vcfs ():
-        tmp_prefix ():
-        out_path ():
-        job_attrs ():
+        input_vcfs (list[ResourceGroup]): List of input VCFs, localised into the Hail Batch
+        tmp_prefix (Path): Path to the temporary directory for writing fragments of annotation output
+        final_out_path (Path): Path to write the final annotation output
+        job_attrs (dict | None): Job attributes for the Hail Batch job
     """
 
     jobs: list[Job] = []
@@ -50,12 +51,12 @@ def add_vep_jobs(
                 vcf=resource[VCF_GZ],
                 out_path=str(result_part_paths[idx]),
                 job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{fragment_count}'),
-            )
+            ),
         )
 
     j = gather_vep_json_to_ht(
         vep_results_paths=result_part_paths,
-        out_path=out_path,
+        out_path=final_out_path,
         job_attrs=job_attrs,
     )
     j.depends_on(*jobs)
@@ -122,7 +123,9 @@ def vep_one(
     # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    cmd = f"""
+    j.command(
+        dedent(
+            f"""
     set -x
     vep \\
     --format vcf \\
@@ -140,9 +143,9 @@ def vep_one(
     {alpha_missense_plugin} \\
     --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
     --plugin UTRAnnotator,file=$UTR38
-    """
-
-    j.command(dedent(cmd))
+    """,
+        ),
+    )
 
     get_batch().write_output(j.output, out_path)
 

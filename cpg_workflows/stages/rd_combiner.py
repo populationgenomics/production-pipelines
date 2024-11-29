@@ -2,16 +2,16 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
     apply_snp_vqsr_to_fragments,
     gather_tranches,
+    get_all_fragments_from_manifest,
     train_vqsr_indels,
     train_vqsr_snp_tranches,
     train_vqsr_snps,
-    get_all_fragments_from_manifest,
 )
-from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -425,7 +425,7 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
 
 
-@stage()
+@stage(analysis_type='custom')
 class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     """
     Annotate VCF with VEP.
@@ -435,19 +435,19 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
         """
         Should this be in tmp? We'll never use it again maybe?
         """
-        return {'ht': self.tmp_prefix / 'vep.ht'}
+        return self.tmp_prefix / 'vep.ht'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
 
         # can't directly use the manifest file, as it's not in the same workflow
         manifest_file = (
-                multicohort.analysis_dataset.prefix()
-                / 'rd_combiner'
-                / get_workflow().output_version
-                / 'CreateDenseMtFromVdsWithHail'
-                / f'{multicohort.name}.vcf.bgz'
-                / SHARD_MANIFEST
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'CreateDenseMtFromVdsWithHail'
+            / f'{multicohort.name}.vcf.bgz'
+            / SHARD_MANIFEST
         )
 
         if not manifest_file.exists():
@@ -460,7 +460,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
         vep_jobs = add_vep_jobs(
             input_vcfs=input_vcfs,
-            out_path=outputs['ht'],
+            final_out_path=outputs,
             tmp_prefix=self.tmp_prefix / 'tmp',
             job_attrs=self.get_job_attrs(),
         )
