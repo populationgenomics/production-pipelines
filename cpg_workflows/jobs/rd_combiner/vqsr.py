@@ -453,7 +453,7 @@ def apply_recalibration_indels(
     --truth-sensitivity-filter-level {filter_level} \\
     --use-allele-specific-annotations \\
     -mode INDEL
-    tabix -p vcf -f {indel_recal_job.output_vcf[VCF_GZ]}
+    tabix -p vcf -f {indel_recal_job.output[VCF_GZ]}
     """,
     )
     get_batch().write_output(indel_recal_job.output_vcf, str(output_path).removesuffix('.vcf.gz'))
