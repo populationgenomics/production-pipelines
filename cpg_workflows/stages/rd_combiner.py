@@ -2,7 +2,12 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
-from cpg_workflows.jobs.rd_combiner.vqsr import gather_tranches, train_vqsr_indels, train_vqsr_snp_tranches, train_vqsr_snps
+from cpg_workflows.jobs.rd_combiner.vqsr import (
+    gather_tranches,
+    train_vqsr_indels,
+    train_vqsr_snp_tranches,
+    train_vqsr_snps,
+)
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -328,25 +333,3 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
             output_path=str(outputs['tranches']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
-
-
-@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=TrainVqsrIndelModelOnCombinerData)
-class RunTrainedVqsrOnCombinerFragments(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        # should this be one per fragment?
-        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
-        )
-
-        if not manifest_file.exists():
-            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
-        ...
