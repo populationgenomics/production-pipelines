@@ -427,10 +427,10 @@ def apply_recalibration_indels(
         vcf=str(snp_annotated_vcf),
         vcf_index=f'{str(snp_annotated_vcf)}.tbi',
     )
-    indel_recalibration_in_batch = get_batch().read_input(str(indel_recalibration))
-    indel_tranches_in_batch = get_batch().read_input_group(
-        tranches=str(indel_tranches),
-        tranches_idx=f'{str(indel_tranches)}.idx',
+    indel_tranches_in_batch = get_batch().read_input(str(indel_tranches))
+    indel_recalibration_in_batch = get_batch().read_input_group(
+        recal=str(indel_recalibration),
+        recal_idx=f'{str(indel_recalibration)}.idx',
     )
 
     indel_recal_job = get_batch().new_bash_job(f'Apply indel recalibration to {snp_annotated_vcf}', job_attrs or {})
@@ -448,8 +448,8 @@ def apply_recalibration_indels(
     --tmp-dir $BATCH_TMPDIR \\
     -O {indel_recal_job.output[VCF_GZ]} \\
     -V {snp_vcf_in_batch.vcf} \\
-    --recal-file {indel_recalibration_in_batch} \\
-    --tranches-file {indel_tranches_in_batch.tranches} \\
+    --recal-file {indel_recalibration_in_batch.recal} \\
+    --tranches-file {indel_tranches_in_batch} \\
     --truth-sensitivity-filter-level {filter_level} \\
     --use-allele-specific-annotations \\
     -mode INDEL
