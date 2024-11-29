@@ -20,7 +20,7 @@ from cpg_workflows.jobs.vqsr import (
 from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks
 
-FRAGMENTS_PER_JOB: int = 100
+FRAGMENTS_PER_JOB: int = 80
 
 
 @lru_cache(2)
