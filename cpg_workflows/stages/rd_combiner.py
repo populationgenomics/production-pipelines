@@ -1,4 +1,4 @@
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
@@ -269,9 +269,12 @@ class TrainVqsrSnpTranches(MultiCohortStage):
     Scattered training of VQSR tranches for SNPs
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, str |Path]:
 
-        return {'tranche_marker': self.tmp_prefix / 'tranches_trained'}
+        return {
+            'tranche_marker': self.tmp_prefix / 'tranches_trained',
+            'temp_path': str(self.tmp_prefix / 'vqsr_snp_tranches'),
+        }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
 
@@ -289,13 +292,12 @@ class TrainVqsrSnpTranches(MultiCohortStage):
 
         outputs = self.expected_outputs(multicohort)
         snp_model_path = inputs.as_path(target=multicohort, stage=TrainVqsrSnpModelOnCombinerData, key='snp_model')
-        temp_path = self.tmp_prefix / 'vqsr_snp_tranches'
 
         jobs = train_vqsr_snp_tranches(
             manifest_file=manifest_file,
             snp_model_path=str(snp_model_path),
             output_path=str(outputs['tranche_marker']),
-            temp_path=temp_path,
+            temp_path=to_path(outputs['temp_path']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
@@ -308,7 +310,7 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
 
-        return {'tranches': self.prefix / 'snp_tranches'}
+        return {'gathered_tranches': self.prefix / 'snp_tranches'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
 
@@ -325,11 +327,34 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
             raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
 
         outputs = self.expected_outputs(multicohort)
-        temp_path = self.tmp_prefix / 'vqsr_snp_tranches'
 
         jobs = gather_tranches(
             manifest_file=manifest_file,
-            temp_path=temp_path,
+            temp_path=to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path')),
             output_path=str(outputs['tranches']),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData])
+class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'vqsr.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+
+        manifest_file = (
+            multicohort.analysis_dataset.prefix()
+            / 'rd_combiner'
+            / get_workflow().output_version
+            / 'CreateDenseMtFromVdsWithHail'
+            / f'{multicohort.name}.vcf.bgz'
+            / SHARD_MANIFEST
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+
+        tranche_file = inputs.as_path(target=multicohort, stage=GatherTrainedVqsrSnpTranches, key='gathered_tranches')
+
+

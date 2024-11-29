@@ -13,6 +13,7 @@ from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import (
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
+    apply_recalibration_snps,
     indel_recalibrator_job,
     snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
@@ -295,3 +296,40 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> J
     )
     get_batch().write_output(gather_tranches_j.out_tranches, output_path)
     return gather_tranches_j
+
+
+def apply_snp_vqsr_to_fragments(
+    manifest_file: Path,
+    output_path: str,
+    temp_path: Path,
+    job_name: str = 'RunTrainedSnpVqsrOnCombinerFragments',
+):
+    """
+    Apply SNP VQSR to the tranches
+    I'm going to retry the stacking approach again to reduce job count
+
+    Gather results into a single file
+
+    Args:
+        manifest_file ():
+        output_path ():
+        temp_path ():
+        job_name ():
+
+    Returns:
+
+    """
+
+    vcf_resources = get_all_fragments_from_manifest(manifest_file)
+    fragment_count = len(vcf_resources)
+
+    # read all the recal fragments into the batch as ResourceGroups
+    # we're creating these paths in expectation that they were written by the tranches stage
+    snps_recal_resources = [
+        get_batch().read_input_group(
+            recal=str(temp_path / f'snp_recalibrations_{i}'),
+            idx=str(temp_path / f'snp_recalibrations_{i}.idx')
+        ) for i in range(fragment_count)
+    ]
+
+
