@@ -42,6 +42,9 @@ API_KEY: str = SECRETS['apiKey']
 class UploadDataToIca(SequencingGroupStage):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> None:
+        pass
+
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         upload_job: PythonJob = get_batch().new_python_job(
             'UploadDataToIca',
