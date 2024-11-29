@@ -424,8 +424,7 @@ def apply_recalibration_indels(
     """
 
     snp_vcf_in_batch = get_batch().read_input_group(
-        VCF_GZ=str(snp_annotated_vcf),
-        VCF_GZ_TBI=f'{str(snp_annotated_vcf)}.tbi',
+        **{VCF_GZ: str(snp_annotated_vcf), VCF_GZ_TBI: f'{str(snp_annotated_vcf)}.tbi'},
     )
     indel_recalibration_in_batch = get_batch().read_input(str(indel_recalibration))
     indel_tranches_in_batch = get_batch().read_input_group(
