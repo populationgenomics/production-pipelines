@@ -304,6 +304,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
 
 def apply_snp_vqsr_to_fragments(
     manifest_file: Path,
+    tranche_file: str,
     temp_path: Path,
     output_path: str,
     job_attrs: dict,
@@ -316,6 +317,7 @@ def apply_snp_vqsr_to_fragments(
 
     Args:
         manifest_file (Path): path to the manifest file, locating all VCF fragments
+        tranche_file ():
         temp_path (): Path to the temp from TrainVqsrSnpTranches
         output_path (str):
         job_attrs ():
@@ -334,9 +336,7 @@ def apply_snp_vqsr_to_fragments(
         for i in range(fragment_count)
     ]
 
-    snp_tranche_paths = [
-        get_batch().read_input(str(temp_path / f'snp_tranches_{i}')) for i in range(len(vcf_resources))
-    ]
+    tranches_in_batch = get_batch().read_input(tranche_file)
 
     applied_recalibration_jobs: list[Job] = []
     recalibrated_snp_vcfs: list[Resource] = []
@@ -345,7 +345,7 @@ def apply_snp_vqsr_to_fragments(
     snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
 
     for chunk_counter, vcfs_recals in enumerate(
-        generator_chunks(zip(vcf_resources, snps_recal_resources, snp_tranche_paths), RECALIBRATION_FRAGMENTS_PER_JOB),
+        generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB),
     ):
 
         chunk_job = get_batch().new_bash_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
@@ -357,7 +357,7 @@ def apply_snp_vqsr_to_fragments(
         res = STANDARD.set_resources(chunk_job, ncpu=1, storage_gb=10)
 
         # iterate over the zipped resource groups
-        for vcf_resource, recal_resource, tranche_resource in vcfs_recals:
+        for vcf_resource, recal_resource in vcfs_recals:
             vcf_counter += 1
             # used in namespacing the outputs
             counter_string = str(vcf_counter)
@@ -379,7 +379,7 @@ def apply_snp_vqsr_to_fragments(
             -O {chunk_job[counter_string]['vcf.gz']} \\
             -V {vcf_resource['vcf.gz']} \\
             --recal-file {recal_resource.recal} \\
-            --tranches-file {tranche_resource} \\
+            --tranches-file {tranches_in_batch} \\
             --truth-sensitivity-filter-level {snp_filter_level} \\
             --use-allele-specific-annotations \\
             -mode SNP
