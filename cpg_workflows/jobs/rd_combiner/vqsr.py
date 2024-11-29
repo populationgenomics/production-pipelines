@@ -8,7 +8,7 @@ from hailtop.batch.job import Job
 from hailtop.batch.resource import ResourceFile, ResourceGroup
 
 from cpg_utils import Path
-from cpg_utils.config import image_path, reference_path
+from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import (
     SNP_ALLELE_SPECIFIC_FEATURES,
@@ -227,7 +227,6 @@ def train_vqsr_snp_tranches(
             chunk_job.command(
                 f"""
                 set -euo pipefail
-
                 MODEL_REPORT={snp_model_in_batch}
                 mv {vcf_resource[VCF_GZ]} input.vcf.bgz
                 mv {vcf_resource[VCF_GZ_TBI]} input.vcf.bgz.tbi
@@ -263,6 +262,7 @@ def train_vqsr_snp_tranches(
 
     # one final job to write the success indicator
     final_job = get_batch().new_bash_job('Completion message')
+    final_job.image(config_retrieve(['workflow', 'driver_image']))
     final_job.command(f'echo "All tranches trained" > {final_job.output}')
     final_job.depends_on(*scatter_jobs)
     scatter_jobs.append(final_job)
