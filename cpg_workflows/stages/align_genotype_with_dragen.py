@@ -13,7 +13,7 @@ from cpg_workflows.workflow import StageOutput, stage
 
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-SECRET_PROJECT = get_gcp_project()  # config_retrieve(['workflow']['project'])  # 'cpg-common'
+SECRET_PROJECT = 'cpg-common'
 SECRET_NAME = 'illumina_cpg_workbench_api'
 SECRET_VERSION = 'latest'
 
