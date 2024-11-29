@@ -219,6 +219,7 @@ def train_vqsr_snp_tranches(
                     counter_string: {
                         'recal': '{root}',
                         'recal_idx': '{root}.idx',
+                        'tranches': '{root}.tranches',
                     },
                 },
             )
@@ -235,7 +236,7 @@ def train_vqsr_snp_tranches(
                   VariantRecalibrator \\
                   -V input.vcf.bgz \\
                   -O {one_job_to_rule_them_all[counter_string].recal} \\
-                  --tranches-file {one_job_to_rule_them_all.tranches} \\
+                  --tranches-file {one_job_to_rule_them_all[counter_string].tranches} \\
                   --trust-all-polymorphic \\
                   {tranche_cmdl} \\
                   {an_cmdl} \\
@@ -256,10 +257,14 @@ def train_vqsr_snp_tranches(
                 str(snps_recal_paths[top_level_counter]),
             )
             get_batch().write_output(
-                one_job_to_rule_them_all.tranches,
+                one_job_to_rule_them_all[counter_string].recal_idx,
+                str(snps_recal_paths[top_level_counter]) + '.idx',
+            )
+            get_batch().write_output(
+                one_job_to_rule_them_all[counter_string].tranches,
                 str(snps_tranches_paths[top_level_counter]),
             )
-            snp_tranche_fragments.append(one_job_to_rule_them_all.tranches)
+            snp_tranche_fragments.append(one_job_to_rule_them_all[counter_string].tranches)
 
     gather_tranches_j = snps_gather_tranches_job(
         get_batch(),
