@@ -62,16 +62,16 @@ class UploadDataToIca(SequencingGroupStage):
         )
 
 
-@stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
-class AlignGenotypeWithDragen(SequencingGroupStage):
-    pass
+# @stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
+# class AlignGenotypeWithDragen(SequencingGroupStage):
+#     pass
 
 
-@stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
-class GvcfMlrWithDragen(SequencingGroupStage):
-    pass
+# @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
+# class GvcfMlrWithDragen(SequencingGroupStage):
+#     pass
 
 
-@stage(analysis_type='ica_data_download')
-class DownloadDataFromIca(SequencingGroupStage):
-    pass
+# @stage(analysis_type='ica_data_download')
+# class DownloadDataFromIca(SequencingGroupStage):
+#     pass
