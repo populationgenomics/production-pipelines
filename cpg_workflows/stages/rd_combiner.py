@@ -140,6 +140,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         Needs a range of INFO fields to be present in the VCF
         """
         prefix = self.prefix
+        temp_prefix = self.tmp_prefix
 
         return {
             'mt': prefix / f'{multicohort.name}.mt',
@@ -148,9 +149,9 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
             # this will be the file which contains the name of all fragments (header-per-shard)
             'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST,
             # this will be the write path for fragments of sites-only VCF (separate header)
-            'separate_header_vcf_dir': str(prefix / f'{multicohort.name}_separate.vcf.bgz'),
+            'separate_header_vcf_dir': str(temp_prefix / f'{multicohort.name}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments (separate header)
-            'separate_header_manifest': prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
+            'separate_header_manifest': temp_prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
