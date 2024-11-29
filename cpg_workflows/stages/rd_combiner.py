@@ -109,7 +109,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
-        j = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', self.get_job_attrs())
+        j = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         j.image(config_retrieve(['workflow', 'driver_image']))
         j.memory(config_retrieve(['combiner', 'memory']))
         j.storage(config_retrieve(['combiner', 'storage']))
@@ -204,7 +204,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
             manifest_path=manifest_file,
             intermediates_path=str(self.prefix / 'temporary_compose_intermediates'),
             output_path=str(outputs['vcf']),
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
@@ -234,7 +234,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
             sites_only_vcf=str(composed_sitesonly_vcf),
             indel_recal=str(outputs['indel_recalibrations']),
             indel_tranches=str(outputs['indel_tranches']),
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
 
@@ -261,7 +261,7 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
         snp_calibration_job = train_vqsr_snps(
             sites_only_vcf=str(composed_sitesonly_vcf),
             snp_model=str(outputs['snp_model']),
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
 
@@ -301,7 +301,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             snp_model_path=str(snp_model_path),
             output_path=str(outputs['tranche_marker']),
             temp_path=to_path(outputs['temp_path']),
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
@@ -336,7 +336,7 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
             manifest_file=manifest_file,
             temp_path=to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path')),
             output_path=str(outputs['gathered_tranches']),
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
@@ -373,6 +373,6 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
             tranche_file=str(tranche_file),
             temp_path=tranche_recal_temp,
             output_path=outputs['vcf'],
-            job_attrs=self.get_job_attrs(),
+            job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)

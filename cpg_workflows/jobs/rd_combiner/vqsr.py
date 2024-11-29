@@ -189,7 +189,7 @@ def train_vqsr_snp_tranches(
         # one block of reference data to be loaded.
         # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
 
-        chunk_job = get_batch().new_job(f'{job_attrs["stage"]}, Chunk {chunk_counter}', job_attrs)
+        chunk_job = get_batch().new_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
@@ -347,7 +347,7 @@ def apply_snp_vqsr_to_fragments(
         generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB),
     ):
 
-        chunk_job = get_batch().new_bash_job(f'{job_attrs["stage"]}, Chunk {chunk_counter}', job_attrs)
+        chunk_job = get_batch().new_bash_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
