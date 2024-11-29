@@ -62,16 +62,34 @@ class UploadDataToIca(SequencingGroupStage):
         )
 
 
-# @stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
-# class AlignGenotypeWithDragen(SequencingGroupStage):
-#     pass
+@stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
+class AlignGenotypeWithDragen(SequencingGroupStage):
+    def expected_outputs(
+        self, sequencing_group: SequencingGroup
+    ) -> CloudPath | Path | dict[str, CloudPath | Path] | dict[str, str] | str | None:
+        return super().expected_outputs(sequencing_group)
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        return super().queue_jobs(sequencing_group, inputs)
 
 
-# @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
-# class GvcfMlrWithDragen(SequencingGroupStage):
-#     pass
+@stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
+class GvcfMlrWithDragen(SequencingGroupStage):
+    def expected_outputs(
+        self, sequencing_group: SequencingGroup
+    ) -> CloudPath | Path | dict[str, CloudPath | Path] | dict[str, str] | str | None:
+        return super().expected_outputs(sequencing_group)
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        return super().queue_jobs(sequencing_group, inputs)
 
 
-# @stage(analysis_type='ica_data_download')
-# class DownloadDataFromIca(SequencingGroupStage):
-#     pass
+@stage(analysis_type='ica_data_download')
+class DownloadDataFromIca(SequencingGroupStage):
+    def expected_outputs(
+        self, sequencing_group: SequencingGroup
+    ) -> CloudPath | Path | dict[str, CloudPath | Path] | dict[str, str] | str | None:
+        return super().expected_outputs(sequencing_group)
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        return super().queue_jobs(sequencing_group, inputs)
