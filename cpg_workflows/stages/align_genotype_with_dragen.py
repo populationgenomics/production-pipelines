@@ -38,7 +38,7 @@ ICA_PROJECT: str = SECRETS['projectID']
 API_KEY: str = SECRETS['apiKey']
 
 
-@stage(anaysis_type='ica_data_upload')
+@stage(analysis_type='ica_data_upload')
 class UploadDataToIca(SequencingGroup):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
