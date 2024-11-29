@@ -73,13 +73,14 @@ def get_localised_resources_for_vqsr() -> dict[str, ResourceGroup]:
     }
 
 
-def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str):
+def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str, job_attrs: dict):
     """
     Train VQSR indels on the sites-only VCF
     Args:
         sites_only_vcf ():
         indel_recal ():
         indel_tranches ():
+        job_attrs ():
     """
     resources = get_localised_resources_for_vqsr()
     siteonly_vcf = get_batch().read_input_group(
@@ -98,6 +99,7 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
         disk_size=20,
         use_as_annotations=True,
         is_small_callset=False,
+        job_attrs=job_attrs,
     )
 
     get_batch().write_output(indel_recalibrator_j.recalibration, indel_recal)
@@ -106,12 +108,13 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
     return indel_recalibrator_j
 
 
-def train_vqsr_snps(sites_only_vcf: str, snp_model: str):
+def train_vqsr_snps(sites_only_vcf: str, snp_model: str, job_attrs: dict):
     """
     Train VQSR indels on the sites-only VCF
     Args:
         sites_only_vcf ():
         snp_model ():
+        job_attrs ():
     """
     resources = get_localised_resources_for_vqsr()
     siteonly_vcf = get_batch().read_input_group(
@@ -131,6 +134,7 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str):
         disk_size=20,
         use_as_annotations=True,
         is_small_callset=False,
+        job_attrs=job_attrs,
     )
 
     get_batch().write_output(snp_recalibrator_j.model_file, snp_model)
@@ -142,7 +146,7 @@ def train_vqsr_snp_tranches(
     snp_model_path: str,
     output_path: str,
     temp_path: Path,
-    job_name: str = 'TrainVqsrSnpTranches',
+    job_attrs: dict,
 ) -> list[Job]:
     """
     train vqsr tranches for SNPs, in a scattered manner
@@ -151,7 +155,7 @@ def train_vqsr_snp_tranches(
         snp_model_path ():
         output_path ():
         temp_path ():
-        job_name ():
+        job_attrs ():
 
     Returns:
         all jobs required to get where we're going
@@ -189,7 +193,7 @@ def train_vqsr_snp_tranches(
 
         chunk_counter += 1
 
-        chunk_job = get_batch().new_job(f'{job_name}, Chunk {chunk_counter}')
+        chunk_job = get_batch().new_job(f'{job_attrs["name"]}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
@@ -264,7 +268,7 @@ def train_vqsr_snp_tranches(
             snp_tranche_fragments.append(chunk_job[counter_string].tranches)
 
     # one final job to write the success indicator
-    final_job = get_batch().new_bash_job('Completion message')
+    final_job = get_batch().new_bash_job('Completion message', job_attrs)
     final_job.image(config_retrieve(['workflow', 'driver_image']))
     final_job.command(f'echo "All tranches trained" > {final_job.output}')
     final_job.depends_on(*scatter_jobs)
@@ -274,7 +278,7 @@ def train_vqsr_snp_tranches(
     return scatter_jobs
 
 
-def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> Job:
+def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_attrs: dict) -> Job:
     """
     The previous approach ran into hard limits on the size of the batch spec
     There was too much metadata around which resource groups the tranches were part of etc etc
@@ -284,6 +288,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> J
         manifest_file (Path): path to the manifest file
         temp_path (Path): path to the temp directory (same as previous stage)
         output_path (str): path to write the tranches aggregate to
+        job_attrs (dict): job attributes
     """
 
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
@@ -295,6 +300,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str) -> J
         get_batch(),
         tranches=snp_tranche_paths,
         disk_size=100,
+        job_attrs=job_attrs,
     )
     get_batch().write_output(gather_tranches_j.out_tranches, output_path)
     return gather_tranches_j
@@ -305,7 +311,7 @@ def apply_snp_vqsr_to_fragments(
     tranche_file: str,
     temp_path: Path,
     output_path: Path,
-    job_name: str = 'RunTrainedSnpVqsrOnCombinerFragments',
+    job_attrs: dict,
 ):
     """
     Apply SNP VQSR to the tranches
@@ -318,7 +324,7 @@ def apply_snp_vqsr_to_fragments(
         tranche_file ():
         temp_path (): Path to the temp from TrainVqsrSnpTranches
         output_path ():
-        job_name ():
+        job_attrs ():
     """
 
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
@@ -328,9 +334,9 @@ def apply_snp_vqsr_to_fragments(
     # we're creating these paths in expectation that they were written by the tranches stage
     snps_recal_resources = [
         get_batch().read_input_group(
-            recal=str(temp_path / f'snp_recalibrations_{i}'),
-            idx=str(temp_path / f'snp_recalibrations_{i}.idx')
-        ) for i in range(fragment_count)
+            recal=str(temp_path / f'snp_recalibrations_{i}'), idx=str(temp_path / f'snp_recalibrations_{i}.idx')
+        )
+        for i in range(fragment_count)
     ]
 
     tranches_in_batch = get_batch().read_input(tranche_file)
@@ -347,7 +353,7 @@ def apply_snp_vqsr_to_fragments(
         # increment relevant counters
         chunk_counter += 1
 
-        chunk_job = get_batch().new_bash_job(f'{job_name}, Chunk {chunk_counter}')
+        chunk_job = get_batch().new_bash_job(f'{job_attrs["name"]}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
         # add this job to the list of scatter jobs
@@ -371,7 +377,8 @@ def apply_snp_vqsr_to_fragments(
                 },
             )
 
-            chunk_job.command(f"""
+            chunk_job.command(
+                f"""
             gatk --java-options "{res.java_mem_options()}" \\
             ApplyVQSR \\
             -O {chunk_job[counter_string]['vcf.gz']} \\
@@ -383,7 +390,8 @@ def apply_snp_vqsr_to_fragments(
             -mode SNP
 
             tabix -p vcf -f {chunk_job[counter_string]['vcf.gz']}
-            """)
+            """
+            )
             recalibrated_snp_vcfs.append(chunk_job[counter_string])
 
     # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
@@ -393,11 +401,9 @@ def apply_snp_vqsr_to_fragments(
         site_only=True,
         sequencing_group_count=66,  # these sites-only VCFs surely don't need a 3000GB vm to combine
         out_vcf_path=output_path,
+        job_attrs=job_attrs,
     )
     for each_job in snps_applied_gathered_jobs:
         each_job.depends_on(*applied_recalibration_jobs)
     applied_recalibration_jobs.extend(snps_applied_gathered_jobs)
     return applied_recalibration_jobs
-
-
-

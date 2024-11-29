@@ -204,7 +204,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
             manifest_path=manifest_file,
             intermediates_path=str(self.prefix / 'temporary_compose_intermediates'),
             output_path=str(outputs['vcf']),
-            job_name=self.name,
+            job_attrs=self.get_job_attrs(),
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
@@ -234,6 +234,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
             sites_only_vcf=str(composed_sitesonly_vcf),
             indel_recal=str(outputs['indel_recalibrations']),
             indel_tranches=str(outputs['indel_tranches']),
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
 
@@ -260,6 +261,7 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
         snp_calibration_job = train_vqsr_snps(
             sites_only_vcf=str(composed_sitesonly_vcf),
             snp_model=str(outputs['snp_model']),
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
 
@@ -270,7 +272,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
     Scattered training of VQSR tranches for SNPs
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, str |Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, str | Path]:
 
         return {
             'tranche_marker': self.tmp_prefix / 'tranches_trained',
@@ -299,6 +301,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             snp_model_path=str(snp_model_path),
             output_path=str(outputs['tranche_marker']),
             temp_path=to_path(outputs['temp_path']),
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
@@ -337,7 +340,11 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage(analysis_keys=['vcf'], analysis_type='qc', required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches])
+@stage(
+    analysis_keys=['vcf'],
+    analysis_type='qc',
+    required_stages=[GatherTrainedVqsrSnpTranches, TrainVqsrSnpModelOnCombinerData, TrainVqsrSnpTranches],
+)
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {'vcf': self.prefix / 'vqsr.vcf.gz'}
@@ -365,6 +372,6 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
             tranche_file=str(tranche_file),
             temp_path=tranche_recal_temp,
             output_path=outputs['vcf'],
-            job_name=self.name,
+            job_attrs=self.get_job_attrs(),
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
