@@ -435,7 +435,7 @@ def apply_recalibration_indels(
 
     indel_recal_job = get_batch().new_bash_job(f'Apply indel recalibration to {snp_annotated_vcf}', job_attrs or {})
     indel_recal_job.image(image_path('gatk'))
-    res = STANDARD.set_resources(indel_tranches_in_batch, ncpu=2, storage_gb=10)
+    res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=10)
 
     indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})
 
