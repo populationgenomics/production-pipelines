@@ -249,10 +249,12 @@ def train_vqsr_snp_tranches(
                   -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
                   -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
                   -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
+                touch {one_job_to_rule_them_all[counter_string]['recal_idx']}
                 """,
             )
 
             # write the results out to GCP
+            print(one_job_to_rule_them_all[counter_string])
             get_batch().write_output(
                 one_job_to_rule_them_all[counter_string].recal,
                 str(snps_recal_paths[top_level_counter]),
