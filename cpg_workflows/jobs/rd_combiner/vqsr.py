@@ -18,7 +18,7 @@ from cpg_workflows.jobs.vqsr import (
     snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
 )
-from cpg_workflows.resources import HIGHMEM, STANDARD
+from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
 
 FRAGMENTS_PER_JOB: int = 100
@@ -396,7 +396,7 @@ def apply_snp_vqsr_to_fragments(
             job_attrs=job_attrs,
         )
         chunk_concat_job.depends_on(chunk_job)
-        applied_recalibration_jobs.append(chunk_concat_job)
+        applied_recalibration_jobs.extend([chunk_job, chunk_concat_job])
         recalibrated_snp_vcfs.append(chunk_concat_job.output)
 
     # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
