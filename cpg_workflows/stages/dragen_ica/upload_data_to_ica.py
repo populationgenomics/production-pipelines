@@ -49,7 +49,7 @@ def create_upload_file_id(
         upload_file_id_instance = project_data_api.ProjectDataApi(upload_file_id_client)
         body = CreateData(
             name=sg_name,
-            folderPath=upload_folder,
+            folderPath=f'{upload_folder}/',
             dataType='FILE',
         )
         try:
