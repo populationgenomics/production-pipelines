@@ -9,7 +9,7 @@ from cpg_utils.config import config_retrieve, get_gcp_project, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.workflow import StageOutput, stage
+from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
@@ -39,10 +39,10 @@ API_KEY: str = SECRETS['apiKey']
 
 
 @stage(analysis_type='ica_data_upload')
-class UploadDataToIca(SequencingGroup):
+class UploadDataToIca(SequencingGroupStage):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
-    def queue_jobs(self, sequencing_group: SequencingGroup) -> StageOutput:
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         upload_job: PythonJob = get_batch().new_python_job(
             'UploadDataToIca',
             (self.get_job_attrs() or {}) | {'tool': 'ICA'},
@@ -50,7 +50,7 @@ class UploadDataToIca(SequencingGroup):
         upload_job.image(image=image_path('cpg_workflows'))
         upload_job.call(
             upload_data_to_ica.run,
-            sg_name=sequencing_group.id,
+            sg_name=sequencing_group.name,
             sg_path=sequencing_group.cram,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
             api_root=ICA_REST_ENDPOINT,
@@ -60,15 +60,15 @@ class UploadDataToIca(SequencingGroup):
 
 
 @stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
-class AlignGenotypeWithDragen(SequencingGroup):
+class AlignGenotypeWithDragen(SequencingGroupStage):
     pass
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
-class GvcfMlrWithDragen(SequencingGroup):
+class GvcfMlrWithDragen(SequencingGroupStage):
     pass
 
 
 @stage(analysis_type='ica_data_download')
-class DownloadDataFromIca(SequencingGroup):
+class DownloadDataFromIca(SequencingGroupStage):
     pass
