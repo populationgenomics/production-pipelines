@@ -25,6 +25,7 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
+    AnnotateFragmentedVcfWithVep,
     CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
     RunTrainedIndelVqsrOnCombinedVcf,
@@ -46,6 +47,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'pre_alignment': [FastQCMultiQC],
     'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail],
     'rd_post_combiner': [
+        AnnotateFragmentedVcfWithVep,
         RunTrainedIndelVqsrOnCombinedVcf,
     ],
     'seqr_loader': [

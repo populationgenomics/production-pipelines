@@ -9,7 +9,9 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_indels,
     train_vqsr_snp_tranches,
     train_vqsr_snps,
+    get_all_fragments_from_manifest,
 )
+from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -421,3 +423,44 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
+
+
+@stage(required_stages=[CreateDenseMtFromVdsWithHail])
+class AnnotateFragmentedVcfWithVep(MultiCohortStage):
+    """
+    Annotate VCF with VEP.
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        """
+        Should this be in tmp? We'll never use it again maybe?
+        """
+        return {'ht': self.tmp_prefix / 'vep.ht'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        manifest_file = (
+                multicohort.analysis_dataset.prefix()
+                / 'rd_combiner'
+                / get_workflow().output_version
+                / 'CreateDenseMtFromVdsWithHail'
+                / f'{multicohort.name}.vcf.bgz'
+                / SHARD_MANIFEST
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+
+        input_vcfs = get_all_fragments_from_manifest(manifest_file)
+
+        if len(input_vcfs) == 0:
+            raise ValueError(f'No VCFs in {manifest_file}')
+
+        vep_jobs = add_vep_jobs(
+            input_vcfs=input_vcfs,
+            out_path=outputs['ht'],
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            job_attrs=self.get_job_attrs(),
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=vep_jobs)

@@ -195,7 +195,7 @@ def train_vqsr_snp_tranches(
         # add this job to the list of scatter jobs
         scatter_jobs.append(chunk_job)
 
-        res = STANDARD.set_resources(chunk_job, ncpu=2, storage_gb=10)
+        res = STANDARD.set_resources(chunk_job, ncpu=4, storage_gb=10)
 
         # iterate over the fragment VCF resource groups
         for vcf_resource in fragment_chunk:
