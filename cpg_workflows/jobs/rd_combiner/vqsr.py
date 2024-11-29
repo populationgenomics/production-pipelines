@@ -18,7 +18,7 @@ from cpg_workflows.jobs.vqsr import (
     snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM
-from cpg_workflows.utils import can_reuse, chunks, VCF_GZ, VCF_GZ_TBI
+from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks
 
 FRAGMENTS_PER_JOB: int = 100
 
