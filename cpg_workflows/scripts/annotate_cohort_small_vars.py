@@ -80,6 +80,8 @@ def annotate_cohort(
         Nothing, but hopefully writes out a new MT
     """
 
+    init_batch()
+
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods
     # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
