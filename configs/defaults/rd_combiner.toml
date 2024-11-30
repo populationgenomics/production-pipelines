@@ -2,6 +2,9 @@
 name = 'rd_combiner'
 status_reporter = 'metamist'
 
+# If set, stop at generation of the joint-callset using the Combiner
+#last_stages = ['CreateDenseMtFromVdsWithHail']
+
 [combiner]
 memory = "8Gi"
 storage = "10Gi"
