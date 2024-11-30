@@ -207,7 +207,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
 
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=manifest_file,
-            intermediates_path=str(self.prefix / 'temporary_compose_intermediates'),
+            intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
             output_path=str(outputs['vcf']),
             job_attrs={'stage': self.name},
         )
