@@ -101,28 +101,23 @@ def annotate_cohort(
     get_logger().info(
         f'Adding VEP annotations into the Matrix Table from {vep_ht_path}. VEP loaded as {vep_ht.n_partitions()} partitions',
     )
-    mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
     # in our long-read VCFs, AF is present as an Entry field, so we need to drop it from entries,
     # and then recompute AC/AF/AN correctly from the variant QC table
-    # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
-    # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
-    if long_read:
+    if 'AF' in mt.entry:
         mt = mt.drop('AF')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(
-            info=mt.info.annotate(
-                AF=mt.variant_qc.AF,
-                AN=mt.variant_qc.AN,
-                AC=mt.variant_qc.AC,
-            ),
-        )
-        mt = mt.drop('variant_qc')
 
-    # Splitting multi-allelics. We do not handle AS info fields here - we handle
-    # them when loading VQSR instead, and populate entire "info" from VQSR.
-    mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
-    mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
+    mt = hl.variant_qc(mt)
+    mt = mt.annotate_rows(
+        info=mt.info.annotate(
+            AF=mt.variant_qc.AF,
+            AN=mt.variant_qc.AN,
+            AC=mt.variant_qc.AC,
+        ),
+        vep=vep_ht[mt.locus].vep,
+    )
+
+    mt = checkpoint_hail(mt, 'mt_vep.mt', checkpoint_prefix)
 
     if vqsr_vcf_path:
         get_logger().info('Adding VQSR annotations into the Matrix Table')
@@ -130,25 +125,15 @@ def annotate_cohort(
         vqsr_ht = load_vqsr(vqsr_vcf_path, vqsr_checkpoint)
         mt = mt.annotate_globals(**vqsr_ht.index_globals())
         mt = mt.annotate_rows(
-            # vqsr_ht has info annotation split by allele, plus the new AS-VQSR annotations
             info=vqsr_ht[mt.row_key].info,
             filters=vqsr_ht[mt.row_key].filters.filter(lambda val: val != 'PASS'),
         )
-        mt = checkpoint_hail(mt, 'mt-vep-split-vqsr.mt', checkpoint_prefix)
+        mt = checkpoint_hail(mt, 'mt_vep_vqsr.mt', checkpoint_prefix)
 
     ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
     clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
 
     get_logger().info('Annotating with seqr-loader fields: round 1')
-
-    # split the AC/AF attributes into separate entries, overwriting the array in INFO
-    # these elements become a 1-element array
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - 1]],
-            AC=[mt.info.AC[mt.a_index - 1]],
-        ),
-    )
 
     get_logger().info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
