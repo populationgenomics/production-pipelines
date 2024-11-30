@@ -230,6 +230,8 @@ def train_vqsr_snp_tranches(
                 },
             )
 
+            # the mv command here is because the input VCF is a .bgz instead of .vcf.bgz
+            # so GATK can't tell what type of file it is
             chunk_job.command(
                 f"""
                 set -euo pipefail
