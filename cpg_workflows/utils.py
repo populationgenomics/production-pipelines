@@ -60,7 +60,7 @@ def get_logger(
         new_logger = logging.getLogger(logger_name)
 
         # unless otherwise specified, use coloredlogs
-        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], True):
+        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], False):
             coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
