@@ -15,9 +15,11 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
+    DatasetStage,
     MultiCohortStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     stage,
 )
 from metamist.graphql import gql, query
@@ -478,7 +480,7 @@ class AnnotateCohortSmallVariants(MultiCohortStage):
         job.command(
             f'annotate_cohort_small '
             f'--input {variant_mt} '
-            f'--output {outputs["ht"]} '
+            f'--output {outputs["mt"]} '
             f'--vep {vep_ht_path} '
             f'--checkpoint {self.tmp_prefix / self.name} '
             f'--vqsr {vqsr_vcf} ',
