@@ -21,8 +21,11 @@ from cpg_workflows.jobs.vqsr import (
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
 
-FRAGMENTS_PER_JOB: int = 100
-RECALIBRATION_FRAGMENTS_PER_JOB: int = 60
+TRAINING_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_training_fragments_per_job'], 100)
+RECALIBRATION_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_apply_fragments_per_job'], 60)
+INDEL_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'indel_recal_disc_size'], 20)
+SNPS_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_recal_disc_size'], 20)
+SNPS_GATHER_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_gather_disc_size'], 10)
 
 
 @lru_cache(2)
@@ -96,7 +99,7 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
         mills_resource_vcf=resources['mills'],
         axiom_poly_resource_vcf=resources['axiom_poly'],
         dbsnp_resource_vcf=resources['dbsnp'],
-        disk_size=20,
+        disk_size=INDEL_RECAL_DISC_SIZE,
         use_as_annotations=True,
         is_small_callset=False,
         job_attrs=job_attrs,
@@ -131,7 +134,7 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str, job_attrs: dict):
         omni_resource_vcf=resources['omni'],
         one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
         dbsnp_resource_vcf=resources['dbsnp'],
-        disk_size=20,
+        disk_size=SNPS_RECAL_DISC_SIZE,
         use_as_annotations=True,
         is_small_callset=False,
         job_attrs=job_attrs,
@@ -152,10 +155,10 @@ def train_vqsr_snp_tranches(
     train vqsr tranches for SNPs, in a scattered manner
     Args:
         manifest_file (Path): Path object to the manifest file
-        snp_model_path ():
-        output_path ():
-        temp_path ():
-        job_attrs ():
+        snp_model_path (str): path to the SNP model trained in the previous stage
+        output_path (str): path to write the tranches to
+        temp_path (Path): path to the temp directory
+        job_attrs (dict): job attributes
 
     Returns:
         all jobs required to get where we're going
@@ -181,7 +184,7 @@ def train_vqsr_snp_tranches(
     vcf_counter = -1
 
     # iterate over all fragments, but in chunks of FRAGMENTS_PER_JOB
-    for chunk_counter, fragment_chunk in enumerate(chunks(vcf_resources, FRAGMENTS_PER_JOB)):
+    for chunk_counter, fragment_chunk in enumerate(chunks(vcf_resources, TRAINING_PER_JOB)):
         # NB this VQSR training stage is scattered, and we have a high number of very small VCF fragments
         # 99.5% of the time and cost of this task was pulling the docker image and loading reference data
         # the actual work took 5 seconds at negligible cost. Instead of running one job per VCF fragment,
@@ -195,7 +198,7 @@ def train_vqsr_snp_tranches(
         # add this job to the list of scatter jobs
         scatter_jobs.append(chunk_job)
 
-        res = STANDARD.set_resources(chunk_job, ncpu=4, storage_gb=10)
+        res = STANDARD.set_resources(chunk_job, ncpu=4, storage_gb=SNPS_GATHER_DISC_SIZE)
 
         # iterate over the fragment VCF resource groups
         for vcf_resource in fragment_chunk:
@@ -295,7 +298,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
     gather_tranches_j = snps_gather_tranches_job(
         get_batch(),
         tranches=snp_tranche_paths,
-        disk_size=10,
+        disk_size=SNPS_GATHER_DISC_SIZE,
         job_attrs=job_attrs,
     )
     get_batch().write_output(gather_tranches_j.out_tranches, output_path)
@@ -345,7 +348,7 @@ def apply_snp_vqsr_to_fragments(
     snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
 
     for chunk_counter, vcfs_recals in enumerate(
-        generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_FRAGMENTS_PER_JOB),
+        generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_PER_JOB),
     ):
 
         chunk_job = get_batch().new_bash_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
@@ -392,7 +395,7 @@ def apply_snp_vqsr_to_fragments(
         # concatenates all VCFs in this chunk
         chunk_concat_job = quick_and_easy_bcftools_concat(
             chunk_vcfs,
-            storage_gb=10,
+            storage_gb=SNPS_GATHER_DISC_SIZE,
             job_attrs=job_attrs,
         )
         chunk_concat_job.depends_on(chunk_job)
@@ -402,7 +405,7 @@ def apply_snp_vqsr_to_fragments(
     # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
     final_gather_job = quick_and_easy_bcftools_concat(
         recalibrated_snp_vcfs,
-        storage_gb=10,
+        storage_gb=SNPS_GATHER_DISC_SIZE,
         job_attrs=job_attrs,
     )
     final_gather_job.depends_on(*applied_recalibration_jobs)
@@ -435,7 +438,7 @@ def apply_recalibration_indels(
 
     indel_recal_job = get_batch().new_bash_job(f'Apply indel recalibration to {snp_annotated_vcf}', job_attrs or {})
     indel_recal_job.image(image_path('gatk'))
-    res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=10)
+    res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=INDEL_RECAL_DISC_SIZE)
 
     indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})
 

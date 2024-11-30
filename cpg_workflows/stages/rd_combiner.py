@@ -13,7 +13,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import Dataset, MultiCohort
-from cpg_workflows.utils import ExpectedResultT, get_logger
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
