@@ -18,7 +18,6 @@ from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
     StageOutput,
-    get_workflow,
     stage,
 )
 from metamist.graphql import gql, query
@@ -172,7 +171,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         return self.make_outputs(multicohort, output, [j])
 
 
-@stage(analysis_keys=['vcf'], analysis_type='vcf')
+@stage(analysis_keys=['vcf'], analysis_type='vcf', required_stages=[CreateDenseMtFromVdsWithHail])
 class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
     Takes a manifest of VCF fragments, and produces a single VCF file
@@ -190,17 +189,15 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
         This means we can combine the VCF header and data fragments through concatenation
         and the result will be a spec-compliant VCF
         """
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}_separate.vcf.bgz'
-            / SHARD_MANIFEST
+        manifest_file = inputs.as_path(
+            target=multicohort,
+            stage=CreateDenseMtFromVdsWithHail,
+            key='separate_header_manifest',
         )
-
         if not manifest_file.exists():
-            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
 
         outputs = self.expected_outputs(multicohort)
 
@@ -270,7 +267,7 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
 
 
-@stage(required_stages=TrainVqsrSnpModelOnCombinerData)
+@stage(required_stages=[CreateDenseMtFromVdsWithHail, TrainVqsrSnpModelOnCombinerData])
 class TrainVqsrSnpTranches(MultiCohortStage):
     """
     Scattered training of VQSR tranches for SNPs
@@ -284,15 +281,11 @@ class TrainVqsrSnpTranches(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
-        )
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
 
         if not manifest_file.exists():
             raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
@@ -310,7 +303,7 @@ class TrainVqsrSnpTranches(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
 
 
-@stage(required_stages=TrainVqsrSnpTranches)
+@stage(required_stages=[CreateDenseMtFromVdsWithHail, TrainVqsrSnpTranches])
 class GatherTrainedVqsrSnpTranches(MultiCohortStage):
     """
     Scattered training of VQSR tranches for SNPs
@@ -321,18 +314,11 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
         return {'gathered_tranches': self.prefix / 'snp_tranches'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
-        )
-
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
         if not manifest_file.exists():
-            raise ValueError(f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow')
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
 
         outputs = self.expected_outputs(multicohort)
 
@@ -347,6 +333,7 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 
 @stage(
     required_stages=[
+        CreateDenseMtFromVdsWithHail,
         GatherTrainedVqsrSnpTranches,
         TrainVqsrSnpModelOnCombinerData,
         TrainVqsrSnpTranches,
@@ -357,18 +344,11 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
         return {'vcf': self.prefix / 'vqsr.vcf.gz'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
-        )
-
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
         if not manifest_file.exists():
-            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
 
         outputs = self.expected_outputs(multicohort)
         tranche_recal_temp = to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path'))
@@ -425,33 +405,25 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
 
 
-@stage(analysis_type='custom')
+@stage(analysis_type='custom', analysis_keys=['ht'], required_stages=[CreateDenseMtFromVdsWithHail])
 class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     """
     Annotate VCF with VEP.
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         """
         Should this be in tmp? We'll never use it again maybe?
         """
-        return self.tmp_prefix / 'vep.ht'
+        return {'ht': self.tmp_prefix / 'vep.ht'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
-
-        # can't directly use the manifest file, as it's not in the same workflow
-        manifest_file = (
-            multicohort.analysis_dataset.prefix()
-            / 'rd_combiner'
-            / get_workflow().output_version
-            / 'CreateDenseMtFromVdsWithHail'
-            / f'{multicohort.name}.vcf.bgz'
-            / SHARD_MANIFEST
-        )
-
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
         if not manifest_file.exists():
-            raise ValueError(f'Manifest file {manifest_file} does not exist, run the rd_combiner workflow')
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
 
         input_vcfs = get_all_fragments_from_manifest(manifest_file)
 
@@ -460,9 +432,55 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
         vep_jobs = add_vep_jobs(
             input_vcfs=input_vcfs,
-            final_out_path=outputs,
+            final_out_path=outputs['ht'],
             tmp_prefix=self.tmp_prefix / 'tmp',
             job_attrs=self.get_job_attrs(),
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=vep_jobs)
+
+
+@stage(
+    analysis_type='matrixtable',
+    required_stages=[
+        CreateDenseMtFromVdsWithHail,
+        AnnotateFragmentedVcfWithVep,
+        RunTrainedIndelVqsrOnCombinedVcf,
+    ],
+)
+class AnnotateCohortSmallVariants(MultiCohortStage):
+    """
+    Annotate small variants with VEP and VQSR
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        """
+        Expected to write a matrix table.
+        """
+        return {'mt': self.prefix / 'annotate_cohort.mt'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+
+        Args:
+            multicohort ():
+            inputs ():
+        """
+
+        outputs = self.expected_outputs(multicohort)
+        vep_ht_path = inputs.as_path(target=multicohort, stage=AnnotateFragmentedVcfWithVep, key='ht')
+        vqsr_vcf = inputs.as_path(target=multicohort, stage=RunTrainedIndelVqsrOnCombinedVcf, key='vcf')
+        variant_mt = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='mt')
+
+        job = get_batch().new_job(self.name, self.get_job_attrs(multicohort))
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.cpu(2).memory('highmem').storage('10Gi')
+        job.command(
+            f'annotate_cohort_small '
+            f'--input {variant_mt} '
+            f'--output {outputs["ht"]} '
+            f'--vep {vep_ht_path} '
+            f'--checkpoint {self.tmp_prefix / self.name} '
+            f'--vqsr {vqsr_vcf} ',
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=job)

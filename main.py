@@ -25,10 +25,9 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
-    AnnotateFragmentedVcfWithVep,
-    CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
-    RunTrainedIndelVqsrOnCombinedVcf,
+    CreateDenseMtFromVdsWithHail,
+    AnnotateCohortSmallVariants,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
@@ -45,11 +44,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
-    'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail],
-    'rd_post_combiner': [
-        AnnotateFragmentedVcfWithVep,
-        RunTrainedIndelVqsrOnCombinedVcf,
-    ],
+    'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail, AnnotateCohortSmallVariants],
     'seqr_loader': [
         DatasetVCF,
         AnnotateDataset,

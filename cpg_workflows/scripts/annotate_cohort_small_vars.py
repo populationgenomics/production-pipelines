@@ -6,10 +6,9 @@ from argparse import ArgumentParser
 
 import hail as hl
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import genome_build, init_batch
-
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, checkpoint_hail, get_logger
 from hail_scripts.computed_fields import variant_id, vep
@@ -249,17 +248,17 @@ def cli_main():
     parser = ArgumentParser()
     parser.add_argument('--input', required=True, help='Input MatrixTable to annotate')
     parser.add_argument('--output', required=True, help='Output MatrixTable')
-    parser.add_argument('--vep-ht', required=True, help='HT with VEP annotations')
-    parser.add_argument('--checkpoint-prefix', required=True, help='Checkpoint prefix')
-    parser.add_argument('--vqsr-vcf', required=False, help='Site-only VQSR VCF')
+    parser.add_argument('--vep', required=True, help='HT with VEP annotations')
+    parser.add_argument('--checkpoint', required=True, help='Checkpoint prefix')
+    parser.add_argument('--vqsr', required=False, help='Site-only VQSR VCF')
     parser.add_argument('--long-read', action='store_true', help='Long-read VCF')
     args = parser.parse_args()
     annotate_cohort(
         mt_path=args.input,
         out_mt_path=args.output,
-        vep_ht_path=args.vep_ht,
-        checkpoint_prefix=args.checkpoint_prefix,
-        vqsr_vcf_path=args.site_only_vqsr_vcf,
+        vep_ht_path=args.vep,
+        checkpoint_prefix=args.checkpoint,
+        vqsr_vcf_path=args.vqsr,
         long_read=args.long_read,
     )
 

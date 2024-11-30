@@ -365,4 +365,4 @@ def get_intervals_from_bed(intervals_path: Path) -> list[str]:
     return intervals
 
 
-ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], dict[str, Path | str], str, None]
