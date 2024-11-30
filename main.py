@@ -25,9 +25,9 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
-    CreateVdsFromGvcfsWithHailCombiner,
-    CreateDenseMtFromVdsWithHail,
     AnnotateCohortSmallVariants,
+    CreateDenseMtFromVdsWithHail,
+    CreateVdsFromGvcfsWithHailCombiner,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram

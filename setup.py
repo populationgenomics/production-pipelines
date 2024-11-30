@@ -80,6 +80,10 @@ setup(
             'vep_json_to_ht = cpg_workflows.scripts.vep_json_to_ht:cli_main',
             # AnnotateCohort, small variants
             'annotate_cohort_small = cpg_workflows.scripts.annotate_cohort_small_vars:cli_main',
+            # Extract a single Dataset from a MatrixTable
+            'subset_mt_to_dataset = cpg_workflows.scripts.subset_mt_to_dataset:cli_main',
+            # Reconfigure annotations for Seqr Export
+            'annotate_dataset_small = cpg_workflows.scripts.annotate_dataset_small:cli_main',
         ],
     },
 )
