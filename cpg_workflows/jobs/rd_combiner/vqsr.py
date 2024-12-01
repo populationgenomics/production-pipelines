@@ -20,7 +20,7 @@ from cpg_workflows.jobs.vqsr import (
     snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM, STANDARD
-from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
+from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks, get_logger
 
 TRAINING_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_training_fragments_per_job'], 100)
 RECALIBRATION_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_apply_fragments_per_job'], 60)
@@ -100,8 +100,6 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     then the tool will tell you there is insufficient data with a No data found error
     message. In this case, try decrementing the --max-gaussians value. 4 is a
     reasonable default for indels, as their number is smaller than SNPs.
-
-    Returns: a Job object with 2 outputs: j.recal (ResourceGroup), j.tranches.
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     indel_recalibrator_j = get_batch().new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
@@ -245,6 +243,7 @@ def train_vqsr_snp_tranches(
             snps_tranche_path = snps_tranches_paths[vcf_counter]
 
             if can_reuse(snps_recal_path) and can_reuse(snps_tranche_path):
+                get_logger().info(f'Reusing {snps_recal_path} and {snps_tranche_path}')
                 snp_tranche_fragments.append(get_batch().read_input(str(snps_tranche_path)))
                 continue
 
