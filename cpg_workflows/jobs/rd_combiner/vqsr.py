@@ -131,8 +131,8 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
           -V {siteonly_vcf['vcf.gz']} \\
-          -O {indel_recalibrator_j.recalibrations} \\
-          --tranches-file {indel_recalibrator_j.tranches} \\
+          -O {indel_recalibrator_j.output.recalibrations} \\
+          --tranches-file {indel_recalibrator_j.output.tranches} \\
           --trust-all-polymorphic \\
           {tranche_cmdl} \\
           {an_cmdl} \\
