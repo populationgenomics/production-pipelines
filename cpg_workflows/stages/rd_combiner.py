@@ -222,10 +222,12 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
     This is disconnected from the CreateDenseMtFromVdsWithHail stage, but requires it to be run first
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
+        prefix = self.prefix
         return {
-            'indel_recalibrations': self.prefix / 'indel_recalibrations',
-            'indel_tranches': self.prefix / 'indel_tranches',
+            'indel_recalibrations': prefix / 'indel.recalibrations',
+            'indel_tranches': prefix / 'indel.tranches',
+            'indel_prefix': str(prefix / 'indel'),
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -237,8 +239,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
         indel_calibration_job = train_vqsr_indels(
             sites_only_vcf=str(composed_sitesonly_vcf),
-            indel_recal=str(outputs['indel_recalibrations']),
-            indel_tranches=str(outputs['indel_tranches']),
+            output_prefix=str(outputs['indel_prefix']),
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_calibration_job)
@@ -279,9 +280,10 @@ class TrainVqsrSnpTranches(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, str | Path]:
 
+        prefix = self.tmp_prefix
         return {
-            'tranche_marker': self.tmp_prefix / 'tranches_trained',
-            'temp_path': str(self.tmp_prefix / 'vqsr_snp_tranches'),
+            'tranche_marker': prefix / 'tranches_trained',
+            'temp_path': str(prefix / 'vqsr_snp_tranches'),
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:

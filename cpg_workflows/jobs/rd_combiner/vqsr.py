@@ -12,13 +12,14 @@ from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vcf import quick_and_easy_bcftools_concat
 from cpg_workflows.jobs.vqsr import (
+    INDEL_ALLELE_SPECIFIC_FEATURES,
+    INDEL_RECALIBRATION_TRANCHE_VALUES,
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
-    indel_recalibrator_job,
     snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
 )
-from cpg_workflows.resources import STANDARD
+from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks
 
 TRAINING_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_training_fragments_per_job'], 100)
@@ -76,13 +77,12 @@ def get_localised_resources_for_vqsr() -> dict[str, ResourceGroup]:
     }
 
 
-def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str, job_attrs: dict):
+def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     """
     Train VQSR indels on the sites-only VCF
     Args:
         sites_only_vcf ():
-        indel_recal ():
-        indel_tranches ():
+        output_prefix ():
         job_attrs ():
     """
     resources = get_localised_resources_for_vqsr()
@@ -92,22 +92,59 @@ def train_vqsr_indels(sites_only_vcf: str, indel_recal: str, indel_tranches: str
             VCF_GZ_TBI: str(sites_only_vcf) + '.tbi',
         },
     )
+    """
+    Run VariantRecalibrator to calculate VQSLOD tranches for indels
 
-    indel_recalibrator_j = indel_recalibrator_job(
-        b=get_batch(),
-        siteonly_vcf=siteonly_vcf,
-        mills_resource_vcf=resources['mills'],
-        axiom_poly_resource_vcf=resources['axiom_poly'],
-        dbsnp_resource_vcf=resources['dbsnp'],
-        disk_size=INDEL_RECAL_DISC_SIZE,
-        use_as_annotations=True,
-        is_small_callset=False,
-        job_attrs=job_attrs,
+    The --max-gaussians parameter sets the expected number of clusters in modeling.
+    If a dataset gives fewer distinct clusters, e.g. as can happen for smaller data,
+    then the tool will tell you there is insufficient data with a No data found error
+    message. In this case, try decrementing the --max-gaussians value. 4 is a
+    reasonable default for indels, as their number is smaller than SNPs.
+
+    Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup), j.tranches.
+    """
+    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
+    indel_recalibrator_j = get_batch().new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
+    indel_recalibrator_j.image(image_path('gatk'))
+
+    # We run it for the entire dataset in one job, so can take an entire instance.
+    instance_fraction = 1
+    res = HIGHMEM.set_resources(indel_recalibrator_j, fraction=instance_fraction, storage_gb=INDEL_RECAL_DISC_SIZE)
+
+    tranche_cmdl = ' '.join([f'-tranche {v}' for v in INDEL_RECALIBRATION_TRANCHE_VALUES])
+    an_cmdl = ' '.join(
+        [f'-an {v}' for v in INDEL_ALLELE_SPECIFIC_FEATURES],
     )
 
-    get_batch().write_output(indel_recalibrator_j.recalibration, indel_recal)
-    get_batch().write_output(indel_recalibrator_j.recalibration_idx, indel_recal + '.idx')
-    get_batch().write_output(indel_recalibrator_j.tranches, indel_tranches)
+    # delclare a resource group for the output
+    indel_recalibrator_j.declare_resource_group(
+        output={
+            'recalibrations': '{root}.recalibrations',
+            'recalibrations.idx': '{root}.recalibrations.idx',
+            'tranches': '{root}.tranches',
+        },
+    )
+    indel_recalibrator_j.command(
+        f"""
+        set -euo pipefail
+        gatk --java-options \
+          "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
+          VariantRecalibrator \\
+          -V {siteonly_vcf['vcf.gz']} \\
+          -O {indel_recalibrator_j.recalibrations} \\
+          --tranches-file {indel_recalibrator_j.tranches} \\
+          --trust-all-polymorphic \\
+          {tranche_cmdl} \\
+          {an_cmdl} \\
+          -mode INDEL \\
+          --use-allele-specific-annotations \\
+          --max-gaussians 4 \\
+          -resource:mills,known=false,training=true,truth=true,prior=12 {resources['mills'].base} \\
+          -resource:axiomPoly,known=false,training=true,truth=false,prior=10 {resources['axiom_poly'].base} \\
+          -resource:dbsnp,known=true,training=false,truth=false,prior=2 {resources['dbsnp'].base}
+        """,
+    )
+    get_batch().write_output(indel_recalibrator_j.output, output_prefix)
     return indel_recalibrator_j
 
 
@@ -167,8 +204,8 @@ def train_vqsr_snp_tranches(
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
 
     fragment_count = len(vcf_resources)
-    snps_recal_paths = [temp_path / f'snp_recalibrations_{i}' for i in range(fragment_count)]
-    snps_tranches_paths = [temp_path / f'snp_tranches_{i}' for i in range(fragment_count)]
+    snps_recal_paths = [temp_path / f'snp_{i}.recalibrations' for i in range(fragment_count)]
+    snps_tranches_paths = [temp_path / f'snp_{i}.tranches' for i in range(fragment_count)]
 
     snp_model_in_batch = get_batch().read_input(snp_model_path)
 
@@ -223,8 +260,8 @@ def train_vqsr_snp_tranches(
             chunk_job.declare_resource_group(
                 **{
                     counter_string: {
-                        'recal': '{root}',
-                        'recal_idx': '{root}.idx',
+                        'recal': '{root}.recalibrations',
+                        'recal_idx': '{root}.recalibrations.idx',
                         'tranches': '{root}.tranches',
                     },
                 },
@@ -263,9 +300,7 @@ def train_vqsr_snp_tranches(
             )
 
             # write the results out to GCP
-            get_batch().write_output(chunk_job[counter_string].recal, str(snps_recal_paths[vcf_counter]))
-            get_batch().write_output(chunk_job[counter_string].recal_idx, str(snps_recal_paths[vcf_counter]) + '.idx')
-            get_batch().write_output(chunk_job[counter_string].tranches, str(snps_tranches_paths[vcf_counter]))
+            get_batch().write_output(chunk_job[counter_string], str(temp_path / f'snp_{vcf_counter}'))
             snp_tranche_fragments.append(chunk_job[counter_string].tranches)
 
     # one final job to write the success indicator
