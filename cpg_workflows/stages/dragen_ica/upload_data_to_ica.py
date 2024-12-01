@@ -64,7 +64,7 @@ def create_upload_file_id(
     sg_name: str,
     upload_folder: str,
 ) -> str:
-    folder_path: str = f'{get_gcp_project()}/{upload_folder}/'
+    folder_path: str = f'{get_gcp_project()}/{upload_folder}'
     existing_file_id: str | None = None
     logging.info(f'Existing file id before check: {existing_file_id}')
     existing_file_id = check_object_already_exists(upload_api_instance, path_params, sg_name, folder_path)
@@ -72,7 +72,7 @@ def create_upload_file_id(
     if not existing_file_id:
         body = CreateData(
             name=sg_name,
-            folderPath=folder_path,
+            folderPath=f'{folder_path}/',
             dataType='FILE',
         )
         try:
