@@ -329,7 +329,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
 
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
     snp_tranche_paths = [
-        get_batch().read_input(str(temp_path / f'snp_tranches_{i}')) for i in range(len(vcf_resources))
+        get_batch().read_input(str(temp_path / f'snp_{i}.tranches')) for i in range(len(vcf_resources))
     ]
 
     gather_tranches_j = snps_gather_tranches_job(
@@ -370,8 +370,8 @@ def apply_snp_vqsr_to_fragments(
     # we're creating these paths in expectation that they were written by the tranches stage
     snps_recal_resources = [
         get_batch().read_input_group(
-            recal=str(temp_path / f'snp_recalibrations_{i}'),
-            idx=str(temp_path / f'snp_recalibrations_{i}.idx'),
+            recal=str(temp_path / f'snp_{i}.recalibrations'),
+            idx=str(temp_path / f'snp_{i}.recalibrations.idx'),
         )
         for i in range(fragment_count)
     ]
