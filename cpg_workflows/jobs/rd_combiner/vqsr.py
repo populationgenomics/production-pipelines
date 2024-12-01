@@ -101,7 +101,7 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     message. In this case, try decrementing the --max-gaussians value. 4 is a
     reasonable default for indels, as their number is smaller than SNPs.
 
-    Returns: a Job object with 2 outputs: j.recalibration (ResourceGroup), j.tranches.
+    Returns: a Job object with 2 outputs: j.recal (ResourceGroup), j.tranches.
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     indel_recalibrator_j = get_batch().new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
@@ -119,8 +119,8 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     # delclare a resource group for the output
     indel_recalibrator_j.declare_resource_group(
         output={
-            'recalibrations': '{root}.recalibrations',
-            'recalibrations.idx': '{root}.recalibrations.idx',
+            'recal': '{root}.recal',
+            'recal.idx': '{root}.recal.idx',
             'tranches': '{root}.tranches',
         },
     )
@@ -131,7 +131,7 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
           -V {siteonly_vcf['vcf.gz']} \\
-          -O {indel_recalibrator_j.output.recalibrations} \\
+          -O {indel_recalibrator_j.output.recal} \\
           --tranches-file {indel_recalibrator_j.output.tranches} \\
           --trust-all-polymorphic \\
           {tranche_cmdl} \\
@@ -204,7 +204,7 @@ def train_vqsr_snp_tranches(
     vcf_resources = get_all_fragments_from_manifest(manifest_file)
 
     fragment_count = len(vcf_resources)
-    snps_recal_paths = [temp_path / f'snp_{i}.recalibrations' for i in range(fragment_count)]
+    snps_recal_paths = [temp_path / f'snp_{i}.recal' for i in range(fragment_count)]
     snps_tranches_paths = [temp_path / f'snp_{i}.tranches' for i in range(fragment_count)]
 
     snp_model_in_batch = get_batch().read_input(snp_model_path)
@@ -260,8 +260,8 @@ def train_vqsr_snp_tranches(
             chunk_job.declare_resource_group(
                 **{
                     counter_string: {
-                        'recal': '{root}.recalibrations',
-                        'recal_idx': '{root}.recalibrations.idx',
+                        'recal': '{root}.recal',
+                        'recal.idx': '{root}.recal.idx',
                         'tranches': '{root}.tranches',
                     },
                 },
@@ -295,7 +295,7 @@ def train_vqsr_snp_tranches(
                   -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
                   -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
                   -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
-                touch {chunk_job[counter_string]['recal_idx']}
+                touch {chunk_job[counter_string]['recal.idx']}
                 """,
             )
 
@@ -370,8 +370,8 @@ def apply_snp_vqsr_to_fragments(
     # we're creating these paths in expectation that they were written by the tranches stage
     snps_recal_resources = [
         get_batch().read_input_group(
-            recal=str(temp_path / f'snp_{i}.recalibrations'),
-            idx=str(temp_path / f'snp_{i}.recalibrations.idx'),
+            recal=str(temp_path / f'snp_{i}.recal'),
+            idx=str(temp_path / f'snp_{i}.recal.idx'),
         )
         for i in range(fragment_count)
     ]
