@@ -107,9 +107,9 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
     # Get the bucket, cram and index information
     cram_path_components = get_path_components_from_gcp_path(str(sg_path.path))
     bucket: str = f'{cram_path_components["bucket"]}'
-    cram: str = f'{cram_path_components["dataset"]}/{cram_path_components["subdir"]}/{cram_path_components["file"]}'
+    cram: str = f'{cram_path_components["dataset"]}/{cram_path_components["suffix"]}/{cram_path_components["file"]}'
     cram_index: str = (
-        f'{cram_path_components["dataset"]}/{cram_path_components["subdir"]}/{cram_path_components["file"]}.crai'
+        f'{cram_path_components["dataset"]}/{cram_path_components["suffix"]}/{cram_path_components["file"]}.crai'
     )
 
     with icasdk.ApiClient(configuration) as upload_api_client:
