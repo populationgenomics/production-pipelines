@@ -42,6 +42,7 @@ def check_object_already_exists(
         'filePathMatchMode': 'STARTS_WITH_CASE_INSENSITIVE',
         'type': 'FILE',
     }
+    logging.info(f'{query_params}')
     try:
         object_check_response = upload_api_instance.get_project_data_list(
             path_params=path_params,
@@ -65,7 +66,9 @@ def create_upload_file_id(
 ) -> str:
     folder_path: str = f'{get_gcp_project()}/{upload_folder}/'
     existing_file_id: str | None = None
+    logging.info(f'Existing file id before check: {existing_file_id}')
     existing_file_id = check_object_already_exists(upload_api_instance, path_params, sg_name, folder_path)
+    logging.info(f'Existing file id after check: {existing_file_id}')
     if not existing_file_id:
         body = CreateData(
             name=sg_name,
@@ -108,10 +111,8 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
     cram_path_components = get_path_components_from_gcp_path(str(sg_path.path))
     logging.info(f'{cram_path_components}')
     bucket: str = f'{cram_path_components["bucket"]}'
-    cram: str = f'{cram_path_components["dataset"]}/{cram_path_components["suffix"]}/{cram_path_components["file"]}'
-    cram_index: str = (
-        f'{cram_path_components["dataset"]}/{cram_path_components["suffix"]}/{cram_path_components["file"]}.crai'
-    )
+    cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
+    cram_index: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}.crai'
 
     with icasdk.ApiClient(configuration) as upload_api_client:
         for item in [sg_name, f'{sg_name}.crai']:
