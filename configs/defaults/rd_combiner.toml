@@ -5,6 +5,22 @@ status_reporter = 'metamist'
 # If set, stop at generation of the joint-callset using the Combiner
 #last_stages = ['CreateDenseMtFromVdsWithHail']
 
+[rd_combiner]
+
+# choices of jar specs to use for the various steps
+# by deafult we match the native Hail version in the container
+[rd_combiner.subset]
+jar_spec_revision = false
+
+[rd_combiner.annotate_cohort]
+jar_spec_revision = false
+
+[rd_combiner.annotate_dataset]
+jar_spec_revision = false
+
+[rd_combiner.densify]
+jar_spec_revision = false
+
 [combiner]
 memory = "8Gi"
 storage = "10Gi"
