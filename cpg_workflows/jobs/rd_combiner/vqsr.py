@@ -104,6 +104,7 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     indel_recalibrator_j = get_batch().new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
     indel_recalibrator_j.image(image_path('gatk'))
+    indel_recalibrator_j.command('set -euo pipefail')
 
     # We run it for the entire dataset in one job, so can take an entire instance.
     instance_fraction = 1
@@ -124,7 +125,6 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     )
     indel_recalibrator_j.command(
         f"""
-        set -euo pipefail
         gatk --java-options \
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
@@ -229,6 +229,7 @@ def train_vqsr_snp_tranches(
 
         chunk_job = get_batch().new_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
+        chunk_job.command('set -euo pipefail')
 
         # add this job to the list of scatter jobs
         scatter_jobs.append(chunk_job)
@@ -270,7 +271,6 @@ def train_vqsr_snp_tranches(
             # so GATK can't tell what type of file it is
             chunk_job.command(
                 f"""
-                set -euo pipefail
                 MODEL_REPORT={snp_model_in_batch}
                 mv {vcf_resource[VCF_GZ]} input.vcf.bgz
                 mv {vcf_resource[VCF_GZ_TBI]} input.vcf.bgz.tbi
