@@ -6,6 +6,13 @@ status_reporter = 'metamist'
 #last_stages = ['CreateDenseMtFromVdsWithHail']
 
 [rd_combiner]
+# these are used when calculating how many fragments to send to each job
+vqsr_training_fragments_per_job = 100
+vqsr_apply_fragments_per_job = 60
+indel_recal_disc_size = 20
+snps_gather_disc_size = 10
+snps_recal_disc_size = 20
+
 
 # choices of jar specs to use for the various steps
 # by deafult we match the native Hail version in the container
@@ -31,11 +38,3 @@ storage = "10Gi"
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
-
-[rd_combiner]
-# these are used when calculating how many fragments to send to each job
-vqsr_training_fragments_per_job = 100
-vqsr_apply_fragments_per_job = 60
-indel_recal_disc_size = 20
-snps_gather_disc_size = 10
-snps_recal_disc_size = 20
