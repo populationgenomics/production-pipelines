@@ -85,7 +85,7 @@ def annotate_cohort(
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods
     # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+    if jar_spec := config_retrieve(['rd_combiner', 'annotate_cohort', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
 
     # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114

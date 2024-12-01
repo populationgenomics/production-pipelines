@@ -46,7 +46,7 @@ def main(
     init_batch()
 
     # if we need to manually specify a non-standard Hail QoB JAR file
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+    if jar_spec := config_retrieve(['rd_combiner', 'densify', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
 
     vds = hl.vds.read_vds(vds_in)
@@ -81,12 +81,15 @@ def main(
     # annotate this info back into the main MatrixTable
     mt = mt.annotate_rows(info=info_ht[mt.row_key])
 
-    # unpack mt.info.info back into mt.info
+    # unpack mt.info.info back into mt.info. Must be better syntax for this?
     mt = mt.transmute_rows(**mt.info)
     mt = mt.drop('gvcf_info')
 
     get_logger().info('Splitting multiallelics')
     mt = hl.split_multi_hts(mt)
+
+    # transmute the LGT -> GT post-splitting
+    mt = mt.transmute_entries(GT=mt.LGT)
 
     mt.write(dense_mt_out, overwrite=True)
 
