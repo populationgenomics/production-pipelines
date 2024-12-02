@@ -24,9 +24,12 @@ def create_upload_url(
             path_params=upload_url_path_params,
             query_params=query_params,
         )
+        logging.info('Returning URL for upload')
         return upload_api_response.body['url']
     except icasdk.ApiException as e:
         raise icasdk.ApiException(f'Exception when calling ProjectDataApi -> create_upload_url_for_data: {e}') from e
+    finally:
+        logging.info('Why are we here?')
 
 
 def check_object_already_exists(
