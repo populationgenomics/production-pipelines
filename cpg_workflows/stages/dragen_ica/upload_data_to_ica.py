@@ -15,24 +15,6 @@ from cpg_utils.config import get_gcp_project
 from cpg_workflows.filetypes import CramPath
 
 
-def create_upload_url(
-    upload_api_instance: project_data_api.ProjectDataApi,
-    path_params: dict[str, str],
-    file_id: str,
-) -> str:
-    upload_url_path_params: dict[str, str] = path_params | {'dataId': file_id}
-    query_params: dict[Any, Any] = {}
-    try:
-        upload_api_response = upload_api_instance.create_upload_url_for_data(
-            path_params=upload_url_path_params,
-            query_params=query_params,
-        )
-        logging.info('Returning URL for upload')
-        return upload_api_response.body['url']
-    except icasdk.ApiException as e:
-        raise icasdk.ApiException(f'Exception when calling ProjectDataApi -> create_upload_url_for_data: {e}') from e
-
-
 def check_object_already_exists(
     upload_api_instance: project_data_api.ProjectDataApi,
     path_params: dict[str, str],
@@ -93,6 +75,24 @@ def create_upload_file_id(
     return existing_file_id
 
 
+def create_upload_url(
+    upload_api_instance: project_data_api.ProjectDataApi,
+    path_params: dict[str, str],
+    file_id: str,
+) -> str:
+    upload_url_path_params: dict[str, str] = path_params | {'dataId': file_id}
+    query_params: dict[Any, Any] = {}
+    try:
+        upload_api_response = upload_api_instance.create_upload_url_for_data(
+            path_params=upload_url_path_params,
+            query_params=query_params,
+        )
+        logging.info('Returning URL for upload')
+        return upload_api_response.body['url']
+    except icasdk.ApiException as e:
+        raise icasdk.ApiException(f'Exception when calling ProjectDataApi -> create_upload_url_for_data: {e}') from e
+
+
 def upload_data(
     upload_url: str,
     data_to_upload: str,
@@ -101,6 +101,7 @@ def upload_data(
     folder_path: str,
     api_key: str,
     file_id: str,
+    path_parameters: dict[str, str],
 ) -> None:
     storage_client = storage.Client()
 
@@ -115,12 +116,13 @@ def upload_data(
         'Content-Type': 'application/vnd.illumina.v3+json',
         'X-API-Key': api_key,
     }
-    request_body: dict[str, str] = {
-        'name': tmp_file_name,
-        'folderPath': folder_path,
-        'dataType': 'FILE',
-        'dataId': file_id,
-    }
+    # request_body: dict[str, str] = {
+    #     'name': tmp_file_name,
+    #     'folderPath': folder_path,
+    #     'dataType': 'FILE',
+    #     'dataId': file_id,
+    # }
+    request_body = path_parameters | {'dataId': file_id}
     ct = datetime.now()
     logging.info('Making POST request to upload data')
 
@@ -162,4 +164,4 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key, upload_file_id)
+            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key, upload_file_id, path_parameters)
