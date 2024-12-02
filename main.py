@@ -23,6 +23,7 @@ from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
 from cpg_workflows.stages.mito import MitoReport
+from cpg_workflows.stages.option_test import DataSink
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import DenseMTFromVDS, GVCFCombiner
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
@@ -39,6 +40,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
+    'option_test': [DataSink],
     'pre_alignment': [FastQCMultiQC],
     'rd_combiner': [GVCFCombiner, DenseMTFromVDS],
     'seqr_loader': [
