@@ -30,7 +30,7 @@ DEFAULT_LOG_FORMAT = config_retrieve(
 LOGGERS: dict[str, logging.Logger] = {}
 
 VCF_BGZ = 'vcf.bgz'
-VCF_GZ_TBI = 'vcf.bgz.tbi'
+VCF_BGZ_TBI = 'vcf.bgz.tbi'
 VCF_GZ = 'vcf.gz'
 VCF_GZ_TBI = 'vcf.gz.tbi'
 
