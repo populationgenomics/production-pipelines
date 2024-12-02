@@ -99,6 +99,8 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str) -> None:
     blob_to_upload.download_to_file(data_stream)
     data_stream.seek(0)
 
+    logging.info(data_stream.getbuffer().nbytes)
+
     res = requests.post(upload_url, data=data_stream)
 
 
