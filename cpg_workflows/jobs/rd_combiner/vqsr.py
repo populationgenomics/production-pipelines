@@ -16,7 +16,6 @@ from cpg_workflows.jobs.vqsr import (
     INDEL_RECALIBRATION_TRANCHE_VALUES,
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
-    snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM, STANDARD
 from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, generator_chunks, get_logger
@@ -100,8 +99,9 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     message. In this case, try decrementing the --max-gaussians value. 4 is a
     reasonable default for indels, as their number is smaller than SNPs.
     """
-    job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
-    indel_recalibrator_j = get_batch().new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
+    indel_recalibrator_j = get_batch().new_job(
+        'TrainVqsrIndelModelOnCombinerData', job_attrs | {'tool': 'gatk VariantRecalibrator'},
+    )
     indel_recalibrator_j.image(image_path('gatk'))
     indel_recalibrator_j.command('set -euo pipefail')
 
@@ -156,22 +156,43 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str, job_attrs: dict):
     resources = get_localised_resources_for_vqsr()
     siteonly_vcf = get_batch().read_input_group(
         **{
-            VCF_GZ: str(sites_only_vcf),
-            VCF_GZ_TBI: str(sites_only_vcf) + '.tbi',
+            VCF_GZ: sites_only_vcf,
+            VCF_GZ_TBI: sites_only_vcf + '.tbi',
         },
     )
 
-    snp_recalibrator_j = snps_recalibrator_create_model_job(
-        b=get_batch(),
-        siteonly_vcf=siteonly_vcf,
-        hapmap_resource_vcf=resources['hapmap'],
-        omni_resource_vcf=resources['omni'],
-        one_thousand_genomes_resource_vcf=resources['one_thousand_genomes'],
-        dbsnp_resource_vcf=resources['dbsnp'],
-        disk_size=SNPS_RECAL_DISC_SIZE,
-        use_as_annotations=True,
-        is_small_callset=False,
-        job_attrs=job_attrs,
+    snp_recalibrator_j = get_batch().new_job(
+        'TrainVqsrSnpModelOnCombinerData',
+        job_attrs | {'tool': 'gatk VariantRecalibrator'},
+    )
+    snp_recalibrator_j.image(image_path('gatk'))
+
+    # We run it for the entire dataset in one job, so can take an entire instance.
+    res = HIGHMEM.set_resources(snp_recalibrator_j, fraction=1, storage_gb=SNPS_RECAL_DISC_SIZE)
+
+    tranche_cmdl = ' '.join([f'-tranche {v}' for v in SNP_RECALIBRATION_TRANCHE_VALUES])
+    an_cmdl = ' '.join(
+        [f'-an {v}' for v in SNP_ALLELE_SPECIFIC_FEATURES],
+    )
+    snp_recalibrator_j.command(
+        f"""set -euo pipefail
+        gatk --java-options \
+          "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
+          VariantRecalibrator \\
+          -V {siteonly_vcf['vcf.gz']} \\
+          --trust-all-polymorphic \\
+          {tranche_cmdl} \\
+          {an_cmdl} \\
+          -mode SNP \\
+          --use-allele-specific-annotations \\
+          --sample-every-Nth-variant 10 \\
+          --output-model {snp_recalibrator_j.model_file} \\
+          --max-gaussians 6 \\
+          -resource:hapmap,known=false,training=true,truth=true,prior=15 {resources['hapmap'].base} \\
+          -resource:omni,known=false,training=true,truth=true,prior=12 {resources['omni'].base} \\
+          -resource:1000G,known=false,training=true,truth=false,prior=10 {resources['one_thousand_genomes'].base} \\
+          -resource:dbsnp,known=true,training=false,truth=false,prior=7 {resources['dbsnp'].base}
+          """,
     )
 
     get_batch().write_output(snp_recalibrator_j.model_file, snp_model)
@@ -226,7 +247,7 @@ def train_vqsr_snp_tranches(
         # one block of reference data to be loaded.
         # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
 
-        chunk_job = get_batch().new_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
+        chunk_job = get_batch().new_job(f'TrainVqsrSnpTranches, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
         chunk_job.command('set -euo pipefail')
 
@@ -308,7 +329,6 @@ def train_vqsr_snp_tranches(
     final_job.depends_on(*scatter_jobs)
     scatter_jobs.append(final_job)
     get_batch().write_output(final_job.output, output_path)
-
     return scatter_jobs
 
 
@@ -330,7 +350,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
         get_batch().read_input(str(temp_path / f'snp_{i}.tranches')) for i in range(len(vcf_resources))
     ]
 
-    gather_tranches_j = get_batch().new_job('VQSR: SNPGatherTranches', job_attrs | {'tool': 'gatk GatherTranches'})
+    gather_tranches_j = get_batch().new_job('GatherTrainedVqsrSnpTranches', job_attrs | {'tool': 'gatk GatherTranches'})
     gather_tranches_j.image(image_path('gatk'))
     res = STANDARD.set_resources(gather_tranches_j, ncpu=2, storage_gb=SNPS_GATHER_DISC_SIZE)
 
@@ -394,7 +414,7 @@ def apply_snp_vqsr_to_fragments(
         generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_PER_JOB),
     ):
 
-        chunk_job = get_batch().new_bash_job(f'{job_attrs.get("stage")}, Chunk {chunk_counter}', job_attrs)
+        chunk_job = get_batch().new_bash_job(f'RunTrainedSnpVqsrOnCombinerFragments, Chunk {chunk_counter}', job_attrs)
         chunk_job.image(image_path('gatk'))
 
         # stores all the annotated VCFs in this chunk
@@ -463,7 +483,7 @@ def apply_recalibration_indels(
     indel_recalibration: Path,
     indel_tranches: Path,
     output_path: Path,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ):
     """
     Apply indel recalibration to the annotated SNP VCF
@@ -479,7 +499,7 @@ def apply_recalibration_indels(
         recal_idx=f'{str(indel_recalibration)}.idx',
     )
 
-    indel_recal_job = get_batch().new_bash_job(f'Apply indel recalibration to {snp_annotated_vcf}', job_attrs or {})
+    indel_recal_job = get_batch().new_bash_job(f'RunTrainedIndelVqsrOnCombinedVcf on {snp_annotated_vcf}', job_attrs)
     indel_recal_job.image(image_path('gatk'))
     res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=INDEL_RECAL_DISC_SIZE)
 

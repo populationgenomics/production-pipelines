@@ -20,7 +20,7 @@ def add_vep_jobs(
     input_vcfs: list[ResourceGroup],
     tmp_prefix: Path,
     final_out_path: Path,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> list[Job]:
     """
     Runs VEP on provided VCF. Writes annotations as JSON output
@@ -29,7 +29,7 @@ def add_vep_jobs(
         input_vcfs (list[ResourceGroup]): List of input VCFs, localised into the Hail Batch
         tmp_prefix (Path): Path to the temporary directory for writing fragments of annotation output
         final_out_path (Path): Path to write the final annotation output
-        job_attrs (dict | None): Job attributes for the Hail Batch job
+        job_attrs (dict): Job attributes for the Hail Batch job
     """
 
     jobs: list[Job] = []
@@ -50,7 +50,7 @@ def add_vep_jobs(
             vep_one(
                 vcf=resource[VCF_GZ],
                 out_path=str(result_part_paths[idx]),
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{fragment_count}'),
+                job_attrs=job_attrs | dict(part=f'{idx + 1}/{fragment_count}'),
             ),
         )
 
@@ -82,9 +82,9 @@ def gather_vep_json_to_ht(
 
 
 def vep_one(
-    vcf: Path | hb.ResourceFile,
+    vcf: hb.ResourceFile,
     out_path: str,
-    job_attrs: dict | None = None,
+    job_attrs: dict,
 ) -> Job:
     """
     Run a single VEP job.
@@ -100,7 +100,7 @@ def vep_one(
     vep_mount_path = to_path(reference_path('vep_110_mount'))
     assert all([vep_image, vep_mount_path])
 
-    j = get_batch().new_job('VEP', (job_attrs or {}) | dict(tool='VEP 110'))
+    j = get_batch().new_job('AnnotateFragmentedVcfWithVep', job_attrs | {'tool': 'VEP 110'})
     j.image(vep_image)
 
     # vep is single threaded, with a middling memory requirement
