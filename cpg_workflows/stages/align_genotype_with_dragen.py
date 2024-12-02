@@ -1,15 +1,16 @@
 import json
-from typing import Final, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
 from google.cloud import secretmanager
-
-from hailtop.batch.job import PythonJob
 
 from cpg_utils.config import config_retrieve, get_gcp_project, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
+
+if TYPE_CHECKING:
+    from hailtop.batch.job import PythonJob
 
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()

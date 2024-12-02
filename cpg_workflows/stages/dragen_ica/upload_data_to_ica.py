@@ -2,6 +2,7 @@ import logging
 import subprocess
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import icasdk
 import requests
@@ -20,7 +21,7 @@ def create_upload_url(
     file_id: str,
 ) -> str:
     upload_url_path_params: dict[str, str] = path_params | {'dataId': file_id}
-    query_params = {}
+    query_params: dict[Any, Any] = {}
     try:
         upload_api_response = upload_api_instance.create_upload_url_for_data(
             path_params=upload_url_path_params,
@@ -37,7 +38,7 @@ def check_object_already_exists(
     path_params: dict[str, str],
     sg_name: str,
     folder_path: str,
-) -> None:
+) -> str | None:
     query_params = {
         'filename': [sg_name],
         'filenameMatchMode': 'EXACT',
@@ -128,7 +129,7 @@ def upload_data(
         r = requests.post(
             url=upload_url,
             files=files,
-            header=request_headers,
+            headers=request_headers,
         )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
