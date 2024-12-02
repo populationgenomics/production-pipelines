@@ -225,7 +225,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
         prefix = self.prefix
         return {
-            'indel_recalibrations': prefix / 'indel.recalibrations',
+            'indel_recalibrations': prefix / 'indel.recal',
             'indel_tranches': prefix / 'indel.tranches',
             'indel_prefix': str(prefix / 'indel'),
         }
