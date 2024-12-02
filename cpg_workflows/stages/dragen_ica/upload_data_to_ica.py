@@ -96,7 +96,7 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str, tmp_file_name
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
     blob_to_upload = gcp_bucket.get_blob(data_to_upload)
-    blob_to_upload.download_to_filename(tmp_file_name)
+    blob_to_upload.download_to_filename(tmp_file_name, timeout=3600)
 
     logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
