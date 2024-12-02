@@ -65,9 +65,8 @@ def create_upload_file_id(
     upload_api_instance: project_data_api.ProjectDataApi,
     path_params: dict[str, str],
     sg_name: str,
-    upload_folder: str,
+    folder_path: str,
 ) -> str:
-    folder_path: str = f'{get_gcp_project()}/{upload_folder}'
     existing_file_id: str | None = None
     logging.info(f'Existing file id before check: {existing_file_id}')
     existing_file_id = check_object_already_exists(upload_api_instance, path_params, sg_name, folder_path)
@@ -91,7 +90,14 @@ def create_upload_file_id(
     return existing_file_id
 
 
-def upload_data(upload_url: str, data_to_upload: str, bucket: str, tmp_file_name: str) -> None:
+def upload_data(
+    upload_url: str,
+    data_to_upload: str,
+    bucket: str,
+    tmp_file_name: str,
+    folder_path: str,
+    api_key: str,
+) -> None:
     storage_client = storage.Client()
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
@@ -100,8 +106,20 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str, tmp_file_name
 
     logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
-    res = requests.post(upload_url, data=tmp_file_name)
-    logging.info(f'{res}')
+    request_headers: dict[str, str] = {
+        'accept': 'application/vnd.illumina.v3+json',
+        'X-API-Key': api_key,
+        'Content-Type': 'application/vnd.illumina.v3+json',
+    }
+    request_body: dict[str, str] = {
+        'name': tmp_file_name,
+        'folderPath': folder_path,
+        'dataType': 'FILE',
+    }
+
+    logging.info('Making POST request to upload data')
+    requests.post(url=upload_url, data=request_body, headers=request_headers)
+    logging.info('Upload done')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
@@ -110,6 +128,7 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
     path_parameters: dict[str, str] = {'projectId': project_id}
+    folder_path: str = f'{get_gcp_project()}/{upload_folder}'
 
     # Get the bucket, cram and index information
     cram_path_components = get_path_components_from_gcp_path(str(sg_path.path))
@@ -122,8 +141,8 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
         for item in [cram_path_components['file'], f'{cram_path_components["file"]}.crai']:
             upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
             logging.info(f'Item is: {item}')
-            upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, upload_folder)
+            upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, folder_path)
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket, item)
+            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key)
