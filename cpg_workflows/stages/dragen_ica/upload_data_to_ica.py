@@ -119,7 +119,7 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
     cram_index: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}.crai'
 
     with icasdk.ApiClient(configuration) as upload_api_client:
-        for item in [sg_name, f'{sg_name}.crai']:
+        for item in [cram_path_components['file'], f'{cram_path_components["file"]}.crai']:
             upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
             upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, upload_folder)
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
