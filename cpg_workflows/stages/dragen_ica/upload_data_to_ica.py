@@ -87,6 +87,7 @@ def create_upload_url(
             path_params=upload_url_path_params,
             query_params=query_params,
         )
+        logging.info(upload_api_response.headers)
         logging.info('Returning URL for upload')
         return upload_api_response.body['url']
     except icasdk.ApiException as e:
