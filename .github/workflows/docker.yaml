@@ -54,6 +54,7 @@ jobs:
       - name: build
         run: |
           docker build . -f Dockerfile --tag $IMAGE_NAME:ica
+          docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_DEV/$IMAGE_NAME:ica
           docker push $DOCKER_DEV/$IMAGE_NAME:ica
 
       - name: push latest
