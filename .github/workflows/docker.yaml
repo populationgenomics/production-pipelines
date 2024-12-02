@@ -3,12 +3,12 @@ on:
 #  pull_request:
   push:
     branches:
-      - main
+      - dragen_ica_pipeline
   workflow_dispatch:
     inputs:
       tag:
         description: 'Tag to use (defaults to "test")'
-        default: "test"
+        default: "ica"
 
 permissions:
   id-token: write
@@ -53,7 +53,7 @@ jobs:
 
       - name: build
         run: |
-          docker build . -f Dockerfile --tag $IMAGE_NAME:${{ github.sha }}
+          docker build . -f Dockerfile --tag $IMAGE_NAME:ica
 
       - name: push latest
         if: ${{ github.ref_name == 'main' }}
