@@ -28,8 +28,6 @@ def create_upload_url(
         return upload_api_response.body['url']
     except icasdk.ApiException as e:
         raise icasdk.ApiException(f'Exception when calling ProjectDataApi -> create_upload_url_for_data: {e}') from e
-    finally:
-        logging.info('Why are we here?')
 
 
 def check_object_already_exists(
@@ -99,12 +97,13 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str) -> None:
     data_stream = BytesIO()
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
     blob_to_upload = gcp_bucket.get_blob(data_to_upload)
-    blob_to_upload.download_to_file(data_stream)
+    blob_to_upload.download_to_filename(data_stream)
     data_stream.seek(0)
 
     logging.info(data_stream.getbuffer().nbytes)
 
     res = requests.post(upload_url, data=data_stream)
+    logging.info(f'{res}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
