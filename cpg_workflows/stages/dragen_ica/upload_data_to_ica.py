@@ -108,14 +108,13 @@ def upload_data(
 
     logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
-    # request_headers: dict[str, str] = {
-    #     'accept': 'application/vnd.illumina.v3+json',
-    #     'X-API-Key': api_key,
-    #     'Content-Type': 'application/vnd.illumina.v3+json',
-    # }
+    request_headers: dict[str, str] = {
+        'accept': 'application/vnd.illumina.v3+json',
+        'Content-Type': 'application/vnd.illumina.v3+json',
+    }
     # request_body: dict[str, str] = {
     #     'name': tmp_file_name,
-    #     'folderPath': folder_path,
+    #     'folderPath': folder_path, 'X-API-Key': api_key,
     #     'dataType': 'FILE',
     # }
     ct = datetime.now()
@@ -129,10 +128,12 @@ def upload_data(
         r = requests.post(
             url=upload_url,
             files=files,
+            header=request_headers,
         )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
     logging.info(f'Status code: {r.status_code}')
+    logging.info(f'Status code: {r.body}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
