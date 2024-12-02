@@ -103,7 +103,6 @@ def annotate_cohort(
     vep_ht_path: str,
     checkpoint_prefix: str,
     vqsr_vcf_path: str | None = None,
-    long_read: bool = False,
 ) -> None:
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR annotations.
@@ -114,7 +113,6 @@ def annotate_cohort(
         vep_ht_path ():
         checkpoint_prefix ():
         vqsr_vcf_path ():
-        long_read ():
 
     Returns:
         Nothing, but hopefully writes out a new MT
@@ -278,7 +276,6 @@ def cli_main():
     parser.add_argument('--vep', required=True, help='HT with VEP annotations')
     parser.add_argument('--checkpoint', required=True, help='Checkpoint prefix')
     parser.add_argument('--vqsr', required=False, help='Site-only VQSR VCF')
-    parser.add_argument('--long-read', action='store_true', help='Long-read VCF')
     args = parser.parse_args()
     annotate_cohort(
         mt_path=args.input,
@@ -286,7 +283,6 @@ def cli_main():
         vep_ht_path=args.vep,
         checkpoint_prefix=args.checkpoint,
         vqsr_vcf_path=args.vqsr,
-        long_read=args.long_read,
     )
 
 
