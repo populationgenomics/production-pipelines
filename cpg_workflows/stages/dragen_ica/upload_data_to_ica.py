@@ -108,23 +108,24 @@ def upload_data(
 
     logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
-    request_headers: dict[str, str] = {
-        'accept': 'application/vnd.illumina.v3+json',
-        'X-API-Key': api_key,
-        'Content-Type': 'application/vnd.illumina.v3+json',
-    }
-    request_body: dict[str, str] = {
-        'name': tmp_file_name,
-        'folderPath': folder_path,
-        'dataType': 'FILE',
-    }
+    # request_headers: dict[str, str] = {
+    #     'accept': 'application/vnd.illumina.v3+json',
+    #     'X-API-Key': api_key,
+    #     'Content-Type': 'application/vnd.illumina.v3+json',
+    # }
+    # request_body: dict[str, str] = {
+    #     'name': tmp_file_name,
+    #     'folderPath': folder_path,
+    #     'dataType': 'FILE',
+    # }
     ct = datetime.now()
     logging.info('Making POST request to upload data')
 
-    # subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"'])
+    # subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"']) headers=request_headers, data=request_body,
 
     requests.post(
-        url=upload_url, data=request_body, headers=request_headers, files={tmp_file_name: open(tmp_file_name, 'rb')}
+        url=upload_url,
+        files={tmp_file_name: open(tmp_file_name, 'rb')},
     )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
