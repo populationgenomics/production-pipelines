@@ -88,8 +88,13 @@ def main(
     get_logger().info('Splitting multiallelics')
     mt = hl.split_multi_hts(mt)
 
-    # transmute the LGT -> GT post-splitting
-    mt = mt.transmute_entries(GT=mt.LGT)
+    # transmute the local (L) annotations to full annotation name post splitting
+    mt = mt.transmute_entries(
+        GT=mt.LGT,
+        Pl=mt.LPL,
+        AD=mt.LAD,
+        PGT=mt.LPGT,
+    )
 
     mt.write(dense_mt_out, overwrite=True)
 
