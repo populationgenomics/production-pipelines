@@ -94,10 +94,10 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str) -> None:
     data_stream = BytesIO()
     gcp_bucket = storage_client.bucket(bucket)
     blob_to_upload = gcp_bucket.blob(data_to_upload)
-    blob_data: BytesIO = blob_to_upload.download_to_file(data_stream)
-    blob_data.seek(0)
+    blob_to_upload.download_to_file(data_stream)
+    blob_to_upload.seek(0)
 
-    res = requests.post(upload_url, data=blob_data)
+    res = requests.post(upload_url, data=blob_to_upload)
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
