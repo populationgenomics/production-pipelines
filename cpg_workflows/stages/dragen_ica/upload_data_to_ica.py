@@ -52,6 +52,8 @@ def check_object_already_exists(
         if len(object_check_response.body['items']) == 0:
             return None
         else:
+            # TODO We don't check any other statuses, something to be improved in the future.
+            # Statuses are ["PARTIAL", "AVAILABLE", "ARCHIVING", "ARCHIVED", "UNARCHIVING", "DELETING", ]
             if object_check_response.body['items'][0]['data']['details']['status'] == 'PARTIAL':
                 return object_check_response.body['items'][0]['data']['id']
     except icasdk.ApiException as e:
@@ -92,12 +94,12 @@ def upload_data(upload_url: str, data_to_upload: str, bucket: str) -> None:
     storage_client = storage.Client()
 
     data_stream = BytesIO()
-    gcp_bucket = storage_client.bucket(bucket)
-    blob_to_upload = gcp_bucket.blob(data_to_upload)
+    gcp_bucket = storage_client.bucket(bucket_name=bucket)
+    blob_to_upload = gcp_bucket.get_blob(data_to_upload)
     blob_to_upload.download_to_file(data_stream)
-    blob_to_upload.seek(0)
+    data_stream.seek(0)
 
-    res = requests.post(upload_url, data=blob_to_upload)
+    res = requests.post(upload_url, data=data_stream)
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
