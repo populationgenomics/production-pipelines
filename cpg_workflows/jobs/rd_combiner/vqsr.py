@@ -100,7 +100,8 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict):
     reasonable default for indels, as their number is smaller than SNPs.
     """
     indel_recalibrator_j = get_batch().new_job(
-        'TrainVqsrIndelModelOnCombinerData', job_attrs | {'tool': 'gatk VariantRecalibrator'},
+        'TrainVqsrIndelModelOnCombinerData',
+        job_attrs | {'tool': 'gatk VariantRecalibrator'},
     )
     indel_recalibrator_j.image(image_path('gatk'))
     indel_recalibrator_j.command('set -euo pipefail')
