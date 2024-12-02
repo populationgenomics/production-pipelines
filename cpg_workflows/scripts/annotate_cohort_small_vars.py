@@ -145,16 +145,6 @@ def annotate_cohort(
     if 'AF' in mt.entry:
         mt = mt.drop('AF')
 
-    mt = hl.variant_qc(mt)
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=mt.variant_qc.AF,
-            AN=mt.variant_qc.AN,
-            AC=mt.variant_qc.AC,
-        ),
-        vep=vep_ht[mt.locus].vep,
-    )
-
     mt = checkpoint_hail(mt, 'mt_vep.mt', checkpoint_prefix)
 
     if vqsr_vcf_path:
@@ -170,6 +160,16 @@ def annotate_cohort(
 
     ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
     clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
+
+    mt = hl.variant_qc(mt)
+    mt = mt.annotate_rows(
+        info=mt.info.annotate(
+            AF=mt.variant_qc.AF,
+            AN=mt.variant_qc.AN,
+            AC=mt.variant_qc.AC,
+        ),
+        vep=vep_ht[mt.locus].vep,
+    )
 
     get_logger().info('Annotating with seqr-loader fields: round 1')
 
