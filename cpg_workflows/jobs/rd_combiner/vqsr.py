@@ -16,7 +16,6 @@ from cpg_workflows.jobs.vqsr import (
     INDEL_RECALIBRATION_TRANCHE_VALUES,
     SNP_ALLELE_SPECIFIC_FEATURES,
     SNP_RECALIBRATION_TRANCHE_VALUES,
-    snps_gather_tranches_job,
     snps_recalibrator_create_model_job,
 )
 from cpg_workflows.resources import HIGHMEM, STANDARD
@@ -331,12 +330,20 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
         get_batch().read_input(str(temp_path / f'snp_{i}.tranches')) for i in range(len(vcf_resources))
     ]
 
-    gather_tranches_j = snps_gather_tranches_job(
-        get_batch(),
-        tranches=snp_tranche_paths,
-        disk_size=SNPS_GATHER_DISC_SIZE,
-        job_attrs=job_attrs,
+    gather_tranches_j = get_batch().new_job('VQSR: SNPGatherTranches', job_attrs | {'tool': 'gatk GatherTranches'})
+    gather_tranches_j.image(image_path('gatk'))
+    res = STANDARD.set_resources(gather_tranches_j, ncpu=2, storage_gb=SNPS_GATHER_DISC_SIZE)
+
+    inputs_cmdl = ' '.join([f'--input {t}' for t in snp_tranche_paths])
+    gather_tranches_j.command(
+        f"""set -euo pipefail
+    gatk --java-options "{res.java_mem_options()}" \\
+      GatherTranches \\
+      --mode SNP \\
+      {inputs_cmdl} \\
+      --output {gather_tranches_j.out_tranches}""",
     )
+
     get_batch().write_output(gather_tranches_j.out_tranches, output_path)
     return gather_tranches_j
 
