@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pathlib import Path
 
 import icasdk
@@ -116,10 +117,11 @@ def upload_data(
         'folderPath': folder_path,
         'dataType': 'FILE',
     }
-
+    ct = datetime.now()
     logging.info('Making POST request to upload data')
     requests.post(url=upload_url, data=request_body, headers=request_headers)
-    logging.info('Upload done')
+    end_t = datetime.now()
+    logging.info(f'Upload done. It took {end_t - ct}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
