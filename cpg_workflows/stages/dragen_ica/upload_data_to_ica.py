@@ -126,7 +126,7 @@ def upload_data(
     with open(tmp_file_name, 'rb') as upload_file:
         files = {'file': (tmp_file_name, upload_file)}
 
-        r = requests.post(
+        r: requests.Response = requests.post(
             url=upload_url,
             files=files,
             headers=request_headers,
@@ -134,7 +134,7 @@ def upload_data(
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
     logging.info(f'Status code: {r.status_code}')
-    logging.info(f'Status code: {r.body}')
+    logging.info(f'Status code: {r.text}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
