@@ -51,7 +51,7 @@ class UploadDataToIca(SequencingGroupStage):
             (self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         upload_job.image(image=image_path('cpg_workflows'))
-        upload_job.storage('40 Gi')
+        upload_job.storage('40Gi')
         upload_job.call(
             upload_data_to_ica.run,
             sg_name=sequencing_group.name,
