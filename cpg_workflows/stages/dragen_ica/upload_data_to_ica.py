@@ -121,9 +121,9 @@ def upload_data(
     ct = datetime.now()
     logging.info('Making POST request to upload data')
 
-    subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"'])
+    # subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"'])
 
-    # requests.post(url=upload_url, data=request_body, headers=request_headers)
+    requests.post(url=upload_url, data=request_body, headers=request_headers, file=open(tmp_file_name, 'rb'))
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
 
