@@ -21,7 +21,6 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
 
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods
-    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
     if jar_spec := config_retrieve(['rd_combiner', 'annotate_dataset', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
 
