@@ -181,7 +181,6 @@ def annotate_cohort(
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
-        originalAltAlleles=variant_id.get_expr_for_variant_ids(mt.locus_old, mt.alleles_old),
         sortedTranscriptConsequences=vep.get_expr_for_vep_sorted_transcript_consequences_array(mt.vep),
         variantId=variant_id.get_expr_for_variant_id(mt),
         contig=variant_id.get_expr_for_contig(mt.locus),
