@@ -180,6 +180,8 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str, job_attrs: dict):
           "{res.java_mem_options()} {res.java_gc_thread_options()}" \\
           VariantRecalibrator \\
           -V {siteonly_vcf['vcf.gz']} \\
+          -O {snp_recalibrator_j.recalibration} \\
+          --tranches-file {snp_recalibrator_j.tranches} \\
           --trust-all-polymorphic \\
           {tranche_cmdl} \\
           {an_cmdl} \\
