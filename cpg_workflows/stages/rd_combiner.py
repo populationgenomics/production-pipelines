@@ -491,7 +491,7 @@ class AnnotateCohortSmallVariants(MultiCohortStage):
             f'--input {variant_mt} '
             f'--output {outputs["mt"]} '
             f'--vep {vep_ht_path} '
-            f'--checkpoint {self.tmp_prefix / self.name} '
+            f'--checkpoint {self.tmp_prefix} '
             f'--vqsr {vqsr_vcf} ',
         )
         return self.make_outputs(multicohort, data=outputs, jobs=job)
