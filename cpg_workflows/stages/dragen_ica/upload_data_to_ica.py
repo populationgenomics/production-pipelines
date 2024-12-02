@@ -123,12 +123,16 @@ def upload_data(
 
     # subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"']) headers=request_headers, data=request_body,
 
-    requests.post(
-        url=upload_url,
-        files={tmp_file_name: open(tmp_file_name, 'rb')},
-    )
+    with open(tmp_file_name, 'rb') as upload_file:
+        files = {'file': (tmp_file_name, upload_file)}
+
+        r = requests.post(
+            url=upload_url,
+            files=files,
+        )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
+    logging.info(f'Status code: {r.status_code}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
