@@ -1,5 +1,5 @@
 import logging
-from io import BytesIO
+from pathlib import Path
 
 import icasdk
 import requests
@@ -91,18 +91,16 @@ def create_upload_file_id(
     return existing_file_id
 
 
-def upload_data(upload_url: str, data_to_upload: str, bucket: str) -> None:
+def upload_data(upload_url: str, data_to_upload: str, bucket: str, tmp_file_name: str) -> None:
     storage_client = storage.Client()
 
-    data_stream = BytesIO()
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
     blob_to_upload = gcp_bucket.get_blob(data_to_upload)
-    blob_to_upload.download_to_filename(data_stream)
-    data_stream.seek(0)
+    blob_to_upload.download_to_filename(tmp_file_name)
 
-    logging.info(data_stream.getbuffer().nbytes)
+    logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
-    res = requests.post(upload_url, data=data_stream)
+    res = requests.post(upload_url, data=tmp_file_name)
     logging.info(f'{res}')
 
 
@@ -128,4 +126,4 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket)
+            upload_data(upload_url, data_to_upload, bucket, item)
