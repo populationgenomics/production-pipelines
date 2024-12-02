@@ -1,4 +1,5 @@
 import logging
+import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -119,7 +120,10 @@ def upload_data(
     }
     ct = datetime.now()
     logging.info('Making POST request to upload data')
-    requests.post(url=upload_url, data=request_body, headers=request_headers)
+
+    subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"'])
+
+    # requests.post(url=upload_url, data=request_body, headers=request_headers)
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
 
