@@ -145,7 +145,7 @@ def annotate_cohort(
     if 'AF' in mt.entry:
         mt = mt.drop('AF')
 
-    mt = checkpoint_hail(mt, 'mt_vep.mt', checkpoint_prefix)
+    mt = checkpoint_hail(mt, 'mt_vep.mt', checkpoint_prefix, allow_reuse=True)
 
     if vqsr_vcf_path:
         get_logger().info('Adding VQSR annotations into the Matrix Table')
@@ -156,7 +156,7 @@ def annotate_cohort(
             info=vqsr_ht[mt.row_key].info,
             filters=vqsr_ht[mt.row_key].filters.filter(lambda val: val != 'PASS'),
         )
-        mt = checkpoint_hail(mt, 'mt_vep_vqsr.mt', checkpoint_prefix)
+        mt = checkpoint_hail(mt, 'mt_vep_vqsr.mt', checkpoint_prefix, allow_reuse=True)
 
     ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
     clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
