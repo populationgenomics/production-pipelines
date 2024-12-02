@@ -113,10 +113,9 @@ def upload_data(
 
     request_headers: dict[str, str] = {
         'accept': 'application/vnd.illumina.v3+json',
-        'Content-Type': 'application/vnd.illumina.v3+json',
         'X-API-Key': api_key,
     }
-    # request_body: dict[str, str] = {
+    # request_body: dict[str, str] = { 'Content-Type': 'application/vnd.illumina.v3+json',
     #     'name': tmp_file_name,
     #     'folderPath': folder_path,
     #     'dataType': 'FILE',
@@ -138,7 +137,7 @@ def upload_data(
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
     logging.info(f'Status code: {r.status_code}')
-    logging.info(f'Status code: {r.headers}')
+    # logging.info(f'Status code: {r.headers}')
     logging.info(f'Status code: {r.text}')
 
 
