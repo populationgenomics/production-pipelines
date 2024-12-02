@@ -100,6 +100,7 @@ def upload_data(
     tmp_file_name: str,
     folder_path: str,
     api_key: str,
+    file_id: str,
 ) -> None:
     storage_client = storage.Client()
 
@@ -112,16 +113,16 @@ def upload_data(
     request_headers: dict[str, str] = {
         'accept': 'application/vnd.illumina.v3+json',
         'Content-Type': 'application/vnd.illumina.v3+json',
+        'X-API-Key': api_key,
     }
-    # request_body: dict[str, str] = {
-    #     'name': tmp_file_name,
-    #     'folderPath': folder_path, 'X-API-Key': api_key,
-    #     'dataType': 'FILE',
-    # }
+    request_body: dict[str, str] = {
+        'name': tmp_file_name,
+        'folderPath': folder_path,
+        'dataType': 'FILE',
+        'dataId': file_id,
+    }
     ct = datetime.now()
     logging.info('Making POST request to upload data')
-
-    # subprocess.run(['curl', '--upload-file', f'{tmp_file_name}', f'"{upload_url}"']) headers=request_headers, data=request_body,
 
     with open(tmp_file_name, 'rb') as upload_file:
         files = {'file': (tmp_file_name, upload_file)}
@@ -130,6 +131,7 @@ def upload_data(
             url=upload_url,
             files=files,
             headers=request_headers,
+            data=request_body,
         )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
@@ -160,4 +162,4 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key)
+            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key, upload_file_id)
