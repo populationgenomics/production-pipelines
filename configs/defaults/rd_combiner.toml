@@ -1,7 +1,39 @@
-[workflow]
 name = 'rd_combiner'
 status_reporter = 'metamist'
+
+# If set, stop at generation of the joint-callset using the Combiner
+#last_stages = ['CreateDenseMtFromVdsWithHail']
+
+[rd_combiner]
+# these are used when calculating how many fragments to send to each job
+vqsr_training_fragments_per_job = 100
+vqsr_apply_fragments_per_job = 60
+indel_recal_disc_size = 20
+snps_gather_disc_size = 10
+snps_recal_disc_size = 20
+
+
+# choices of jar specs to use for the various steps
+# by deafult we match the native Hail version in the container
+[rd_combiner.subset]
+jar_spec_revision = false
+
+[rd_combiner.annotate_cohort]
+jar_spec_revision = false
+
+[rd_combiner.annotate_dataset]
+jar_spec_revision = false
+
+[rd_combiner.densify]
+jar_spec_revision = false
 
 [combiner]
 memory = "8Gi"
 storage = "10Gi"
+
+[vqsr]
+# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
+# based on the model's estimated sensitivity to a set of true variants.
+snp_filter_level = 99.7
+indel_filter_level = 99.0
