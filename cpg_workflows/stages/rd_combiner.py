@@ -10,8 +10,8 @@ from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     gather_tranches,
     train_vqsr_indels,
-    train_vqsr_snps,
     train_vqsr_snp_tranches,
+    train_vqsr_snps,
 )
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
@@ -301,7 +301,6 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
-
 
 
 @stage(required_stages=[CreateDenseMtFromVdsWithHail, TrainVqsrSnpTranches])
