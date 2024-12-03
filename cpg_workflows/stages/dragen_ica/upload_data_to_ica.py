@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any
 
 import icasdk
-import requests
 from google.cloud import storage
 from icasdk.apis.tags import project_data_api
 from icasdk.model.create_data import CreateData
@@ -99,10 +98,6 @@ def upload_data(
     data_to_upload: str,
     bucket: str,
     tmp_file_name: str,
-    folder_path: str,
-    api_key: str,
-    file_id: str,
-    path_parameters: dict[str, str],
 ) -> None:
     storage_client = storage.Client()
 
@@ -112,36 +107,13 @@ def upload_data(
 
     logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
 
-    request_headers: dict[str, str] = {
-        'accept': 'application/vnd.illumina.v3+json',
-        'X-API-Key': api_key,
-    }
-    # request_body: dict[str, str] = { 'Content-Type': 'application/vnd.illumina.v3+json',
-    #     'name': tmp_file_name,
-    #     'folderPath': folder_path,
-    #     'dataType': 'FILE',
-    #     'dataId': file_id,
-    # }
-    request_body = path_parameters | {'dataId': file_id}
     ct = datetime.now()
-    logging.info('Making POST request to upload data')
-    # logging.info(f'curl --upload-file {tmp_file_name} "{upload_url}"')
+    logging.info('Uploading data with cURL')
+
     subprocess.run(['curl', '--upload-file', tmp_file_name, f'{upload_url}'])
 
-    with open(tmp_file_name, 'rb') as upload_file:
-        files = {'file': (tmp_file_name, upload_file)}
-
-        r: requests.Response = requests.post(
-            url=upload_url,
-            files=files,
-            headers=request_headers,
-            data=request_body,
-        )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
-    # logging.info(f'Status code: {r.status_code}')
-    # logging.info(f'Status code: {r.headers}')
-    # logging.info(f'Status code: {r.text}')
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
@@ -167,4 +139,4 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket, item, folder_path, api_key, upload_file_id, path_parameters)
+            upload_data(upload_url, data_to_upload, bucket, item)
