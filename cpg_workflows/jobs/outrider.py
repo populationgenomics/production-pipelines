@@ -290,7 +290,7 @@ def outrider(
     b: hb.Batch,
     input_counts: list[str | Path],
     output_rdata_path: str | Path | None = None,
-    cohort_name: str | None = None,
+    cohort_id: str | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
     requested_nthreads: int | None = None,
@@ -316,7 +316,7 @@ def outrider(
     z_cutoff = get_config().get('outrider', {}).get('z_cutoff', 0.0)
 
     # Create job
-    job_name = f'outrider_{cohort_name}' if cohort_name else 'count'
+    job_name = f'outrider_{cohort_id}' if cohort_id else 'count'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='outrider')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('outrider'))
