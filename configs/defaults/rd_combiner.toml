@@ -2,8 +2,11 @@
 name = 'rd_combiner'
 status_reporter = 'metamist'
 
-# If set, stop at generation of the joint-callset using the Combiner
+## If set, stop at generation of the joint-callset using the Combiner
 #last_stages = ['CreateDenseMtFromVdsWithHail']
+
+## if this is False, we will not check for existing VDS - always create fresh VDS from gVCFs
+#check_for_existing_vds = false
 
 [rd_combiner]
 # these are used when calculating how many fragments to send to each job
