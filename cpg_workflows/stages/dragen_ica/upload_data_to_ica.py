@@ -125,18 +125,18 @@ def upload_data(
     request_body = path_parameters | {'dataId': file_id}
     ct = datetime.now()
     logging.info('Making POST request to upload data')
-    logging.info(f'curl --upload-file {tmp_file_name} "{upload_url}"')
-    subprocess.run(['curl', '--upload-file', tmp_file_name, f'"{upload_url}"'])
+    # logging.info(f'curl --upload-file {tmp_file_name} "{upload_url}"')
+    subprocess.run(['curl', '--upload-file', tmp_file_name, f'{upload_url}'])
 
-    # with open(tmp_file_name, 'rb') as upload_file:
-    #     files = {'file': (tmp_file_name, upload_file)}
+    with open(tmp_file_name, 'rb') as upload_file:
+        files = {'file': (tmp_file_name, upload_file)}
 
-    #     r: requests.Response = requests.post(
-    #         url=upload_url,
-    #         files=files,
-    #         headers=request_headers,
-    #         data=request_body,
-    #     )
+        r: requests.Response = requests.post(
+            url=upload_url,
+            files=files,
+            headers=request_headers,
+            data=request_body,
+        )
     end_t = datetime.now()
     logging.info(f'Upload done. It took {end_t - ct}')
     # logging.info(f'Status code: {r.status_code}')
