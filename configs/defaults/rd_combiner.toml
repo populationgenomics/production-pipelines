@@ -44,3 +44,7 @@ indel_filter_level = 99.0
 [gcloud_condense]
 chunk_size = 32
 storage = "10Gi"
+
+[references]
+# this might be a holdover until the references file is corrected. Working in Main.
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
