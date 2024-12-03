@@ -78,8 +78,6 @@ def main(
         pipe_delimited_annotations=[],
     )
 
-
-
     # annotate this info back into the main MatrixTable
     mt = mt.annotate_rows(info=info_ht[mt.row_key].info)
 
