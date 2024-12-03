@@ -509,10 +509,6 @@ class GctaPCA(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.jobs import gcta_PCA
-
-        ######### LOCALISATION #########
-        # can't pass batch's
 
         outputs = self.expected_outputs(cohort)
 
@@ -540,15 +536,7 @@ class GctaPCA(CohortStage):
         run_PCA_j.command(
             f'gcta --grm $BATCH_TMPDIR/GRM/{gcta_version()} --remove $BATCH_TMPDIR/{relateds_name} --pca 10 --out {run_PCA_j.output}',
         )
-        # run_PCA_j.command(
-        #     'gcta_pca '
-        #     '--grm-directory "${BATCH_TMPDIR}" '
-        #     f'--output-path {run_PCA_j.output} '
-        #     f'--version {gcta_version()} '
-        #     f'--n-pcs {config_retrieve(["large_cohort", "n_pcs"])} '
-        #     f'--relateds-to-drop "${{BATCH_TMPDIR}}/{relateds_name}" ',
-        # )
-        # Delocalise the output
+
         run_PCA_j.command(
             f'gcloud --no-user-output-enabled storage cp -r "{run_PCA_j.output}.eigenval" {str(outputs["gcta_eigenval"])}',
         )
@@ -556,52 +544,6 @@ class GctaPCA(CohortStage):
             f'gcloud --no-user-output-enabled storage cp -r "{run_PCA_j.output}.eigenvec" {str(outputs["gcta_eigenvec"])}',
         )
 
-        #################################
-        ######### QUERY COMMAND #########
-
-        # j = get_batch().new_job('Run GCTA PCA', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
-        # j.image(image_path('cpg_workflows'))
-        # j.command(
-        #     query_command(
-        #         gcta_PCA,
-        #         gcta_PCA.run_PCA.__name__,
-        #         get_batch(),
-        #         str(inputs.as_path(cohort, GctaGRM, 'grm_dir')),
-        #         str(self.expected_outputs(cohort)['pca_dir']),
-        #         gcta_version(),
-        #         config_retrieve(['large_cohort', 'n_pcs']),
-        #         str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop')),
-        #         setup_gcp=True,
-        #     ),
-        # )
-
-        #################################
-        ######### FUNCTION CALL #########
-        # b = get_batch()
-        # # grm_directory = str(inputs.as_path(cohort, GctaGRM, 'grm_bin').parent)
-        # bfile = b.read_input_group(
-        #     **{
-        #         'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
-        #         'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
-        #         'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
-        #     },
-        # )
-        # grm_directory = {
-        #     'grm.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_bin')),
-        #     'grm.id': str(inputs.as_path(cohort, GctaGRM, 'grm_id')),
-        #     'grm.N.bin': str(inputs.as_path(cohort, GctaGRM, 'grm_N_bin')),
-        # }
-        # logging.info(
-        #     f'GRM files LARGE COHORT: bin: {bfile["grm.bin"]}, id: {bfile["grm.id"]}, N: {bfile["grm.N.bin"]}',
-        # )
-        # run_PCA_j = gcta_PCA.run_PCA(
-        #     b=b,
-        #     grm_directory=grm_directory,
-        #     output_path=str(self.expected_outputs(cohort)['pca_dir']),
-        #     version=gcta_version(),
-        #     n_pcs=config_retrieve(['large_cohort', 'n_pcs']),
-        #     relateds_to_drop=str(inputs.as_path(cohort, RelatednessFlag, 'relateds_to_drop_gcta')),
-        # )
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[run_PCA_j])
 
 
