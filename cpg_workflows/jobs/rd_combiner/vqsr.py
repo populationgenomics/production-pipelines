@@ -7,7 +7,6 @@ from functools import lru_cache
 from hailtop.batch.job import Job
 from hailtop.batch.resource import ResourceGroup
 
-from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.vqsr import (
@@ -24,30 +23,6 @@ RECALIBRATION_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_apply_fragmen
 INDEL_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'indel_recal_disc_size'], 20)
 SNPS_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_recal_disc_size'], 20)
 SNPS_GATHER_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_gather_disc_size'], 10)
-
-
-@lru_cache(2)
-def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
-    """
-    read the manifest file, and return all the fragment resources as an ordered list
-    this is a cached method as we don't want to localise every fragment once per task
-
-    Args:
-        manifest_file ():
-
-    Returns:
-        an ordered list of all the fragment VCFs and corresponding indices
-    """
-
-    resource_objects: list[ResourceGroup] = []
-    manifest_folder: Path = manifest_file.parent
-    with manifest_file.open() as f:
-        for line in f:
-            vcf_path = manifest_folder / line.strip()
-            resource_objects.append(
-                get_batch().read_input_group(**{VCF_GZ: vcf_path, VCF_GZ_TBI: f'{vcf_path}.tbi'}),
-            )
-    return resource_objects
 
 
 @lru_cache(1)
