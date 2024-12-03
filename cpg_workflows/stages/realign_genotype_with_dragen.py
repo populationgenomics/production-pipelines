@@ -60,11 +60,15 @@ class UploadDataToIca(SequencingGroupStage):
         # TODO calculate storage for each individual file
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(
-            bucket_name=get_cpg_namespace(get_access_level()),
+            bucket_name=f'{get_gcp_project()}-{get_access_level()}',
             user_project=get_gcp_project(),
         )
+        # cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        # cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
         logging.info(sequencing_group.cram)
-        blob_to_upload_size: int | None = gcp_bucket.get_blob(str(sequencing_group.cram).replace('gs://', '')).size
+        blob_to_upload_size: int | None = gcp_bucket.get_blob(
+            str(sequencing_group.cram).replace(f'gs://{get_gcp_project()}-{get_access_level()}', '')
+        ).size
 
         logging.info(blob_to_upload_size)
         sys.exit(0)
