@@ -9,8 +9,8 @@ from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_indels,
-    train_vqsr_snps,
     train_vqsr_snp_tranches,
+    train_vqsr_snps,
 )
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
