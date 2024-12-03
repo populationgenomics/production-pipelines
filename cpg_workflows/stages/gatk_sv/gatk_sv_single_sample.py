@@ -175,7 +175,7 @@ class EvidenceQC(CohortStage):
         sgids = cohort.get_sequencing_group_ids()
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'samples': sgids,
             'run_vcf_qc': True,
             'counts': [str(d[sid]['coverage_counts']) for sid in sgids],
