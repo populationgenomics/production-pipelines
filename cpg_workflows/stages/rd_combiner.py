@@ -8,6 +8,7 @@ from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner.vqsr import (
+    gather_tranches,
     train_vqsr_indels,
     train_vqsr_snps,
     train_vqsr_snp_tranches,
@@ -297,6 +298,35 @@ class TrainVqsrSnpTranches(MultiCohortStage):
             snp_model_path=str(snp_model_path),
             output_path=str(outputs['tranche_marker']),
             temp_path=to_path(outputs['temp_path']),
+            job_attrs={'stage': self.name},
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+
+
+
+@stage(required_stages=[CreateDenseMtFromVdsWithHail, TrainVqsrSnpTranches])
+class GatherTrainedVqsrSnpTranches(MultiCohortStage):
+    """
+    Scattered training of VQSR tranches for SNPs
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'snp_tranches'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
+
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = gather_tranches(
+            manifest_file=manifest_file,
+            temp_path=to_path(inputs.as_str(target=multicohort, stage=TrainVqsrSnpTranches, key='temp_path')),
+            output_path=str(outputs),
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=jobs)
