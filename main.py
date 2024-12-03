@@ -12,12 +12,6 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from cpg_workflows.stages.align_genotype_with_dragen import (
-    AlignGenotypeWithDragen,
-    DownloadDataFromIca,
-    GvcfMlrWithDragen,
-    UploadDataToIca,
-)
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
 from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
@@ -32,6 +26,12 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import DenseMTFromVDS, GVCFCombiner
+from cpg_workflows.stages.realign_genotype_with_dragen import (
+    AlignGenotypeWithDragen,
+    DownloadDataFromIca,
+    GvcfMlrWithDragen,
+    UploadDataToIca,
+)
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
