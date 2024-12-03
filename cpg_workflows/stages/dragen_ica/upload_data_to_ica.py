@@ -107,37 +107,25 @@ def upload_data(
     blob_to_upload = gcp_bucket.get_blob(data_to_upload)
     blob_to_upload.download_to_filename(tmp_file_name, timeout=3600)
 
-    logging.info(f'Filesize is {Path(tmp_file_name).stat().st_size}')
-
-    ct = datetime.now()
     logging.info('Uploading data with cURL')
-
     subprocess.run(['curl', '--upload-file', tmp_file_name, f'{upload_url}'])
 
-    end_t = datetime.now()
-    logging.info(f'Upload done. It took {end_t - ct}')
 
-
-def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
+def run(sg_name: str, cram: str, bucket_name: str, upload_folder: str, api_root: str, project_id: str, api_key: str):
     coloredlogs.install(level=logging.INFO)
 
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
     path_parameters: dict[str, str] = {'projectId': project_id}
     folder_path: str = f'{get_gcp_project()}/{upload_folder}'
-
-    # Get the bucket, cram and index information
-    cram_path_components = get_path_components_from_gcp_path(str(sg_path.path))
-    bucket: str = f'{cram_path_components["bucket"]}'
-    cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
-    cram_index: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}.crai'
+    cram_index: str = f'{cram}.crai'
 
     with icasdk.ApiClient(configuration) as upload_api_client:
-        for item in [cram_path_components['file'], f'{cram_path_components["file"]}.crai']:
+        for item in [cram, cram_index]:
             upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
             logging.info(f'Item is: {item}')
             upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, folder_path)
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket, item)
+            upload_data(upload_url, data_to_upload, bucket_name, item)
