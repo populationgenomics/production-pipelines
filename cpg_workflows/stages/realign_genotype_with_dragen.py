@@ -58,7 +58,9 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.image(image=image_path('cpg_workflows'))
         # TODO calculate storage for each individual file
         storage_client = storage.Client()
-        gcp_bucket = storage_client.bucket(bucket_name=get_cpg_namespace(get_access_level()))
+        gcp_bucket = storage_client.bucket(
+            bucket_name=get_cpg_namespace(get_access_level()), user_project=get_gcp_project()
+        )
         logging.info(sequencing_group.cram)
         blob_to_upload_size: int | None = gcp_bucket.get_blob(str(sequencing_group.cram)).size
 
