@@ -442,3 +442,48 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
         )
 
         return self.make_outputs(multicohort, data=outputs, jobs=vep_jobs)
+
+@stage(
+    analysis_type='matrixtable',
+    required_stages=[
+        CreateDenseMtFromVdsWithHail,
+        AnnotateFragmentedVcfWithVep,
+        RunTrainedIndelVqsrOnCombinedVcf,
+    ],
+)
+class AnnotateCohortSmallVariants(MultiCohortStage):
+    """
+    Annotate small variants with VEP and VQSR
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        """
+        Expected to write a matrix table.
+        """
+        return self.prefix / 'annotate_cohort.mt'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+
+        Args:
+            multicohort ():
+            inputs ():
+        """
+
+        outputs = self.expected_outputs(multicohort)
+        vep_ht_path = inputs.as_path(target=multicohort, stage=AnnotateFragmentedVcfWithVep)
+        vqsr_vcf = inputs.as_path(target=multicohort, stage=RunTrainedIndelVqsrOnCombinedVcf)
+        variant_mt = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='mt')
+
+        job = get_batch().new_job(self.name, self.get_job_attrs(multicohort))
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.cpu(2).memory('highmem').storage('10Gi')
+        job.command(
+            f'annotate_cohort_small '
+            f'--input {variant_mt} '
+            f'--output {outputs} '
+            f'--vep {vep_ht_path} '
+            f'--checkpoint {self.tmp_prefix} '
+            f'--vqsr {vqsr_vcf} ',
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
