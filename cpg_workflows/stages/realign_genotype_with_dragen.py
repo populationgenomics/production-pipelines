@@ -1,9 +1,11 @@
 import json
+import logging
 from typing import TYPE_CHECKING, Final, Literal
 
-from google.cloud import secretmanager
+import coloredlogs
+from google.cloud import secretmanager, storage
 
-from cpg_utils.config import config_retrieve, get_gcp_project, image_path
+from cpg_utils.config import config_retrieve, get_access_level, get_cpg_namespace, get_gcp_project, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
@@ -38,6 +40,8 @@ SECRETS: dict[Literal['projectID', 'apiKey'], str] = get_ica_secrets()
 ICA_PROJECT: str = SECRETS['projectID']
 API_KEY: str = SECRETS['apiKey']
 
+coloredlogs.install(level=logging.INFO)
+
 
 @stage(analysis_type='ica_data_upload')
 class UploadDataToIca(SequencingGroupStage):
@@ -53,6 +57,12 @@ class UploadDataToIca(SequencingGroupStage):
         )
         upload_job.image(image=image_path('cpg_workflows'))
         # TODO calculate storage for each individual file
+        storage_client = storage.Client()
+        gcp_bucket = storage_client.bucket(bucket_name=get_cpg_namespace(get_access_level()))
+        blob_to_upload_size = gcp_bucket.get_blob(sequencing_group.cram)
+
+        logging.info(blob_to_upload_size)
+        exit(0)
         upload_job.storage('40Gi')
         upload_job.call(
             upload_data_to_ica.run,
