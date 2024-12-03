@@ -18,10 +18,12 @@ from typing import Union, cast
 import coloredlogs
 
 import hail as hl
-from hailtop.batch import ResourceFile
+from hailtop.batch import ResourceFile, ResourceGroup
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
+from cpg_utils.hail_batch import get_batch
+
 
 DEFAULT_LOG_FORMAT = config_retrieve(
     ['workflow', 'logger', 'default_format'],
@@ -364,6 +366,30 @@ def get_intervals_from_bed(intervals_path: Path) -> list[str]:
             chrom, start, end = line.strip().split('\t')
             intervals.append(f'{chrom}:{int(start)+1}-{end}')
     return intervals
+
+
+@lru_cache(2)
+def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
+    """
+    read the manifest file, and return all the fragment resources as an ordered list
+    this is a cached method as we don't want to localise every fragment once per task
+
+    Args:
+        manifest_file ():
+
+    Returns:
+        an ordered list of all the fragment VCFs and corresponding indices
+    """
+
+    resource_objects: list[ResourceGroup] = []
+    manifest_folder: Path = manifest_file.parent
+    with manifest_file.open() as f:
+        for line in f:
+            vcf_path = manifest_folder / line.strip()
+            resource_objects.append(
+                get_batch().read_input_group(**{VCF_GZ: vcf_path, VCF_GZ_TBI: f'{vcf_path}.tbi'}),
+            )
+    return resource_objects
 
 
 ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], dict[str, Path | str], str, None]
