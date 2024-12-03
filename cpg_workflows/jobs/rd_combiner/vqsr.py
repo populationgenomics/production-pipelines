@@ -310,3 +310,39 @@ def train_vqsr_snp_tranches(
     scatter_jobs.append(final_job)
     get_batch().write_output(final_job.output, output_path)
     return scatter_jobs
+
+
+def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_attrs: dict) -> Job:
+    """
+    The previous approach ran into hard limits on the size of the batch spec
+    There was too much metadata around which resource groups the tranches were part of etc etc
+    Splitting out data generating from data aggregating should hopefully help
+
+    Args:
+        manifest_file (Path): path to the manifest file
+        temp_path (Path): path to the temp directory (same as previous stage)
+        output_path (str): path to write the tranches aggregate to
+        job_attrs (dict): job attributes
+    """
+
+    vcf_resources = get_all_fragments_from_manifest(manifest_file)
+    snp_tranche_paths = [
+        get_batch().read_input(str(temp_path / f'snp_{i}.tranches')) for i in range(len(vcf_resources))
+    ]
+
+    gather_tranches_j = get_batch().new_job('GatherTrainedVqsrSnpTranches', job_attrs | {'tool': 'gatk GatherTranches'})
+    gather_tranches_j.image(image_path('gatk'))
+    res = STANDARD.set_resources(gather_tranches_j, ncpu=2, storage_gb=SNPS_GATHER_DISC_SIZE)
+
+    inputs_cmdl = ' '.join([f'--input {t}' for t in snp_tranche_paths])
+    gather_tranches_j.command(
+        f"""set -euo pipefail
+    gatk --java-options "{res.java_mem_options()}" \\
+      GatherTranches \\
+      --mode SNP \\
+      {inputs_cmdl} \\
+      --output {gather_tranches_j.out_tranches}""",
+    )
+
+    get_batch().write_output(gather_tranches_j.out_tranches, output_path)
+    return gather_tranches_j
