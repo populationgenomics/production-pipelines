@@ -71,12 +71,13 @@ def create_multicohort() -> MultiCohort:
     multicohort = MultiCohort()
 
     datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids_unique)
-    cohort_names_by_id = get_metamist().get_cohort_name_by_ids(custom_cohort_ids_unique)
 
     read_pedigree = config.get('read_pedigree', True)
     for cohort_id in custom_cohort_ids_unique:
-        cohort = multicohort.create_cohort(id=cohort_id, name=cohort_names_by_id[cohort_id])
-        sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
+        data = datasets_by_cohort[cohort_id]
+        sgs_by_dataset_for_cohort = data['sequencing_groups']
+        cohort_name = data['name']
+        cohort = multicohort.create_cohort(id=cohort_id, name=cohort_name)
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
         # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset

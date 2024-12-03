@@ -67,6 +67,7 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
     """
     query SGByCohortQuery($cohort_id: String!) {
         cohorts(id: {eq: $cohort_id}) {
+            name
             sequencingGroups {
                 id
                 meta
@@ -124,17 +125,6 @@ GET_PEDIGREE_QUERY = gql(
                 pedigree(replaceWithFamilyExternalIds: false)
             }
         }
-    """,
-)
-
-GET_COHORT_NAMES_QUERY = gql(
-    """
-    query CohortNamesQuery($cohort_ids: [String!]!) {
-        cohorts(id: { in_: $cohort_ids }) {
-            id
-            name
-        }
-    }
     """,
 )
 
@@ -334,16 +324,24 @@ class Metamist:
         """
         entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
-        # Create dictionary keying sequencing groups by project
-        # {project_id: [sequencing_group_1, sequencing_group_2, ...], ...}
-
+        # Create dictionary keying sequencing groups by project and including cohort name
+        # {
+        #     "sequencing_groups": {
+        #         project_id: [sequencing_group_1, sequencing_group_2, ...],
+        #         ...
+        #     },
+        #     "name": "CohortName"
+        # }
         if len(entries['cohorts']) != 1:
             raise MetamistError('We only support one cohort at a time currently')
         sequencing_groups = entries['cohorts'][0]['sequencingGroups']
-
+        cohort_name = entries['cohorts'][0]['name']
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
-        return sort_sgs_by_project(sequencing_groups)
+        return {
+            'sequencing_groups': sort_sgs_by_project(sequencing_groups),
+            'name': cohort_name,
+        }
 
     @retry(
         stop=stop_after_attempt(3),
@@ -618,18 +616,6 @@ class Metamist:
             metamist_proj += '-test'
 
         return metamist_proj
-
-    def get_cohort_name_by_ids(self, cohort_ids: list[str]) -> dict[str, str]:
-        """
-        Retrieve cohort names by cohort IDs.
-        """
-        cohort_names = {}
-        entries = query(GET_COHORT_NAMES_QUERY, variables={'cohort_ids': cohort_ids})
-
-        for cohort in entries['cohorts']:
-            cohort_names[cohort['id']] = cohort['name']
-
-        return cohort_names
 
 
 @dataclass
