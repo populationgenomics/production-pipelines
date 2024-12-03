@@ -66,7 +66,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
-    'align_genotype_with_dragen': [UploadDataToIca, AlignGenotypeWithDragen, GvcfMlrWithDragen, DownloadDataFromIca],
+    'realign_genotype_with_dragen': [DownloadDataFromIca],
 }
 
 
