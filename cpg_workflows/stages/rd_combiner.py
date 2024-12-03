@@ -178,7 +178,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         return self.make_outputs(multicohort, output, densify_job)
 
 
-@stage(analysis_keys=['vcf'], analysis_type='vcf', required_stages=[CreateDenseMtFromVdsWithHail])
+@stage(analysis_keys=['vcf'], required_stages=[CreateDenseMtFromVdsWithHail])
 class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
     Takes a manifest of VCF fragments, and produces a single VCF file
@@ -186,8 +186,8 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     So we check for the exact same output, and fail if we're not ready to start
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'vcf': self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -212,7 +212,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=manifest_file,
             intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
-            output_path=str(outputs['vcf']),
+            output_path=str(outputs),
             job_attrs={'stage': self.name},
         )
 
@@ -239,7 +239,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud)
         outputs = self.expected_outputs(multicohort)
         indel_calibration_job = train_vqsr_indels(
             sites_only_vcf=str(composed_sitesonly_vcf),
@@ -264,7 +264,7 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud)
         outputs = self.expected_outputs(multicohort)
         snp_calibration_job = train_vqsr_snps(
             sites_only_vcf=str(composed_sitesonly_vcf),
