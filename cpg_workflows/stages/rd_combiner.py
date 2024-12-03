@@ -7,6 +7,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
     apply_snp_vqsr_to_fragments,
@@ -16,7 +17,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import MultiCohort
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger
 from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
@@ -405,3 +406,39 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
+
+
+@stage(analysis_type='custom', required_stages=[CreateDenseMtFromVdsWithHail])
+class AnnotateFragmentedVcfWithVep(MultiCohortStage):
+    """
+    Annotate VCF with VEP.
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        """
+        Should this be in tmp? We'll never use it again maybe?
+        """
+        return self.tmp_prefix / 'vep.ht'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
+
+        input_vcfs = get_all_fragments_from_manifest(manifest_file)
+
+        if len(input_vcfs) == 0:
+            raise ValueError(f'No VCFs in {manifest_file}')
+
+        vep_jobs = add_vep_jobs(
+            input_vcfs=input_vcfs,
+            final_out_path=outputs,
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            job_attrs=self.get_job_attrs(),
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=vep_jobs)
