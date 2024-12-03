@@ -24,7 +24,6 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 
-
 DEFAULT_LOG_FORMAT = config_retrieve(
     ['workflow', 'logger', 'default_format'],
     '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s',

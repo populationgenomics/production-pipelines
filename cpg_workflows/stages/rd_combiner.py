@@ -3,11 +3,15 @@ All Stages relating to the seqr_loader pipeline, reimplemented from scratch to
 use the gVCF combiner instead of joint-calling.
 """
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
-from cpg_workflows.jobs.rd_combiner.vqsr import train_vqsr_indels, train_vqsr_snps
+from cpg_workflows.jobs.rd_combiner.vqsr import (
+    train_vqsr_indels,
+    train_vqsr_snps,
+    train_vqsr_snp_tranches,
+)
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -261,3 +265,38 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
             job_attrs={'stage': self.name},
         )
         return self.make_outputs(multicohort, data=outputs, jobs=snp_calibration_job)
+
+
+@stage(required_stages=[CreateDenseMtFromVdsWithHail, TrainVqsrSnpModelOnCombinerData])
+class TrainVqsrSnpTranches(MultiCohortStage):
+    """
+    Scattered training of VQSR tranches for SNPs
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, str | Path]:
+
+        prefix = self.tmp_prefix
+        return {
+            'tranche_marker': prefix / 'tranches_trained',
+            'temp_path': str(prefix / 'vqsr_snp_tranches'),
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
+
+        outputs = self.expected_outputs(multicohort)
+        snp_model_path = inputs.as_path(target=multicohort, stage=TrainVqsrSnpModelOnCombinerData, key='snp_model')
+
+        jobs = train_vqsr_snp_tranches(
+            manifest_file=manifest_file,
+            snp_model_path=str(snp_model_path),
+            output_path=str(outputs['tranche_marker']),
+            temp_path=to_path(outputs['temp_path']),
+            job_attrs={'stage': self.name},
+        )
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
