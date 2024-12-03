@@ -40,3 +40,7 @@ storage = "10Gi"
 # based on the model's estimated sensitivity to a set of true variants.
 snp_filter_level = 99.7
 indel_filter_level = 99.0
+
+[gcloud_condense]
+chunk_size = 32
+storage = "10Gi"
