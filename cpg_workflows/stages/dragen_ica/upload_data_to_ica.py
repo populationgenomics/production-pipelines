@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import coloredlogs
 import icasdk
 from google.cloud import storage
 from icasdk.apis.tags import project_data_api
@@ -117,7 +118,7 @@ def upload_data(
 
 
 def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, project_id: str, api_key: str):
-    logging.basicConfig(level=logging.INFO)
+    coloredlogs.install(level=logging.INFO)
 
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
@@ -126,7 +127,6 @@ def run(sg_name: str, sg_path: CramPath, upload_folder: str, api_root: str, proj
 
     # Get the bucket, cram and index information
     cram_path_components = get_path_components_from_gcp_path(str(sg_path.path))
-    logging.info(f'{cram_path_components}')
     bucket: str = f'{cram_path_components["bucket"]}'
     cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
     cram_index: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}.crai'
