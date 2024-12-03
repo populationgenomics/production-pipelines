@@ -455,7 +455,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
         RunTrainedIndelVqsrOnCombinedVcf,
     ],
 )
-class AnnotateCohortSmallVariants(MultiCohortStage):
+class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
     """
     Annotate small variants with VEP and VQSR
     """
@@ -493,8 +493,8 @@ class AnnotateCohortSmallVariants(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AnnotateCohortSmallVariants], analysis_type='matrixtable', analysis_keys=['mt'])
-class SubsetMatrixTableToDataset(DatasetStage):
+@stage(required_stages=[AnnotateCohortSmallVariantsWithHailQuery], analysis_type='matrixtable', analysis_keys=['mt'])
+class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
     """
     Subset the MT to a single dataset
     Skips this stage if the MultiCohort has only one dataset
@@ -520,7 +520,7 @@ class SubsetMatrixTableToDataset(DatasetStage):
         if outputs is None:
             return self.make_outputs(dataset)
 
-        variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariants)
+        variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
 
         # write a list of all the SG IDs to retain
         if not config_retrieve(['workflow', 'dry_run'], False):
@@ -537,4 +537,35 @@ class SubsetMatrixTableToDataset(DatasetStage):
             f'--output {str(outputs["mt"])} '
             f'--sg_id_file {str(outputs["id_file"])} ',
         )
+        return self.make_outputs(dataset, data=outputs, jobs=job)
+
+
+@stage(
+    required_stages=[
+        AnnotateCohortSmallVariantsWithHailQuery,
+        SubsetMatrixTableToDatasetUsingHailQuery,
+    ],
+    analysis_type='matrixtable',
+)
+class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        """
+        Expected to generate a matrix table
+        """
+        return dataset.prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt'
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        # choose the input MT based on the number of datasets in the MultiCohort
+        if len(get_multicohort().get_datasets()) == 1:
+            input_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
+        else:
+            input_mt = inputs.as_path(target=dataset, stage=SubsetMatrixTableToDatasetUsingHailQuery, key='mt')
+
+        outputs = self.expected_outputs(dataset)
+
+        job = get_batch().new_job(self.name, self.get_job_attrs(dataset))
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.cpu(2).memory('highmem').storage('10Gi')
+        job.command(f'annotate_dataset_small --input {str(input_mt)} --output {str(outputs)} ')
         return self.make_outputs(dataset, data=outputs, jobs=job)
