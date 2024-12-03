@@ -67,7 +67,7 @@ class UploadDataToIca(SequencingGroupStage):
         gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
 
         logging.info(cram)
-        blob_to_upload_size_bytes: int | None = gcp_bucket.get_blob(cram).size
+        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(cram).size
         storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
 
         logging.info(storage_size)
