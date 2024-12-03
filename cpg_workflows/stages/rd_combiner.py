@@ -6,6 +6,7 @@ use the gVCF combiner instead of joint-calling.
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -163,3 +164,44 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
             f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
         return self.make_outputs(multicohort, output, densify_job)
+
+
+@stage(analysis_keys=['vcf'], analysis_type='vcf', required_stages=[CreateDenseMtFromVdsWithHail])
+class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
+    """
+    Takes a manifest of VCF fragments, and produces a single VCF file
+    This is disconnected from the previous stage, but requires it to be run first
+    So we check for the exact same output, and fail if we're not ready to start
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {'vcf': self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Submit jobs to take a manifest of VCF fragments, and produce a single VCF file
+        The VCF being composed here has a single header in a separate file, the first entry in the manifest
+        This means we can combine the VCF header and data fragments through concatenation
+        and the result will be a spec-compliant VCF
+        """
+        manifest_file = inputs.as_path(
+            target=multicohort,
+            stage=CreateDenseMtFromVdsWithHail,
+            key='separate_header_manifest',
+        )
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
+
+        outputs = self.expected_outputs(multicohort)
+
+        jobs = gcloud_compose_vcf_from_manifest(
+            manifest_path=manifest_file,
+            intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
+            output_path=str(outputs['vcf']),
+            job_attrs={'stage': self.name},
+        )
+
+        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
