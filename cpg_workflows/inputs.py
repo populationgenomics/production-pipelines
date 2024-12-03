@@ -74,8 +74,10 @@ def create_multicohort() -> MultiCohort:
 
     read_pedigree = config.get('read_pedigree', True)
     for cohort_id in custom_cohort_ids_unique:
-        cohort = multicohort.create_cohort(cohort_id)
-        sgs_by_dataset_for_cohort = datasets_by_cohort[cohort_id]
+        data = datasets_by_cohort[cohort_id]
+        sgs_by_dataset_for_cohort = data['sequencing_groups']
+        cohort_name = data['name']
+        cohort = multicohort.create_cohort(id=cohort_id, name=cohort_name)
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
         # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
@@ -165,7 +167,7 @@ def deprecated_create_cohort() -> MultiCohort:
     # this is the deprecated entrypoint, so all SG IDs are in the same cohort
     # maintains ability to run CohortStages and MultiCohortStages without
     # explicitly requiring workflows to update to MultiCohort
-    cohort = multi_cohort.create_cohort(analysis_dataset_name)
+    cohort = multi_cohort.create_cohort(id=analysis_dataset_name, name=analysis_dataset_name)
 
     for dataset_name in dataset_names:
         dataset = cohort.create_dataset(dataset_name)
