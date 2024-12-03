@@ -66,7 +66,7 @@ class UploadDataToIca(SequencingGroupStage):
         # cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
         # cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
         logging.info(sequencing_group.cram)
-        x = str(sequencing_group.cram).replace(f'gs://{get_gcp_project()}-{get_access_level()}')
+        x = str(sequencing_group.cram).replace(f'gs://{get_gcp_project()}-{get_access_level()}', '')
         logging.info(x)
         blob_to_upload_size: int | None = gcp_bucket.get_blob(x).size
 
