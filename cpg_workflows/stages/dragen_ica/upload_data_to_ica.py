@@ -125,7 +125,7 @@ def upload_data(
     request_body = path_parameters | {'dataId': file_id}
     ct = datetime.now()
     logging.info('Making POST request to upload data')
-
+    logging.info(f'curl --upload-file {tmp_file_name} "{upload_url}"')
     subprocess.run(['curl', '--upload-file', tmp_file_name, f'"{upload_url}"'])
 
     # with open(tmp_file_name, 'rb') as upload_file:
