@@ -28,6 +28,7 @@ from cpg_workflows.stages.rd_combiner import (
     ConcatenateVcfFragmentsWithGcloud,
     CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
+    TrainVqsrSnpTranches,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
@@ -48,6 +49,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         CreateVdsFromGvcfsWithHailCombiner,
         CreateDenseMtFromVdsWithHail,
         ConcatenateVcfFragmentsWithGcloud,
+        TrainVqsrSnpTranches,
     ],
     'seqr_loader': [
         DatasetVCF,
