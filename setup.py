@@ -78,6 +78,8 @@ setup(
             'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
             # AnnotateCohort, small variants
             'annotate_cohort_small = cpg_workflows.scripts.annotate_cohort_small_vars:cli_main',
+            # Extract a single Dataset from a MatrixTable
+            'subset_mt_to_dataset = cpg_workflows.scripts.subset_mt_to_dataset:cli_main',
         ],
     },
 )
