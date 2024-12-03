@@ -64,7 +64,7 @@ class UploadDataToIca(SequencingGroupStage):
             user_project=get_gcp_project(),
         )
         logging.info(sequencing_group.cram)
-        blob_to_upload_size: int | None = gcp_bucket.get_blob(str(sequencing_group.cram)).size
+        blob_to_upload_size: int | None = gcp_bucket.get_blob(str(sequencing_group.cram).replace('gs://', '')).size
 
         logging.info(blob_to_upload_size)
         sys.exit(0)
