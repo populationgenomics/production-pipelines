@@ -42,6 +42,7 @@ def check_object_already_exists(
             # Statuses are ["PARTIAL", "AVAILABLE", "ARCHIVING", "ARCHIVED", "UNARCHIVING", "DELETING", ]
             if object_check_response.body['items'][0]['data']['details']['status'] == 'PARTIAL':
                 return object_check_response.body['items'][0]['data']['id']
+            raise NotImplementedError('Checking for other status is not implemented yet.')
     except icasdk.ApiException as e:
         raise icasdk.ApiException(f'Exception when calling ProjectDataApi -> get_project_data_list: {e}') from e
 

@@ -1,5 +1,6 @@
 import json
 import logging
+import sys
 from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
@@ -59,13 +60,14 @@ class UploadDataToIca(SequencingGroupStage):
         # TODO calculate storage for each individual file
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(
-            bucket_name=get_cpg_namespace(get_access_level()), user_project=get_gcp_project()
+            bucket_name=get_cpg_namespace(get_access_level()),
+            user_project=get_gcp_project(),
         )
         logging.info(sequencing_group.cram)
         blob_to_upload_size: int | None = gcp_bucket.get_blob(str(sequencing_group.cram)).size
 
         logging.info(blob_to_upload_size)
-        exit(0)
+        sys.exit(0)
         upload_job.storage('40Gi')
         upload_job.call(
             upload_data_to_ica.run,
