@@ -75,7 +75,7 @@ setup(
             # used in the validation workflow, pulls a single SG VCF representation from a MT
             'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
             # script to create a dense MatrixTable from a VDS input
-            'mt_from_vds = cpg_workflows.scripts.densify_vds_to_mt:cli_main',
+            'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
         ],
     },
 )
