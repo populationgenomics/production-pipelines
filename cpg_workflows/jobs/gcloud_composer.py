@@ -1,4 +1,3 @@
-
 """
 All jobs required to take a shard manifest (containing paths to VCF fragments) and produce a single VCF file
 
@@ -137,7 +136,7 @@ def gcloud_compose_vcf_from_manifest(
             'vcf.bgz': '{root}.vcf.bgz',
             'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
             'vcf.bgz.csi': '{root}.vcf.bgz.csi',
-        }
+        },
     )
     final_job.image(image_path('bcftools'))
     final_job.storage(config_retrieve(['gcloud_condense', 'storage'], '10Gi'))

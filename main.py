@@ -24,7 +24,11 @@ from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, Validati
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
-from cpg_workflows.stages.rd_combiner import CreateDenseMtFromVdsWithHail, CreateVdsFromGvcfsWithHailCombiner
+from cpg_workflows.stages.rd_combiner import (
+    ConcatenateVcfFragmentsWithGcloud,
+    CreateDenseMtFromVdsWithHail,
+    CreateVdsFromGvcfsWithHailCombiner,
+)
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
@@ -40,7 +44,11 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
-    'rd_combiner': [CreateVdsFromGvcfsWithHailCombiner, CreateDenseMtFromVdsWithHail],
+    'rd_combiner': [
+        CreateVdsFromGvcfsWithHailCombiner,
+        CreateDenseMtFromVdsWithHail,
+        ConcatenateVcfFragmentsWithGcloud,
+    ],
     'seqr_loader': [
         DatasetVCF,
         AnnotateDataset,
