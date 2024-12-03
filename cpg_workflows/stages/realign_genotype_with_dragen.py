@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Final, Literal
 import coloredlogs
 from google.cloud import secretmanager, storage
 
+from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, get_access_level, get_cpg_namespace, get_gcp_project, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
@@ -63,12 +64,10 @@ class UploadDataToIca(SequencingGroupStage):
             bucket_name=f'{get_gcp_project()}-{get_access_level()}',
             user_project=get_gcp_project(),
         )
-        # cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        # cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
-        logging.info(sequencing_group.cram)
-        x = str(sequencing_group.cram).replace(f'gs://{get_gcp_project()}-{get_access_level()}', '')
-        logging.info(x)
-        blob_to_upload_size: int | None = gcp_bucket.get_blob(x).size
+        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
+        logging.info(cram)
+        blob_to_upload_size: int | None = gcp_bucket.get_blob(cram).size
 
         logging.info(blob_to_upload_size)
         sys.exit(0)
