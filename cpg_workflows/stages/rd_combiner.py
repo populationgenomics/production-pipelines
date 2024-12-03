@@ -16,12 +16,15 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snp_tranches,
     train_vqsr_snps,
 )
-from cpg_workflows.targets import MultiCohort
+from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger
 from cpg_workflows.workflow import (
+    DatasetStage,
     MultiCohortStage,
     StageInput,
     StageOutput,
+    get_multicohort,
+    get_workflow,
     stage,
 )
 from metamist.graphql import gql, query
@@ -480,7 +483,7 @@ class AnnotateCohortSmallVariants(MultiCohortStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.cpu(2).memory('highmem').storage('10Gi')
         job.command(
-            f'annotate_cohort_small '
+            'annotate_cohort_small '
             f'--input {variant_mt} '
             f'--output {outputs} '
             f'--vep {vep_ht_path} '
@@ -488,3 +491,50 @@ class AnnotateCohortSmallVariants(MultiCohortStage):
             f'--vqsr {vqsr_vcf} ',
         )
         return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=[AnnotateCohortSmallVariants], analysis_type='matrixtable', analysis_keys=['mt'])
+class SubsetMatrixTableToDataset(DatasetStage):
+    """
+    Subset the MT to a single dataset
+    Skips this stage if the MultiCohort has only one dataset
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path] | None:
+        """
+        Expected to generate a MatrixTable
+        This is kinda transient, so shove it in tmp
+        """
+        if len(get_multicohort().get_datasets()) == 1:
+            get_logger().info(f'Skipping SubsetMatrixTableToDataset for single Dataset {dataset}')
+            return None
+        return {
+            'mt': dataset.tmp_prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt',
+            'id_file': dataset.tmp_prefix() / f'{get_workflow().output_version}-{dataset.name}-SG-ids.txt',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        outputs = self.expected_outputs(dataset)
+
+        if outputs is None:
+            return self.make_outputs(dataset)
+
+        variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariants)
+
+        # write a list of all the SG IDs to retain
+        if not config_retrieve(['workflow', 'dry_run'], False):
+            with outputs['id_file'].open('w') as f:
+                for sg in dataset.get_sequencing_groups():
+                    f.write(f'{sg.id}\n')
+
+        job = get_batch().new_job(self.name, self.get_job_attrs(dataset))
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.cpu(2).memory('highmem').storage('10Gi')
+        job.command(
+            'subset_mt_to_dataset '
+            f'--input {str(variant_mt)} '
+            f'--output {str(outputs["mt"])} '
+            f'--sg_id_file {str(outputs["id_file"])} ',
+        )
+        return self.make_outputs(dataset, data=outputs, jobs=job)

@@ -33,6 +33,7 @@ from cpg_workflows.stages.rd_combiner import (
     GatherTrainedVqsrSnpTranches,
     RunTrainedIndelVqsrOnCombinedVcf,
     TrainVqsrSnpTranches,
+    SubsetMatrixTableToDataset,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
@@ -58,6 +59,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         RunTrainedIndelVqsrOnCombinedVcf,
         AnnotateFragmentedVcfWithVep,
         AnnotateCohortSmallVariants,
+    SubsetMatrixTableToDataset,
     ],
     'seqr_loader': [
         DatasetVCF,
