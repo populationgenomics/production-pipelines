@@ -243,13 +243,6 @@ def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     ]
 
 
-def mock_get_cohort_names_by_ids(*args, **kwargs) -> dict:
-    return {
-        'COH123': 'CohortA',
-        'COH456': 'CohortB',
-    }
-
-
 def test_multicohort(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
