@@ -50,6 +50,17 @@ coloredlogs.install(level=logging.INFO)
 class UploadDataToIca(SequencingGroupStage):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
+    def calculate_needed_storage(self, sequencing_group: SequencingGroup) -> str:
+        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
+        bucket_name = cram_path_components['bucket']
+
+        storage_client = storage.Client()
+        gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
+        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(cram).size
+        storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
+        return f'{storage_size}Gi'
+
     def expected_outputs(self, sequencing_group: SequencingGroup) -> None:
         pass
 
@@ -59,20 +70,8 @@ class UploadDataToIca(SequencingGroupStage):
             (self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         upload_job.image(image=image_path('cpg_workflows'))
-        # TODO calculate storage for each individual file
-        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
-        bucket_name = cram_path_components['bucket']
-        storage_client = storage.Client()
-        gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
 
-        logging.info(cram)
-        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(cram).size
-        storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
-
-        logging.info(storage_size)
-        sys.exit(0)
-        upload_job.storage(f'{storage_size}Gi')
+        upload_job.storage(self.calculate_needed_storage(sequencing_group))
         upload_job.call(
             upload_data_to_ica.run,
             sg_name=sequencing_group.name,
