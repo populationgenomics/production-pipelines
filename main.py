@@ -25,6 +25,7 @@ from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVq
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
+    AnnotateCohortSmallVariants,
     AnnotateFragmentedVcfWithVep,
     ConcatenateVcfFragmentsWithGcloud,
     CreateDenseMtFromVdsWithHail,
@@ -56,6 +57,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         TrainVqsrSnpTranches,
         RunTrainedIndelVqsrOnCombinedVcf,
         AnnotateFragmentedVcfWithVep,
+        AnnotateCohortSmallVariants,
     ],
     'seqr_loader': [
         DatasetVCF,

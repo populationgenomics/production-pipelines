@@ -443,6 +443,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
         return self.make_outputs(multicohort, data=outputs, jobs=vep_jobs)
 
+
 @stage(
     analysis_type='matrixtable',
     required_stages=[
