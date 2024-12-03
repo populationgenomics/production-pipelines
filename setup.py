@@ -3,9 +3,9 @@
 from setuptools import find_packages, setup
 
 setup(
-    name='cpg-workflows',
+    name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.29.6',
+    version='1.31.7',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -16,7 +16,9 @@ setup(
         'cpg-utils>=5.1.1',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        'hail==0.2.132',  # Pin Hail at CPG's installed version
+        # Pin Hail to the release prior to 0.2.133
+        # see https://centrepopgen.slack.com/archives/C018KFBCR1C/p1731047651300539
+        'hail==0.2.132',
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
         'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
@@ -70,6 +72,10 @@ setup(
             # Generate new intervals from a MatrixTable
             'new_intervals_from_mt = cpg_workflows.scripts.generate_new_intervals:cli_main',
             'seqr_loader_cnv = cpg_workflows.scripts.seqr_loader_cnv:cli_main',
+            # used in the validation workflow, pulls a single SG VCF representation from a MT
+            'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
+            # script to create a dense MatrixTable from a VDS input
+            'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
         ],
     },
 )

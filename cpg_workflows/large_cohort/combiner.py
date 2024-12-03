@@ -13,7 +13,9 @@ from typing import TYPE_CHECKING
 
 from hail.vds import new_combiner
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, to_path
 
 if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
@@ -25,6 +27,7 @@ def run(
     sequencing_type: str,
     tmp_prefix: str,
     genome_build: str,
+    save_path: str | None,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
@@ -38,6 +41,12 @@ def run(
 
     if not can_reuse(to_path(output_vds_path)):
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+        if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+            override_jar_spec(jar_spec)
+
+        # Load from save, if supplied
+        if save_path:
+            logging.info(f'Loading combiner plan from {save_path}')
 
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
@@ -51,6 +60,7 @@ def run(
 
         combiner: VariantDatasetCombiner = new_combiner(
             output_path=output_vds_path,
+            save_path=save_path,
             gvcf_paths=gvcf_paths,
             vds_paths=vds_paths,
             reference_genome=genome_build,

@@ -60,14 +60,16 @@ class CopyLatestClinvarFiles(MultiCohortStage):
 
 @stage(required_stages=CopyLatestClinvarFiles, analysis_type='custom', analysis_keys=['clinvar_decisions'])
 class GenerateNewClinvarSummary(MultiCohortStage):
-    def expected_outputs(self, mc: MultiCohort) -> dict[str, Path | str]:
+    def expected_outputs(self, mc: MultiCohort) -> dict[str, Path]:
         """
         a couple of files and a HT as Paths
         """
-        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        common_folder = to_path(
+            join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING),
+        )
         return {
-            'clinvar_decisions': join(common_folder, 'clinvar_decisions.ht'),
-            'snv_vcf': to_path(join(common_folder, 'pathogenic_snvs.vcf.bgz')),
+            'clinvar_decisions': common_folder / 'clinvar_decisions.ht',
+            'snv_vcf': common_folder / 'pathogenic_snvs.vcf.bgz',
         }
 
     def queue_jobs(self, mc: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -94,7 +96,7 @@ class GenerateNewClinvarSummary(MultiCohortStage):
         clinvarbitrate.command(
             f'resummary -v {var_file} -s {sub_file} -o {clinvarbitrate.output} --minimal {blacklist_string}',
         )
-        clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output}.ht {outputs["clinvar_decisions"]}')
+        clinvarbitrate.command(f'gcloud storage cp -r {clinvarbitrate.output}.ht {str(outputs["clinvar_decisions"])}')
 
         # selectively copy back some outputs
         get_batch().write_output(clinvarbitrate.output, str(outputs['snv_vcf']).removesuffix('.vcf.bgz'))
@@ -108,12 +110,11 @@ class AnnotateClinvarDecisions(MultiCohortStage):
     take the vcf output from the clinvar stage, and apply VEP annotations
     """
 
-    def expected_outputs(self, mc: MultiCohort) -> dict[str, Path]:
-        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
-        return {
-            'vcf': to_path(join(common_folder, 'annotated_snv.vcf.bgz')),
-            'index': to_path(join(common_folder, 'annotated_snv.vcf.bgz.tbi')),
-        }
+    def expected_outputs(self, mc: MultiCohort) -> Path:
+        return (
+            to_path(join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING))
+            / 'annotated_snv.vcf.bgz'
+        )
 
     def queue_jobs(self, mc: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(mc)
@@ -121,7 +122,7 @@ class AnnotateClinvarDecisions(MultiCohortStage):
         # delegate the splitting, annotation, and re-merging to this existing method
         _out_file, jobs = split_and_annotate_vcf(
             vcf_in=str(inputs.as_path(mc, GenerateNewClinvarSummary, 'snv_vcf')),
-            out_vcf=str(outputs['vcf']),
+            out_vcf=str(outputs),
         )
 
         return self.make_outputs(target=mc, jobs=jobs, data=outputs)
@@ -133,10 +134,12 @@ class PM5TableGeneration(MultiCohortStage):
         """
         a single HT
         """
-        common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING)
+        common_folder = to_path(
+            join(config_retrieve(['storage', 'common', 'analysis']), 'clinvarbitration', DATE_STRING),
+        )
         return {
-            'clinvar_pm5': join(common_folder, 'clinvar_pm5.ht'),
-            'pm5_json': to_path(join(common_folder, 'clinvar_pm5.json')),
+            'clinvar_pm5': common_folder / 'clinvar_pm5.ht',
+            'pm5_json': common_folder / 'clinvar_pm5.json',
         }
 
     def queue_jobs(self, mc: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -157,9 +160,58 @@ class PM5TableGeneration(MultiCohortStage):
         clinvarbitrate_pm5.command(f'mv output.json {clinvarbitrate_pm5.output}')
 
         # recursive copy of the HT
-        clinvarbitrate_pm5.command(f'gcloud storage cp -r output.ht {outputs["clinvar_pm5"]}')
+        clinvarbitrate_pm5.command(f'gcloud storage cp -r output.ht {str(outputs["clinvar_pm5"])}')
 
         # also copy back the JSON file
         get_batch().write_output(clinvarbitrate_pm5.output, str(outputs['pm5_json']))
 
         return self.make_outputs(target=mc, data=outputs, jobs=clinvarbitrate_pm5)
+
+
+@stage(
+    required_stages=[GenerateNewClinvarSummary, AnnotateClinvarDecisions, PM5TableGeneration],
+    analysis_type='custom',
+)
+class PackageForRelease(MultiCohortStage):
+    """
+    takes the data created so far, and packages it up for release
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+
+        common_folder = to_path(
+            join(
+                config_retrieve(['storage', 'common', 'analysis']),
+                'clinvarbitration',
+                DATE_STRING,
+            ),
+        )
+        return common_folder / 'clinvarbitration.tar.gz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Localise all the previously generated data into a folder
+        tarball it, and write out as a single file
+        """
+        tar_output = self.expected_outputs(multicohort)
+
+        # find paths to the previous outputs
+        vcf = inputs.as_path(multicohort, AnnotateClinvarDecisions)
+        pm5 = inputs.as_dict(multicohort, PM5TableGeneration)
+        clinvar_decisions = inputs.as_path(multicohort, GenerateNewClinvarSummary, 'clinvar_decisions')
+
+        job = get_batch().new_job('package clinvarbitration for release')
+        job.storage('10G')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(
+            f"""
+            mkdir clinvarbitration_data
+            gcloud storage cp -r {str(pm5["clinvar_pm5"])} clinvarbitration_data
+            gcloud storage cp {str(pm5["pm5_json"])} clinvarbitration_data
+            gcloud storage cp -r {str(clinvar_decisions)} clinvarbitration_data
+            gcloud storage cp "{vcf}*" clinvarbitration_data
+            tar -czf {job.output} clinvarbitration_data
+        """,
+        )
+        get_batch().write_output(job.output, str(tar_output))
+        return self.make_outputs(multicohort, data=tar_output, jobs=job)

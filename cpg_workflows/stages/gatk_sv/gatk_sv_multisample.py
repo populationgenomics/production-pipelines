@@ -35,6 +35,7 @@ from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -1311,10 +1312,8 @@ class AnnotateDatasetSv(DatasetStage):
             get_logger().info(f'Skipping AnnotateDatasetSv mt subsetting for {dataset}')
             return None
 
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
-        exclusion_file = inputs.as_path(dataset.cohort.multicohort, stage=CombineExclusionLists, key='exclusion_list')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSv, key='mt')
+        exclusion_file = inputs.as_path(get_multicohort(), stage=CombineExclusionLists, key='exclusion_list')
 
         outputs = self.expected_outputs(dataset)
 

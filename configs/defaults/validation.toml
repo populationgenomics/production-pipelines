@@ -1,5 +1,3 @@
 [workflow]
-input_datasets = ['validation']
 name = 'hap.py_validation'
-dataset = 'validation'
 status_reporter = 'metamist'
