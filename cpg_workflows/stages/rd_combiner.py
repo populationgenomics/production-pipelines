@@ -341,7 +341,6 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
     required_stages=[
         CreateDenseMtFromVdsWithHail,
         GatherTrainedVqsrSnpTranches,
-        TrainVqsrSnpModelOnCombinerData,
         TrainVqsrSnpTranches,
     ],
 )
@@ -374,7 +373,6 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
 @stage(
     analysis_type='qc',
     required_stages=[
-        GatherTrainedVqsrSnpTranches,
         RunTrainedSnpVqsrOnCombinerFragments,
         TrainVqsrIndelModelOnCombinerData,
     ],
