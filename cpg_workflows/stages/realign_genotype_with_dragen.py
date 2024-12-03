@@ -99,7 +99,7 @@ class GvcfMlrWithDragen(SequencingGroupStage):
         pass
 
 
-@stage(analysis_type='ica_data_download')
+@stage(analysis_type='ica_data_download', required_stages=[AlignGenotypeWithDragen, GvcfMlrWithDragen])
 class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
         self,
