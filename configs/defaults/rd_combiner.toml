@@ -1,3 +1,4 @@
+[workflow]
 name = 'rd_combiner'
 status_reporter = 'metamist'
 
@@ -12,9 +13,8 @@ indel_recal_disc_size = 20
 snps_gather_disc_size = 10
 snps_recal_disc_size = 20
 
-
 # choices of jar specs to use for the various steps
-# by deafult we match the native Hail version in the container
+# by default we match the native Hail version in the container
 [rd_combiner.subset]
 jar_spec_revision = false
 
