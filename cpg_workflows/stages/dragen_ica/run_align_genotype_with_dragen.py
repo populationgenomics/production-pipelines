@@ -13,6 +13,10 @@ from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
+def get_output_folder_id(output_folder_path: str) -> str:
+    return 'fol.29ea0d0fbdb84e5cfb9408dd1496d01c'
+
+
 def submit_dragen_run(
     cram_id: str,
     cram_index_id: str,
@@ -77,7 +81,7 @@ def run(
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
-    output_folder_id: str,
+    output_folder_path: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -100,7 +104,7 @@ def run(
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            output_folder_id=output_folder_id,
+            output_folder_id=get_output_folder_id(output_folder_path),
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,

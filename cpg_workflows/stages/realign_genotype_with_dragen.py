@@ -116,7 +116,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 
         align_genotype_job = get_batch().new_python_job(
             name='AlignGenotypeWithDragen',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
         align_genotype_job.image(image=image_path('cpg_workflows'))
         align_genotype_job.call(
