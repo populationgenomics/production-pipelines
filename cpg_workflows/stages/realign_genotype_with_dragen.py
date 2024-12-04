@@ -1,14 +1,13 @@
 import json
 import logging
-import sys
-from math import ceil, pow
+from math import ceil
 from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
 from google.cloud import secretmanager, storage
 
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from cpg_utils.config import config_retrieve, get_access_level, get_cpg_namespace, get_gcp_project, image_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
@@ -80,7 +79,6 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.storage(self.calculate_needed_storage(cram, bucket_name, suffix))
         upload_job.call(
             upload_data_to_ica.run,
-            # sg_name=sequencing_group.name,
             suffix=suffix,
             cram=cram,
             bucket_name=bucket_name,

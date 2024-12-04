@@ -1,7 +1,5 @@
 import logging
 import subprocess
-from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import coloredlogs
@@ -10,9 +8,7 @@ from google.cloud import storage
 from icasdk.apis.tags import project_data_api
 from icasdk.model.create_data import CreateData
 
-from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import get_gcp_project
-from cpg_workflows.filetypes import CramPath
 
 
 def check_object_already_exists(
@@ -103,15 +99,20 @@ def upload_data(
     storage_client = storage.Client()
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
-    blob_to_upload = gcp_bucket.get_blob(f'{suffix}{data_to_upload}')
-    blob_to_upload.download_to_filename(data_to_upload, timeout=3600)
+    blob_to_download = gcp_bucket.get_blob(f'{suffix}{data_to_upload}')
+    blob_to_download.download_to_filename(data_to_upload, timeout=3600)
 
     logging.info('Uploading data with cURL')
     subprocess.run(['curl', '--upload-file', data_to_upload, f'{upload_url}'])
 
 
+def register_gcp_output(bucket: str, ica_file_id: str, item: str) -> None:
+    upload_name_and_prefix: str = f'ica/{item}'
+    blob_client = storage.Blob(name=upload_name_and_prefix, bucket=bucket)
+    blob_client.upload_from_string(data=ica_file_id)
+
+
 def run(
-    # sg_name: str,
     suffix: str,
     cram: str,
     bucket_name: str,
@@ -134,6 +135,6 @@ def run(
             logging.info(f'Item is: {item}')
             upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, folder_path)
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
-            # data_to_upload: str = cram if item.endswith('cram') else cram_index
             logging.info(f'Data to upload: {item}')
             upload_data(upload_url, item, bucket_name, suffix)
+            register_gcp_output(bucket_name, upload_file_id, item)
