@@ -156,6 +156,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             project_id=ICA_PROJECT,
             api_key=API_KEY,
         )
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=align_genotype_job)
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
