@@ -62,7 +62,8 @@ class UploadDataToIca(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
+        suffix: str = cram_path_components['suffix']
+        cram: str = cram_path_components['file']
         bucket_name = cram_path_components['bucket']
 
         upload_job: PythonJob = get_batch().new_python_job(
@@ -74,7 +75,8 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.storage(self.calculate_needed_storage(sequencing_group, cram, bucket_name))
         upload_job.call(
             upload_data_to_ica.run,
-            sg_name=sequencing_group.name,
+            # sg_name=sequencing_group.name,
+            suffix=suffix,
             cram=cram,
             bucket_name=bucket_name,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),

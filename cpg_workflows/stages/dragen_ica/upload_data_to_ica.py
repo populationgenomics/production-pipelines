@@ -88,7 +88,6 @@ def create_upload_url(
             path_params=upload_url_path_params,
             query_params=query_params,
         )
-        logging.info(upload_api_response.headers)
         logging.info('Returning URL for upload')
         return upload_api_response.body['url']
     except icasdk.ApiException as e:
@@ -99,19 +98,28 @@ def upload_data(
     upload_url: str,
     data_to_upload: str,
     bucket: str,
-    tmp_file_name: str,
+    suffix: str,
 ) -> None:
     storage_client = storage.Client()
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
-    blob_to_upload = gcp_bucket.get_blob(data_to_upload)
-    blob_to_upload.download_to_filename(tmp_file_name, timeout=3600)
+    blob_to_upload = gcp_bucket.get_blob(f'{suffix}{data_to_upload}')
+    blob_to_upload.download_to_filename(data_to_upload, timeout=3600)
 
     logging.info('Uploading data with cURL')
-    subprocess.run(['curl', '--upload-file', tmp_file_name, f'{upload_url}'])
+    subprocess.run(['curl', '--upload-file', data_to_upload, f'{upload_url}'])
 
 
-def run(sg_name: str, cram: str, bucket_name: str, upload_folder: str, api_root: str, project_id: str, api_key: str):
+def run(
+    # sg_name: str,
+    suffix: str,
+    cram: str,
+    bucket_name: str,
+    upload_folder: str,
+    api_root: str,
+    project_id: str,
+    api_key: str,
+):
     coloredlogs.install(level=logging.INFO)
 
     configuration = icasdk.Configuration(host=api_root)
@@ -126,6 +134,6 @@ def run(sg_name: str, cram: str, bucket_name: str, upload_folder: str, api_root:
             logging.info(f'Item is: {item}')
             upload_file_id: str = create_upload_file_id(upload_api_instance, path_parameters, item, folder_path)
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
-            data_to_upload: str = cram if item.endswith('cram') else cram_index
-            logging.info(f'Data to upload: {data_to_upload}')
-            upload_data(upload_url, data_to_upload, bucket_name, item)
+            # data_to_upload: str = cram if item.endswith('cram') else cram_index
+            logging.info(f'Data to upload: {item}')
+            upload_data(upload_url, item, bucket_name, suffix)
