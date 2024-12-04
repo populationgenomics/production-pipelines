@@ -107,8 +107,9 @@ def upload_data(
 
 
 def register_gcp_output(bucket: str, ica_file_id: str, item: str) -> None:
+    storage_client = storage.Client()
     upload_name_and_prefix: str = f'ica/{item}'
-    blob_client = storage.Blob(name=upload_name_and_prefix, bucket=bucket)
+    blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
     blob_client.upload_from_string(data=ica_file_id)
 
 
