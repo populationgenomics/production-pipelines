@@ -11,6 +11,7 @@ from cpg_utils.hail_batch import get_batch, init_batch
 
 
 def make_plink(mt: hl.MatrixTable, plink_output_path: Path):
+    logging.info('Exporting plink')
     return hl.export_plink(mt, plink_output_path, ind_id=mt.s)
 
 
@@ -36,8 +37,8 @@ def main(dense_mt_path: Path, plink_output_path: Path):
     logging.info(f'Loading dense MT from {dense_mt_path}')
     dense_mt = hl.read_matrix_table(dense_mt_path)
     logging.info('Loaded dense MT')
-    plink_result = make_plink_job(dense_mt, plink_output_path)
-    logging.info('Ran make_plink_job()')
+    plink_result = make_plink(dense_mt, plink_output_path)
+    logging.info('Ran make_plink()')
     logging.info(f'plink_result: {plink_result}')
 
     b = get_batch()
