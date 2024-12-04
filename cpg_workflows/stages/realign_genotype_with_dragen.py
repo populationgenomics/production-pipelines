@@ -85,8 +85,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
-    ) -> None:
-        pass
+    ) -> cpg_utils.Path:
+        return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
     def read_blob_contents(self, full_blob_path: str) -> str:
         path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
