@@ -47,7 +47,7 @@ API_KEY: str = SECRETS['apiKey']
 coloredlogs.install(level=logging.INFO)
 
 
-@stage(analysis_type='ica_data_upload')
+@stage(analysis_type='ica_data_upload', analysis_keys=['cram', 'cram_index'])
 class UploadDataToIca(SequencingGroupStage):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
@@ -66,7 +66,7 @@ class UploadDataToIca(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         output_dict: dict[str, cpg_utils.Path] = {
             'cram': cpg_utils.to_path(
-                f'gs://cpg-{sequencing_group.dataset.name.replace("-test", "")}-{get_access_level()}'
+                f'gs://cpg-{sequencing_group.dataset.name.replace("-test", "")}-{get_access_level()}',
             )
             / GCP_FOLDER_FOR_ICA_UPLOAD
             / f'{sequencing_group.name}.cram_ica_file_id',
