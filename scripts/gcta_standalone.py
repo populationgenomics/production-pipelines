@@ -61,7 +61,7 @@ def create_GRM(
         f'gcta --bfile {bfile} --make-grm --out {create_GRM_j.ofile}',
     )
 
-    return create_GRM_j.ofile
+    return create_GRM_j
 
 
 @click.command()
