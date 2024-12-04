@@ -8,7 +8,7 @@ from google.cloud import secretmanager, storage
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from cpg_utils.config import config_retrieve, image_path
+from cpg_utils.config import config_retrieve, get_access_level, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
@@ -65,10 +65,10 @@ class UploadDataToIca(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         output_dict: dict[str, cpg_utils.Path] = {
-            'cram': sequencing_group.dataset.prefix()
+            'cram': cpg_utils.Path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
             / GCP_FOLDER_FOR_ICA_UPLOAD
             / f'{sequencing_group.name}.cram_ica_file_id',
-            'cram_index': sequencing_group.dataset.prefix()
+            'cram_index': cpg_utils.Path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
             / GCP_FOLDER_FOR_ICA_UPLOAD
             / f'{sequencing_group.name}.cram.crai_ica_file_id',
         }
