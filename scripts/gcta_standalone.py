@@ -13,6 +13,7 @@ from cpg_workflows.utils import can_reuse
 
 def make_plink(mt: hl.MatrixTable, plink_output_path: Path):
     plink_paths = [f'{plink_output_path}.{ext}' for ext in ['bed', 'bim', 'fam']]
+    logging.info(f'plink_paths: {plink_paths}')
     if can_reuse(plink_paths):
         logging.info('Plink files already exist')
         return True
@@ -83,7 +84,7 @@ def main(dense_mt_path: Path, plink_output_path: str, grm_output_path: str, vers
     logging.info(f'Loading dense MT from {dense_mt_path}')
     dense_mt = hl.read_matrix_table(dense_mt_path)
     logging.info('Loaded dense MT')
-    plink_result = make_plink(dense_mt, plink_output_path)
+    plink_result = make_plink(dense_mt, to_path(plink_output_path))
     logging.info('Ran make_plink()')
     logging.info(f'plink_result: {plink_result}')
 
