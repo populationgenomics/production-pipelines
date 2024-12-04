@@ -15,6 +15,7 @@ def submit_dragen_run(
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
+    output_folder_id: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -31,7 +32,7 @@ def submit_dragen_run(
             userTags=user_tags,
             referenceTags=reference_tags,
         ),
-        outputParentFolderId='',
+        outputParentFolderId=output_folder_id,
         analysisInput=NextflowAnalysisInput(
             inputs=[
                 AnalysisDataInput(parameterCode='crams', dataIds=[cram_id]),
@@ -72,6 +73,7 @@ def run(
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
+    output_folder_id: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -91,6 +93,7 @@ def run(
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
+            output_folder_id=output_folder_id,
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,

@@ -138,6 +138,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
         user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
 
+        output_folder_path: str = f'{sequencing_group.dataset.name}/{sequencing_group.name}/'
+
         align_genotype_job = get_batch().new_python_job(
             name='AlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
@@ -150,6 +152,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
+            output_folder_path=output_folder_path,
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,
