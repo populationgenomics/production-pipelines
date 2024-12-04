@@ -115,7 +115,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         pass
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        pass
+        logging.info(f'{inputs}')
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
