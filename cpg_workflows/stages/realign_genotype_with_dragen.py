@@ -1,10 +1,9 @@
-import json
 import logging
 from math import ceil
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Final
 
 import coloredlogs
-from google.cloud import secretmanager, storage
+from google.cloud import storage
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
@@ -19,30 +18,7 @@ if TYPE_CHECKING:
 
 GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
-SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-SECRET_PROJECT = 'cpg-common'
-SECRET_NAME = 'illumina_cpg_workbench_api'
-SECRET_VERSION = 'latest'
 
-
-def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
-    try:
-        secret_path: str = SECRET_CLIENT.secret_version_path(
-            project=SECRET_PROJECT,
-            secret=SECRET_NAME,
-            secret_version=SECRET_VERSION,
-        )
-        response: secretmanager.AccessSecretVersionResponse = SECRET_CLIENT.access_secret_version(
-            request={'name': secret_path},
-        )
-        return json.loads(response.payload.data.decode('UTF-8'))
-    except Exception as e:
-        raise Exception(f'Could not obtain ICA credentials: {e}') from e
-
-
-SECRETS: dict[Literal['projectID', 'apiKey'], str] = get_ica_secrets()
-ICA_PROJECT: str = SECRETS['projectID']
-API_KEY: str = SECRETS['apiKey']
 
 coloredlogs.install(level=logging.INFO)
 
@@ -98,8 +74,6 @@ class UploadDataToIca(SequencingGroupStage):
             bucket_name=bucket_name,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
             api_root=ICA_REST_ENDPOINT,
-            project_id=ICA_PROJECT,
-            api_key=API_KEY,
             gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
         )
 
@@ -158,8 +132,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             reference_tags=reference_tags,
             user_reference=user_reference,
             api_root=ICA_REST_ENDPOINT,
-            project_id=ICA_PROJECT,
-            api_key=API_KEY,
         )
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=align_genotype_job)
 

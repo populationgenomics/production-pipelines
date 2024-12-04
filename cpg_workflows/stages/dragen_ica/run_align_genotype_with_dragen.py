@@ -1,5 +1,7 @@
-from typing import Any
+import logging
+from typing import Any, Literal
 
+import coloredlogs
 import icasdk
 from icasdk.apis.tags import project_analysis_api
 from icasdk.model.analysis_data_input import AnalysisDataInput
@@ -7,6 +9,8 @@ from icasdk.model.analysis_parameter_input import AnalysisParameterInput
 from icasdk.model.analysis_tag import AnalysisTag
 from icasdk.model.create_nextflow_analysis import CreateNextflowAnalysis
 from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
+
+from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def submit_dragen_run(
@@ -79,9 +83,12 @@ def run(
     reference_tags: list[str],
     user_reference: str,
     api_root: str,
-    project_id: str,
-    api_key: str,
 ) -> None:
+    SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
+    project_id: str = SECRETS['projectID']
+    api_key: str = SECRETS['apiKey']
+
+    coloredlogs.install(level=logging.INFO)
     configuration = icasdk.Configuration(host=api_root, api_key=api_key)
 
     with icasdk.ApiClient(configuration=configuration) as api_client:

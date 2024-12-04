@@ -1,6 +1,6 @@
 import logging
 import subprocess
-from typing import Any
+from typing import Any, Literal
 
 import coloredlogs
 import icasdk
@@ -9,6 +9,7 @@ from icasdk.apis.tags import project_data_api
 from icasdk.model.create_data import CreateData
 
 from cpg_utils.config import get_gcp_project
+from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def check_object_already_exists(
@@ -119,10 +120,11 @@ def run(
     bucket_name: str,
     upload_folder: str,
     api_root: str,
-    project_id: str,
-    api_key: str,
     gcp_folder: str,
 ):
+    SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
+    project_id: str = SECRETS['projectID']
+    api_key: str = SECRETS['apiKey']
     coloredlogs.install(level=logging.INFO)
 
     configuration = icasdk.Configuration(host=api_root)
