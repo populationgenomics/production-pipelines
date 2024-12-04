@@ -9,12 +9,20 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import Batch, get_batch, init_batch
 
-from scripts.make_plink import export_plink
-
 
 def make_plink(mt: hl.MatrixTable, plink_output_path: Path):
     logging.info('Exporting plink')
-    return hl.export_plink(mt, plink_output_path, ind_id=mt.s)
+    return hl.export_plink(mt, str(plink_output_path), ind_id=mt.s)
+
+
+def make_plink_job(dense_mt: hl.MatrixTable, plink_output_path: Path) -> hb.batch._resource.PythonResult:
+    logging.info('Creating plink files')
+    make_plink_job = get_batch().new_python_job('Make Plink Files', ({'tool': 'hail query'}))
+    make_plink_job.image(image_path('cpg_workflows'))
+    logging.info('Created plink job')
+    plink_result = make_plink_job.call(make_plink, dense_mt, plink_output_path)
+
+    return plink_result
 
 
 @click.command()
@@ -35,7 +43,7 @@ def main(dense_mt_path: Path, plink_output_path: str, version: str):
     logging.info(f'Loading dense MT from {dense_mt_path}')
     dense_mt = hl.read_matrix_table(dense_mt_path)
     logging.info('Loaded dense MT')
-    plink_result = export_plink(dense_mt, plink_output_path)
+    plink_result = make_plink(dense_mt, plink_output_path)
     logging.info('Ran make_plink()')
     logging.info(f'plink_result: {plink_result}')
 
