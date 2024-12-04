@@ -50,10 +50,15 @@ coloredlogs.install(level=logging.INFO)
 class UploadDataToIca(SequencingGroupStage):
     from cpg_workflows.stages.dragen_ica import upload_data_to_ica
 
-    def calculate_needed_storage(self, sequencing_group: SequencingGroup, cram: str, bucket_name: str) -> str:
+    def calculate_needed_storage(
+        self,
+        cram: str,
+        bucket_name: str,
+        suffix: str,
+    ) -> str:
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
-        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(cram).size
+        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(f'{suffix}{cram}').size
         storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
         return f'{storage_size}Gi'
 
@@ -72,7 +77,7 @@ class UploadDataToIca(SequencingGroupStage):
         )
         upload_job.image(image=image_path('cpg_workflows'))
 
-        upload_job.storage(self.calculate_needed_storage(sequencing_group, cram, bucket_name))
+        upload_job.storage(self.calculate_needed_storage(cram, bucket_name, suffix))
         upload_job.call(
             upload_data_to_ica.run,
             # sg_name=sequencing_group.name,
