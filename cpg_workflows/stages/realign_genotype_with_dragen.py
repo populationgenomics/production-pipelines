@@ -123,8 +123,10 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return blob_client.download_as_text()
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_id: str = self.read_blob_contents(inputs.as_str(sequencing_group, UploadDataToIca, 'cram_id'))
-        cram_index_id: str = self.read_blob_contents(inputs.as_str(sequencing_group, UploadDataToIca, 'cram_index_id'))
+        cram_id: str = self.read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
+        cram_index_id: str = self.read_blob_contents(
+            str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_index_id'))
+        )
 
         dragen_pipeline_id = config_retrieve(['ica.pipelines', 'dragen_3_7_8'])
 
