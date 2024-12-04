@@ -31,7 +31,7 @@ def make_plink_job(dense_mt: hl.MatrixTable, plink_output_path: Path) -> hb.batc
 @click.option('--version')
 def main(dense_mt_path: Path, plink_output_path: str, version: str):
     logging.basicConfig(level=logging.INFO)
-    b = Batch()
+    b = get_batch()
     # Make Plink files
     plink_output_path = to_path(plink_output_path) / version
     logging.info(f'plink_output_path: {plink_output_path}')
