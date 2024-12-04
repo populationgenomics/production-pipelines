@@ -65,10 +65,10 @@ class UploadDataToIca(SequencingGroupStage):
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         output_dict: dict[str, cpg_utils.Path] = {
-            'cram': cpg_utils.Path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
+            'cram': cpg_utils.to_path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
             / GCP_FOLDER_FOR_ICA_UPLOAD
             / f'{sequencing_group.name}.cram_ica_file_id',
-            'cram_index': cpg_utils.Path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
+            'cram_index': cpg_utils.to_path(f'gs://cpg-{sequencing_group.dataset.name}-{get_access_level()}')
             / GCP_FOLDER_FOR_ICA_UPLOAD
             / f'{sequencing_group.name}.cram.crai_ica_file_id',
         }
