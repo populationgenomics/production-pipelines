@@ -125,18 +125,18 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_id: str = self.read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
         cram_index_id: str = self.read_blob_contents(
-            str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_index_id'))
+            str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_index_id')),
         )
 
-        dragen_pipeline_id = config_retrieve(['ica.pipelines', 'dragen_3_7_8'])
+        dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
 
-        dragen_ht_id: str = config_retrieve(['ica.reference_ids', 'dragen_ht_id'])
-        cram_reference_id: str = config_retrieve(['ica.reference_ids', 'cram_reference_id'])
+        dragen_ht_id: str = config_retrieve(['ica', 'reference_ids', 'dragen_ht_id'])
+        cram_reference_id: str = config_retrieve(['ica', 'reference_ids', 'cram_reference_id'])
 
-        user_tags: list[str] = config_retrieve(['ica.tags', 'user_tags'])
-        technical_tags: list[str] = config_retrieve(['ica.tags', 'technical_tags'])
-        reference_tags: list[str] = config_retrieve(['ica.tags', 'reference_tags'])
-        user_reference: str = config_retrieve(['ica.tags', 'user_reference'])
+        user_tags: list[str] = config_retrieve(['ica', 'tags', 'user_tags'])
+        technical_tags: list[str] = config_retrieve(['ica', 'tags', 'technical_tags'])
+        reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
+        user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
 
         align_genotype_job = get_batch().new_python_job(
             name='AlignGenotypeWithDragen',
