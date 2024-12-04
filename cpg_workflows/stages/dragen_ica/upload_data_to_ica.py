@@ -106,9 +106,9 @@ def upload_data(
     subprocess.run(['curl', '--upload-file', data_to_upload, f'{upload_url}'])
 
 
-def register_gcp_output(bucket: str, ica_file_id: str, item: str) -> None:
+def register_gcp_output(bucket: str, ica_file_id: str, item: str, gcp_folder: str) -> None:
     storage_client = storage.Client()
-    upload_name_and_prefix: str = f'ica/{item}'
+    upload_name_and_prefix: str = f'{gcp_folder}/{item}_ica_file_id'
     blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
     blob_client.upload_from_string(data=ica_file_id)
 
@@ -121,6 +121,7 @@ def run(
     api_root: str,
     project_id: str,
     api_key: str,
+    gcp_folder: str,
 ):
     coloredlogs.install(level=logging.INFO)
 
@@ -138,4 +139,4 @@ def run(
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, upload_file_id)
             logging.info(f'Data to upload: {item}')
             upload_data(upload_url, item, bucket_name, suffix)
-            register_gcp_output(bucket_name, upload_file_id, item)
+            register_gcp_output(bucket_name, upload_file_id, item, gcp_folder)

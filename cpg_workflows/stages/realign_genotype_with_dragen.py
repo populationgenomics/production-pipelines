@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Final, Literal
 import coloredlogs
 from google.cloud import secretmanager, storage
 
+import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
@@ -16,6 +17,7 @@ from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput
 if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
+GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
 SECRET_PROJECT = 'cpg-common'
@@ -61,8 +63,16 @@ class UploadDataToIca(SequencingGroupStage):
         storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
         return f'{storage_size}Gi'
 
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> None:
-        pass
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+        output_dict: dict[str, cpg_utils.Path] = {
+            'cram': sequencing_group.dataset.prefix()
+            / GCP_FOLDER_FOR_ICA_UPLOAD
+            / f'{sequencing_group.name}.cram_ica_file_id',
+            'cram_index': sequencing_group.dataset.prefix()
+            / GCP_FOLDER_FOR_ICA_UPLOAD
+            / f'{sequencing_group.name}.cram.crai_ica_file_id',
+        }
+        return output_dict
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
@@ -86,7 +96,10 @@ class UploadDataToIca(SequencingGroupStage):
             api_root=ICA_REST_ENDPOINT,
             project_id=ICA_PROJECT,
             api_key=API_KEY,
+            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
         )
+
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
 
 
 @stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
