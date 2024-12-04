@@ -51,7 +51,7 @@ def main(dense_mt_path: Path, plink_output_path: str, version: str):
 
     # b = get_batch()
     logging.info('Writing output')
-    b.write_output(plink_result, plink_output_path)
+    b.write_output(plink_result, str(plink_output_path))
     b.run()
 
 
