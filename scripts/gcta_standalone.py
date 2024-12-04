@@ -30,8 +30,11 @@ def make_plink_job(dense_mt: hl.MatrixTable, plink_output_path: Path) -> hb.batc
 @click.option('--plink-output-path')
 @click.option('--version')
 def main(dense_mt_path: Path, plink_output_path: str, version: str):
-    plink_output_path = to_path(plink_output_path) / version
     logging.basicConfig(level=logging.INFO)
+
+    # Make Plink files
+    plink_output_path = to_path(plink_output_path) / version
+    logging.info(f'plink_output_path: {plink_output_path}')
 
     logging.info('Starting batch')
     init_batch()
@@ -43,9 +46,11 @@ def main(dense_mt_path: Path, plink_output_path: str, version: str):
     logging.info('Ran make_plink()')
     logging.info(f'plink_result: {plink_result}')
 
-    b = get_batch()
-    logging.info('Writing output')
-    b.write_output(plink_result, plink_output_path)
+    # Create GRM
+
+    # b = get_batch()
+    # logging.info('Writing output')
+    # b.write_output(plink_result, plink_output_path)
 
 
 if __name__ == '__main__':
