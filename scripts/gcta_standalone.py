@@ -5,7 +5,7 @@ import click
 import hail as hl
 import hailtop.batch as hb
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch, init_batch
 
@@ -28,7 +28,9 @@ def make_plink_job(dense_mt: hl.MatrixTable, plink_output_path: Path) -> hb.batc
 @click.command()
 @click.option('--dense-mt-path')
 @click.option('--plink-output-path')
-def main(dense_mt_path: Path, plink_output_path: Path):
+@click.option('--version')
+def main(dense_mt_path: Path, plink_output_path: str, version: str):
+    plink_output_path = to_path(plink_output_path) / version
     logging.basicConfig(level=logging.INFO)
 
     logging.info('Starting batch')
