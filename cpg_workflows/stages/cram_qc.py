@@ -155,7 +155,7 @@ class SomalierPedigree(DatasetStage):
         if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
-        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
+        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
@@ -224,7 +224,7 @@ class CramMultiQC(DatasetStage):
             return {}
 
         # get the unique hash for these Sequencing Groups
-        sg_hash = dataset.alignment_inputs_hash()
+        sg_hash = dataset.get_alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
