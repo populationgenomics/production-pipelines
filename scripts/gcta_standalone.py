@@ -1,7 +1,6 @@
 import logging
 
 import click
-from make_plink import export_plink
 
 import hail as hl
 import hailtop.batch as hb
@@ -9,6 +8,8 @@ import hailtop.batch as hb
 from cpg_utils import Path, to_path
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import Batch, get_batch, init_batch
+
+from scripts.make_plink import export_plink
 
 
 def make_plink(mt: hl.MatrixTable, plink_output_path: Path):
