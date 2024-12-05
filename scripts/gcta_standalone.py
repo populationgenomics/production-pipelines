@@ -41,7 +41,7 @@ def create_GRM(
     output_path: str,
 ):
 
-    grm_paths = [f'{output_path}.{ext}' for ext in ['.grm.bin', '.grm.id', 'grm.N.bin']]
+    grm_paths = [f'{output_path}.{ext}' for ext in ['grm.bin', 'grm.id', 'grm.N.bin']]
     logging.info(f'GRM paths: {grm_paths}')
     if can_reuse(grm_paths):
         logging.info('GRM files already exist')
@@ -109,7 +109,7 @@ def read_grm_bin(prefix, all_n=False, size=4):
 
 def run_PCA(
     b: hb.Batch,
-    grm_directory: dict[str, str],
+    grm_directory: str,
     version: str,
     n_pcs: int,
     relateds_to_drop: str,
@@ -119,11 +119,13 @@ def run_PCA(
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
     # Read GRM files
-
-    logging.info(
-        f'GRM files: bin: {grm_directory["grm.bin"]}, id: {grm_directory["grm.id"]}, N: {grm_directory["grm.N.bin"]}',
-    )
-    run_PCA_j.declare_resource_group(grm_directory=grm_directory)
+    # Turn grm_directory into a dictionary with correct keys and values
+    grm_directory_group = {
+        'grm.bin': f'{grm_directory}.grm.bin',
+        'grm.id': f'{grm_directory}.grm.id',
+        'grm.N.bin': f'{grm_directory}.grm.N.bin',
+    }
+    run_PCA_j.declare_resource_group(grm_directory=grm_directory_group)
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
