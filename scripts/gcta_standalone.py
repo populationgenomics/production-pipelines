@@ -109,6 +109,7 @@ def read_grm_bin(prefix, all_n=False, size=4):
 
 def run_PCA(
     b: hb.Batch,
+    create_GRM_j: hb.ResourceGroup,
     grm_directory: str,
     version: str,
     n_pcs: int,
@@ -125,7 +126,8 @@ def run_PCA(
         'grm.id': f'{grm_directory}.grm.id',
         'grm.N.bin': f'{grm_directory}.grm.N.bin',
     }
-    run_PCA_j.declare_resource_group(grm_directory=grm_directory_group)
+    logging.info(f'grm_directory_group: {grm_directory_group}')
+    run_PCA_j.declare_resource_group(grm_directory=create_GRM_j.ofile)
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
@@ -221,11 +223,13 @@ def main(
         logging.info('Creating PCA job')
         run_PCA_j = run_PCA(
             b=b,
+            create_GRM_j=create_GRM_j,
             grm_directory=grm_output_path,
             version=version,
             n_pcs=10,
             relateds_to_drop=relateds_txt_path,
         )
+        run_PCA_j.depends_on(create_GRM_j)
         b.write_output(run_PCA_j.ofile, str(pca_output_path))
 
     # b = get_batch()
