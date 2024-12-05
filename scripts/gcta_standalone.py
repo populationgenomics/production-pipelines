@@ -1,6 +1,7 @@
 import logging
 
 import click
+import numpy as np
 
 import hail as hl
 import hailtop.batch as hb
@@ -39,6 +40,12 @@ def create_GRM(
     output_path: str,
 ):
 
+    grm_paths = [f'{output_path}.{ext}' for ext in ['.grm.bin', '.grm.id', 'grm.N.bin']]
+    logging.info(f'GRM paths: {grm_paths}')
+    if can_reuse(grm_paths):
+        logging.info('GRM files already exist')
+        return True
+
     # Read in PLINK files created by Hail
     bfile = b.read_input_group(bed=bed_file_path, bim=bim_file_path, fam=fam_file_path)
 
@@ -64,23 +71,118 @@ def create_GRM(
     return create_GRM_j
 
 
+def read_grm_bin(prefix, all_n=False, size=4):
+    def sum_i(i):
+        return sum(range(1, i + 1))
+
+    # File paths
+    bin_file_name = prefix['grm.bin']
+    n_file_name = prefix['grm.N.bin']
+    id_file_name = prefix['grm.id']
+
+    # Read ID file
+    id_data = np.loadtxt(id_file_name, dtype=str)
+    n = id_data.shape[0]
+
+    # Read GRM bin file
+    with open(bin_file_name, "rb") as bin_file:
+        grm = np.fromfile(bin_file, dtype=np.float32 if size == 4 else np.float64, count=n * (n + 1) // 2)
+
+    # Read N bin file
+    with open(n_file_name, "rb") as n_file:
+        if all_n:
+            N = np.fromfile(n_file, dtype=np.float32 if size == 4 else np.float64, count=n * (n + 1) // 2)
+        else:
+            N = struct.unpack('f' if size == 4 else 'd', n_file.read(size))[0]
+
+    # Compute indices for diagonal elements
+    i = np.array([sum_i(j) - 1 for j in range(1, n + 1)])
+
+    return {
+        "diag": grm[i],  # Diagonal elements of GRM
+        "off": np.delete(grm, i),  # Off-diagonal elements
+        "id": id_data,  # ID data
+        "N": N,  # N values
+    }
+
+
+def run_PCA(
+    b: hb.Batch,
+    grm_directory: dict[str, str],
+    version: str,
+    n_pcs: int,
+    relateds_to_drop: str,
+):
+
+    # Create PCA job
+    run_PCA_j = b.new_job('Run PCA')
+    run_PCA_j.image(image_path('gcta'))
+    # Read GRM files
+
+    logging.info(
+        f'GRM files: bin: {grm_directory["grm.bin"]}, id: {grm_directory["grm.id"]}, N: {grm_directory["grm.N.bin"]}',
+    )
+    run_PCA_j.declare_resource_group(grm_directory=grm_directory)
+    run_PCA_j.declare_resource_group(
+        ofile={
+            'eigenvec': '{root}.eigenvec',
+            'eigenval': '{root}.eigenval',
+        },
+    )
+    logging.info(
+        f'{run_PCA_j.grm_directory}'
+        f'{run_PCA_j.grm_directory["grm.bin"]}'
+        f'{run_PCA_j.grm_directory["grm.id"]}'
+        f'{run_PCA_j.grm_directory["grm.N.bin"]}',
+    )
+    # Check if there are relateds to drop
+    if relateds_to_drop:
+        with to_path(relateds_to_drop).open('r') as f:
+            sgids_to_remove = set(line.strip() for line in f)
+        remove_file = f'{version}.indi.list'
+        remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
+        id_data = np.loadtxt(run_PCA_j.grm_directory['grm.id'], dtype=str)
+        remove_contents = ''
+        for fam_id, sg_id in id_data:
+            if sg_id in sgids_to_remove:
+                remove_contents += f'{fam_id}\t{sg_id}\n'
+        collate_relateds_cmd = (
+            f'printf "{remove_contents}" >> ${{BATCH_TMPDIR}}/{remove_file} && cat ${{BATCH_TMPDIR}}/{remove_file}'
+        )
+        run_PCA_j.command(collate_relateds_cmd)
+
+    run_PCA_j.command(
+        f'gcta --grm {run_PCA_j.grm_directory} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+    )
+
+    return run_PCA_j
+
+
 @click.command()
 @click.option('--dense-mt-path')
-@click.option('--plink-output-path')
-@click.option('--grm-output-path')
+@click.option('--out-dir')
+@click.option('--relateds-to-drop-path')
 @click.option('--version')
-def main(dense_mt_path: Path, plink_output_path: str, grm_output_path: str, version: str):
+@click.option('--create-plink', is_flag=True, help="Create PLINK output based on out_dir")
+@click.option('--create-grm', is_flag=True, help="Create GRM output based on out_dir")
+def main(
+    dense_mt_path: Path,
+    out_dir: Path,
+    relateds_to_drop_path: str,
+    version: str,
+    create_plink: bool,
+    create_grm: bool,
+):
     logging.basicConfig(level=logging.INFO)
+    out_dir = to_path(out_dir)
+    plink_output_path = out_dir / 'plink' / version
+    grm_output_path: Path = out_dir / 'grm' / version
+
     b = get_batch()
     init_batch()
     # Make Plink files
-    plink_output_path = str(to_path(plink_output_path) / version)
-    grm_output_path = str(to_path(grm_output_path) / version)
     logging.info(f'plink_output_path: {plink_output_path}')
 
-    # logging.info('Starting batch')
-    # init_batch()
-    # logging.info('Batch started')
     logging.info(f'Loading dense MT from {dense_mt_path}')
     dense_mt = hl.read_matrix_table(dense_mt_path)
     logging.info('Loaded dense MT')
@@ -96,9 +198,33 @@ def main(dense_mt_path: Path, plink_output_path: str, grm_output_path: str, vers
             bed_file_path=f'{plink_output_path}.bed',
             bim_file_path=f'{plink_output_path}.bim',
             fam_file_path=f'{plink_output_path}.fam',
-            output_path=plink_output_path,
+            output_path=grm_output_path,
         )
         b.write_output(create_GRM_j.ofile, grm_output_path)
+
+    # Run PCA
+    pca_output_path = out_dir / 'pca' / version
+    if relateds_to_drop_path:
+        logging.info('Reading relateds_to_drop Hail Table')
+        relateds_to_drop_ht = hl.read_table(relateds_to_drop_path)
+        logging.info('Read relateds_to_drop, now collecting list of sample ids')
+        sample_ids = relateds_to_drop_ht.s.collect()
+        logging.info(f'sample ids to drop: {sample_ids}')
+        relateds_txt_path = out_dir / version / 'gcta_relateds_remove.indi.list'
+        logging.info(f'relateds_txt_path: {relateds_txt_path}')
+        with to_path(relateds_txt_path).open('w') as f:
+            for sample_id in sample_ids:
+                f.write(f'{sample_id}\n')
+
+        run_PCA_j = run_PCA(
+            b=b,
+            grm_directory=grm_output_path,
+            version=version,
+            n_pcs=10,
+            relateds_to_drop=relateds_txt_path,
+        )
+        b.write_output(run_PCA_j.ofile, f'{pca_output_path}')
+
     # b = get_batch()
     logging.info('Running batch')
     b.run()
