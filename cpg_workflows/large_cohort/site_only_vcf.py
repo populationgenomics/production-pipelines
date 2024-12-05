@@ -8,6 +8,8 @@ import logging
 import hail as hl
 
 from cpg_utils import Path, to_path
+from cpg_utils.config import config_retrieve
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.sparse_mt import default_compute_info
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
@@ -20,6 +22,9 @@ def run(
     out_vcf_path: str,
     tmp_prefix: str,
 ):
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
