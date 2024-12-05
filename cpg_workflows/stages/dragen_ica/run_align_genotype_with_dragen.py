@@ -97,7 +97,7 @@ def run(
 
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
-        path_params: dict[str, str] = {'projectID': project_id}
+        path_params: dict[str, str] = {'projectId': project_id}
         submit_dragen_run(
             cram_id=cram_id,
             cram_index_id=cram_index_id,
