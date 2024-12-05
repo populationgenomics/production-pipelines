@@ -215,7 +215,7 @@ def main(
         with to_path(relateds_txt_path).open('w') as f:
             for sample_id in sample_ids:
                 f.write(f'{sample_id}\n')
-
+        logging.info('Creating PCA job')
         run_PCA_j = run_PCA(
             b=b,
             grm_directory=grm_output_path,
