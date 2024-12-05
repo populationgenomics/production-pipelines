@@ -9,6 +9,7 @@ import hail as hl
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import init_batch
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.sparse_mt import default_compute_info
