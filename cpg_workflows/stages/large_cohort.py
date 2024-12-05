@@ -333,9 +333,19 @@ class MakeSiteOnlyVcf(CohortStage):
             'MakeSiteOnlyVcf',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+
+        sitesvcf_config = config_retrieve('sitesvcf')
+
         j.image(image_path('cpg_workflows'))
-        j.memory(config_retrieve('sitesvcf').get('memory', "4Gi"))
-        j.storage(config_retrieve('sitesvcf').get('storage', "5Gi"))
+        j.memory(sitesvcf_config.get('memory', "4Gi"))
+        j.storage(sitesvcf_config.get('storage', "5Gi"))
+
+        init_batch_args: dict[str, str | int] = {}
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if sitesvcf_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in sitesvcf_config:
+            init_batch_args['driver_cores'] = sitesvcf_config['driver_cores']
 
         j.command(
             query_command(
@@ -346,6 +356,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )
