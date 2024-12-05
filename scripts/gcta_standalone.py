@@ -128,9 +128,9 @@ def run_PCA(
     # Turn grm_directory into a dictionary with correct keys and values
     run_PCA_j.declare_resource_group(
         grm_directory={
-            'grm_bin': f'{grm_directory}.grm.bin',
-            'grm_id': f'{grm_directory}.grm.id',
-            'grm_N_bin': f'{grm_directory}.grm.N.bin',
+            'grm.bin': f'{grm_directory}.grm.bin',
+            'grm.id': f'{grm_directory}.grm.id',
+            'grm.N.bin': f'{grm_directory}.grm.N.bin',
         },
     )
     run_PCA_j.declare_resource_group(
