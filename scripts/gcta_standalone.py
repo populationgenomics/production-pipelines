@@ -117,20 +117,22 @@ def run_PCA(
     relateds_to_drop: str,
 ):
 
+    logging.info(
+        f'create_GRM_j.ofile: {create_GRM_j.ofile["grm.bin"], create_GRM_j.ofile["grm.id"], create_GRM_j.ofile["grm.N.bin"]}',
+    )
+
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
     # Read GRM files
     # Turn grm_directory into a dictionary with correct keys and values
-    bfile = b.read_input_group(
-        grm_bin=f'{grm_directory}.grm.bin',
-        grm_id=f'{grm_directory}.grm.id',
-        grm_N_bin=f'{grm_directory}.grm.N.bin',
+    run_PCA_j.declare_resource_group(
+        grm_directory={
+            'grm_bin': f'{grm_directory}.grm.bin',
+            'grm_id': f'{grm_directory}.grm.id',
+            'grm_N_bin': f'{grm_directory}.grm.N.bin',
+        },
     )
-    # or
-    # bfile = b.read_input_group(create_GRM_j.ofile)
-    logging.info(f'bfile: {bfile}')
-    run_PCA_j.declare_resource_group(grm_directory=bfile)
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
