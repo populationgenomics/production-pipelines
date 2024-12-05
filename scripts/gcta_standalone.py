@@ -121,17 +121,16 @@ def run_PCA(
         f'create_GRM_j.ofile: {create_GRM_j.ofile["grm.bin"], create_GRM_j.ofile["grm.id"], create_GRM_j.ofile["grm.N.bin"]}',
     )
 
+    grm_directory_dict = {f'{ext}': f'{grm_directory}.{ext}' for ext in ['grm.bin', 'grm.id', 'grm.N.bin']}
     # Create PCA job
     run_PCA_j = b.new_job('Run PCA')
     run_PCA_j.image(image_path('gcta'))
     # Read GRM files
     # Turn grm_directory into a dictionary with correct keys and values
-    run_PCA_j.declare_resource_group(
-        grm_directory={
-            'grm.bin': f'{grm_directory}.grm.bin',
-            'grm.id': f'{grm_directory}.grm.id',
-            'grm.N.bin': f'{grm_directory}.grm.N.bin',
-        },
+    bfile = b.read_input_group(
+        bin=grm_directory_dict['grm.bin'],
+        id=grm_directory_dict['grm.id'],
+        N=grm_directory_dict['grm.N.bin'],
     )
     run_PCA_j.declare_resource_group(
         ofile={
@@ -139,19 +138,19 @@ def run_PCA(
             'eigenval': '{root}.eigenval',
         },
     )
-    logging.info(
-        f'{run_PCA_j.grm_directory}'
-        f'{run_PCA_j.grm_directory["grm.bin"]}'
-        f'{run_PCA_j.grm_directory["grm.id"]}'
-        f'{run_PCA_j.grm_directory["grm.N.bin"]}',
-    )
+    # logging.info(
+    #     f'{run_PCA_j.grm_directory}'
+    #     f'{run_PCA_j.grm_directory["grm.bin"]}'
+    #     f'{run_PCA_j.grm_directory["grm.id"]}'
+    #     f'{run_PCA_j.grm_directory["grm.N.bin"]}',
+    # )
     # Check if there are relateds to drop
     if relateds_to_drop:
         with to_path(relateds_to_drop).open('r') as f:
             sgids_to_remove = set(line.strip() for line in f)
         remove_file = f'{version}.indi.list'
         remove_flag = f'--remove ${{BATCH_TMPDIR}}/{remove_file}'
-        id_data = np.loadtxt(run_PCA_j.grm_directory['grm.id'], dtype=str)
+        id_data = np.loadtxt(bfile.id, dtype=str)
         remove_contents = ''
         for fam_id, sg_id in id_data:
             if sg_id in sgids_to_remove:
@@ -162,7 +161,7 @@ def run_PCA(
         run_PCA_j.command(collate_relateds_cmd)
 
     run_PCA_j.command(
-        f'gcta --grm {run_PCA_j.grm_directory} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
+        f'gcta --grm {bfile} {remove_flag if relateds_to_drop else ""} --pca {n_pcs} --out {run_PCA_j.ofile}',
     )
 
     return run_PCA_j
