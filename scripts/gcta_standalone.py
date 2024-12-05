@@ -201,7 +201,7 @@ def main(
             fam_file_path=f'{plink_output_path}.fam',
             output_path=grm_output_path,
         )
-        b.write_output(create_GRM_j.ofile, grm_output_path)
+        b.write_output(create_GRM_j.ofile, str(grm_output_path))
 
     # Run PCA
     pca_output_path = out_dir / 'pca' / version
@@ -224,7 +224,7 @@ def main(
             n_pcs=10,
             relateds_to_drop=relateds_txt_path,
         )
-        b.write_output(run_PCA_j.ofile, f'{pca_output_path}')
+        b.write_output(run_PCA_j.ofile, str(pca_output_path))
 
     # b = get_batch()
     logging.info('Running batch')
