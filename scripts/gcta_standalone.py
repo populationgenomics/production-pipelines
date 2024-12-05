@@ -1,4 +1,5 @@
 import logging
+import struct
 
 import click
 import numpy as np
