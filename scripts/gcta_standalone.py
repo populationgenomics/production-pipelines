@@ -65,6 +65,7 @@ def create_GRM(
             'grm.N.bin': '{root}.grm.N.bin',
         },
     )
+    logging.info(f'create_GRM_j.ofile: {create_GRM_j.ofile}')
     create_GRM_j.command(
         f'gcta --bfile {bfile} --make-grm --out {create_GRM_j.ofile}',
     )
@@ -121,13 +122,15 @@ def run_PCA(
     run_PCA_j.image(image_path('gcta'))
     # Read GRM files
     # Turn grm_directory into a dictionary with correct keys and values
-    grm_directory_group = {
-        'grm.bin': f'{grm_directory}.grm.bin',
-        'grm.id': f'{grm_directory}.grm.id',
-        'grm.N.bin': f'{grm_directory}.grm.N.bin',
-    }
-    logging.info(f'grm_directory_group: {grm_directory_group}')
-    run_PCA_j.declare_resource_group(grm_directory=create_GRM_j.ofile)
+    bfile = b.read_input_group(
+        grm_bin=f'{grm_directory}.grm.bin',
+        grm_id=f'{grm_directory}.grm.id',
+        grm_N_bin=f'{grm_directory}.grm.N.bin',
+    )
+    # or
+    # bfile = b.read_input_group(create_GRM_j.ofile)
+    logging.info(f'bfile: {bfile}')
+    run_PCA_j.declare_resource_group(grm_directory=bfile)
     run_PCA_j.declare_resource_group(
         ofile={
             'eigenvec': '{root}.eigenvec',
