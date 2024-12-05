@@ -93,7 +93,8 @@ def run(
     api_key: str = SECRETS['apiKey']
 
     coloredlogs.install(level=logging.INFO)
-    configuration = icasdk.Configuration(host=api_root, api_key=api_key)
+    configuration = icasdk.Configuration(host=api_root)
+    configuration.api_key['ApiKeyAuth'] = api_key
 
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
