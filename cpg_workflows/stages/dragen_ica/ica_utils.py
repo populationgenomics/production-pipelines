@@ -26,7 +26,8 @@ def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
 
 
 def check_ica_pipeline_status(
-    api_instance: project_analysis_api.ProjectAnalysisApi, path_params: dict[str, str]
+    api_instance: project_analysis_api.ProjectAnalysisApi,
+    path_params: dict[str, str],
 ) -> str:
     try:
         api_response = api_instance.get_analysis(path_params=path_params)
