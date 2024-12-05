@@ -334,6 +334,8 @@ class MakeSiteOnlyVcf(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
+        j.memory(config_retrieve('sitesvcf').get('memory', "4Gi"))
+        j.storage(config_retrieve('sitesvcf').get('storage', "5Gi"))
 
         j.command(
             query_command(
