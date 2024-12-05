@@ -1,4 +1,6 @@
 import logging
+import time
+from random import randint
 from typing import Any, Literal
 
 import coloredlogs
@@ -30,7 +32,7 @@ def submit_dragen_run(
     user_reference: str,
     project_id: dict[str, str],
     api_instance: project_analysis_api.ProjectAnalysisApi,
-):
+) -> str:
     header_params: dict[Any, Any] = {}
     body = CreateNextflowAnalysis(
         userReference=user_reference,
@@ -70,7 +72,7 @@ def submit_dragen_run(
             header_params=header_params,
             body=body,
         )
-        print(api_response)
+        return api_response.body['id']
     except icasdk.ApiException as e:
         raise icasdk.ApiException(f'Exception when calling ProjectAnalysisApi->create_nextflow_analysis: {e}') from e
 
@@ -99,7 +101,7 @@ def run(
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
         path_params: dict[str, str] = {'projectId': project_id}
-        submit_dragen_run(
+        analysis_run_id: str = submit_dragen_run(
             cram_id=cram_id,
             cram_index_id=cram_index_id,
             dragen_ht_id=dragen_ht_id,
@@ -113,3 +115,18 @@ def run(
             project_id=path_params,
             api_instance=api_instance,
         )
+        pipeline_status: str = ica_utils.check_ica_pipeline_status(
+            api_instance,
+            path_params | {'analysisId': analysis_run_id},
+        )
+        # Other running statuses are REQUESTED AWAITINGINPUT INPROGRESS
+        while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']:
+            time.sleep(600 + randint(0, 10))
+            pipeline_status: str = ica_utils.check_ica_pipeline_status(
+                api_instance,
+                path_params | {'analysisId': analysis_run_id},
+            )
+        if pipeline_status == 'SUCCEEDED':
+            pass
+        else:
+            raise Exception
