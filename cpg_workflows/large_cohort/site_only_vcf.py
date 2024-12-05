@@ -22,6 +22,7 @@ def run(
     out_vcf_path: str,
     tmp_prefix: str,
 ):
+    init_batch(driver_memory='highmem', driver_cores=4)
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
 
