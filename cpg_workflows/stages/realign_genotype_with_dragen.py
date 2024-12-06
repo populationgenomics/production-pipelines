@@ -23,10 +23,43 @@ ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 coloredlogs.install(level=logging.INFO)
 
 
+@stage(analysis_type='prepare_ica_for_analysis', analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
+class PrepareIcaForDragenAnalysis(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+        output_dict = {
+            'cram_fid': cpg_utils.to_path('x'),
+            'cram_index_fid': cpg_utils.to_path('x'),
+            'analysis_output_fid': cpg_utils.to_path('x'),
+        }
+        return output_dict
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        suffix: str = cram_path_components['suffix']
+        cram: str = cram_path_components['file']
+        bucket_name = cram_path_components['bucket']
+
+        upload_job: PythonJob = get_batch().new_python_job(
+            name='UploadDataToIca',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+        )
+        upload_job.image(image=image_path('cpg_workflows'))
+
+        upload_job.call(
+            upload_data_to_ica.run,
+            suffix=suffix,
+            cram=cram,
+            bucket_name=bucket_name,
+            upload_folder=config_retrieve(['dragen', 'upload_folder']),
+            api_root=ICA_REST_ENDPOINT,
+            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
+        )
+
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
+
+
 @stage(analysis_type='ica_data_upload', analysis_keys=['cram', 'cram_index'])
 class UploadDataToIca(SequencingGroupStage):
-    # from cpg_workflows.stages.dragen_ica import upload_data_to_ica
-
     def calculate_needed_storage(
         self,
         cram: str,
@@ -136,8 +169,44 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=align_genotype_job)
 
 
+@stage(required_stages=[AlignGenotypeWithDragen])
+class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> None:
+        pass
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        pass
+
+
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
 class GvcfMlrWithDragen(SequencingGroupStage):
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> None:
+        pass
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        pass
+
+
+@stage(required_stages=[GvcfMlrWithDragen])
+class MonitorGvcfMlrWithDragen(SequencingGroupStage):
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> None:
+        pass
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        pass
+
+
+@stage(required_stages=[AlignGenotypeWithDragen, GvcfMlrWithDragen])
+class CancelIcaPipelineRun(SequencingGroupStage):
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
