@@ -9,7 +9,7 @@ import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, get_access_level, image_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.stages.dragen_ica import run_align_genotype_with_dragen, upload_data_to_ica
+from cpg_workflows.stages.dragen_ica import prepare_ica_for_analysis, run_align_genotype_with_dragen, upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
@@ -63,11 +63,10 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         upload_job.image(image=image_path('cpg_workflows'))
 
         upload_job.call(
-            upload_data_to_ica.run,
-            suffix=suffix,
+            prepare_ica_for_analysis.run,
             cram=cram,
-            bucket_name=bucket_name,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
+            ica_analysis_output_folder=config_retrieve(['dragen', 'output_folder']),
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
         )
