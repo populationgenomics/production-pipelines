@@ -63,7 +63,6 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='vc-hard-filter', value='DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1'),
                 AnalysisParameterInput(code='vc-frd-max-effective-depth', value='40'),
                 AnalysisParameterInput(code='vc-enable-joint-detection', value='True'),
-                # AnalysisParameterInput(code='vc_enable_vcf_output', value='True'),
                 AnalysisParameterInput(code='enable_cnv', value='True'),
                 AnalysisParameterInput(code='enable_sv', value='True'),
             ],
