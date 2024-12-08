@@ -75,7 +75,9 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
 
 
-@stage(analysis_type='ica_data_upload', analysis_keys=['cram', 'cram_index'])
+@stage(
+    analysis_type='ica_data_upload', analysis_keys=['cram', 'cram_index'], required_stages=[PrepareIcaForDragenAnalysis]
+)
 class UploadDataToIca(SequencingGroupStage):
     def calculate_needed_storage(
         self,
