@@ -1,11 +1,14 @@
 import json
 import logging
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import icasdk
 from google.cloud import secretmanager, storage
 from icasdk.apis.tags import project_analysis_api, project_data_api
 from icasdk.model.create_data import CreateData
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
@@ -46,7 +49,7 @@ def check_object_already_exists(
     folder_path: str,
     object_type: str,
 ) -> str | None:
-    query_params: dict[str, list[str] | str] = {
+    query_params: dict[str, Sequence[str] | list[str] | str] = {
         'filePath': [f'{folder_path}/{file_name}'],
         'filePathMatchMode': 'STARTS_WITH_CASE_INSENSITIVE',
         'type': object_type,
