@@ -16,7 +16,8 @@ from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput
 if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
-GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica'
+GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica/upload'
+GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = 'ica/download'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 
 
@@ -25,11 +26,27 @@ coloredlogs.install(level=logging.INFO)
 
 @stage(analysis_type='prepare_ica_for_analysis', analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
+    """Set up ICA for a single realignment run.
+
+    Creates a file ID for both the CRAM and CRAI file to upload to.
+    Creates a folder ID for the Dragen output to be written into.
+
+    """
+
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+        # This nasty construct is needed in order to stop the pipeline generating a bucket name
+        # like fewgenomes-test-test
+        sg_bucket: str = f'{sequencing_group.dataset.name.replace("test", "")}-{get_access_level()}'
         output_dict = {
-            'cram_fid': cpg_utils.to_path('x'),
-            'cram_index_fid': cpg_utils.to_path('x'),
-            'analysis_output_fid': cpg_utils.to_path('x'),
+            'cram_fid': cpg_utils.to_path(
+                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
+            ),
+            'cram_index_fid': cpg_utils.to_path(
+                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_ica_file_id',
+            ),
+            'analysis_output_fid': cpg_utils.to_path(
+                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
+            ),
         }
         return output_dict
 
@@ -52,7 +69,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             bucket_name=bucket_name,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
             api_root=ICA_REST_ENDPOINT,
-            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
+            sg_name=sequencing_group.name,
         )
 
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
@@ -167,18 +184,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             api_root=ICA_REST_ENDPOINT,
         )
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=align_genotype_job)
-
-
-@stage(required_stages=[AlignGenotypeWithDragen])
-class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
-    def expected_outputs(
-        self,
-        sequencing_group: SequencingGroup,
-    ) -> None:
-        pass
-
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        pass
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])

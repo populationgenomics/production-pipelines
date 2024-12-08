@@ -9,7 +9,7 @@ from cpg_utils.config import get_gcp_project
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
-def run(cram: str, upload_folder: str, ica_analysis_output_folder: str, api_root: str, gcp_folder: str) -> None:
+def run(cram: str, upload_folder: str, ica_analysis_output_folder: str, api_root: str, sg_name: str) -> None:
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
@@ -35,12 +35,12 @@ def run(cram: str, upload_folder: str, ica_analysis_output_folder: str, api_root
             'object_type': 'FOLDER',
         },
     ]
-
+    logging.info('Creating ICA object to upload data.')
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_data_api.ProjectDataApi(api_client)
         for idx, item in enumerate(data_setup):
             for object, object_type in item.items():
-                x = ica_utils.create_upload_object_id(
+                ica_utils.create_upload_object_id(
                     api_instance=api_instance,
                     path_params=path_parameters,
                     sg_name=sg_name,
