@@ -3,6 +3,8 @@ import logging
 import hail as hl
 
 from cpg_utils import Path
+from cpg_utils.config import config_retrieve
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
@@ -25,6 +27,9 @@ def run(
 ):
     if can_reuse(out_ht_path):
         return
+
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
