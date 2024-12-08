@@ -40,11 +40,12 @@ def run(cram: str, upload_folder: str, ica_analysis_output_folder: str, api_root
         api_instance = project_data_api.ProjectDataApi(api_client)
         for idx, item in enumerate(data_setup):
             for object, object_type in item.items():
-                ica_utils.create_upload_object_id(
-                    api_instance=api_instance,
-                    path_params=path_parameters,
-                    sg_name=sg_name,
-                    file_name=object,
-                    folder_path=folder_path,
-                    object_type=object_type,
-                )
+                logging.info(f'File is: {object}, object typ is {object_type}')
+                # ica_utils.create_upload_object_id(
+                #     api_instance=api_instance,
+                #     path_params=path_parameters,
+                #     sg_name=sg_name,
+                #     file_name=object,
+                #     folder_path=folder_path,
+                #     object_type=object_type,
+                # )
