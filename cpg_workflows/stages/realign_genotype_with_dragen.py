@@ -36,13 +36,13 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))["bucket"]}'
         output_dict = {
             'cram_fid': cpg_utils.to_path(
-                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
             ),
             'cram_index_fid': cpg_utils.to_path(
-                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_ica_file_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
-                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
             ),
         }
         return output_dict
