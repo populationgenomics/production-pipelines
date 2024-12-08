@@ -17,6 +17,7 @@ from gnomad.utils.annotations import (
     qual_hist_expr,
 )
 from gnomad.utils.release import make_faf_index_dict
+from gnomad.utils.sparse_mt import default_compute_info
 
 
 def run(
@@ -87,6 +88,11 @@ def frequency_annotations(
     freq_ht = mt.rows()
     freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
     freq_ht = freq_ht.drop('variant_qc')
+
+    # Compute the adjusted AC information.
+    info_ht = default_compute_info(mt, site_annotations=True)
+    freq_ht = freq_ht.annotate(additional_info=info_ht)
+
     return freq_ht
 
 
