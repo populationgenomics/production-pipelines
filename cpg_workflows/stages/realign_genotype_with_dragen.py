@@ -36,7 +36,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         # This nasty construct is needed in order to stop the pipeline generating a bucket name
         # like fewgenomes-test-test
-        sg_bucket: str = f'{sequencing_group.dataset.name.replace("test", "")}-{get_access_level()}'
+        sg_bucket: str = f'{sequencing_group.dataset.name.replace("-test", "")}-{get_access_level()}'
         output_dict = {
             'cram_fid': cpg_utils.to_path(
                 f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
@@ -76,7 +76,9 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
 
 
 @stage(
-    analysis_type='ica_data_upload', analysis_keys=['cram', 'cram_index'], required_stages=[PrepareIcaForDragenAnalysis]
+    analysis_type='ica_data_upload',
+    analysis_keys=['cram', 'cram_index'],
+    required_stages=[PrepareIcaForDragenAnalysis],
 )
 class UploadDataToIca(SequencingGroupStage):
     def calculate_needed_storage(
