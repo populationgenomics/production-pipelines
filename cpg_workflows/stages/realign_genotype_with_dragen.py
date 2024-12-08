@@ -54,6 +54,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         # suffix: str = cram_path_components['suffix']
         cram: str = cram_path_components['file']
         bucket_name = cram_path_components['bucket']
+        logging.info(bucket_name)
 
         upload_job: PythonJob = get_batch().new_python_job(
             name='UploadDataToIca',
