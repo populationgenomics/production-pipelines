@@ -46,9 +46,9 @@ def run(
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_data_api.ProjectDataApi(api_client)
         for item in data_setup:
-            folder_path: str = f'{get_gcp_project()}/{upload_folder}'
+            folder_path: str = f'{bucket_name}/{upload_folder}'
             if item['object_type'] == 'FOLDER':
-                folder_path = f'{get_gcp_project()}/{ica_analysis_output_folder}'
+                folder_path = f'{bucket_name}/{ica_analysis_output_folder}'
             logging.info(f'File is: {item["object"]}, object type is {item["object_type"]}')
             object_id: str = ica_utils.create_upload_object_id(
                 api_instance=api_instance,
