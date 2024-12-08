@@ -114,8 +114,8 @@ def create_upload_object_id(
         ) from e
 
 
-def register_output_to_gcp(bucket: str, ica_file_id: str, item: str, gcp_folder: str) -> None:
+def register_output_to_gcp(bucket: str, ica_object_id: str, item: str, gcp_folder: str) -> None:
     storage_client = storage.Client()
     upload_name_and_prefix: str = f'{gcp_folder}/{item}_ica_file_id'
     blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
-    blob_client.upload_from_string(data=ica_file_id)
+    blob_client.upload_from_string(data=ica_object_id)

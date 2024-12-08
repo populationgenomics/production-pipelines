@@ -123,7 +123,7 @@ def run(
         )
         # Other running statuses are REQUESTED AWAITINGINPUT INPROGRESS
         while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']:
-            time.sleep(600 + randint(0, 10))
+            time.sleep(600 + randint(-60, 60))
             pipeline_status = ica_utils.check_ica_pipeline_status(
                 api_instance,
                 path_params | {'analysisId': analysis_run_id},

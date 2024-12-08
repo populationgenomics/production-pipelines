@@ -16,8 +16,7 @@ from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput
 if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
-GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica/upload'
-GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = 'ica/download'
+GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica/prepare'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 
 
@@ -45,14 +44,14 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
                 f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
-                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
+                f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
             ),
         }
         return output_dict
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        suffix: str = cram_path_components['suffix']
+        # suffix: str = cram_path_components['suffix']
         cram: str = cram_path_components['file']
         bucket_name = cram_path_components['bucket']
 
@@ -69,6 +68,8 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             ica_analysis_output_folder=config_retrieve(['dragen', 'output_folder']),
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
+            bucket_name=bucket_name,
+            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
         )
 
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
