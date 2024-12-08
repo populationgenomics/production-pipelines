@@ -226,7 +226,7 @@ class MtToEs(DatasetStage):
 
         job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
         if not config_retrieve(['workflow', 'es_index', 'spot_instance'], default=True):
-            job = job.spot(is_spot = False)
+            job = job.spot(is_spot=False)
 
         req_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
