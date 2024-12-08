@@ -33,7 +33,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
-        sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))}'
+        sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))["bucke"]}'
         output_dict = {
             'cram_fid': cpg_utils.to_path(
                 f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
