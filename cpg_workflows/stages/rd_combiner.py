@@ -1,3 +1,8 @@
+"""
+All Stages relating to the seqr_loader pipeline, reimplemented from scratch to
+use the gVCF combiner instead of joint-calling.
+"""
+
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
@@ -27,6 +32,7 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
+SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
@@ -65,7 +71,7 @@ def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | N
 
 
 @stage(analysis_type='combiner', analysis_keys=['vds'])
-class GVCFCombiner(MultiCohortStage):
+class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
         return {
             'vds': self.prefix / f'{multicohort.name}.vds',
@@ -99,13 +105,13 @@ class GVCFCombiner(MultiCohortStage):
             get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
-        j = get_batch().new_python_job('Combiner', self.get_job_attrs())
-        j.image(config_retrieve(['workflow', 'driver_image']))
-        j.memory(config_retrieve(['combiner', 'memory']))
-        j.storage(config_retrieve(['combiner', 'storage']))
+        combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
+        combiner_job.image(config_retrieve(['workflow', 'driver_image']))
+        combiner_job.memory(config_retrieve(['combiner', 'memory']))
+        combiner_job.storage(config_retrieve(['combiner', 'storage']))
 
         # Default to GRCh38 for reference if not specified
-        j.call(
+        combiner_job.call(
             combiner.run,
             output_vds_path=str(outputs['vds']),
             save_path=outputs['combiner_plan'],
@@ -116,30 +122,44 @@ class GVCFCombiner(MultiCohortStage):
             vds_paths=[vds_path] if vds_path else None,
         )
 
-        return self.make_outputs(multicohort, outputs, j)
+        return self.make_outputs(multicohort, outputs, combiner_job)
 
 
-@stage(required_stages=[GVCFCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
-class DenseMTFromVDS(MultiCohortStage):
+@stage(required_stages=[CreateVdsFromGvcfsWithHailCombiner], analysis_type='matrixtable', analysis_keys=['mt'])
+class CreateDenseMtFromVdsWithHail(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
+        """
+        the MT and both shard_manifest files are Paths, so this stage will rerun if any of those are missing
+        the VCFs are written as a directory, rather than a single VCF, so we can't check its existence well
+
+        Needs a range of INFO fields to be present in the VCF
+        """
+        prefix = self.prefix
+        temp_prefix = self.tmp_prefix
+
         return {
-            'mt': self.prefix / f'{multicohort.name}.mt',
-            # this will be the write path for fragments of sites-only VCF
-            'vcf_dir': str(self.prefix / f'{multicohort.name}.vcf.bgz'),
-            # this will be the file which contains the name of all fragments
-            'shard_manifest': str(self.prefix / f'{multicohort.name}.vcf.bgz' / 'shard_manifest.txt'),
+            'mt': prefix / f'{multicohort.name}.mt',
+            # this will be the write path for fragments of sites-only VCF (header-per-shard)
+            'hps_vcf_dir': str(prefix / f'{multicohort.name}.vcf.bgz'),
+            # this will be the file which contains the name of all fragments (header-per-shard)
+            'hps_shard_manifest': prefix / f'{multicohort.name}.vcf.bgz' / SHARD_MANIFEST,
+            # this will be the write path for fragments of sites-only VCF (separate header)
+            'separate_header_vcf_dir': str(temp_prefix / f'{multicohort.name}_separate.vcf.bgz'),
+            # this will be the file which contains the name of all fragments (separate header)
+            'separate_header_manifest': temp_prefix / f'{multicohort.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
 
         output = self.expected_outputs(multicohort)
 
-        j = get_batch().new_job('Dense Subset')
-        j.image(config_retrieve(['workflow', 'driver_image']))
-        j.command(
+        densify_job = get_batch().new_job('CreateDenseMtFromVdsWithHail')
+        densify_job.image(config_retrieve(['workflow', 'driver_image']))
+        densify_job.command(
             'mt_from_vds '
-            f'--input {str(inputs.as_dict(multicohort, GVCFCombiner)["vds"])} '
+            f'--input {str(inputs.as_dict(multicohort, CreateVdsFromGvcfsWithHailCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
-            f'--sites_only {output["vcf_dir"]}',
+            f'--sites_only {output["hps_vcf_dir"]} '
+            f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
-        return self.make_outputs(multicohort, output, [j])
+        return self.make_outputs(multicohort, output, densify_job)

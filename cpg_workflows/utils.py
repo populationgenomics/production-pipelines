@@ -29,6 +29,11 @@ DEFAULT_LOG_FORMAT = config_retrieve(
 )
 LOGGERS: dict[str, logging.Logger] = {}
 
+VCF_BGZ = 'vcf.bgz'
+VCF_BGZ_TBI = 'vcf.bgz.tbi'
+VCF_GZ = 'vcf.gz'
+VCF_GZ_TBI = 'vcf.gz.tbi'
+
 
 def get_logger(
     logger_name: str = 'cpg_workflows',
@@ -56,7 +61,7 @@ def get_logger(
         new_logger.setLevel(log_level)
 
         # unless otherwise specified, use coloredlogs
-        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], True):
+        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], False):
             coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
@@ -361,4 +366,4 @@ def get_intervals_from_bed(intervals_path: Path) -> list[str]:
     return intervals
 
 
-ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], dict[str, Path | str], str, None]
