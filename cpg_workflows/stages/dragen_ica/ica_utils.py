@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
-coloredlogs.install(level=logging.info)
+coloredlogs.install(level=logging.INFO)
 
 
 def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
