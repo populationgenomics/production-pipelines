@@ -48,7 +48,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             'cram_fid': cpg_utils.to_path(
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
             ),
-            'cram_index_fid': cpg_utils.to_path(
+            'crai_fid': cpg_utils.to_path(
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
