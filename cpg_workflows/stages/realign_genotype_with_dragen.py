@@ -161,7 +161,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        gcp_bucket: str = get_path_components_from_gcp_path(sequencing_group.cram)['bucket']
+        gcp_bucket: str = get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket']
 
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
 
