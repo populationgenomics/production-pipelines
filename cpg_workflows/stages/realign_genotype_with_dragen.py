@@ -167,7 +167,7 @@ class UploadDataToIca(SequencingGroupStage):
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
 
 
-@stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
+@stage(analysis_type='dragen_align_genotype', required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
     # Output object with pipeline ID to GCP
     def expected_outputs(
