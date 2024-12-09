@@ -95,6 +95,7 @@ class UploadDataToIca(SequencingGroupStage):
         cram: str,
         bucket_name: str,
     ) -> str:
+        logging.info(f'Checking blob size for {cram}')
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
         blob_to_upload_size_bytes: int = gcp_bucket.get_blob(f'{cram}').size
