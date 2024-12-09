@@ -64,7 +64,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         logging.info(bucket_name)
 
         prepare_ica_job: PythonJob = get_batch().new_python_job(
-            name='UploadDataToIca',
+            name='PrepareIcaForDragenAnalysis',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         prepare_ica_job.image(image=image_path('cpg_workflows'))
