@@ -37,6 +37,7 @@ run_module_metrics = false
 
 [resource_overrides.GenotypeBatch]
 run_module_metrics = false
+# If we run into silent failures in integrateGQ.sh, modify the number of splits (affecting number of shards)
 n_per_split = 5001
 n_gt_bins = 100000
 
