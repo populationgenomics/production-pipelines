@@ -86,7 +86,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
 
 @stage(
     analysis_type='ica_data_upload',
-    analysis_keys=['cram', 'cram_index'],
+    analysis_keys=['cram_upload_success', 'crai_upload_success'],
     required_stages=[PrepareIcaForDragenAnalysis],
 )
 class UploadDataToIca(SequencingGroupStage):
