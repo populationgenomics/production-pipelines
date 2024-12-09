@@ -48,7 +48,7 @@ def run(
         for item in data_setup:
             folder_path: str = f'/{bucket_name}/{upload_folder}'
             if item['object_type'] == 'FOLDER':
-                folder_path = f'/{bucket_name}/{ica_analysis_output_folder}'
+                folder_path = f'/{bucket_name}/{ica_analysis_output_folder}/{sg_name}'
             logging.info(f'File is: {item["object"]}, object type is {item["object_type"]}')
             object_id: str = ica_utils.create_upload_object_id(
                 api_instance=api_instance,
