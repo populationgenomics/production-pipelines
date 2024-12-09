@@ -17,7 +17,6 @@ from gnomad.utils.annotations import (
     qual_hist_expr,
 )
 from gnomad.utils.release import make_faf_index_dict
-from gnomad.utils.sparse_mt import default_compute_info
 
 
 def run(
@@ -76,6 +75,10 @@ def frequency_annotations(
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
 
+    logging.info('Computing adj call rates...')
+    mt_adj = mt.filter_entries(mt.adj)
+    info_ht = mt_adj.annotate_rows(adj_gt_stats=hl.agg.call_stats(mt_adj.GT, mt_adj.alleles)).rows()
+
     logging.info('Generating frequency data...')
     mt = hl.variant_qc(mt)
 
@@ -88,10 +91,7 @@ def frequency_annotations(
     freq_ht = mt.rows()
     freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
     freq_ht = freq_ht.drop('variant_qc')
-
-    # Compute the adjusted AC information.
-    info_ht = default_compute_info(mt, site_annotations=True)
-    freq_ht = freq_ht.annotate(additional_info=info_ht)
+    freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
 
     return freq_ht
 
