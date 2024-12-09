@@ -124,7 +124,7 @@ class UploadDataToIca(SequencingGroupStage):
         )
 
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        cram: str = f'{cram_path_components["suffix"]}/{cram_path_components["file"]}'
+        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
         bucket_name = cram_path_components['bucket']
 
         cram_data_mapping: list[dict[str, str]] = [
