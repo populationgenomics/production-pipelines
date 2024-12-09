@@ -107,7 +107,7 @@ class UploadDataToIca(SequencingGroupStage):
         return f'{storage_size}Gi'
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
-        sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))["bucket"]}'
+        sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
         output_dict: dict[str, cpg_utils.Path] = {
             'cram_upload_success': cpg_utils.to_path(
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_upload_success',
@@ -120,15 +120,19 @@ class UploadDataToIca(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         cram_fid: str = read_blob_contents(
-            str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid')),
+            full_blob_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
+            ),
         )
         crai_fid: str = read_blob_contents(
-            str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid')),
+            full_blob_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
+            ),
         )
 
-        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
         cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
-        bucket_name = cram_path_components['bucket']
+        bucket_name: str = cram_path_components['bucket']
 
         cram_data_mapping: list[dict[str, str]] = [
             {
@@ -181,7 +185,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
             ),
         )
-        ica_analysis_output_fid: str = read_blob_contents(
+        ica_output_folder_id: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
             ),
@@ -197,8 +201,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
         user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
 
-        output_folder_path: str = f'{sequencing_group.dataset.name}/{sequencing_group.name}/'
-
         align_genotype_job = get_batch().new_python_job(
             name='AlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
@@ -206,19 +208,23 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         align_genotype_job.image(image=image_path('cpg_workflows'))
         align_genotype_job.call(
             run_align_genotype_with_dragen.run,
-            cram_id=cram_id,
-            cram_index_id=cram_index_id,
+            cram_id=cram_fid,
+            cram_index_id=crai_fid,
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            output_folder_path=output_folder_path,
+            ica_output_folder_id=ica_output_folder_id,
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,
             user_reference=user_reference,
             api_root=ICA_REST_ENDPOINT,
         )
-        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=align_genotype_job)
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=align_genotype_job,
+        )
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])

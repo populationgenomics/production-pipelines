@@ -71,6 +71,6 @@ def run(
             ica_utils.register_output_to_gcp(
                 bucket=bucket_name,
                 object_contents='success',
-                object_name=item['name'],
+                object_name=f'{item["name"]}_upload_success',
                 gcp_folder=gcp_folder,
             )

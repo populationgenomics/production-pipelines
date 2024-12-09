@@ -25,7 +25,7 @@ def submit_dragen_run(
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
-    output_folder_id: str,
+    ica_output_folder_id: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -42,7 +42,7 @@ def submit_dragen_run(
             userTags=user_tags,
             referenceTags=reference_tags,
         ),
-        outputParentFolderId=output_folder_id,
+        outputParentFolderId=ica_output_folder_id,
         analysisInput=NextflowAnalysisInput(
             inputs=[
                 AnalysisDataInput(parameterCode='crams', dataIds=[cram_id]),
@@ -85,7 +85,7 @@ def run(
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
-    output_folder_path: str,
+    ica_output_folder_id: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -109,7 +109,7 @@ def run(
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            output_folder_id=get_output_folder_id(output_folder_path),
+            ica_output_folder_id=ica_output_folder_id,
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,
@@ -117,16 +117,19 @@ def run(
             project_id=path_params,
             api_instance=api_instance,
         )
+
+        # Wait 10 seconds just so we don't try call the API for pipeline status immediately
+        time.sleep(10)
         pipeline_status: str = ica_utils.check_ica_pipeline_status(
-            api_instance,
-            path_params | {'analysisId': analysis_run_id},
+            api_instance=api_instance,
+            path_params=path_params | {'analysisId': analysis_run_id},
         )
         # Other running statuses are REQUESTED AWAITINGINPUT INPROGRESS
         while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']:
             time.sleep(600 + randint(-60, 60))
             pipeline_status = ica_utils.check_ica_pipeline_status(
-                api_instance,
-                path_params | {'analysisId': analysis_run_id},
+                api_instance=api_instance,
+                path_params=path_params | {'analysisId': analysis_run_id},
             )
         if pipeline_status == 'SUCCEEDED':
             pass
