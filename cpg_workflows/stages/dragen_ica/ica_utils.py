@@ -63,6 +63,7 @@ def check_object_already_exists(
             'filename': [file_name],
             'filenameMatchMode': 'EXACT',
         } | query_params
+    logging.info(f'{query_params}')
     check_object: str = f'{folder_path}/{file_name}' if object_type == 'FILE' else folder_path
     logging.info(f'Checking to see if the {object_type} object already exists at {check_object}')
     try:
