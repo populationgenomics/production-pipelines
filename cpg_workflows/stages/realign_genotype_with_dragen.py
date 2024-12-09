@@ -25,15 +25,6 @@ ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 coloredlogs.install(level=logging.INFO)
 
 
-def read_blob_contents(full_blob_path: str) -> str:
-    path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
-    gcp_bucket: str = path_components['bucket']
-    blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
-    storage_client = storage.Client()
-    blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
-    return blob_client.download_as_text()
-
-
 # No need to register this stage in Metamist I think, just ICA prep
 @stage(analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
@@ -121,17 +112,6 @@ class UploadDataToIca(SequencingGroupStage):
         return output_dict
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
-        cram_fid: str = read_blob_contents(
-            full_blob_path=str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
-            ),
-        )
-        crai_fid: str = read_blob_contents(
-            full_blob_path=str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
-            ),
-        )
-
         cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
         cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
         bucket_name: str = cram_path_components['bucket']
@@ -140,12 +120,16 @@ class UploadDataToIca(SequencingGroupStage):
             {
                 'name': f'{cram_path_components["file"]}',
                 'full_path': cram,
-                'id': cram_fid,
+                'id_path': str(
+                    inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
+                ),
             },
             {
                 'name': f'{cram_path_components["file"]}.crai',
                 'full_path': f'{cram}.crai',
-                'id': crai_fid,
+                'id_path': str(
+                    inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
+                ),
             },
         ]
 
@@ -177,22 +161,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_fid: str = read_blob_contents(
-            full_blob_path=str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
-            ),
-        )
-        crai_fid: str = read_blob_contents(
-            full_blob_path=str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
-            ),
-        )
-        ica_output_folder_id: str = read_blob_contents(
-            full_blob_path=str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
-            ),
-        )
-
         gcp_bucket: str = get_path_components_from_gcp_path(sequencing_group.cram)['bucket']
 
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
@@ -213,12 +181,18 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         align_genotype_job.call(
             run_align_genotype_with_dragen.run,
             cram_name=sequencing_group.name,
-            cram_id=cram_fid,
-            cram_index_id=crai_fid,
+            cram_id_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
+            ),
+            cram_index_id_apth=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
+            ),
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            ica_output_folder_id=ica_output_folder_id,
+            ica_output_folder_id_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
+            ),
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,

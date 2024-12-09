@@ -81,12 +81,12 @@ def submit_dragen_run(
 
 def run(
     cram_name: str,
-    cram_id: str,
-    cram_index_id: str,
+    cram_id_path: str,
+    cram_index_id_path: str,
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
-    ica_output_folder_id: str,
+    ica_output_folder_id_path: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -107,12 +107,12 @@ def run(
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
         path_params: dict[str, str] = {'projectId': project_id}
         analysis_run_id: str = submit_dragen_run(
-            cram_id=cram_id,
-            cram_index_id=cram_index_id,
+            cram_id=ica_utils.read_blob_contents(full_blob_path=cram_id_path),
+            cram_index_id=ica_utils.read_blob_contents(full_blob_path=cram_index_id_path),
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            ica_output_folder_id=ica_output_folder_id,
+            ica_output_folder_id=ica_utils.read_blob_contents(full_blob_path=ica_output_folder_id_path),
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,

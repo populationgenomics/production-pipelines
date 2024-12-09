@@ -8,6 +8,8 @@ from google.cloud import secretmanager, storage
 from icasdk.apis.tags import project_analysis_api, project_data_api
 from icasdk.model.create_data import CreateData
 
+from cpg_utils.cloud import get_path_components_from_gcp_path
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -127,3 +129,12 @@ def register_output_to_gcp(bucket: str, object_contents: str, object_name: str, 
     upload_name_and_prefix: str = f'{gcp_folder}/{object_name}'
     blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
     blob_client.upload_from_string(data=object_contents)
+
+
+def read_blob_contents(full_blob_path: str) -> str:
+    path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
+    gcp_bucket: str = path_components['bucket']
+    blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
+    storage_client = storage.Client()
+    blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
+    return blob_client.download_as_text()

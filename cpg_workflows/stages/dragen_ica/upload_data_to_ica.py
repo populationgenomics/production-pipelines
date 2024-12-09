@@ -65,7 +65,7 @@ def run(
             upload_url: str = create_upload_url(
                 upload_api_instance=upload_api_instance,
                 path_params=path_parameters,
-                file_id=item['id'],
+                file_id=ica_utils.read_blob_contents(full_blob_path=item['id_path']),
             )
             upload_data(upload_url=upload_url, gcp_path=item['full_path'], object_name=item['name'], bucket=bucket_name)
             ica_utils.register_output_to_gcp(
