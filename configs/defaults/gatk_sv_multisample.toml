@@ -37,6 +37,8 @@ run_module_metrics = false
 
 [resource_overrides.GenotypeBatch]
 run_module_metrics = false
+n_per_split = 5001
+n_gt_bins = 100000
 
 [resource_overrides.MakeCohortVcf]
 run_module_metrics = false
