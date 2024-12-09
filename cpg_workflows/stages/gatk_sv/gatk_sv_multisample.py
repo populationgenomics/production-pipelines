@@ -690,7 +690,10 @@ class GenotypeBatch(CohortStage):
         input_dict: dict[str, Any] = {
             'batch': cohort.id,
             'n_per_split': config_retrieve(['resource_overrides', 'GenotypeBatch', 'n_per_split'], 5000),
-            'n_RD_genotype_bins': config_retrieve(['resource_overrides', 'GenotypeBatch', 'n_RD_genotype_bins'], 100000),
+            'n_RD_genotype_bins': config_retrieve(
+                ['resource_overrides', 'GenotypeBatch', 'n_RD_genotype_bins'],
+                100000,
+            ),
             'coveragefile': batchevidence_d['merged_bincov'],
             'coveragefile_index': batchevidence_d['merged_bincov_index'],
             'discfile': batchevidence_d['merged_PE'],
