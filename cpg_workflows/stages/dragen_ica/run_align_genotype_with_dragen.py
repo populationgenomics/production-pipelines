@@ -80,6 +80,7 @@ def submit_dragen_run(
 
 
 def run(
+    cram_name: str,
     cram_id: str,
     cram_index_id: str,
     dragen_ht_id: str,
@@ -90,6 +91,8 @@ def run(
     technical_tags: list[str],
     reference_tags: list[str],
     user_reference: str,
+    gcp_bucket: str,
+    pipeline_registration_path: str,
     api_root: str,
 ) -> None:
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
@@ -132,6 +135,11 @@ def run(
                 path_params=path_params | {'analysisId': analysis_run_id},
             )
         if pipeline_status == 'SUCCEEDED':
-            pass
+            ica_utils.register_output_to_gcp(
+                bucket=gcp_bucket,
+                object_contents=analysis_run_id,
+                object_name=f'{cram_name}_pipeline_id',
+                gcp_folder=pipeline_registration_path,
+            )
         else:
             raise Exception

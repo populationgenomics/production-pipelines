@@ -16,7 +16,9 @@ from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput
 if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
-GCP_FOLDER_FOR_ICA_UPLOAD: Final = 'ica/prepare'
+GCP_FOLDER_FOR_ICA_PREP: Final = 'ica/prepare'
+GCP_FOLDER_FOR_RUNNING_PIPELINE: Final = 'ica/pipelines'
+GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = f'ica/{config_retrieve(["ica", "pipelines", "dragen_version"])}'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 
 
@@ -46,13 +48,13 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))["bucket"]}'
         output_dict = {
             'cram_fid': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram_ica_file_id',
             ),
             'crai_fid': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram.crai_ica_file_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.dragen_ouput_folder_id',
             ),
         }
         return output_dict
@@ -72,12 +74,12 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         prepare_ica_job.call(
             prepare_ica_for_analysis.run,
             cram=cram,
-            upload_folder=config_retrieve(['dragen', 'upload_folder']),
-            ica_analysis_output_folder=config_retrieve(['dragen', 'output_folder']),
+            upload_folder=config_retrieve(['ica', 'data_prep', 'upload_folder']),
+            ica_analysis_output_folder=config_retrieve(['ica', 'data_prep', 'output_folder']),
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
             bucket_name=bucket_name,
-            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
+            gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
         )
 
         return self.make_outputs(
@@ -110,10 +112,10 @@ class UploadDataToIca(SequencingGroupStage):
         sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
         output_dict: dict[str, cpg_utils.Path] = {
             'cram_upload_success': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_upload_success',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram_upload_success',
             ),
             'crai_upload_success': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_upload_success',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.crai_upload_success',
             ),
         }
         return output_dict
@@ -158,7 +160,7 @@ class UploadDataToIca(SequencingGroupStage):
             upload_data_to_ica.run,
             cram_data_mapping=cram_data_mapping,
             bucket_name=bucket_name,
-            gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
+            gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
             api_root=ICA_REST_ENDPOINT,
         )
 
@@ -190,6 +192,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
             ),
         )
+
+        gcp_bucket: str = get_path_components_from_gcp_path(sequencing_group.cram)['bucket']
 
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
 
