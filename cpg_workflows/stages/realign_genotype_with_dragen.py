@@ -212,6 +212,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         align_genotype_job.image(image=image_path('cpg_workflows'))
         align_genotype_job.call(
             run_align_genotype_with_dragen.run,
+            cram_name=sequencing_group.name,
             cram_id=cram_fid,
             cram_index_id=crai_fid,
             dragen_ht_id=dragen_ht_id,
@@ -222,6 +223,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             technical_tags=technical_tags,
             reference_tags=reference_tags,
             user_reference=user_reference,
+            gcp_bucket=gcp_bucket,
+            pipeline_registration_path=GCP_FOLDER_FOR_RUNNING_PIPELINE,
             api_root=ICA_REST_ENDPOINT,
         )
         return self.make_outputs(
