@@ -46,8 +46,10 @@ def run(
         api_instance = project_data_api.ProjectDataApi(api_client)
         for item in data_setup:
             folder_path: str = f'/{bucket_name}/{upload_folder}'
+            output_object_name: str = f'{item["object"]}_ica_file_id'
             if item['object_type'] == 'FOLDER':
                 folder_path = f'/{bucket_name}/{ica_analysis_output_folder}'
+                output_object_name = f'{item["object"]}_dragen_output_folder_id'
             logging.info(f'File is: {item["object"]}, object type is {item["object_type"]}')
             object_id: str = ica_utils.create_upload_object_id(
                 api_instance=api_instance,
@@ -57,4 +59,9 @@ def run(
                 folder_path=folder_path,
                 object_type=item['object_type'],
             )
-            ica_utils.register_output_to_gcp(bucket_name, object_id, f'{item["object"]}_ica_file_id', gcp_folder)
+            ica_utils.register_output_to_gcp(
+                bucket=bucket_name,
+                object_contents=object_id,
+                object_name=output_object_name,
+                gcp_folder=gcp_folder,
+            )
