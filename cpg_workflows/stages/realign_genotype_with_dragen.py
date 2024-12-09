@@ -7,7 +7,7 @@ from google.cloud import storage
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from cpg_utils.config import config_retrieve, get_access_level, image_path
+from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.stages.dragen_ica import prepare_ica_for_analysis, run_align_genotype_with_dragen, upload_data_to_ica
 from cpg_workflows.targets import SequencingGroup
@@ -59,18 +59,17 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        # suffix: str = cram_path_components['suffix']
         cram: str = cram_path_components['file']
         bucket_name = cram_path_components['bucket']
         logging.info(bucket_name)
 
-        upload_job: PythonJob = get_batch().new_python_job(
+        prepare_ica_job: PythonJob = get_batch().new_python_job(
             name='UploadDataToIca',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
-        upload_job.image(image=image_path('cpg_workflows'))
+        prepare_ica_job.image(image=image_path('cpg_workflows'))
 
-        upload_job.call(
+        prepare_ica_job.call(
             prepare_ica_for_analysis.run,
             cram=cram,
             upload_folder=config_retrieve(['dragen', 'upload_folder']),
@@ -81,7 +80,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
         )
 
-        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
+        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=prepare_ica_job)
 
 
 @stage(
@@ -167,8 +166,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_id: str = self.read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
-        cram_index_id: str = self.read_blob_contents(
+        cram_id: str = read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
+        cram_index_id: str = read_blob_contents(
             str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_index_id')),
         )
 

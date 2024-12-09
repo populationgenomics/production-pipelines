@@ -62,5 +62,5 @@ def run(
         upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
         for item in cram_data_mapping:
             upload_url: str = create_upload_url(upload_api_instance, path_parameters, item['id'])
-            upload_data(upload_url, item['file'], bucket_name)
+            upload_data(upload_url, item['full_path'], bucket_name)
             ica_utils.register_output_to_gcp(bucket_name, 'success', item['name'], gcp_folder)

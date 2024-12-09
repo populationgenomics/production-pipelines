@@ -5,7 +5,6 @@ import coloredlogs
 import icasdk
 from icasdk.apis.tags import project_data_api
 
-from cpg_utils.config import get_gcp_project
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
