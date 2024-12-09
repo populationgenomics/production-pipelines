@@ -25,6 +25,15 @@ ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 coloredlogs.install(level=logging.INFO)
 
 
+def read_blob_contents(full_blob_path: str) -> str:
+    path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
+    gcp_bucket: str = path_components['bucket']
+    blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
+    storage_client = storage.Client()
+    blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
+    return blob_client.download_as_text()
+
+
 # No need to register this stage in Metamist I think, just ICA prep
 @stage(analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
@@ -111,21 +120,13 @@ class UploadDataToIca(SequencingGroupStage):
         }
         return output_dict
 
-    def read_blob_contents(self, full_blob_path: str) -> str:
-        path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
-        gcp_bucket: str = path_components['bucket']
-        blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
-        storage_client = storage.Client()
-        blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
-        return blob_client.download_as_text()
-
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
-        cram_fid: str = self.read_blob_contents(
+        cram_fid: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
             ),
         )
-        crai_fid: str = self.read_blob_contents(
+        crai_fid: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
             ),
@@ -175,26 +176,18 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
     ) -> cpg_utils.Path:
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
-    def read_blob_contents(self, full_blob_path: str) -> str:
-        path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
-        gcp_bucket: str = path_components['bucket']
-        blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
-        storage_client = storage.Client()
-        blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
-        return blob_client.download_as_text()
-
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_fid: str = self.read_blob_contents(
+        cram_fid: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
             ),
         )
-        crai_fid: str = self.read_blob_contents(
+        crai_fid: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
             ),
         )
-        ica_output_folder_id: str = self.read_blob_contents(
+        ica_output_folder_id: str = read_blob_contents(
             full_blob_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
             ),
