@@ -58,9 +58,9 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         return output_dict
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
+        cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
         cram: str = cram_path_components['file']
-        bucket_name = cram_path_components['bucket']
+        bucket_name: str = cram_path_components['bucket']
         logging.info(bucket_name)
 
         prepare_ica_job: PythonJob = get_batch().new_python_job(
@@ -80,7 +80,11 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
         )
 
-        return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=prepare_ica_job)
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=prepare_ica_job,
+        )
 
 
 @stage(
@@ -97,7 +101,7 @@ class UploadDataToIca(SequencingGroupStage):
         logging.info(f'Checking blob size for {cram}')
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
-        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(f'{cram}').size
+        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(blob_name=f'{cram}').size
         storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
         logging.info(f'Calculated storage is {storage_size}Gi.')
         return f'{storage_size}Gi'
@@ -116,10 +120,10 @@ class UploadDataToIca(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
         cram_fid: str = read_blob_contents(
-            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'cram_fid')),
+            str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid')),
         )
         crai_fid: str = read_blob_contents(
-            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'crai_fid')),
+            str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid')),
         )
 
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
@@ -159,6 +163,7 @@ class UploadDataToIca(SequencingGroupStage):
 
 @stage(analysis_type='dragen_align_genotype', required_stages=[UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
+    # Output object with pipeline ID to GCP
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
@@ -166,9 +171,20 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_id: str = read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
-        cram_index_id: str = read_blob_contents(
-            str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_index_id')),
+        cram_fid: str = read_blob_contents(
+            full_blob_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
+            ),
+        )
+        crai_fid: str = read_blob_contents(
+            full_blob_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
+            ),
+        )
+        ica_analysis_output_fid: str = read_blob_contents(
+            full_blob_path=str(
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
+            ),
         )
 
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])

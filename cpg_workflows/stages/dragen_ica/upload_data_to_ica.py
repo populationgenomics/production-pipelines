@@ -30,17 +30,18 @@ def create_upload_url(
 
 def upload_data(
     upload_url: str,
-    data_to_upload: str,
+    gcp_path: str,
+    object_name: str,
     bucket: str,
 ) -> None:
     storage_client = storage.Client()
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
-    blob_to_download = gcp_bucket.get_blob(f'{data_to_upload}')
-    blob_to_download.download_to_filename(data_to_upload, timeout=3600)
+    blob_to_download = gcp_bucket.get_blob(f'{gcp_path}')
+    blob_to_download.download_to_filename(object_name, timeout=3600)
 
     logging.info('Uploading data with cURL')
-    subprocess.run(['curl', '--upload-file', data_to_upload, f'{upload_url}'])
+    subprocess.run(['curl', '--upload-file', object_name, f'{upload_url}'])
 
 
 def run(
@@ -61,6 +62,15 @@ def run(
     with icasdk.ApiClient(configuration) as upload_api_client:
         upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
         for item in cram_data_mapping:
-            upload_url: str = create_upload_url(upload_api_instance, path_parameters, item['id'])
-            upload_data(upload_url, item['full_path'], bucket_name)
-            ica_utils.register_output_to_gcp(bucket_name, 'success', item['name'], gcp_folder)
+            upload_url: str = create_upload_url(
+                upload_api_instance=upload_api_instance,
+                path_params=path_parameters,
+                file_id=item['id'],
+            )
+            upload_data(upload_url=upload_url, gcp_path=item['full_path'], object_name=item['name'], bucket=bucket_name)
+            ica_utils.register_output_to_gcp(
+                bucket=bucket_name,
+                object_contents='success',
+                object_name=item['name'],
+                gcp_folder=gcp_folder,
+            )
