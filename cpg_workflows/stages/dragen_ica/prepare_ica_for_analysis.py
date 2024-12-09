@@ -58,4 +58,4 @@ def run(
                 folder_path=folder_path,
                 object_type=item['object_type'],
             )
-            ica_utils.register_output_to_gcp(bucket_name, object_id, item['object'], gcp_folder)
+            ica_utils.register_output_to_gcp(bucket_name, object_id, f'{item["object"]}_ica_file_id', gcp_folder)

@@ -23,7 +23,17 @@ ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 coloredlogs.install(level=logging.INFO)
 
 
-@stage(analysis_type='prepare_ica_for_analysis', analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
+def read_blob_contents(full_blob_path: str) -> str:
+    path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
+    gcp_bucket: str = path_components['bucket']
+    blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
+    storage_client = storage.Client()
+    blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
+    return blob_client.download_as_text()
+
+
+# No need to register this stage in Metamist I think, just ICA prep
+@stage(analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     """Set up ICA for a single realignment run.
 
@@ -84,34 +94,50 @@ class UploadDataToIca(SequencingGroupStage):
         self,
         cram: str,
         bucket_name: str,
-        suffix: str,
     ) -> str:
         storage_client = storage.Client()
         gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
-        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(f'{suffix}{cram}').size
+        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(f'{cram}').size
         storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
+        logging.info(f'Calculated storage is {storage_size}Gi.')
         return f'{storage_size}Gi'
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+        sg_bucket: str = f'{get_path_components_from_gcp_path(str(sequencing_group.cram))["bucket"]}'
         output_dict: dict[str, cpg_utils.Path] = {
-            'cram_id': cpg_utils.to_path(
-                f'gs://cpg-{sequencing_group.dataset.name.replace("-test", "")}-{get_access_level()}',
-            )
-            / GCP_FOLDER_FOR_ICA_UPLOAD
-            / f'{sequencing_group.name}.cram_ica_file_id',
-            'cram_index_id': cpg_utils.to_path(
-                f'gs://cpg-{sequencing_group.dataset.name.replace("-test", "")}-{get_access_level()}',
-            )
-            / GCP_FOLDER_FOR_ICA_UPLOAD
-            / f'{sequencing_group.name}.cram.crai_ica_file_id',
+            'cram_upload_success': cpg_utils.to_path(
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_upload_success',
+            ),
+            'cram_index_upload_success': cpg_utils.to_path(
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_index_upload_success',
+            ),
         }
         return output_dict
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
+        cram_fid: str = read_blob_contents(
+            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'cram_fid')),
+        )
+        cram_index_fid: str = read_blob_contents(
+            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'cram_index_fid')),
+        )
+
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
-        suffix: str = cram_path_components['suffix']
-        cram: str = cram_path_components['file']
+        cram: str = f'{cram_path_components["suffix"]}/{cram_path_components["file"]}'
         bucket_name = cram_path_components['bucket']
+
+        cram_data_mapping: list[dict[str, str]] = [
+            {
+                'name': f'{cram_path_components["file"]}',
+                'full_path': cram,
+                'id': cram_fid,
+            },
+            {
+                'name': f'{cram_path_components["file"]}.crai',
+                'full_path': f'{cram}.crai',
+                'id': cram_index_fid,
+            },
+        ]
 
         upload_job: PythonJob = get_batch().new_python_job(
             name='UploadDataToIca',
@@ -119,15 +145,13 @@ class UploadDataToIca(SequencingGroupStage):
         )
         upload_job.image(image=image_path('cpg_workflows'))
 
-        upload_job.storage(self.calculate_needed_storage(cram, bucket_name, suffix))
+        upload_job.storage(self.calculate_needed_storage(cram, bucket_name))
         upload_job.call(
             upload_data_to_ica.run,
-            suffix=suffix,
-            cram=cram,
+            cram_data_mapping=cram_data_mapping,
             bucket_name=bucket_name,
-            upload_folder=config_retrieve(['dragen', 'upload_folder']),
-            api_root=ICA_REST_ENDPOINT,
             gcp_folder=GCP_FOLDER_FOR_ICA_UPLOAD,
+            api_root=ICA_REST_ENDPOINT,
         )
 
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
@@ -140,14 +164,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
         return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
-
-    def read_blob_contents(self, full_blob_path: str) -> str:
-        path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
-        gcp_bucket: str = path_components['bucket']
-        blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
-        storage_client = storage.Client()
-        blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
-        return blob_client.download_as_text()
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_id: str = self.read_blob_contents(str(inputs.as_path(sequencing_group, UploadDataToIca, 'cram_id')))
