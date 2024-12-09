@@ -49,7 +49,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_ica_file_id',
             ),
             'cram_index_fid': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_ica_file_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.dragen_ouput_folder_id',
@@ -108,8 +108,8 @@ class UploadDataToIca(SequencingGroupStage):
             'cram_upload_success': cpg_utils.to_path(
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_upload_success',
             ),
-            'cram_index_upload_success': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.cram_index_upload_success',
+            'crai_upload_success': cpg_utils.to_path(
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_UPLOAD}/{sequencing_group.name}.crai_upload_success',
             ),
         }
         return output_dict
@@ -118,8 +118,8 @@ class UploadDataToIca(SequencingGroupStage):
         cram_fid: str = read_blob_contents(
             str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'cram_fid')),
         )
-        cram_index_fid: str = read_blob_contents(
-            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'cram_index_fid')),
+        crai_fid: str = read_blob_contents(
+            str(inputs.as_path(sequencing_group, PrepareIcaForDragenAnalysis, 'crai_fid')),
         )
 
         cram_path_components = get_path_components_from_gcp_path(str(sequencing_group.cram))
@@ -135,7 +135,7 @@ class UploadDataToIca(SequencingGroupStage):
             {
                 'name': f'{cram_path_components["file"]}.crai',
                 'full_path': f'{cram}.crai',
-                'id': cram_index_fid,
+                'id': crai_fid,
             },
         ]
 
