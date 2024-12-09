@@ -91,6 +91,7 @@ def create_upload_object_id(
         folder_path=folder_path,
         object_type=object_type,
     )
+    logging.info(f'{existing_object_id}')
     if existing_object_id:
         return existing_object_id
     try:
