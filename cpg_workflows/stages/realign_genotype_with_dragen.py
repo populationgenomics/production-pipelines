@@ -184,7 +184,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             cram_id_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
             ),
-            cram_index_id_apth=str(
+            cram_index_id_path=str(
                 inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
             ),
             dragen_ht_id=dragen_ht_id,
