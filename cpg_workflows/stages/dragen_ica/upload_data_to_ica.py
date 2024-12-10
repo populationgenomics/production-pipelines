@@ -15,6 +15,19 @@ def create_upload_url(
     path_params: dict[str, str],
     file_id: str,
 ) -> str:
+    """Generate a presigned URL to upload data to ICA
+
+    Args:
+        upload_api_instance (project_data_api.ProjectDataApi): An instance of the ProjectDataApi.
+        path_params (dict[str, str]): A Dict of {projectId: id, dataId: id}.
+        file_id (str): The ID to populate the path_params dict with.
+
+    Raises:
+        icasdk.ApiException: Raises API errors if the API call is formatted incorrectly.
+
+    Returns:
+        str: A presigned URL that can be used to upload data.
+    """
     upload_url_path_params: dict[str, str] = path_params | {'dataId': file_id}
     query_params: dict[Any, Any] = {}
     try:
@@ -34,6 +47,14 @@ def upload_data(
     object_name: str,
     bucket: str,
 ) -> None:
+    """Uploads data to ICA, via intermediate download to running VM
+
+    Args:
+        upload_url (str): The presigned URL to upload the data to
+        gcp_path (str): The path in GCP to the object to upload, without gs:// or the bucket name
+        object_name (str): The name of the object, used for local download
+        bucket (str): The bucket that the object is in in GCP (e.g. fewgenomes-test)
+    """
     storage_client = storage.Client()
 
     gcp_bucket = storage_client.bucket(bucket_name=bucket)
@@ -49,7 +70,15 @@ def run(
     bucket_name: str,
     gcp_folder: str,
     api_root: str,
-):
+) -> None:
+    """Generate a presigned URL per file, and upload the CRAM and CRAI to them.
+
+    Args:
+        cram_data_mapping (list[dict[str, str]]): List of dicts, format {name: file_name, full_path: path in gcp minus gs:// and bucket, id_path: GCP path to previous stage output with object ID}
+        bucket_name (str): The name of the GCP bucket where the data reside.
+        gcp_folder (str): The GCP folder where successful outputs will be written to
+        api_root (str): The ICA API endpoint
+    """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']

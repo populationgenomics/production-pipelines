@@ -18,6 +18,14 @@ coloredlogs.install(level=logging.INFO)
 
 
 def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
+    """Gets the project ID and API key used to interact with ICA
+
+    Raises:
+        Exception: Any exception, as we want to fail if we can't get the credentials for any reason
+
+    Returns:
+        dict[str, str]: A dictionary with the keys projectID and apiKey
+    """
     SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
     SECRET_PROJECT = 'cpg-common'
     SECRET_NAME = 'illumina_cpg_workbench_api'
@@ -40,6 +48,18 @@ def check_ica_pipeline_status(
     api_instance: project_analysis_api.ProjectAnalysisApi,
     path_params: dict[str, str],
 ) -> str:
+    """Check the status of an ICA pipeline via a pipeline ID
+
+    Args:
+        api_instance (project_analysis_api.ProjectAnalysisApi): An instance of the ProjectAnalysisApi
+        path_params (dict[str, str]): Dict with projectId and analysisId
+
+    Raises:
+        icasdk.ApiException: Any exception if the API call is incorrect
+
+    Returns:
+        str: The status of the pipeline. Can be one of ['REQUESTED', 'AWAITINGINPUT', 'INPROGRESS', 'SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']
+    """
     try:
         api_response = api_instance.get_analysis(path_params=path_params)
         pipeline_status: str = api_response.body['status']
@@ -55,6 +75,23 @@ def check_object_already_exists(
     folder_path: str,
     object_type: str,
 ) -> str | None:
+    """Check if an object already exists in ICA, as trying to create another object at
+    the same path causes an error
+
+    Args:
+        api_instance (project_data_api.ProjectDataApi): An instance of the ProjectDataApi
+        path_params (dict[str, str]): A dict with the projectId
+        file_name (str): The name of the object that you want to check in ICA e.g.
+        folder_path (str): _description_
+        object_type (str): _description_
+
+    Raises:
+        NotImplementedError: _description_
+        icasdk.ApiException: _description_
+
+    Returns:
+        str | None: _description_
+    """
     query_params: dict[str, Sequence[str] | list[str] | str] = {
         'filePath': [f'{folder_path}/{file_name}'],
         'filePathMatchMode': 'STARTS_WITH_CASE_INSENSITIVE',

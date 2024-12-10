@@ -17,6 +17,18 @@ def run(
     bucket_name: str,
     gcp_folder: str,
 ) -> None:
+    """Prepare ICA for data upload and pipeline runs by generating a file ID for
+    the CRAM and CRAI files, and a folder ID for the outputs of the Dragen pipeline.
+
+    Args:
+        cram (str): The filename of the CRAM that is to be uploaded
+        upload_folder (str): The folder in which data should be uploaded into
+        ica_analysis_output_folder (str): The folder that outputs from the pipeline run should be written to
+        api_root (str): The ICA API endpoint
+        sg_name (str): The name of the sequencing group
+        bucket_name (str): The  name of the GCP bucket that the data reside in
+        gcp_folder (str): The path to the folder in GCP that expected outputs should be written to
+    """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
