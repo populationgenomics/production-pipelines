@@ -10,7 +10,13 @@ from icasdk.apis.tags import project_analysis_api
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
-def run(ica_pipeline_id: str, api_root: str, gcp_bucket: str, sg_name: str, pipeline_registration_path: str) -> None:
+def run(
+    ica_pipeline_id_path: str,
+    api_root: str,
+    gcp_bucket: str,
+    sg_name: str,
+    pipeline_registration_path: str,
+) -> None:
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
@@ -19,6 +25,8 @@ def run(ica_pipeline_id: str, api_root: str, gcp_bucket: str, sg_name: str, pipe
 
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
+
+    ica_pipeline_id: str = ica_utils.read_blob_contents(full_blob_path=ica_pipeline_id_path)
 
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)

@@ -158,7 +158,7 @@ class UploadDataToIca(SequencingGroupStage):
         return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs=upload_job)
 
 
-@stage(analysis_type='dragen_align_genotype', required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
+@stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
     # Output object with pipeline ID to GCP
     def expected_outputs(
@@ -216,7 +216,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
 
 
-@stage(required_stages=[AlignGenotypeWithDragen])
+@stage(analysis_type='dragen_align_genotype', required_stages=[AlignGenotypeWithDragen])
 class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
