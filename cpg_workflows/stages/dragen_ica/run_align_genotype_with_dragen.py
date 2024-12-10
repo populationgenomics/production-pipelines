@@ -119,25 +119,10 @@ def run(
             api_instance=api_instance,
         )
 
-        # Wait 10 seconds just so we don't try call the API for pipeline status immediately
-        time.sleep(10)
-        pipeline_status: str = ica_utils.check_ica_pipeline_status(
-            api_instance=api_instance,
-            path_params=path_params | {'analysisId': analysis_run_id},
+        logging.info(f'Submitted ICA run with pipeline ID: {analysis_run_id}')
+        ica_utils.register_output_to_gcp(
+            bucket=gcp_bucket,
+            object_contents=analysis_run_id,
+            object_name=f'{cram_name}_pipeline_id',
+            gcp_folder=pipeline_registration_path,
         )
-        # Other running statuses are REQUESTED AWAITINGINPUT INPROGRESS
-        while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']:
-            time.sleep(600 + randint(-60, 60))
-            pipeline_status = ica_utils.check_ica_pipeline_status(
-                api_instance=api_instance,
-                path_params=path_params | {'analysisId': analysis_run_id},
-            )
-        if pipeline_status == 'SUCCEEDED':
-            ica_utils.register_output_to_gcp(
-                bucket=gcp_bucket,
-                object_contents=analysis_run_id,
-                object_name=f'{cram_name}_pipeline_id',
-                gcp_folder=pipeline_registration_path,
-            )
-        else:
-            raise Exception

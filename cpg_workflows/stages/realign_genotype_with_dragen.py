@@ -5,11 +5,18 @@ from typing import TYPE_CHECKING, Final
 import coloredlogs
 from google.cloud import storage
 
+from hailtop.batch.job import PythonJob
+
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.stages.dragen_ica import prepare_ica_for_analysis, run_align_genotype_with_dragen, upload_data_to_ica
+from cpg_workflows.stages.dragen_ica import (
+    monitor_align_genotype_with_dragen,
+    prepare_ica_for_analysis,
+    run_align_genotype_with_dragen,
+    upload_data_to_ica,
+)
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
@@ -158,11 +165,9 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         self,
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
-        return cpg_utils.to_path(f'{sequencing_group.dataset.name}/{sequencing_group.name}/')
+        return cpg_utils.to_path(f'{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_id')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        gcp_bucket: str = get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket']
-
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
 
         dragen_ht_id: str = config_retrieve(['ica', 'reference_ids', 'dragen_ht_id'])
@@ -173,7 +178,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
         user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
 
-        align_genotype_job = get_batch().new_python_job(
+        align_genotype_job: PythonJob = get_batch().new_python_job(
             name='AlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
@@ -197,7 +202,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             technical_tags=technical_tags,
             reference_tags=reference_tags,
             user_reference=user_reference,
-            gcp_bucket=gcp_bucket,
+            gcp_bucket=get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket'],
             pipeline_registration_path=GCP_FOLDER_FOR_RUNNING_PIPELINE,
             api_root=ICA_REST_ENDPOINT,
         )
@@ -205,6 +210,35 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             target=sequencing_group,
             data=self.expected_outputs(sequencing_group=sequencing_group),
             jobs=align_genotype_job,
+        )
+
+
+@stage(required_stages=[AlignGenotypeWithDragen])
+class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
+        return cpg_utils.to_path(f'{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_success')
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        ica_pipeline_id = str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen))
+
+        monitor_pipeline_run: PythonJob = get_batch().new_python_job(
+            name='MonitorAlignGenotypeWithDragen',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+        )
+
+        monitor_pipeline_run.image(image=image_path('cpg_workflows'))
+        monitor_pipeline_run.call(
+            monitor_align_genotype_with_dragen.run,
+            ica_pipeline_id=ica_pipeline_id,
+            api_root=ICA_REST_ENDPOINT,
+            gcp_bucket=get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket'],
+            sg_name=sequencing_group.name,
+            pipeline_registration_path=GCP_FOLDER_FOR_RUNNING_PIPELINE,
+        )
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=monitor_pipeline_run,
         )
 
 
