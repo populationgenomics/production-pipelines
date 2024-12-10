@@ -281,7 +281,7 @@ class CancelIcaPipelineRun(SequencingGroupStage):
         pass
 
 
-@stage(analysis_type='ica_data_download', required_stages=[AlignGenotypeWithDragen, GvcfMlrWithDragen])
+@stage(analysis_type='ica_data_download', required_stages=[MonitorAlignGenotypeWithDragen, GvcfMlrWithDragen])
 class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
         self,
