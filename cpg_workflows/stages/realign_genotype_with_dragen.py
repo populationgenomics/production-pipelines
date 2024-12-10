@@ -45,7 +45,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram.crai_ica_file_id',
             ),
             'analysis_output_fid': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.dragen_ouput_folder_id',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}_dragen_ouput_folder_id',
             ),
         }
         return output_dict
