@@ -82,15 +82,15 @@ def check_object_already_exists(
         api_instance (project_data_api.ProjectDataApi): An instance of the ProjectDataApi
         path_params (dict[str, str]): A dict with the projectId
         file_name (str): The name of the object that you want to check in ICA e.g.
-        folder_path (str): _description_
-        object_type (str): _description_
+        folder_path (str): The path to the object that you want to create in ICA.
+        object_type (str): The type of hte object to create in ICA. Must be one of ['FILE', 'FOLDER']
 
     Raises:
-        NotImplementedError: _description_
-        icasdk.ApiException: _description_
+        NotImplementedError: Only checks for files with the status 'PARTIAL'
+        icasdk.ApiException: Other API errors
 
     Returns:
-        str | None: _description_
+        str | None: The object ID, if it exists, or else None
     """
     query_params: dict[str, Sequence[str] | list[str] | str] = {
         'filePath': [f'{folder_path}/{file_name}'],
@@ -127,6 +127,23 @@ def create_upload_object_id(
     folder_path: str,
     object_type: str,
 ) -> str:
+    """Create an object in ICA that can be used to upload data to,
+    or to write analysis outputs into
+
+    Args:
+        api_instance (project_data_api.ProjectDataApi): An instance of the ProjectDataApi
+        path_params (dict[str, str]): A dict with the projectId
+        sg_name (str): The name of the sequencing group
+        file_name (str): The name of the file to upload e.g. CPGxxxx.CRAM
+        folder_path (str): The base path to the object in ICA to create
+        object_type (str): The type of the object to create. Must be one of ['FILE', 'FOLDER']
+
+    Raises:
+        icasdk.ApiException: Any API error
+
+    Returns:
+        str: The ID of the object that was created, or the existing ID if it was already present.
+    """
     existing_object_id: str | None = check_object_already_exists(
         api_instance=api_instance,
         path_params=path_params,
@@ -162,6 +179,14 @@ def create_upload_object_id(
 
 
 def register_output_to_gcp(bucket: str, object_contents: str, object_name: str, gcp_folder: str) -> None:
+    """Register ICA steps into GCP, so that the workflow can reuse previous steps.
+
+    Args:
+        bucket (str): The bucket to write the object in
+        object_contents (str): The contents of the object. Usually an ICA ID, but can be any string.
+        object_name (str): The name of the object to wwrite.
+        gcp_folder (str): The prefix of the object.
+    """
     storage_client = storage.Client()
     upload_name_and_prefix: str = f'{gcp_folder}/{object_name}'
     blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
@@ -169,6 +194,14 @@ def register_output_to_gcp(bucket: str, object_contents: str, object_name: str, 
 
 
 def read_blob_contents(full_blob_path: str) -> str:
+    """Read the contents of a blob in GCP as text
+
+    Args:
+        full_blob_path (str): The full path to the blob, including gs://
+
+    Returns:
+        str: The contents of the blob as a string. e.g. fil.xxxxx (ICA ID)
+    """
     path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
     gcp_bucket: str = path_components['bucket']
     blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
