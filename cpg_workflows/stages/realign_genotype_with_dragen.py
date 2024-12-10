@@ -225,7 +225,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        ica_pipeline_id = str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen))
+        ica_pipeline_id_path = str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen))
 
         monitor_pipeline_run: PythonJob = get_batch().new_python_job(
             name='MonitorAlignGenotypeWithDragen',
@@ -235,7 +235,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         monitor_pipeline_run.image(image=image_path('cpg_workflows'))
         monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
-            ica_pipeline_id=ica_pipeline_id,
+            ica_pipeline_id_path=ica_pipeline_id_path,
             api_root=ICA_REST_ENDPOINT,
             gcp_bucket=get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket'],
             sg_name=sequencing_group.name,
