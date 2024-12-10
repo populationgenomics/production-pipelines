@@ -15,10 +15,6 @@ from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
-def get_output_folder_id(output_folder_path: str) -> str:
-    return 'fol.29ea0d0fbdb84e5cfb9408dd1496d01c'
-
-
 def submit_dragen_run(
     cram_id: str,
     cram_index_id: str,
@@ -60,11 +56,13 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='enable_duplicate_marking', value='True'),
                 AnalysisParameterInput(code='enable_variant_caller', value='True'),
                 AnalysisParameterInput(code='vc_emit_reference_confidence', value='GVCF'),
-                AnalysisParameterInput(code='vc-hard-filter', value='DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1'),
-                AnalysisParameterInput(code='vc-frd-max-effective-depth', value='40'),
-                AnalysisParameterInput(code='vc-enable-joint-detection', value='True'),
+                AnalysisParameterInput(code='vc_enable_vcf_output', value='False'),
                 AnalysisParameterInput(code='enable_cnv', value='True'),
                 AnalysisParameterInput(code='enable_sv', value='True'),
+                AnalysisParameterInput(
+                    code='additional_args',
+                    value='--vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true',
+                ),
             ],
         ),
     )
