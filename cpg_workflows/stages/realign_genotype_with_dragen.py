@@ -167,7 +167,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
     ) -> cpg_utils.Path:
         sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
         return cpg_utils.to_path(
-            f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_id',
+            f'gs://{sg_bucket}/{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_id',
         )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -219,7 +219,10 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 @stage(required_stages=[AlignGenotypeWithDragen])
 class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
-        return cpg_utils.to_path(f'{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_success')
+        sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
+        return cpg_utils.to_path(
+            f'gs://{sg_bucket}/{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_success',
+        )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         ica_pipeline_id = str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen))
