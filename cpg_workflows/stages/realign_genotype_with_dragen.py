@@ -106,7 +106,7 @@ class UploadDataToIca(SequencingGroupStage):
                 f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram_upload_success',
             ),
             'crai_upload_success': cpg_utils.to_path(
-                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.crai_upload_success',
+                f'gs://{sg_bucket}/{GCP_FOLDER_FOR_ICA_PREP}/{sequencing_group.name}.cram.crai_upload_success',
             ),
         }
         return output_dict
