@@ -165,7 +165,10 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         self,
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
-        return cpg_utils.to_path(f'{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_id')
+        sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
+        return cpg_utils.to_path(
+            f'gs://cpg-{sg_bucket}/{GCP_FOLDER_FOR_RUNNING_PIPELINE}/{sequencing_group.name}_pipeline_id',
+        )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
