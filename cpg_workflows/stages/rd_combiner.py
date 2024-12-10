@@ -175,7 +175,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'vcf': self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
+        return {'vcf': self.tmp_prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
