@@ -76,6 +76,8 @@ setup(
             'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
             # script to create a dense MatrixTable from a VDS input
             'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
+            # aggregate VEP results into a single HT
+            'vep_json_to_ht = cpg_workflows.scripts.vep_json_to_ht:cli_main',
         ],
     },
 )
