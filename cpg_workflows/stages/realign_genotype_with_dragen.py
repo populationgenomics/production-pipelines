@@ -23,9 +23,10 @@ from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput
 if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
-GCP_FOLDER_FOR_ICA_PREP: Final = 'ica/prepare'
-GCP_FOLDER_FOR_RUNNING_PIPELINE: Final = 'ica/pipelines'
-GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = f'ica/{config_retrieve(["ica", "pipelines", "dragen_version"])}'
+DRAGEN_VERSION: Final = config_retrieve(['ica', 'pipelines', 'dragen_version'])
+GCP_FOLDER_FOR_ICA_PREP: Final = f'ica/{DRAGEN_VERSION}/prepare/'
+GCP_FOLDER_FOR_RUNNING_PIPELINE: Final = f'ica/{DRAGEN_VERSION}/pipelines'
+GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = f'ica/{DRAGEN_VERSION}/output'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 
 
@@ -172,8 +173,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
-
         dragen_ht_id: str = config_retrieve(['ica', 'reference_ids', 'dragen_ht_id'])
+
         cram_reference_id: str = config_retrieve(['ica', 'reference_ids', 'cram_reference_id'])
 
         user_tags: list[str] = config_retrieve(['ica', 'tags', 'user_tags'])
