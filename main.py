@@ -45,6 +45,7 @@ from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, Minimi
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'align_and_genotype': [GvcfMultiQC, CramMultiQC],
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
     'exomiser': [RunExomiser, ExomiserSeqrTSV],
