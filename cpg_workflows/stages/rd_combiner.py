@@ -187,7 +187,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'
+        return self.tmp_prefix / 'gcloud_composed_sitesonly.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -346,7 +346,7 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
 )
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return self.prefix / 'vqsr.vcf.gz'
+        return self.tmp_prefix / 'vqsr.vcf.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
@@ -419,7 +419,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
         """
         Should this be in tmp? We'll never use it again maybe?
         """
-        return self.tmp_prefix / 'vep.ht'
+        return self.prefix / 'vep.ht'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -462,7 +462,7 @@ class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
         """
         Expected to write a matrix table.
         """
-        return self.prefix / 'annotate_cohort.mt'
+        return self.tmp_prefix / 'annotate_cohort.mt'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
