@@ -1,6 +1,6 @@
 import logging
 from math import ceil
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
 from google.cloud import storage
@@ -10,8 +10,9 @@ from hailtop.batch.job import PythonJob
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import Batch, get_batch
 from cpg_workflows.stages.dragen_ica import (
+    ica_utils,
     monitor_align_genotype_with_dragen,
     prepare_ica_for_analysis,
     run_align_genotype_with_dragen,
@@ -21,7 +22,7 @@ from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
 if TYPE_CHECKING:
-    from hailtop.batch.job import PythonJob
+    from hailtop.batch.job import BashJob, PythonJob
 
 DRAGEN_VERSION: Final = config_retrieve(['ica', 'pipelines', 'dragen_version'])
 GCP_FOLDER_FOR_ICA_PREP: Final = f'ica/{DRAGEN_VERSION}/prepare/'
@@ -31,6 +32,19 @@ ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
 
 
 coloredlogs.install(level=logging.INFO)
+
+
+def calculate_needed_storage(
+    cram: str,
+    bucket_name: str,
+) -> str:
+    logging.info(f'Checking blob size for {cram}')
+    storage_client = storage.Client()
+    gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
+    blob_to_upload_size_bytes: int = gcp_bucket.get_blob(blob_name=f'{cram}').size
+    storage_size: int = ceil(ceil((blob_to_upload_size_bytes / (1024**3)) + 3) * 1.2)
+    logging.info(f'Calculated storage is {storage_size}Gi.')
+    return f'{storage_size}Gi'
 
 
 # No need to register this stage in Metamist I think, just ICA prep
@@ -94,19 +108,6 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     required_stages=[PrepareIcaForDragenAnalysis],
 )
 class UploadDataToIca(SequencingGroupStage):
-    def calculate_needed_storage(
-        self,
-        cram: str,
-        bucket_name: str,
-    ) -> str:
-        logging.info(f'Checking blob size for {cram}')
-        storage_client = storage.Client()
-        gcp_bucket = storage_client.bucket(bucket_name=bucket_name)
-        blob_to_upload_size_bytes: int = gcp_bucket.get_blob(blob_name=f'{cram}').size
-        storage_size: int = ceil((blob_to_upload_size_bytes / (1024**3)) + 3)
-        logging.info(f'Calculated storage is {storage_size}Gi.')
-        return f'{storage_size}Gi'
-
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         sg_bucket: str = f'{get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))["bucket"]}'
         output_dict: dict[str, cpg_utils.Path] = {
@@ -147,7 +148,7 @@ class UploadDataToIca(SequencingGroupStage):
         )
         upload_job.image(image=image_path('cpg_workflows'))
 
-        upload_job.storage(self.calculate_needed_storage(cram, bucket_name))
+        upload_job.storage(calculate_needed_storage(cram, bucket_name))
         upload_job.call(
             upload_data_to_ica.run,
             cram_data_mapping=cram_data_mapping,
@@ -290,8 +291,42 @@ class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
-    ) -> None:
-        pass
+    ) -> cpg_utils.Path:
+        bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
+        return cpg_utils.to_path(f'gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}')
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        pass
+        secrets: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
+        cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
+        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
+        bucket_name: str = cram_path_components['bucket']
+        ica_analysis_folder_id_path: str = str(
+            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
+        )
+        batch_instance: Batch = get_batch()
+        ica_download_job: BashJob = batch_instance.new_bash_job(
+            name='DownloadDataFromIca',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+        )
+        ica_download_job.storage(storage=calculate_needed_storage(cram=cram, bucket_name=bucket_name))
+        # TODO add ICA image when ready
+        ica_download_job.image(image=image_path('placeholder for ica image'))
+
+        # Get secrets and folder ID needed for runtime
+        ica_analysis_folder_id = batch_instance.read_input(ica_analysis_folder_id_path)
+
+        # Download an entire folder with ICA. Don't log projectId
+        ica_download_job.command('set +x')
+        # Might also need API key here
+        ica_download_job.command(f'icav2 project enter {secrets["projectId"]}')
+        ica_download_job.command('set -x')
+        ica_download_job.command(f'icav2 projectdata download <(cat {ica_analysis_folder_id}) .')
+        ica_download_job.command(
+            f'gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}',
+        )
+
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=ica_download_job,
+        )
