@@ -69,7 +69,6 @@ As the seqr_loader pipeline used to be continuous with the alignment and genotyp
 - Train VQSR models on the genome-wide sites-only VCF
 - Run VQSR once per interval, by passing the whole-genome sites-only VCF and a single interval of interest
 - Combine VQSR results into a single VCF
-- Generate a separate sites-only VCF for each interval
 - Run VEP on each interval separately
 - Combine VEP results into a single Hail Table
 - Read the whole-genome VCF (with genotypes) as a MatrixTable
