@@ -45,7 +45,44 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
+SPECIFIC_VDS_QUERY = gql(
+    """
+    query getVDSByAnalysisId($vds_id: Int!) {
+        analyses(id: {eq: $vds_id}) {
+            output
+            sequencingGroups {
+                id
+            }
+        }
+    }
+""",
+)
 SHARD_MANIFEST = 'shard-manifest.txt'
+
+
+def query_for_specific_vds(vds_id: int) -> tuple[str, set[str]] | None:
+    """
+    query for a specific analysis of type entry_type for a dataset
+    if found, return the set of SG IDs in the VDS (using the metadata)
+
+    - stolen from the cpg_workflows.large_cohort.combiner Stage, but duplicated here so we can split pipelines without
+      further code changes
+
+    Args:
+        vds_id (int): analysis id to query for
+
+    Returns:
+        either None if the analysis wasn't found, or a set of SG IDs in the VDS
+    """
+
+    # query for the exact, single analysis entry
+    query_results: dict[str, dict] = query(SPECIFIC_VDS_QUERY, variables={'vds_id': vds_id})
+
+    if not query_results['analyses']:
+        return None
+    vds_path: str = query_results['analyses'][0]['output']
+    sg_ids = {sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']}
+    return vds_path, sg_ids
 
 
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
@@ -98,14 +135,26 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         # create these as empty lists instead of None, they have the same truthiness
         vds_path: str | None = None
-        sg_ids_in_vds: list[str] = []
+        sg_ids_in_vds: set[str] = set()
 
+        # check for existing VDS by getting all and fetching latest
         if config_retrieve(['workflow', 'check_for_existing_vds'], True):
-            # check for existing VDS
             get_logger(__file__).info('Checking for existing VDS')
             if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
                 vds_path = existing_vds_analysis_entry['output']
-                sg_ids_in_vds = [sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']]
+                sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
+
+        # check for a VDS by ID
+        elif vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
+            vds_result_or_none = query_for_specific_vds(vds_id)
+            if vds_result_or_none is None:
+                raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
+
+            # if not none, unpack the result
+            vds_path, sg_ids_in_vds = vds_result_or_none
+
+        else:
+            get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
 
         new_sg_gvcfs: list[str] = [
             str(sg.gvcf)
