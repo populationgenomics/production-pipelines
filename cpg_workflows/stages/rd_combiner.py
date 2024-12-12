@@ -564,7 +564,12 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        if outputs is None:
+        # only create dataset MTs for datasets specified in the config
+        # and only run this stage if the callset has multiple datasets
+        if (outputs is None) or (
+            dataset.name not in config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        ):
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return self.make_outputs(dataset)
 
         variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
@@ -602,6 +607,11 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         return dataset.prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        # only create final MTs for datasets specified in the config
+        if dataset.name not in config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
+            return self.make_outputs(dataset)
 
         # choose the input MT based on the number of datasets in the MultiCohort
         if len(get_multicohort().get_datasets()) == 1:
