@@ -78,8 +78,7 @@ As the seqr_loader pipeline used to be continuous with the alignment and genotyp
 `rd_combiner`:
 - Create a VDS from the gVCFs (defaulting to Hail's preferred intervals for exome or genome)
   - Optionally create a VDS from the union of a previous VDS and new gVCFs
-- Densify the VDS to a MatrixTable
-- Export the MatrixTable as a collection of sites-only VCFs, one per partition
+- Densify the VDS to a MatrixTable, and export as a collection of sites-only VCFs, one per partition
 - Concatenate all the sites-only VCFs into a single VCF
 - Train VQSR models on the genome-wide sites-only VCF
 - Run VQSR on each separate sites-only VCF by passing only the relevant data
@@ -90,10 +89,10 @@ As the seqr_loader pipeline used to be continuous with the alignment and genotyp
 - Downstream processing for Hail
 
 The main differences are:
-- `seqr_loader` needs to create the joint call in full with each run, `rd_combiner` can build incrementally on existing data
-- `seqr_loader` generates VCF fragments, reassembles into a single VCF, then subsets that VCF into fragments again later. `rd_combiner` leverages Hail's inbuilt parallelisation to export partial VCFs, and then concatenates them into a single VCF when required.
+- `seqr_loader` needs to create the joint call in full per run, `rd_combiner` can build incrementally on existing data.
 - `rd_combiner` jobs can be trimmed to a smaller storage requirement, as they use fragments, instead of being passed the whole VCF and only working on a single interval of it.
 - `rd_combiner` keeps the joint-call representation in MT format, instead of having to read the VCF as a MT and immediately write the MT representation to disc during downstream processing.
+- `rd_combiner` splits up the large multi-step processes into separate single-step Stages, to aid maintainability and readability.
 
 ### references...
 
