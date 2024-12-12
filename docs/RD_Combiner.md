@@ -23,10 +23,12 @@ The first Stage `CreateVdsFromGvcfsWithHailCombiner` uses the Hail Combiner to g
 The second stage `CreateDenseMtFromVdsWithHail` reads the VDS and generates a few outputs:
 * A MatrixTable with the data from the VDS. This is done by 'densifying' the variant representation to a VCF-equivalent format, and using gnomad utils methods to populate the INFO fields, emulating the INFO which would be generated from a GATK joint-call
 * A directory of sites-only VCFs, each having a full VCF header
+  * These VCFs are stand-alone fragments, each representing a subset, but can be used in isolation (e.g. in VEP)
 * A directory of sites-only VCFs, with a separate header file
+  * These VCFs are used to rebuild a whole-genome VCF, required for VQSR training. By exporting fragments in parallel (fast), and concatenating the VCFs through a gcloud command (fast, cheap), we make the best use of the compute resources available.
 * A manifest file which can be used to locate all individual sites-only VCFs
 
-This represents the stopping point for the first part of the workflow. The VCF fragments created here are used in scatter-gather operations to parallelise the VQSR QC and variant annotation with VEP. Due to Hail's scheduling mechanics, it needs to know exactly how many partitions there are downstream of this Stage so it can schedule the jobs correctly. We're defaulting to Hail's in-built intervals, which could change in the future, and we have the option to override using a different set of intervals. These 
+This represents the stopping point for the first part of the workflow. The VCF fragments created here are used in scatter-gather operations to parallelise the VQSR QC and variant annotation with VEP. Due to Hail's scheduling mechanics, it needs to know exactly how many partitions there are downstream of this Stage so it can schedule the jobs correctly. We're defaulting to Hail's in-built intervals, which could change in the future, and we have the option to override using a different set of intervals.
 
 There are ways to work around this, but none that are easily maintainable, so I'm leaning on the assumption that this is the best way to do it, at the expense of having to set off two separate workflows.
 
