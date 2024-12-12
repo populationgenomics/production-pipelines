@@ -137,21 +137,21 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         vds_path: str | None = None
         sg_ids_in_vds: set[str] = set()
 
-        # check for existing VDS by getting all and fetching latest
-        if config_retrieve(['workflow', 'check_for_existing_vds'], True):
-            get_logger(__file__).info('Checking for existing VDS')
-            if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
-                vds_path = existing_vds_analysis_entry['output']
-                sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
-
         # check for a VDS by ID
-        elif vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
+        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
             vds_result_or_none = query_for_specific_vds(vds_id)
             if vds_result_or_none is None:
                 raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
 
             # if not none, unpack the result
             vds_path, sg_ids_in_vds = vds_result_or_none
+
+        # check for existing VDS by getting all and fetching latest
+        elif config_retrieve(['workflow', 'check_for_existing_vds'], True):
+            get_logger(__file__).info('Checking for existing VDS')
+            if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
+                vds_path = existing_vds_analysis_entry['output']
+                sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
 
         else:
             get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
