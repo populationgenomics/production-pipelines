@@ -1,0 +1,35 @@
+# Tha base folders in ICA where data are uploaded, and Dragen results are written.
+# Is automatically prefixed by the dataset and access level, so these values would result in
+# cpg-fewgenomes-test/new_upload_folder and cpg-fewgenomes-test/test_output_folder when run.
+[ica.data_prep]
+upload_folder = "new_upload_folder"
+output_folder = "test_output_folder"
+
+# These tags are used in the ICA UI. You can also use the mfor filtering via the API, but I don't do any of that in this pipeline.
+[ica.tags]
+technical_tags = ['test_technical_tag']
+user_tags = ['test_user_tags']
+reference_tags = ['test_reference_tags']
+
+# This gets added to the pipeline name with the pipeline ID in the format <ref>-<id> automatically by ICA
+user_reference = 'test_user_reference'
+
+# The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
+[ica.pipelines]
+dragen_version = 'dragen_3_7_8'
+dragen_3_7_8 = 'a59c10af-b44a-46f9-b4ba-47e5191c358d'
+
+[ica.reference_ids]
+# Dragen hash table for 3.7.8
+dragen_ht_id = 'fil.854d49a151a24edae5d708da2935b1b0'
+
+# CRAM reference used to align the CRAM file that you want to realign with Dragen
+# Dragmap reference FASTA
+cram_reference_id = 'fil.159e94790e5c4bdfcbef08dd148ff548'
+
+# GATK reference FASTA
+# cram_reference_id = 'fil.7e16c32f65e9468d31b908dcefab1cbc'
+
+[images]
+# This image contains the ICA CLI used for transferring data from ICA -> GCP at the end of the pipeline.
+ica = "australia-southeast1-docker.pkg.dev/cpg-common/images/ica:2.31.0"
