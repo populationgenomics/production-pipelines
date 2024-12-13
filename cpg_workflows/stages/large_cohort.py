@@ -30,7 +30,7 @@ class Combiner(CohortStage):
         workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f"{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
+            f"{cohort.name}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
 
         # include the list of all VDS IDs in the plan name
@@ -96,8 +96,8 @@ class Combiner(CohortStage):
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
-        j.memory(combiner_config['memory'])
-        j.storage(combiner_config['storage'])
+        j.memory(combiner_config.get('memory', "4Gi"))
+        j.storage(combiner_config.get('storage', "5Gi"))
 
         # Default to GRCh38 for reference if not specified
         j.call(
@@ -333,7 +333,19 @@ class MakeSiteOnlyVcf(CohortStage):
             'MakeSiteOnlyVcf',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+
+        sitesvcf_config = config_retrieve('sitesvcf')
+
         j.image(image_path('cpg_workflows'))
+        j.memory(sitesvcf_config.get('memory', "4Gi"))
+        j.storage(sitesvcf_config.get('storage', "5Gi"))
+
+        init_batch_args: dict[str, str | int] = {}
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if sitesvcf_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in sitesvcf_config:
+            init_batch_args['driver_cores'] = sitesvcf_config['driver_cores']
 
         j.command(
             query_command(
@@ -344,6 +356,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )
@@ -415,6 +428,16 @@ class Frequencies(CohortStage):
             'Frequencies',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in workflow_config:
+            init_batch_args['driver_cores'] = workflow_config['driver_cores']
+
         j.image(image_path('cpg_workflows'))
 
         j.command(
@@ -425,6 +448,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )

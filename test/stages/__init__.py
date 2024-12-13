@@ -35,7 +35,7 @@ def add_sg(ds, id, external_id: str):
 
 def mock_cohort() -> MultiCohort:
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='COH123', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
     m_ds = m.add_dataset(ds)
 
@@ -46,7 +46,7 @@ def mock_cohort() -> MultiCohort:
 
 def mock_multidataset_cohort() -> MultiCohort:
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='COH123', name='fewgenomes')
 
     ds = c.create_dataset('my_dataset')
     m_ds_1 = m.add_dataset(ds)
@@ -72,7 +72,7 @@ def mock_multicohort() -> MultiCohort:
     mc = MultiCohort()
 
     # Create a cohort with two datasets
-    cohort_a = mc.create_cohort('CohortA')
+    cohort_a = mc.create_cohort(id='COH123', name='CohortA')
     # Create a dataset in the cohort (legacy)
     ds = cohort_a.create_dataset('projecta')
     # Create a dataset in the multicohort (new)
@@ -90,7 +90,7 @@ def mock_multicohort() -> MultiCohort:
     dm2.add_sequencing_group_object(sg3)
     dm2.add_sequencing_group_object(sg4)
 
-    cohort_b = mc.create_cohort('CohortB')
+    cohort_b = mc.create_cohort(id='COH456', name='CohortB')
     ds3 = cohort_b.create_dataset('projectb')
     dm3 = mc.add_dataset(ds3)
     sg5 = add_sg(ds3, 'CPGEEEEEE', external_id='SAMPLE5')
@@ -121,7 +121,7 @@ class TestDatasetStage(DatasetStage):
 
 class TestCohortStage(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return to_path(dataset_path(f'{cohort.name}_{self.name}.tsv'))
+        return to_path(dataset_path(f'{cohort.id}_{self.name}.tsv'))
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         j = get_batch().new_job(self.name, attributes=self.get_job_attrs(cohort))

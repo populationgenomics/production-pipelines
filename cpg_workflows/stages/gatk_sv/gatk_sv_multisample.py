@@ -119,11 +119,11 @@ def check_for_cohort_overlaps(multicohort: MultiCohort):
     # grab all SG IDs per cohort
     for cohort in multicohort.get_cohorts():
         # shouldn't be possible, but guard against to be sure
-        if cohort.name in sgs_per_cohort:
-            raise ValueError(f'Cohort {cohort.name} already exists in {sgs_per_cohort}')
+        if cohort.id in sgs_per_cohort:
+            raise ValueError(f'Cohort {cohort.id} already exists in {sgs_per_cohort}')
 
         # collect the SG IDs for this cohort
-        sgs_per_cohort[cohort.name] = set(cohort.get_sequencing_group_ids())
+        sgs_per_cohort[cohort.id] = set(cohort.get_sequencing_group_ids())
 
     # pairwise iteration over cohort IDs
     for id1, id2 in combinations(sgs_per_cohort, 2):
@@ -228,7 +228,7 @@ class GatherBatchEvidence(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(pedigree_input),
             'counts': [
@@ -336,7 +336,7 @@ class ClusterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(pedigree_input),
@@ -410,7 +410,7 @@ class GenerateBatchMetrics(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'baf_metrics': gatherbatchevidence_d['merged_BAF'],
             'discfile': gatherbatchevidence_d['merged_PE'],
             'coveragefile': gatherbatchevidence_d['merged_bincov'],
@@ -513,7 +513,7 @@ class FilterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'ped_file': str(pedigree_input),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
@@ -576,8 +576,8 @@ class MergeBatchSites(MultiCohortStage):
 
         # take from previous per-cohort outputs
         filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
-        pesr_vcfs = [filter_batch_outputs[cohort.name]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
-        depth_vcfs = [filter_batch_outputs[cohort.name]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
+        pesr_vcfs = [filter_batch_outputs[cohort.id]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
+        depth_vcfs = [filter_batch_outputs[cohort.id]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
         input_dict: dict = {'cohort': multicohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
         input_dict |= get_images(['sv_pipeline_docker'])
@@ -621,7 +621,7 @@ class CombineExclusionLists(MultiCohortStage):
 
         filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
         all_filter_lists = [
-            str(filter_batch_outputs[cohort.name]['outlier_samples_excluded_file'])
+            str(filter_batch_outputs[cohort.id]['outlier_samples_excluded_file'])
             for cohort in multicohort.get_cohorts()
         ]
 
@@ -688,9 +688,12 @@ class GenotypeBatch(CohortStage):
         mergebatch_d = inputs.as_dict(this_multicohort, MergeBatchSites)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
-            'n_per_split': 5000,
-            'n_RD_genotype_bins': 100000,
+            'batch': cohort.id,
+            'n_per_split': config_retrieve(['resource_overrides', 'GenotypeBatch', 'n_per_split'], 5000),
+            'n_RD_genotype_bins': config_retrieve(
+                ['resource_overrides', 'GenotypeBatch', 'n_RD_genotype_bins'],
+                100000,
+            ),
             'coveragefile': batchevidence_d['merged_bincov'],
             'coveragefile_index': batchevidence_d['merged_bincov_index'],
             'discfile': batchevidence_d['merged_PE'],
@@ -764,7 +767,7 @@ class MakeCohortVcf(MultiCohortStage):
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         # get the names of all contained cohorts
-        all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
+        all_batch_names: list[str] = [cohort.id for cohort in multicohort.get_cohorts()]
 
         pesr_vcfs = [genotypebatch_outputs[cohort]['genotyped_pesr_vcf'] for cohort in all_batch_names]
         depth_vcfs = [genotypebatch_outputs[cohort]['genotyped_depth_vcf'] for cohort in all_batch_names]
@@ -907,7 +910,7 @@ class JoinRawCalls(MultiCohortStage):
         clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatch)
 
         # get the names of all contained cohorts
-        all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
+        all_batch_names: list[str] = [cohort.id for cohort in multicohort.get_cohorts()]
         for caller in SV_CALLERS + ['depth']:
             input_dict[f'clustered_{caller}_vcfs'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names

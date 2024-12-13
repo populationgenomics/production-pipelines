@@ -201,7 +201,7 @@ class Fraser:
 def fraser(
     b: hb.Batch,
     input_bams_or_crams: list[tuple[BamPath, None] | tuple[CramPath, Path]],
-    cohort_name: str,
+    cohort_id: str,
     output_fds_path: str | Path | None = None,
     job_attrs: dict[str, str] | None = None,
     overwrite: bool = False,
@@ -243,7 +243,7 @@ def fraser(
     assert all([isinstance(f, hb.ResourceFile) for f in list(input_bams_localised.values())])
 
     # Create FRASER job
-    job_name = f'fraser_{cohort_name}' if cohort_name else 'fraser'
+    job_name = f'fraser_{cohort_id}' if cohort_id else 'fraser'
     _job_attrs = (job_attrs or {}) | dict(label=job_name, tool='fraser')
     j = b.new_job(job_name, _job_attrs)
     j.image(image_path('fraser'))
@@ -272,7 +272,7 @@ def fraser(
     count_jobs, fds_tar = fraser_count(
         b=b,
         input_bams_localised=input_bams_localised,
-        cohort_name=cohort_name,
+        cohort_name=cohort_id,
         output_counts_prefix=output_counts_prefix,
         job_attrs=job_attrs,
         requested_nthreads=requested_nthreads,
@@ -289,7 +289,7 @@ def fraser(
     # Create counting command
     fraser = Fraser(
         fds_tar=fds_tar,
-        cohort_name=cohort_name,
+        cohort_name=cohort_id,
         output=j.output,
         nthreads=res.get_nthreads(),
         pval_cutoff=pval_cutoff,
