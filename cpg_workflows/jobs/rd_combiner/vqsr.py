@@ -5,11 +5,12 @@ Create and run jobs relating to VQSR for the RD combiner
 from functools import lru_cache
 
 from hailtop.batch.job import Job
-from hailtop.batch.resource import ResourceFile, ResourceGroup
+from hailtop.batch.resource import Resource, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
+from cpg_workflows.jobs.vcf import quick_and_easy_bcftools_concat
 from cpg_workflows.jobs.vqsr import (
     INDEL_ALLELE_SPECIFIC_FEATURES,
     INDEL_RECALIBRATION_TRANCHE_VALUES,
@@ -17,7 +18,15 @@ from cpg_workflows.jobs.vqsr import (
     SNP_RECALIBRATION_TRANCHE_VALUES,
 )
 from cpg_workflows.resources import HIGHMEM, STANDARD
-from cpg_workflows.utils import VCF_GZ, VCF_GZ_TBI, can_reuse, chunks, get_all_fragments_from_manifest, get_logger
+from cpg_workflows.utils import (
+    VCF_GZ,
+    VCF_GZ_TBI,
+    can_reuse,
+    chunks,
+    generator_chunks,
+    get_all_fragments_from_manifest,
+    get_logger,
+)
 
 TRAINING_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_training_fragments_per_job'], 100)
 RECALIBRATION_PER_JOB: int = config_retrieve(['rd_combiner', 'vqsr_apply_fragments_per_job'], 60)
@@ -310,3 +319,197 @@ def train_vqsr_snp_tranches(
     scatter_jobs.append(final_job)
     get_batch().write_output(final_job.output, output_path)
     return scatter_jobs
+
+
+def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_attrs: dict) -> Job:
+    """
+    The previous approach ran into hard limits on the size of the batch spec
+    There was too much metadata around which resource groups the tranches were part of etc etc
+    Splitting out data generating from data aggregating should hopefully help
+
+    Args:
+        manifest_file (Path): path to the manifest file
+        temp_path (Path): path to the temp directory (same as previous stage)
+        output_path (str): path to write the tranches aggregate to
+        job_attrs (dict): job attributes
+    """
+
+    vcf_resources = get_all_fragments_from_manifest(manifest_file)
+    snp_tranche_paths = [
+        get_batch().read_input(str(temp_path / f'snp_{i}.tranches')) for i in range(len(vcf_resources))
+    ]
+
+    gather_tranches_j = get_batch().new_job('GatherTrainedVqsrSnpTranches', job_attrs | {'tool': 'gatk GatherTranches'})
+    gather_tranches_j.image(image_path('gatk'))
+    res = STANDARD.set_resources(gather_tranches_j, ncpu=2, storage_gb=SNPS_GATHER_DISC_SIZE)
+
+    inputs_cmdl = ' '.join([f'--input {t}' for t in snp_tranche_paths])
+    gather_tranches_j.command(
+        f"""set -euo pipefail
+    gatk --java-options "{res.java_mem_options()}" \\
+      GatherTranches \\
+      --mode SNP \\
+      {inputs_cmdl} \\
+      --output {gather_tranches_j.out_tranches}""",
+    )
+
+    get_batch().write_output(gather_tranches_j.out_tranches, output_path)
+    return gather_tranches_j
+
+
+def apply_snp_vqsr_to_fragments(
+    manifest_file: Path,
+    tranche_file: str,
+    temp_path: Path,
+    output_path: str,
+    job_attrs: dict,
+):
+    """
+    Apply SNP VQSR to the tranches
+    I'm going to retry the stacking approach again to reduce job count
+
+    Gather results into a single file
+
+    Args:
+        manifest_file (Path): path to the manifest file, locating all VCF fragments
+        tranche_file ():
+        temp_path (): Path to the temp from TrainVqsrSnpTranches
+        output_path (str):
+        job_attrs ():
+    """
+
+    vcf_resources = get_all_fragments_from_manifest(manifest_file)
+    fragment_count = len(vcf_resources)
+
+    # read all the recal fragments into the batch as ResourceGroups
+    # we're creating these paths in expectation that they were written by the tranches stage
+    snps_recal_resources = [
+        get_batch().read_input_group(
+            recal=str(temp_path / f'snp_{i}.recal'),
+            idx=str(temp_path / f'snp_{i}.recal.idx'),
+        )
+        for i in range(fragment_count)
+    ]
+
+    tranches_in_batch = get_batch().read_input(tranche_file)
+
+    applied_recalibration_jobs: list[Job] = []
+    recalibrated_snp_vcfs: list[Resource] = []
+
+    vcf_counter = -1
+    snp_filter_level = config_retrieve(['vqsr', 'snp_filter_level'])
+
+    for chunk_counter, vcfs_recals in enumerate(
+        generator_chunks(zip(vcf_resources, snps_recal_resources), RECALIBRATION_PER_JOB),
+    ):
+
+        chunk_job = get_batch().new_bash_job(f'RunTrainedSnpVqsrOnCombinerFragments, Chunk {chunk_counter}', job_attrs)
+        chunk_job.image(image_path('gatk'))
+
+        # stores all the annotated VCFs in this chunk
+        chunk_vcfs = []
+
+        res = STANDARD.set_resources(chunk_job, ncpu=1, storage_gb=10)
+
+        # iterate over the zipped resource groups
+        for vcf_resource, recal_resource in vcfs_recals:
+            vcf_counter += 1
+            # used in namespacing the outputs
+            counter_string = str(vcf_counter)
+
+            # create a resource group for the recalibration output and its index
+            chunk_job.declare_resource_group(
+                **{
+                    counter_string: {
+                        VCF_GZ: '{root}.vcf.gz',
+                        VCF_GZ_TBI: '{root}.vcf.gz.tbi',
+                    },
+                },
+            )
+
+            chunk_job.command(
+                f"""
+            gatk --java-options "{res.java_mem_options()}" \\
+            ApplyVQSR \\
+            -O {chunk_job[counter_string]['vcf.gz']} \\
+            -V {vcf_resource['vcf.gz']} \\
+            --recal-file {recal_resource.recal} \\
+            --tranches-file {tranches_in_batch} \\
+            --truth-sensitivity-filter-level {snp_filter_level} \\
+            --use-allele-specific-annotations \\
+            -mode SNP
+
+            tabix -p vcf -f {chunk_job[counter_string]['vcf.gz']}
+            """,
+            )
+            chunk_vcfs.append(chunk_job[counter_string])
+
+        # concatenates all VCFs in this chunk
+        chunk_concat_job = quick_and_easy_bcftools_concat(
+            chunk_vcfs,
+            storage_gb=SNPS_GATHER_DISC_SIZE,
+            job_attrs=job_attrs,
+        )
+        chunk_concat_job.depends_on(chunk_job)
+        applied_recalibration_jobs.extend([chunk_job, chunk_concat_job])
+        recalibrated_snp_vcfs.append(chunk_concat_job.output)
+
+    # now we've got all the recalibrated VCFs, we need to gather them into a single VCF
+    final_gather_job = quick_and_easy_bcftools_concat(
+        recalibrated_snp_vcfs,
+        storage_gb=SNPS_GATHER_DISC_SIZE,
+        job_attrs=job_attrs,
+    )
+    final_gather_job.depends_on(*applied_recalibration_jobs)
+    applied_recalibration_jobs.append(final_gather_job)
+
+    get_batch().write_output(final_gather_job.output, output_path.removesuffix('.vcf.gz'))
+    return applied_recalibration_jobs
+
+
+def apply_recalibration_indels(
+    snp_annotated_vcf: Path,
+    indel_recalibration: Path,
+    indel_tranches: Path,
+    output_path: Path,
+    job_attrs: dict,
+):
+    """
+    Apply indel recalibration to the annotated SNP VCF
+    """
+
+    snp_vcf_in_batch = get_batch().read_input_group(
+        vcf=str(snp_annotated_vcf),
+        vcf_index=f'{str(snp_annotated_vcf)}.tbi',
+    )
+    indel_tranches_in_batch = get_batch().read_input(str(indel_tranches))
+    indel_recalibration_in_batch = get_batch().read_input_group(
+        recal=str(indel_recalibration),
+        recal_idx=f'{str(indel_recalibration)}.idx',
+    )
+
+    indel_recal_job = get_batch().new_bash_job(f'RunTrainedIndelVqsrOnCombinedVcf on {snp_annotated_vcf}', job_attrs)
+    indel_recal_job.image(image_path('gatk'))
+    res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=INDEL_RECAL_DISC_SIZE)
+
+    indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})
+
+    filter_level = config_retrieve(['vqsr', 'indel_filter_level'])
+
+    indel_recal_job.command(
+        f"""
+    gatk --java-options "{res.java_mem_options()}" \\
+    ApplyVQSR \\
+    --tmp-dir $BATCH_TMPDIR \\
+    -O {indel_recal_job.output[VCF_GZ]} \\
+    -V {snp_vcf_in_batch.vcf} \\
+    --recal-file {indel_recalibration_in_batch.recal} \\
+    --tranches-file {indel_tranches_in_batch} \\
+    --truth-sensitivity-filter-level {filter_level} \\
+    --use-allele-specific-annotations \\
+    -mode INDEL
+    tabix -p vcf -f {indel_recal_job.output[VCF_GZ]}
+    """,
+    )
+    get_batch().write_output(indel_recal_job.output, str(output_path).removesuffix('.vcf.gz'))
+    return indel_recal_job

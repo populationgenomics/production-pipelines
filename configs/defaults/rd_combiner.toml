@@ -6,7 +6,13 @@ status_reporter = 'metamist'
 #last_stages = ['CreateDenseMtFromVdsWithHail']
 
 ## if this is False, we will not check for existing VDS - always create fresh VDS from gVCFs
-#check_for_existing_vds = false
+check_for_existing_vds = false
+
+## If this is populated with an integer, we will use the VDS with this ID in Metamist as the starting point
+#use_specific_vds = 1234
+
+## Subsetting and AnnotateDataset will only run for these datasets
+#write_mt_for_datasets = ['test_dataset', ]
 
 [rd_combiner]
 # these are used when calculating how many fragments to send to each job
@@ -44,3 +50,7 @@ indel_filter_level = 99.0
 [gcloud_condense]
 chunk_size = 32
 storage = "10Gi"
+
+[references]
+# this might be a holdover until the references file is corrected. Working in Main.
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
