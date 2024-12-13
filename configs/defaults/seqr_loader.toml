@@ -39,6 +39,10 @@ write_vcf = ["udn-aus"]
 # [workflow.gvcf_multiqc.extra_config]
 # plots_force_interactive = true
 
+# By default, run the es-index generating jobs on spot (preemptible) instances
+[workflow.es_index]
+spot_instance = true
+
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without
 # demanding higher resources for all operations as standard. Examples below

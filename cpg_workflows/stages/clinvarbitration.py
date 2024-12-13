@@ -152,7 +152,7 @@ class PM5TableGeneration(MultiCohortStage):
         # get the expected outputs
         outputs = self.expected_outputs(mc)
 
-        vcf = str(inputs.as_path(mc, AnnotateClinvarDecisions, 'vcf'))
+        vcf = str(inputs.as_path(mc, AnnotateClinvarDecisions))
         annotated_vcf = get_batch().read_input_group(**{'vcf.gz': vcf, 'vcf.gz.tbi': vcf + '.tbi'})['vcf.gz']
 
         # using a declared resource group and only exporting part of it failed... not sure why
