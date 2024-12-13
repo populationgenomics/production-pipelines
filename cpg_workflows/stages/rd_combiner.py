@@ -45,7 +45,44 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
+SPECIFIC_VDS_QUERY = gql(
+    """
+    query getVDSByAnalysisId($vds_id: Int!) {
+        analyses(id: {eq: $vds_id}) {
+            output
+            sequencingGroups {
+                id
+            }
+        }
+    }
+""",
+)
 SHARD_MANIFEST = 'shard-manifest.txt'
+
+
+def query_for_specific_vds(vds_id: int) -> tuple[str, set[str]] | None:
+    """
+    query for a specific analysis of type entry_type for a dataset
+    if found, return the set of SG IDs in the VDS (using the metadata)
+
+    - stolen from the cpg_workflows.large_cohort.combiner Stage, but duplicated here so we can split pipelines without
+      further code changes
+
+    Args:
+        vds_id (int): analysis id to query for
+
+    Returns:
+        either None if the analysis wasn't found, or a set of SG IDs in the VDS
+    """
+
+    # query for the exact, single analysis entry
+    query_results: dict[str, dict] = query(SPECIFIC_VDS_QUERY, variables={'vds_id': vds_id})
+
+    if not query_results['analyses']:
+        return None
+    vds_path: str = query_results['analyses'][0]['output']
+    sg_ids = {sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']}
+    return vds_path, sg_ids
 
 
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
@@ -98,14 +135,26 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         # create these as empty lists instead of None, they have the same truthiness
         vds_path: str | None = None
-        sg_ids_in_vds: list[str] = []
+        sg_ids_in_vds: set[str] = set()
 
-        if config_retrieve(['workflow', 'check_for_existing_vds'], True):
-            # check for existing VDS
+        # check for a VDS by ID
+        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
+            vds_result_or_none = query_for_specific_vds(vds_id)
+            if vds_result_or_none is None:
+                raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
+
+            # if not none, unpack the result
+            vds_path, sg_ids_in_vds = vds_result_or_none
+
+        # check for existing VDS by getting all and fetching latest
+        elif config_retrieve(['workflow', 'check_for_existing_vds'], True):
             get_logger(__file__).info('Checking for existing VDS')
             if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
                 vds_path = existing_vds_analysis_entry['output']
-                sg_ids_in_vds = [sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']]
+                sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
+
+        else:
+            get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
 
         new_sg_gvcfs: list[str] = [
             str(sg.gvcf)
@@ -178,7 +227,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         return self.make_outputs(multicohort, output, densify_job)
 
 
-@stage(analysis_keys=['vcf'], analysis_type='vcf', required_stages=[CreateDenseMtFromVdsWithHail])
+@stage(analysis_keys=['vcf'], required_stages=[CreateDenseMtFromVdsWithHail])
 class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
     Takes a manifest of VCF fragments, and produces a single VCF file
@@ -186,8 +235,8 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     So we check for the exact same output, and fail if we're not ready to start
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {'vcf': self.prefix / 'gcloud_composed_sitesonly.vcf.bgz'}
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.tmp_prefix / 'gcloud_composed_sitesonly.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
@@ -212,7 +261,7 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=manifest_file,
             intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
-            output_path=str(outputs['vcf']),
+            output_path=str(outputs),
             job_attrs={'stage': self.name},
         )
 
@@ -239,7 +288,7 @@ class TrainVqsrIndelModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud)
         outputs = self.expected_outputs(multicohort)
         indel_calibration_job = train_vqsr_indels(
             sites_only_vcf=str(composed_sitesonly_vcf),
@@ -264,7 +313,7 @@ class TrainVqsrSnpModelOnCombinerData(MultiCohortStage):
         Submit jobs to train VQSR on the combiner data
         """
 
-        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud, 'vcf')
+        composed_sitesonly_vcf = inputs.as_path(multicohort, ConcatenateVcfFragmentsWithGcloud)
         outputs = self.expected_outputs(multicohort)
         snp_calibration_job = train_vqsr_snps(
             sites_only_vcf=str(composed_sitesonly_vcf),
@@ -341,13 +390,12 @@ class GatherTrainedVqsrSnpTranches(MultiCohortStage):
     required_stages=[
         CreateDenseMtFromVdsWithHail,
         GatherTrainedVqsrSnpTranches,
-        TrainVqsrSnpModelOnCombinerData,
         TrainVqsrSnpTranches,
     ],
 )
 class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return self.prefix / 'vqsr.vcf.gz'
+        return self.tmp_prefix / 'vqsr.vcf.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
@@ -374,7 +422,6 @@ class RunTrainedSnpVqsrOnCombinerFragments(MultiCohortStage):
 @stage(
     analysis_type='qc',
     required_stages=[
-        GatherTrainedVqsrSnpTranches,
         RunTrainedSnpVqsrOnCombinerFragments,
         TrainVqsrIndelModelOnCombinerData,
     ],
@@ -421,7 +468,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
         """
         Should this be in tmp? We'll never use it again maybe?
         """
-        return self.tmp_prefix / 'vep.ht'
+        return self.prefix / 'vep.ht'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -464,7 +511,7 @@ class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
         """
         Expected to write a matrix table.
         """
-        return self.prefix / 'annotate_cohort.mt'
+        return self.tmp_prefix / 'annotate_cohort.mt'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
@@ -517,7 +564,12 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        if outputs is None:
+        # only create dataset MTs for datasets specified in the config
+        # and only run this stage if the callset has multiple datasets
+        if (outputs is None) or (
+            dataset.name not in config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        ):
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return self.make_outputs(dataset)
 
         variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
@@ -555,6 +607,11 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         return dataset.prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        # only create final MTs for datasets specified in the config
+        if dataset.name not in config_retrieve(['workflow', 'write_mt_for_datasets'], default=[]):
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
+            return self.make_outputs(dataset)
 
         # choose the input MT based on the number of datasets in the MultiCohort
         if len(get_multicohort().get_datasets()) == 1:
