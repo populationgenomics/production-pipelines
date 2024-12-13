@@ -66,7 +66,7 @@ def get_logger(
             coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
-        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler = logging.StreamHandler()
         stream_handler.setLevel(log_level)
 
         # create format string for messages
