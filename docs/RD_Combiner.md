@@ -8,7 +8,13 @@
 * Status: `Under Review`
 * Source: [rd_combiner.py](https://github.com/populationgenomics/production-pipelines/blob/main/cpg_workflows/stages/rd_combiner.py)
 
-### Instructions
+## Flow Diagram
+
+![RD Combiner Workflow](rd_combiner_flow_diagram.png)
+
+This is a placeholder for the flow diagram, which will be updated when there's time to make a pretty one.
+
+## Instructions
 
 1. Run the `align_and_genotype` workflow on any new samples to generate the gVCFs
 2. Run the `rd_combiner` workflow with the `--config configs/create_mt_only.toml` argument to generate the combined callset from gVCFs
