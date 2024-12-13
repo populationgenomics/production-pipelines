@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.31.7',
+    version='1.32.0',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -76,6 +76,14 @@ setup(
             'ss_vcf_from_mt = cpg_workflows.scripts.extract_single_sample_vcf_from_mt:cli_main',
             # script to create a dense MatrixTable from a VDS input
             'mt_from_vds = cpg_workflows.scripts.densify_VDS_to_MT:cli_main',
+            # aggregate VEP results into a single HT
+            'vep_json_to_ht = cpg_workflows.scripts.vep_json_to_ht:cli_main',
+            # AnnotateCohort, small variants
+            'annotate_cohort_small = cpg_workflows.scripts.annotate_cohort_small_vars:cli_main',
+            # Extract a single Dataset from a MatrixTable
+            'subset_mt_to_dataset = cpg_workflows.scripts.subset_mt_to_dataset:cli_main',
+            # Reconfigure annotations for Seqr Export
+            'annotate_dataset_small = cpg_workflows.scripts.annotate_dataset_small_vars:cli_main',
         ],
     },
 )
