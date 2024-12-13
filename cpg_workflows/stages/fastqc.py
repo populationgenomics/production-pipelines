@@ -118,7 +118,7 @@ class FastQCMultiQC(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
+        h = dataset.get_alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'fastqc' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'fastqc' / h / 'multiqc_data.json',
