@@ -1,0 +1,3 @@
+[workflow]
+# this config should be used to run the first two stages of the rd_combiner workflow
+last_stages = ['CreateDenseMtFromVdsWithHail']
