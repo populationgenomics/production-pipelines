@@ -465,3 +465,51 @@ def apply_snp_vqsr_to_fragments(
 
     get_batch().write_output(final_gather_job.output, output_path.removesuffix('.vcf.gz'))
     return applied_recalibration_jobs
+
+
+def apply_recalibration_indels(
+    snp_annotated_vcf: Path,
+    indel_recalibration: Path,
+    indel_tranches: Path,
+    output_path: Path,
+    job_attrs: dict,
+):
+    """
+    Apply indel recalibration to the annotated SNP VCF
+    """
+
+    snp_vcf_in_batch = get_batch().read_input_group(
+        vcf=str(snp_annotated_vcf),
+        vcf_index=f'{str(snp_annotated_vcf)}.tbi',
+    )
+    indel_tranches_in_batch = get_batch().read_input(str(indel_tranches))
+    indel_recalibration_in_batch = get_batch().read_input_group(
+        recal=str(indel_recalibration),
+        recal_idx=f'{str(indel_recalibration)}.idx',
+    )
+
+    indel_recal_job = get_batch().new_bash_job(f'RunTrainedIndelVqsrOnCombinedVcf on {snp_annotated_vcf}', job_attrs)
+    indel_recal_job.image(image_path('gatk'))
+    res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=INDEL_RECAL_DISC_SIZE)
+
+    indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})
+
+    filter_level = config_retrieve(['vqsr', 'indel_filter_level'])
+
+    indel_recal_job.command(
+        f"""
+    gatk --java-options "{res.java_mem_options()}" \\
+    ApplyVQSR \\
+    --tmp-dir $BATCH_TMPDIR \\
+    -O {indel_recal_job.output[VCF_GZ]} \\
+    -V {snp_vcf_in_batch.vcf} \\
+    --recal-file {indel_recalibration_in_batch.recal} \\
+    --tranches-file {indel_tranches_in_batch} \\
+    --truth-sensitivity-filter-level {filter_level} \\
+    --use-allele-specific-annotations \\
+    -mode INDEL
+    tabix -p vcf -f {indel_recal_job.output[VCF_GZ]}
+    """,
+    )
+    get_batch().write_output(indel_recal_job.output, str(output_path).removesuffix('.vcf.gz'))
+    return indel_recal_job
