@@ -74,7 +74,7 @@ def mock_create_analysis(_, project, analysis) -> int:
 
 def mock_deprecated_create_cohort() -> MultiCohort:
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='fewgenomes', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
     m_ds = m.add_dataset(ds)
 

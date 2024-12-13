@@ -187,10 +187,16 @@ def mock_get_sgs_by_cohort_project_b(*args, **kwargs) -> list[dict]:
 def mock_get_cohorts(*args, **kwargs) -> dict:
     return {
         'COH123': {
-            'projecta': mock_get_sgs_by_cohort_project_a(),
+            "sequencing_groups": {
+                'projecta': mock_get_sgs_by_cohort_project_a(),
+            },
+            "name": "CohortA",
         },
         'COH456': {
-            'projectb': mock_get_sgs_by_cohort_project_b(),
+            "sequencing_groups": {
+                'projectb': mock_get_sgs_by_cohort_project_b(),
+            },
+            "name": "CohortB",
         },
     }
 
@@ -198,10 +204,16 @@ def mock_get_cohorts(*args, **kwargs) -> dict:
 def mock_get_overlapping_cohorts(*args, **kwargs) -> dict:
     return {
         'COH123': {
-            'projecta': [mock_get_sgs_by_cohort_project_a()[0]],
+            "sequencing_groups": {
+                'projecta': [mock_get_sgs_by_cohort_project_a()[0]],
+            },
+            "name": "CohortA",
         },
         'COH456': {
-            'projecta': [mock_get_sgs_by_cohort_project_a()[1]],
+            "sequencing_groups": {
+                'projecta': [mock_get_sgs_by_cohort_project_a()[1]],
+            },
+            "name": "CohortB",
         },
     }
 
@@ -251,8 +263,13 @@ def test_multicohort(mocker: MockFixture, tmp_path):
     assert isinstance(multicohort, MultiCohort)
 
     # Testing Cohort Information
+    cohorts = multicohort.get_cohorts()
+    assert len(cohorts) == 2
+    assert cohorts[0].name == "CohortA"
+    assert cohorts[1].name == "CohortB"
+
     assert len(multicohort.get_sequencing_groups()) == 4
-    assert multicohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA', 'CPGCCCCCC', 'CPGDDDDDD']
+    assert sorted(multicohort.get_sequencing_group_ids()) == ['CPGAAAA', 'CPGCCCCCC', 'CPGDDDDDD', 'CPGXXXX']
 
     # Test the projects they belong to
     assert multicohort.get_sequencing_groups()[0].dataset.name == 'projecta'
@@ -295,6 +312,14 @@ def test_overlapping_multicohort(mocker: MockFixture, tmp_path):
     assert isinstance(multicohort, MultiCohort)
 
     # Testing Cohort Information
+
+    # Validate Cohort Names
+    cohorts = multicohort.get_cohorts()
+    assert len(cohorts) == 2
+    assert cohorts[0].name == "CohortA"
+    assert cohorts[1].name == "CohortB"
+
+    # Validate Sequencing Groups
     assert len(multicohort.get_sequencing_groups()) == 2
     assert multicohort.get_sequencing_group_ids() == ['CPGXXXX', 'CPGAAAA']
 

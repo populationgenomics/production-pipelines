@@ -3,6 +3,8 @@ import logging
 import hail as hl
 
 from cpg_utils import Path
+from cpg_utils.config import config_retrieve
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
@@ -25,6 +27,9 @@ def run(
 ):
     if can_reuse(out_ht_path):
         return
+
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
@@ -70,6 +75,10 @@ def frequency_annotations(
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
 
+    logging.info('Computing adj call rates...')
+    mt_adj = mt.filter_entries(mt.adj)
+    info_ht = mt_adj.annotate_rows(adj_gt_stats=hl.agg.call_stats(mt_adj.GT, mt_adj.alleles)).rows()
+
     logging.info('Generating frequency data...')
     mt = hl.variant_qc(mt)
 
@@ -82,6 +91,8 @@ def frequency_annotations(
     freq_ht = mt.rows()
     freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
     freq_ht = freq_ht.drop('variant_qc')
+    freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
+
     return freq_ht
 
 

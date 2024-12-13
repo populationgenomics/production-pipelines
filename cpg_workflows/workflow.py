@@ -945,13 +945,13 @@ class Workflow:
         e.g. "gs://cpg-project-main/seqr_loader/COH123", or "gs://cpg-project-main-analysis/seqr_loader/COH123"
 
         Args:
-            cohort (Cohort): we pull the analysis dataset and name from this Cohort
+            cohort (Cohort): we pull the analysis dataset and id from this Cohort
             category (str | None): sub-bucket for this project
 
         Returns:
             Path
         """
-        return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.name
+        return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.id
 
     def run(
         self,

@@ -139,11 +139,6 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
     if not mt_by_date:
         return []
 
-    if sv_type == 'cnv':
-        full_paths = list(mt_by_date.values())
-        filenames = [path.split('/')[-1] for path in full_paths]
-        return list(zip(full_paths, filenames))
-
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
     sv_file = mt_by_date[sorted(mt_by_date)[-1]]
@@ -642,9 +637,10 @@ class ValidateMOI(DatasetStage):
 class HPOFlagging(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        date_prefix = dataset.prefix() / get_date_folder()
         return {
-            'pheno_annotated': dataset.prefix() / get_date_folder() / 'pheno_annotated_report.json',
-            'pheno_filtered': dataset.prefix() / get_date_folder() / 'pheno_filtered_report.json',
+            'pheno_annotated': date_prefix / 'pheno_annotated_report.json',
+            'pheno_filtered': date_prefix / 'pheno_filtered_report.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -690,12 +686,11 @@ class HPOFlagging(DatasetStage):
 )
 class CreateTalosHTML(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        date_folder_prefix = dataset.prefix(category='web') / get_date_folder()
         return {
-            'results_html': dataset.prefix(category='web') / get_date_folder() / 'summary_output.html',
-            'latest_html': dataset.prefix(category='web')
-            / get_date_folder()
-            / f'summary_latest_{get_date_string()}.html',
-            'folder': dataset.prefix(category='web') / get_date_folder(),
+            'results_html': date_folder_prefix / 'summary_output.html',
+            'latest_html': date_folder_prefix / f'summary_latest_{get_date_string()}.html',
+            'folder': date_folder_prefix,
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -752,11 +747,10 @@ class MinimiseOutputForSeqr(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        analysis_folder_prefix = dataset.prefix(category='analysis') / 'seqr_files'
         return {
-            'seqr_file': dataset.prefix(category='analysis') / 'seqr_files' / f'{get_date_folder()}_seqr.json',
-            'seqr_pheno_file': dataset.prefix(category='analysis')
-            / 'seqr_files'
-            / f'{get_date_folder()}_seqr_pheno.json',
+            'seqr_file': analysis_folder_prefix / f'{get_date_folder()}_seqr.json',
+            'seqr_pheno_file': analysis_folder_prefix / f'{get_date_folder()}_seqr_pheno.json',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

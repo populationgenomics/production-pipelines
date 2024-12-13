@@ -133,7 +133,7 @@ def _mock_cohort():
     from cpg_workflows.targets import MultiCohort
 
     multi_cohort = MultiCohort()
-    cohort = multi_cohort.create_cohort('test-analysis-dataset')
+    cohort = multi_cohort.create_cohort(id='COH123', name='test-analysis-dataset')
     ds = cohort.create_dataset('test-analysis-dataset')
     mc_dataset = multi_cohort.add_dataset(ds)
     sg1 = ds.add_sequencing_group(

@@ -9,7 +9,8 @@ from attr import dataclass
 import hail as hl
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config, reference_path
+from cpg_utils.config import config_retrieve, get_config, reference_path
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
@@ -130,6 +131,10 @@ def run(
         'pop': str
         'prob_<pop>': float64 (for each population label)
     """
+
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     min_pop_prob = get_config()['large_cohort']['min_pop_prob']
     n_pcs = get_config()['large_cohort']['n_pcs']
     dense_mt = hl.read_matrix_table(str(dense_mt_path))
@@ -231,11 +236,15 @@ def _run_pca_ancestry_analysis(
     samples_to_use = mt.count_cols()
     logging.info(f'Total sample number in the matrix table: {samples_to_use}')
     if sample_to_drop_ht is not None:
-        samples_to_drop = sample_to_drop_ht.count()
-        logging.info(f'Determined {samples_to_drop} relateds to drop')
-        samples_to_use -= samples_to_drop
+        samples_to_drop_list = sample_to_drop_ht.s.collect()
+        samples_to_use_list = mt.s.collect()
+        # Only drop samples that are in the matrix table
+        sample_to_drop_ht = sample_to_drop_ht.filter(hl.literal(samples_to_use_list).contains(sample_to_drop_ht.s))
+        num_samples_drop = len([sample for sample in samples_to_drop_list if sample in samples_to_use_list])
+        logging.info(f'Determined {num_samples_drop} relateds to drop: {samples_to_drop_list}')
+        samples_to_use -= num_samples_drop
         logging.info(
-            f'Removing the {samples_to_drop} relateds from the list of samples used '
+            f'Removing the {num_samples_drop} relateds from the list of samples used '
             f'for PCA, got remaining {samples_to_use} samples',
         )
 
