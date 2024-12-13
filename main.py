@@ -24,7 +24,18 @@ from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, Validati
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
-from cpg_workflows.stages.rd_combiner import DenseMTFromVDS, GVCFCombiner
+from cpg_workflows.stages.rd_combiner import (
+    AnnotateCohortSmallVariantsWithHailQuery,
+    AnnotateDatasetSmallVariantsWithHailQuery,
+    AnnotateFragmentedVcfWithVep,
+    ConcatenateVcfFragmentsWithGcloud,
+    CreateDenseMtFromVdsWithHail,
+    CreateVdsFromGvcfsWithHailCombiner,
+    GatherTrainedVqsrSnpTranches,
+    RunTrainedIndelVqsrOnCombinedVcf,
+    SubsetMatrixTableToDatasetUsingHailQuery,
+    TrainVqsrSnpTranches,
+)
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
@@ -40,7 +51,18 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
-    'rd_combiner': [GVCFCombiner, DenseMTFromVDS],
+    'rd_combiner': [
+        CreateVdsFromGvcfsWithHailCombiner,
+        CreateDenseMtFromVdsWithHail,
+        ConcatenateVcfFragmentsWithGcloud,
+        GatherTrainedVqsrSnpTranches,
+        TrainVqsrSnpTranches,
+        RunTrainedIndelVqsrOnCombinedVcf,
+        AnnotateFragmentedVcfWithVep,
+        AnnotateCohortSmallVariantsWithHailQuery,
+        SubsetMatrixTableToDatasetUsingHailQuery,
+        AnnotateDatasetSmallVariantsWithHailQuery,
+    ],
     'seqr_loader': [
         DatasetVCF,
         AnnotateDataset,
