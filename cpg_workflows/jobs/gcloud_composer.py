@@ -141,9 +141,9 @@ def gcloud_compose_vcf_from_manifest(
     final_job.image(image_path('bcftools'))
     final_job.storage(config_retrieve(['gcloud_condense', 'storage'], '10Gi'))
 
-    # we specifically need block-gzipped output for some downstream tools
-    # otherwise a mv or a bcftools view with --write-index=tbi would be neater
-    final_job.command(f'bcftools view {input_vcf} | bgzip -c > {final_job.output["vcf.bgz"]}')
+    # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
+    # will still be a block-gzipped result. We generate both index types as futureproofing
+    final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
     final_job.command(f'tabix {final_job.output["vcf.bgz"]}')
     final_job.command(f'tabix -C {final_job.output["vcf.bgz"]}')
 
