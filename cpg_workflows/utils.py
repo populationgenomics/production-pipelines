@@ -18,16 +18,22 @@ from typing import Union, cast
 import coloredlogs
 
 import hail as hl
-from hailtop.batch import ResourceFile
+from hailtop.batch import ResourceFile, ResourceGroup
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config
+from cpg_utils.hail_batch import get_batch
 
 DEFAULT_LOG_FORMAT = config_retrieve(
     ['workflow', 'logger', 'default_format'],
     '%(asctime)s - %(name)s - %(pathname)s: %(lineno)d - %(levelname)s - %(message)s',
 )
 LOGGERS: dict[str, logging.Logger] = {}
+
+VCF_BGZ = 'vcf.bgz'
+VCF_BGZ_TBI = 'vcf.bgz.tbi'
+VCF_GZ = 'vcf.gz'
+VCF_GZ_TBI = 'vcf.gz.tbi'
 
 
 def get_logger(
@@ -56,11 +62,11 @@ def get_logger(
         new_logger.setLevel(log_level)
 
         # unless otherwise specified, use coloredlogs
-        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], True):
+        if config_retrieve(['workflow', 'logger', logger_name, 'use_colored_logs'], False):
             coloredlogs.install(level=log_level, fmt=fmt_string, logger=new_logger)
 
         # create a stream handler to write output
-        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler = logging.StreamHandler()
         stream_handler.setLevel(log_level)
 
         # create format string for messages
@@ -361,4 +367,28 @@ def get_intervals_from_bed(intervals_path: Path) -> list[str]:
     return intervals
 
 
-ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], str, None]
+@lru_cache(2)
+def get_all_fragments_from_manifest(manifest_file: Path) -> list[ResourceGroup]:
+    """
+    read the manifest file, and return all the fragment resources as an ordered list
+    this is a cached method as we don't want to localise every fragment once per task
+
+    Args:
+        manifest_file ():
+
+    Returns:
+        an ordered list of all the fragment VCFs and corresponding indices
+    """
+
+    resource_objects: list[ResourceGroup] = []
+    manifest_folder: Path = manifest_file.parent
+    with manifest_file.open() as f:
+        for line in f:
+            vcf_path = manifest_folder / line.strip()
+            resource_objects.append(
+                get_batch().read_input_group(**{VCF_GZ: vcf_path, VCF_GZ_TBI: f'{vcf_path}.tbi'}),
+            )
+    return resource_objects
+
+
+ExpectedResultT = Union[Path, dict[str, Path], dict[str, str], dict[str, Path | str], str, None]
