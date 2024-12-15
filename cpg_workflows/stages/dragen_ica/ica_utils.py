@@ -1,6 +1,6 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
 import icasdk
@@ -14,6 +14,10 @@ if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
+SECRET_PROJECT: Final = 'cpg-common'
+SECRET_NAME: Final = 'illumina_cpg_workbench_api'
+SECRET_VERSION: Final = 'latest'
 coloredlogs.install(level=logging.INFO)
 
 
@@ -26,10 +30,6 @@ def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
     Returns:
         dict[str, str]: A dictionary with the keys projectId and apiKey
     """
-    SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-    SECRET_PROJECT = 'cpg-common'
-    SECRET_NAME = 'illumina_cpg_workbench_api'
-    SECRET_VERSION = 'latest'
     try:
         secret_path: str = SECRET_CLIENT.secret_version_path(
             project=SECRET_PROJECT,
