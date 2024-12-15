@@ -250,7 +250,12 @@ def sort_sgs_by_project(response_data) -> dict:
     result_dict: dict[str, list[str]] = {}
 
     for sequencing_group in response_data:
+
         project_id = sequencing_group['sample']['project']['name']
+
+        # RE: PR #1063 - we need to strip the '-test' suffix from the project_id to match configs
+        if project_id.endswith('-test'):
+            project_id = project_id[:-5]
 
         if project_id not in result_dict:
             result_dict[project_id] = []
