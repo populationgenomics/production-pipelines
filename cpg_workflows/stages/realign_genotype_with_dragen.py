@@ -1,3 +1,4 @@
+import json
 import logging
 from math import ceil
 from typing import TYPE_CHECKING, Final
@@ -11,6 +12,7 @@ import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, get_batch
+from cpg_workflows.filetypes import CramPath
 from cpg_workflows.stages.dragen_ica import (
     monitor_align_genotype_with_dragen,
     prepare_ica_for_analysis,
@@ -51,16 +53,17 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
 
     """
 
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        output_dict: dict[str, cpg_utils.Path] = {
-            'cram_fid': sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}.cram_ica_file_id',
-            'crai_fid': sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}.crai_ica_file_id',
-            'analysis_output_fid': sg_bucket
-            / GCP_FOLDER_FOR_ICA_PREP
-            / f'{sequencing_group.name}.cram.crai_ica_file_id',
-        }
-        return output_dict
+        # fids_json = sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_fids.json'
+        # output_dict: dict[str, cpg_utils.Path] = {
+        #     'cram_fid_path': sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}.cram_ica_file_id',
+        #     'crai_fid_path': sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}.crai_ica_file_id',
+        #     'analysis_output_fid_path': sg_bucket
+        #     / GCP_FOLDER_FOR_ICA_PREP
+        #     / f'{sequencing_group.name}.cram.crai_ica_file_id',
+        # }
+        return sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_fids.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
@@ -74,7 +77,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         )
         prepare_ica_job.image(image=image_path('cpg_workflows'))
 
-        prepare_ica_job.call(
+        output_fids = prepare_ica_job.call(
             prepare_ica_for_analysis.run,
             cram=cram,
             upload_folder=config_retrieve(['ica', 'data_prep', 'upload_folder']),
@@ -82,13 +85,17 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
             bucket_name=bucket_name,
-            gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
-        )
+        ).as_json()
 
-        return self.make_outputs(
-            target=sequencing_group,
-            data=self.expected_outputs(sequencing_group=sequencing_group),
-            jobs=prepare_ica_job,
+        return get_batch().write_output(
+            output_fids,
+            str(
+                self.make_outputs(
+                    target=sequencing_group,
+                    data=self.expected_outputs(sequencing_group=sequencing_group),
+                    jobs=prepare_ica_job,
+                ),
+            ),
         )
 
 
@@ -136,7 +143,7 @@ class UploadDataToIca(SequencingGroupStage):
         )
         upload_job.image(image=image_path('cpg_workflows'))
 
-        upload_job.storage(calculate_needed_storage(cram=cram))
+        upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
         upload_job.call(
             upload_data_to_ica.run,
             cram_data_mapping=cram_data_mapping,
@@ -301,7 +308,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             name='DownloadDataFromIca',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
-        ica_download_job.storage(storage=calculate_needed_storage(cram=cram))
+        ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.image(image=image_path('ica'))
 
         # Get secrets and folder ID needed for runtime
