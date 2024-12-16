@@ -142,12 +142,12 @@ class UploadDataToIca(SequencingGroupStage):
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         upload_job.image(image=image_path('cpg_workflows'))
-        input_data = get_batch().read_input(inputs.as_str(target=sequencing_group, stage=PrepareIcaForDragenAnalysis))
+        input_data = get_batch().read_input(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis))
 
         upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
         upload_job.call(
             upload_data_to_ica.run,
-            cram_data_mapping=input_data,
+            cram_data_mapping=str(input_data),
             bucket_name=bucket_name,
             gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
             api_root=ICA_REST_ENDPOINT,
