@@ -289,12 +289,14 @@ class DownloadDataFromIca(SequencingGroupStage):
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
             f"""
+            set -x
+            mkdir -p $HOME/.icav2
+            echo "server-url: ica.illumina.com" > /root/.icav2/config.yaml
+
             set +x
-            mkdir -p ~/.icavc2
-            echo "server-url: ica.illumina.com" > ~/.icav2/config.yaml
             gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq .apiKey | sed 's/\\\"//g' > key
             gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq .projectID | sed 's/\\\"//g' > projectID
-            echo "x-api-key: $(cat key)" >> ~/.icav2/config.yaml
+            echo "x-api-key: $(cat key)" >> $HOME/.icav2/config.yaml
             icav2 projects enter $(cat projectID)
             set -x
             icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq .analysis_output_fid | sed 's/\\\"//g') .
