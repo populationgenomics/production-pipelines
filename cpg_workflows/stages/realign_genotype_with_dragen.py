@@ -147,7 +147,7 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
         upload_job.call(
             upload_data_to_ica.run,
-            cram_data_mapping=str(input_data),
+            cram_data_mapping=str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis)),
             bucket_name=bucket_name,
             gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
             api_root=ICA_REST_ENDPOINT,

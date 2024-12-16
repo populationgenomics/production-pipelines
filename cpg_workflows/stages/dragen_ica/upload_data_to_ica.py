@@ -9,6 +9,7 @@ import icasdk
 from google.cloud import storage
 from icasdk.apis.tags import project_data_api
 
+import cpg_utils
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
@@ -87,7 +88,7 @@ def run(
     coloredlogs.install(level=logging.INFO)
 
     logging.info(cram_data_mapping)
-    logging.info(json.load(open(cram_data_mapping)))
+    logging.info(json.load(open(cpg_utils.to_path(cram_data_mapping))))
 
     sys.exit(1)
 
