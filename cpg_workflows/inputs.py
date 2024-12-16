@@ -108,7 +108,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
         # If the dataset_name string ends in -test, strip test from the end
         # This is to ensure compatibility with the structure of our storage configs.
         if dataset_name.endswith('-test'):
-            dataset_name = dataset_name[:-5]
+            dataset_name = dataset_name.removesuffix('-test')
         dataset = cohort.create_dataset(dataset_name)
         sgs = sgs_by_dataset_for_cohort[dataset_name]
 
@@ -177,7 +177,7 @@ def deprecated_create_cohort() -> MultiCohort:
         # If the dataset_name string ends in -test, strip test from the end
         # This is to ensure compatibility with the structure of our storage configs.
         if dataset_name.endswith('-test'):
-            dataset_name = dataset_name[:-5]
+            dataset_name = dataset_name.removesuffix('-test')
         dataset = cohort.create_dataset(dataset_name)
         mc_dataset = multi_cohort.add_dataset(dataset)
         sgs = get_metamist().get_sg_entries(dataset_name)

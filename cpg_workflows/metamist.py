@@ -255,7 +255,7 @@ def sort_sgs_by_project(response_data) -> dict:
 
         # RE: PR #1063 - we need to strip the '-test' suffix from the project_id to match configs
         if project_id.endswith('-test'):
-            project_id = project_id[:-5]
+            project_id = project_id.removesuffix('-test')
 
         if project_id not in result_dict:
             result_dict[project_id] = []
