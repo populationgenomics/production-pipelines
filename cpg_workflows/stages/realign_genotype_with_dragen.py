@@ -44,7 +44,7 @@ def calculate_needed_storage(
 
 
 # No need to register this stage in Metamist I think, just ICA prep
-@stage(analysis_keys=['cram_fid', 'cram_index_fid', 'analysis_output_fid'])
+@stage
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     """Set up ICA for a single realignment run.
 
@@ -77,6 +77,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         )
         prepare_ica_job.image(image=image_path('cpg_workflows'))
 
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
         output_fids = prepare_ica_job.call(
             prepare_ica_for_analysis.run,
             cram=cram,
@@ -87,15 +88,14 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             bucket_name=bucket_name,
         ).as_json()
 
-        return get_batch().write_output(
+        get_batch().write_output(
             output_fids,
-            str(
-                self.make_outputs(
-                    target=sequencing_group,
-                    data=self.expected_outputs(sequencing_group=sequencing_group),
-                    jobs=prepare_ica_job,
-                ),
-            ),
+            str(outputs),
+        )
+        return self.make_outputs(
+            target=sequencing_group,
+            data=outputs,
+            jobs=prepare_ica_job,
         )
 
 
@@ -142,11 +142,12 @@ class UploadDataToIca(SequencingGroupStage):
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         upload_job.image(image=image_path('cpg_workflows'))
+        input_data = get_batch().read_input(inputs.as_str(target=sequencing_group, stage=PrepareIcaForDragenAnalysis))
 
         upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
         upload_job.call(
             upload_data_to_ica.run,
-            cram_data_mapping=cram_data_mapping,
+            cram_data_mapping=input_data,
             bucket_name=bucket_name,
             gcp_folder=GCP_FOLDER_FOR_ICA_PREP,
             api_root=ICA_REST_ENDPOINT,

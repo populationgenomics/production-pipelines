@@ -1,5 +1,7 @@
+import json
 import logging
 import subprocess
+import sys
 from typing import Any, Literal
 
 import coloredlogs
@@ -66,7 +68,7 @@ def upload_data(
 
 
 def run(
-    cram_data_mapping: list[dict[str, str]],
+    cram_data_mapping: str,  # list[dict[str, str]],
     bucket_name: str,
     gcp_folder: str,
     api_root: str,
@@ -83,6 +85,11 @@ def run(
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
     coloredlogs.install(level=logging.INFO)
+
+    logging.info(cram_data_mapping)
+    logging.info(json.load(open(cram_data_mapping)))
+
+    sys.exit(1)
 
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
