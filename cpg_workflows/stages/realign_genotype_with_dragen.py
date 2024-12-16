@@ -120,22 +120,22 @@ class UploadDataToIca(SequencingGroupStage):
         cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
         bucket_name: str = cram_path_components['bucket']
 
-        cram_data_mapping: list[dict[str, str]] = [
-            {
-                'name': f'{cram_path_components["file"]}',
-                'full_path': cram,
-                'id_path': str(
-                    inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
-                ),
-            },
-            {
-                'name': f'{cram_path_components["file"]}.crai',
-                'full_path': f'{cram}.crai',
-                'id_path': str(
-                    inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
-                ),
-            },
-        ]
+        # cram_data_mapping: list[dict[str, str]] = [
+        #     {
+        #         'name': f'{cram_path_components["file"]}',
+        #         'full_path': cram,
+        #         'id_path': str(
+        #             inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='cram_fid'),
+        #         ),
+        #     },
+        #     {
+        #         'name': f'{cram_path_components["file"]}.crai',
+        #         'full_path': f'{cram}.crai',
+        #         'id_path': str(
+        #             inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='crai_fid'),
+        #         ),
+        #     },
+        # ]
 
         upload_job: PythonJob = get_batch().new_python_job(
             name='UploadDataToIca',
