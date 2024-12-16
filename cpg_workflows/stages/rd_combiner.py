@@ -6,8 +6,8 @@ use the gVCF combiner instead of joint-calling.
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.rd_combiner import combiner
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner import combiner
 from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
