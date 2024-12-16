@@ -86,9 +86,6 @@ def run(
     api_key: str = SECRETS['apiKey']
     coloredlogs.install(level=logging.INFO)
 
-    logging.info(cram_data_mapping)
-    logging.info(json.load(open(cpg_utils.to_path(cram_data_mapping))))
-
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
     path_parameters: dict[str, str] = {'projectId': project_id}
