@@ -23,7 +23,7 @@ snps_recal_disc_size = 20
 
 # choices of jar specs to use for the various steps
 # without this setting we would default to matching the native Hail version in the container
-# currently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 133 + 400'retry + StreamConstraints patch
+# currently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
 [rd_combiner.jar_spec_revision]
 annotate_cohort = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 annotate_dataset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
