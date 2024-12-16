@@ -287,7 +287,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         )
         ica_analysis_folder_id_path: str = batch_instance.read_input(
             str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis, key='analysis_output_fid'),
+                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
             ),
         )
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
