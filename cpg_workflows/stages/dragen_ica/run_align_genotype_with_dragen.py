@@ -78,7 +78,6 @@ def submit_dragen_run(
 
 
 def run(
-    cram_name: str,
     ica_fids_path: str,
     dragen_ht_id: str,
     cram_reference_id: str,
@@ -87,8 +86,6 @@ def run(
     technical_tags: list[str],
     reference_tags: list[str],
     user_reference: str,
-    gcp_bucket: str,
-    pipeline_registration_path: str,
     api_root: str,
 ) -> dict[str, str]:
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()

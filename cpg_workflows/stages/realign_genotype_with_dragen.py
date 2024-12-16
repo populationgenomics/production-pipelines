@@ -1,10 +1,8 @@
-import json
 import logging
 from math import ceil
 from typing import TYPE_CHECKING, Final
 
 import coloredlogs
-from google.cloud import storage
 
 from hailtop.batch.job import PythonJob
 
@@ -12,7 +10,6 @@ import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, get_batch
-from cpg_workflows.filetypes import CramPath
 from cpg_workflows.stages.dragen_ica import (
     monitor_align_genotype_with_dragen,
     prepare_ica_for_analysis,
@@ -175,7 +172,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_call = align_genotype_job.call(
             run_align_genotype_with_dragen.run,
-            cram_name=sequencing_group.name,
             ica_fids_path=str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis)),
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
@@ -184,8 +180,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             technical_tags=technical_tags,
             reference_tags=reference_tags,
             user_reference=user_reference,
-            gcp_bucket=get_path_components_from_gcp_path(path=str(sequencing_group.cram))['bucket'],
-            pipeline_registration_path=GCP_FOLDER_FOR_RUNNING_PIPELINE,
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
         get_batch().write_output(
