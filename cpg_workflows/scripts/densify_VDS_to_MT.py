@@ -46,7 +46,7 @@ def main(
     init_batch()
 
     # if we need to manually specify a non-standard Hail QoB JAR file
-    if jar_spec := config_retrieve(['rd_combiner', 'jar_spec_revision', 'densify'], False):
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
         override_jar_spec(jar_spec)
 
     vds = hl.vds.read_vds(vds_in)

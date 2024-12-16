@@ -42,7 +42,7 @@ def run(
     logging.basicConfig(level=logging.INFO)
 
     init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision', 'combiner'], False):
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'combiner'], False):
         override_jar_spec(jar_spec)
 
     # Load from save, if supplied (log correctly depending on force_new_combiner)
