@@ -1,3 +1,4 @@
+import json
 import logging
 import subprocess
 from typing import Any, Literal
@@ -7,6 +8,7 @@ import icasdk
 from google.cloud import storage
 from icasdk.apis.tags import project_data_api
 
+import cpg_utils
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
@@ -67,10 +69,10 @@ def upload_data(
 
 def run(
     cram_data_mapping: list[dict[str, str]],
+    ica_fids: str,
     bucket_name: str,
-    gcp_folder: str,
     api_root: str,
-) -> None:
+) -> dict[str, str]:
     """Generate a presigned URL per file, and upload the CRAM and CRAI to them.
 
     Args:
@@ -88,19 +90,20 @@ def run(
     configuration.api_key['ApiKeyAuth'] = api_key
     path_parameters: dict[str, str] = {'projectId': project_id}
 
+    with open(cpg_utils.to_path(ica_fids), 'rt') as fids_handle:
+        fids: dict[str, str] = json.load(fids_handle)
+
+    uploads_success: dict[str, str] = {}
+
     with icasdk.ApiClient(configuration) as upload_api_client:
         upload_api_instance = project_data_api.ProjectDataApi(upload_api_client)
         for item in cram_data_mapping:
-            file_id: str = ica_utils.read_blob_contents(full_blob_path=item['id_path'])
+            file_id: str = fids['cram_fid'] if item['name'].endswith('cram') else fids['crai_fid']
             upload_url: str = create_upload_url(
                 upload_api_instance=upload_api_instance,
                 path_params=path_parameters,
                 file_id=file_id,
             )
             upload_data(upload_url=upload_url, gcp_path=item['full_path'], object_name=item['name'], bucket=bucket_name)
-            ica_utils.register_output_to_gcp(
-                bucket=bucket_name,
-                object_contents=file_id,
-                object_name=f'{item["name"]}_upload_success',
-                gcp_folder=gcp_folder,
-            )
+            uploads_success[item['name']] = 'success'
+    return uploads_success

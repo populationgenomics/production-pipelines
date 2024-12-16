@@ -18,17 +18,21 @@ user_reference = 'test_user_reference'
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'
 dragen_3_7_8 = 'a59c10af-b44a-46f9-b4ba-47e5191c358d'
-
-[ica.reference_ids]
 # Dragen hash table for 3.7.8
 dragen_ht_id = 'fil.854d49a151a24edae5d708da2935b1b0'
 
+# IDs for all CRAM references that were previously used to generate the CRAM files that are to be realigned
+[ica.cram_references]
+
+# Choice for which CRAM reference to use. Current choices are 'dragmap' or 'gatk'
+old_cram_reference = 'dragmap'
+
 # CRAM reference used to align the CRAM file that you want to realign with Dragen
 # Dragmap reference FASTA
-cram_reference_id = 'fil.159e94790e5c4bdfcbef08dd148ff548'
+dragmap = 'fil.159e94790e5c4bdfcbef08dd148ff548'
 
 # GATK reference FASTA
-# cram_reference_id = 'fil.7e16c32f65e9468d31b908dcefab1cbc'
+gatk = 'fil.7e16c32f65e9468d31b908dcefab1cbc'
 
 [images]
 # This image contains the ICA CLI used for transferring data from ICA -> GCP at the end of the pipeline.

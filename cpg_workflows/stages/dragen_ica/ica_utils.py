@@ -1,19 +1,21 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
 import icasdk
-from google.cloud import secretmanager, storage
+from google.cloud import secretmanager
 from icasdk.apis.tags import project_analysis_api, project_data_api
 from icasdk.model.create_data import CreateData
-
-from cpg_utils.cloud import get_path_components_from_gcp_path
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
 
+SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
+SECRET_PROJECT: Final = 'cpg-common'
+SECRET_NAME: Final = 'illumina_cpg_workbench_api'
+SECRET_VERSION: Final = 'latest'
 coloredlogs.install(level=logging.INFO)
 
 
@@ -26,10 +28,6 @@ def get_ica_secrets() -> dict[Literal['projectID', 'apiKey'], str]:
     Returns:
         dict[str, str]: A dictionary with the keys projectId and apiKey
     """
-    SECRET_CLIENT = secretmanager.SecretManagerServiceClient()
-    SECRET_PROJECT = 'cpg-common'
-    SECRET_NAME = 'illumina_cpg_workbench_api'
-    SECRET_VERSION = 'latest'
     try:
         secret_path: str = SECRET_CLIENT.secret_version_path(
             project=SECRET_PROJECT,
@@ -176,35 +174,3 @@ def create_upload_object_id(
         raise icasdk.ApiException(
             f'Exception when calling ProjectDataApi -> create_data_in_project: {e}',
         ) from e
-
-
-def register_output_to_gcp(bucket: str, object_contents: str, object_name: str, gcp_folder: str) -> None:
-    """Register ICA steps into GCP, so that the workflow can reuse previous steps.
-
-    Args:
-        bucket (str): The bucket to write the object in
-        object_contents (str): The contents of the object. Usually an ICA ID, but can be any string.
-        object_name (str): The name of the object to wwrite.
-        gcp_folder (str): The prefix of the object.
-    """
-    storage_client = storage.Client()
-    upload_name_and_prefix: str = f'{gcp_folder}/{object_name}'
-    blob_client = storage.Blob(name=upload_name_and_prefix, bucket=storage_client.bucket(bucket_name=bucket))
-    blob_client.upload_from_string(data=object_contents)
-
-
-def read_blob_contents(full_blob_path: str) -> str:
-    """Read the contents of a blob in GCP as text
-
-    Args:
-        full_blob_path (str): The full path to the blob, including gs://
-
-    Returns:
-        str: The contents of the blob as a string. e.g. fil.xxxxx (ICA ID)
-    """
-    path_components: dict[str, str] = get_path_components_from_gcp_path(full_blob_path)
-    gcp_bucket: str = path_components['bucket']
-    blob_path: str = f'{path_components["suffix"]}{path_components["file"]}'
-    storage_client = storage.Client()
-    blob_client = storage.Blob(name=blob_path, bucket=storage_client.bucket(bucket_name=gcp_bucket))
-    return blob_client.download_as_text()

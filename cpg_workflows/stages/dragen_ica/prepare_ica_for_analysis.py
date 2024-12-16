@@ -15,8 +15,7 @@ def run(
     api_root: str,
     sg_name: str,
     bucket_name: str,
-    gcp_folder: str,
-) -> None:
+) -> dict[str, str]:
     """Prepare ICA for data upload and pipeline runs by generating a file ID for
     the CRAM and CRAI files, and a folder ID for the outputs of the Dragen pipeline.
 
@@ -53,15 +52,18 @@ def run(
             'object_type': 'FOLDER',
         },
     ]
+    fid_output: dict[str, str] = {
+        'cram_fid': '',
+        'crai_fid': '',
+        'analysis_output_fid': '',
+    }
     logging.info('Creating ICA object to upload data.')
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_data_api.ProjectDataApi(api_client)
         for item in data_setup:
             folder_path: str = f'/{bucket_name}/{upload_folder}'
-            output_object_name: str = f'{item["object"]}_ica_file_id'
             if item['object_type'] == 'FOLDER':
                 folder_path = f'/{bucket_name}/{ica_analysis_output_folder}'
-                output_object_name = f'{item["object"]}_dragen_output_folder_id'
             logging.info(f'File is: {item["object"]}, object type is {item["object_type"]}')
             object_id: str = ica_utils.create_upload_object_id(
                 api_instance=api_instance,
@@ -71,9 +73,10 @@ def run(
                 folder_path=folder_path,
                 object_type=item['object_type'],
             )
-            ica_utils.register_output_to_gcp(
-                bucket=bucket_name,
-                object_contents=object_id,
-                object_name=output_object_name,
-                gcp_folder=gcp_folder,
-            )
+            if item['object'].endswith('cram'):
+                fid_output['cram_fid'] = object_id
+            elif item['object'].endswith('crai'):
+                fid_output['crai_fid'] = object_id
+            else:
+                fid_output['analysis_output_fid'] = object_id
+    return fid_output
