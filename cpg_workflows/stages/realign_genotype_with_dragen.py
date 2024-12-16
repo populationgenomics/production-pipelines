@@ -286,15 +286,10 @@ class DownloadDataFromIca(SequencingGroupStage):
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
         ica_analysis_folder_id_path: str = batch_instance.read_input(
-            str(
-                inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
-            ),
+            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
         )
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.image(image=image_path('ica'))
-
-        # Get secrets and folder ID needed for runtime
-        ica_analysis_folder_id = batch_instance.read_input(ica_analysis_folder_id_path)
 
         # Download an entire folder with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
@@ -308,7 +303,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             echo "x-api-key: $(cat key)" >> ~/.icav2/config.yaml
             icav2 projects enter $(cat projectID)
             set -x
-            icav2 projectdata download $(cat {ica_analysis_folder_id} | jq .analysis_output_fid | sed 's/\\\"//g') .
+            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq .analysis_output_fid | sed 's/\\\"//g') .
             mv {bucket_name}/{config_retrieve(["ica", "data_prep", "output_folder"])}/{sequencing_group.name}/* {sequencing_group.name}
             cd {sequencing_group.name} && cat *.md5sum > dragen.md5sum && md5sum -c dragen.md5sum
             gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}
