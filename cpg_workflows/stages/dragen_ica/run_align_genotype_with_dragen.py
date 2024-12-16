@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any, Literal
 
@@ -10,6 +11,7 @@ from icasdk.model.analysis_tag import AnalysisTag
 from icasdk.model.create_nextflow_analysis import CreateNextflowAnalysis
 from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
 
+import cpg_utils
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
@@ -77,12 +79,10 @@ def submit_dragen_run(
 
 def run(
     cram_name: str,
-    cram_id_path: str,
-    cram_index_id_path: str,
+    ica_fids_path: str,
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
-    ica_output_folder_id_path: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
@@ -90,7 +90,7 @@ def run(
     gcp_bucket: str,
     pipeline_registration_path: str,
     api_root: str,
-) -> None:
+) -> dict[str, str]:
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
@@ -99,16 +99,19 @@ def run(
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
 
+    with open(cpg_utils.to_path(ica_fids_path), 'rt') as ica_fids_handle:
+        ica_fids: dict[str, str] = json.load(ica_fids_handle)
+
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
         path_params: dict[str, str] = {'projectId': project_id}
         analysis_run_id: str = submit_dragen_run(
-            cram_id=ica_utils.read_blob_contents(full_blob_path=cram_id_path),
-            cram_index_id=ica_utils.read_blob_contents(full_blob_path=cram_index_id_path),
+            cram_id=ica_fids['cram_fid'],
+            cram_index_id=ica_fids['crai_fid'],
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            ica_output_folder_id=ica_utils.read_blob_contents(full_blob_path=ica_output_folder_id_path),
+            ica_output_folder_id=ica_fids['analysis_output_fid'],
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,
@@ -118,9 +121,4 @@ def run(
         )
 
         logging.info(f'Submitted ICA run with pipeline ID: {analysis_run_id}')
-        ica_utils.register_output_to_gcp(
-            bucket=gcp_bucket,
-            object_contents=analysis_run_id,
-            object_name=f'{cram_name}_pipeline_id',
-            gcp_folder=pipeline_registration_path,
-        )
+        return {'pipeline_id': analysis_run_id}
