@@ -169,8 +169,9 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         combiner_job.image(config_retrieve(['workflow', 'driver_image']))
-        combiner_job.memory(config_retrieve(['combiner', 'memory']))
-        combiner_job.storage(config_retrieve(['combiner', 'storage']))
+        combiner_job.memory(config_retrieve(['combiner', 'driver_memory'], 'highmem'))
+        combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
+        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
 
         # Default to GRCh38 for reference if not specified
         combiner_job.call(

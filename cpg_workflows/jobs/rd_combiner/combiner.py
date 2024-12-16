@@ -41,7 +41,11 @@ def run(
     # set up a quick logger inside the job
     logging.basicConfig(level=logging.INFO)
 
-    init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'combiner'], False):
         override_jar_spec(jar_spec)
 
