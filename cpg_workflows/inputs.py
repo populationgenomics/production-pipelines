@@ -105,6 +105,10 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     TODO (mwelland): so we can lose a layer of the structure here
     """
     for dataset_name in sgs_by_dataset_for_cohort.keys():
+        # If the dataset_name string ends in -test, strip test from the end
+        # This is to ensure compatibility with the structure of our storage configs.
+        if dataset_name.endswith('-test'):
+            dataset_name = dataset_name[:-5]
         dataset = cohort.create_dataset(dataset_name)
         sgs = sgs_by_dataset_for_cohort[dataset_name]
 
@@ -170,6 +174,10 @@ def deprecated_create_cohort() -> MultiCohort:
     cohort = multi_cohort.create_cohort(id=analysis_dataset_name, name=analysis_dataset_name)
 
     for dataset_name in dataset_names:
+        # If the dataset_name string ends in -test, strip test from the end
+        # This is to ensure compatibility with the structure of our storage configs.
+        if dataset_name.endswith('-test'):
+            dataset_name = dataset_name[:-5]
         dataset = cohort.create_dataset(dataset_name)
         mc_dataset = multi_cohort.add_dataset(dataset)
         sgs = get_metamist().get_sg_entries(dataset_name)
