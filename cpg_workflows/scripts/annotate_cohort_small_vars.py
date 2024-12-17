@@ -170,6 +170,16 @@ def annotate_cohort(
         ),
         vep=vep_ht[mt.locus].vep,
     )
+    mt = mt.drop('variant_qc')
+
+    # split the AC/AF attributes into separate entries, overwriting the array in INFO
+    # these elements become a 1-element array
+    mt = mt.annotate_rows(
+        info=mt.info.annotate(
+            AF=[mt.info.AF[mt.a_index - 1]],
+            AC=[mt.info.AC[mt.a_index - 1]],
+        ),
+    )
 
     get_logger().info('Annotating with seqr-loader fields: round 1')
 
