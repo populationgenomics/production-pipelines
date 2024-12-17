@@ -55,48 +55,52 @@ def main(
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
         override_jar_spec(jar_spec)
 
-    vds = hl.vds.read_vds(vds_in)
-
-    get_logger().info('Densifying data...')
-    mt = hl.vds.to_dense_mt(vds)
-
-    # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
-    # remove any monoallelic or non-ref-in-any-sample sites
-    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
-
-    # annotate site-level DP to avoid name collision
-    mt = mt.annotate_rows(
-        site_dp=hl.agg.sum(mt.DP),
-        ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
-    )
-
-    # content shared with large_cohort.site_only_vcf.py
-    info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
-    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
-
-    info_ht = adjust_vcf_incompatible_types(
-        info_ht,
-        # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
-        # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
-        # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-        # it as an array with a single string value "|132.1|140.2", leading to
-        # an IndexOutOfBound exception when trying to access value for second allele)
-        pipe_delimited_annotations=[],
-    )
-
-    # annotate this info back into the main MatrixTable
-    mt = mt.annotate_rows(info=info_ht[mt.row_key].info)
-
-    # unpack mt.info.info back into mt.info. Must be better syntax for this?
-    mt = mt.drop('gvcf_info')
-
-    get_logger().info('Splitting multiallelics, in a sparse way')
-    mt = hl.experimental.sparse_split_multi(mt)
-
     # check here to see if we can reuse the dense MT
     if not can_reuse(dense_mt_out):
+
+        vds = hl.vds.read_vds(vds_in)
+
+        get_logger().info('Densifying data...')
+        mt = hl.vds.to_dense_mt(vds)
+
+        # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
+        # remove any monoallelic or non-ref-in-any-sample sites
+        mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
+
+        # annotate site-level DP to avoid name collision
+        mt = mt.annotate_rows(
+            site_dp=hl.agg.sum(mt.DP),
+            ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
+        )
+
+        # content shared with large_cohort.site_only_vcf.py
+        info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
+        info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
+
+        info_ht = adjust_vcf_incompatible_types(
+            info_ht,
+            # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
+            # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
+            # which breaks VQSR parser (it doesn't recognise the delimiter and treats
+            # it as an array with a single string value "|132.1|140.2", leading to
+            # an IndexOutOfBound exception when trying to access value for second allele)
+            pipe_delimited_annotations=[],
+        )
+
+        # annotate this info back into the main MatrixTable
+        mt = mt.annotate_rows(info=info_ht[mt.row_key].info)
+
+        # unpack mt.info.info back into mt.info. Must be better syntax for this?
+        mt = mt.drop('gvcf_info')
+
+        get_logger().info('Splitting multiallelics, in a sparse way')
+        mt = hl.experimental.sparse_split_multi(mt)
+
         get_logger().info(f'Writing fresh data into {dense_mt_out}')
         mt.write(dense_mt_out, overwrite=True)
+
+    else:
+        get_logger().info(f'Accepting existing data in {dense_mt_out}')
 
     if not (sites_only or separate_header):
         return
