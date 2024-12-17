@@ -15,8 +15,10 @@ check_for_existing_vds = false
 #write_mt_for_datasets = ['test_dataset', ]
 
 ## number of partitions to coalesce the data into
-densify_partitions = 2500
+densify_partitions = 5000
+
 ## strategy to use for partitioning the data [none, naive, shuffle]
+## not currently in use (see #1078)
 partition_strategy = 'naive'
 
 # these are used when calculating how many fragments to send to each job
