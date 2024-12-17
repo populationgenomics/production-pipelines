@@ -29,17 +29,23 @@ from gnomad.utils.vcf import adjust_vcf_incompatible_types
 def main(
     vds_in: str,
     dense_mt_out: str,
+    partitions: int,
+    partition_strategy: str,
     sites_only: str | None = None,
     separate_header: str | None = None,
 ) -> None:
     """
     Load a sparse VariantDataset
     Write a dense MatrixTable with split multiallelics
-    optionally coalesce the data into a predetermined number of partitions
+    optionally, coalesce the data into a predetermined number of partitions
+    - defaulting to the most computationally efficient coalesce, instead of a full repartition
+    - option to override this with a naive coalesce, or a shuffle repartition
 
     Args:
         vds_in (str):
         dense_mt_out (str):
+        partitions (int): set the number of partitions to use for the VCF export
+        partition_strategy (str): when repartitioning, choose between none, 'naive_coalesce' or 'shuffled repartition'.
         sites_only (str): optional, if used write a sites-only VCF directory to this location
         separate_header (str): optional, if used write a sites-only VCF directory with a separate header to this location
     """
@@ -97,6 +103,19 @@ def main(
 
     # read the dense MT and obtain the sites-only HT
     mt = hl.read_matrix_table(dense_mt_out)
+
+    # coalesce the data into a predetermined number of partitions
+    if partition_strategy == 'naive':
+        get_logger().info(f'Coalescing data into {partitions} partitions using naive coalesce')
+        mt = mt.naive_coalesce(partitions)
+    elif partition_strategy == 'shuffle':
+        get_logger().info(f'Coalescing data into {partitions} partitions using shuffle repartition')
+        mt = mt.repartition(partitions, shuffle=True)
+    elif partition_strategy == 'none':
+        get_logger().info(f'Not coalesceing data into {partitions} partitions')
+    else:
+        raise ValueError(f'Invalid partition strategy: {partition_strategy}')
+
     sites_only_ht = mt.rows()
 
     # write a directory containing all the per-partition VCF fragments, each with a VCF header
@@ -130,10 +149,24 @@ def cli_main():
         '--separate_header',
         help='Specify an output path for a sites-only VCF, with a separate header file, or None',
     )
+    parser.add_argument(
+        '--partitions',
+        help='Specify the number of partitions to coalesce the data into',
+        type=int,
+        default=2500,
+    )
+    parser.add_argument(
+        '--partition_strategy',
+        help='Strategy to use for partitioning the data',
+        choices=['naive', 'shuffle', 'none'],
+        default='naive',
+    )
     args = parser.parse_args()
     main(
         vds_in=args.input,
         dense_mt_out=args.output,
+        partitions=args.partitions,
+        partition_strategy=args.partition_strategy,
         sites_only=args.sites_only,
         separate_header=args.separate_header,
     )
