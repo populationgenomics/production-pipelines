@@ -51,6 +51,8 @@ def main(
     """
     init_batch()
 
+    get_logger().info(f'Partition strategy {partition_strategy} is not currently in use')
+
     # if we need to manually specify a non-standard Hail QoB JAR file
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
         override_jar_spec(jar_spec)
@@ -60,8 +62,10 @@ def main(
 
         vds = hl.vds.read_vds(vds_in)
 
-        get_logger().info('Densifying data...')
-        mt = hl.vds.to_dense_mt(vds)
+        get_logger().info(f'Densifying data, using {partitions} partitions')
+
+        # providing n_partitions here gets Hail to calculate the intervals per partition on the VDS var and ref data
+        mt = hl.vds.to_dense_mt(vds, n_partitions=partitions)
 
         # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
         # remove any monoallelic or non-ref-in-any-sample sites
@@ -108,17 +112,19 @@ def main(
     # read the dense MT and obtain the sites-only HT
     mt = hl.read_matrix_table(dense_mt_out)
 
-    # coalesce the data into a predetermined number of partitions
-    if partition_strategy == 'naive':
-        get_logger().info(f'Coalescing data into {partitions} partitions using naive coalesce')
-        mt = mt.naive_coalesce(partitions)
-    elif partition_strategy == 'shuffle':
-        get_logger().info(f'Coalescing data into {partitions} partitions using shuffle repartition')
-        mt = mt.repartition(partitions, shuffle=True)
-    elif partition_strategy == 'none':
-        get_logger().info(f'Not coalesceing data into {partitions} partitions')
-    else:
-        raise ValueError(f'Invalid partition strategy: {partition_strategy}')
+    # changed plan here - attempting to read the VDS with set partitions, instead of only
+    # repartitioning the MT for VCF export
+    # # coalesce the data into a predetermined number of partitions
+    # if partition_strategy == 'naive':
+    #     get_logger().info(f'Coalescing data into {partitions} partitions using naive coalesce')
+    #     mt = mt.naive_coalesce(partitions)
+    # elif partition_strategy == 'shuffle':
+    #     get_logger().info(f'Coalescing data into {partitions} partitions using shuffle repartition')
+    #     mt = mt.repartition(partitions, shuffle=True)
+    # elif partition_strategy == 'none':
+    #     get_logger().info(f'Not coalesceing data into {partitions} partitions')
+    # else:
+    #     raise ValueError(f'Invalid partition strategy: {partition_strategy}')
 
     sites_only_ht = mt.rows()
 
