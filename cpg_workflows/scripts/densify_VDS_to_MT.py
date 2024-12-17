@@ -51,7 +51,7 @@ def main(
     """
     init_batch()
 
-    get_logger().info(f'Partition strategy {partition_strategy} is not currently in use')
+    get_logger().info(f'Partition strategy {partition_strategy} is not currently in use (see #1078)')
 
     # if we need to manually specify a non-standard Hail QoB JAR file
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
