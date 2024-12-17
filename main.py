@@ -37,7 +37,7 @@ from cpg_workflows.stages.rd_combiner import (
     SubsetMatrixTableToDatasetUsingHailQuery,
     TrainVqsrSnpTranches,
 )
-from cpg_workflows.stages.realign_genotype_with_dragen import DownloadDataFromIca
+from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
@@ -83,7 +83,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
-    'realign_genotype_with_dragen': [DownloadDataFromIca],
+    'realign_genotype_with_dragen': [CancelIcaPipelineRun, DownloadDataFromIca],
 }
 
 

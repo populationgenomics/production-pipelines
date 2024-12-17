@@ -46,5 +46,7 @@ def run(
         if pipeline_status == 'SUCCEEDED':
             logging.info(f'Pipeline run {ica_pipeline_id} has succeeded')
             return {'pipeline': 'success'}
+        elif pipeline_status in ['ABORTING', 'ABORTED']:
+            raise Exception(f'Pipeline run {ica_pipeline_id} has been cancelled.')
         else:
-            raise Exception
+            raise Exception(f'The pipeline run {ica_pipeline_id} has failed, please check ICA for more info.')

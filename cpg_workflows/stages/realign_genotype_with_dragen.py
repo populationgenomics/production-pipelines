@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from math import ceil
 from typing import TYPE_CHECKING, Final
 
@@ -11,12 +12,13 @@ from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.stages.dragen_ica import (
+    cancel_ica_pipeline_run,
     monitor_align_genotype_with_dragen,
     prepare_ica_for_analysis,
     run_align_genotype_with_dragen,
-    upload_data_to_ica,
 )
 from cpg_workflows.targets import SequencingGroup
+from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
 if TYPE_CHECKING:
@@ -27,6 +29,17 @@ GCP_FOLDER_FOR_ICA_PREP: Final = f'ica/{DRAGEN_VERSION}/prepare'
 GCP_FOLDER_FOR_RUNNING_PIPELINE: Final = f'ica/{DRAGEN_VERSION}/pipelines'
 GCP_FOLDER_FOR_ICA_DOWNLOAD: Final = f'ica/{DRAGEN_VERSION}/output'
 ICA_REST_ENDPOINT: Final = 'https://ica.illumina.com/ica/rest'
+ICA_CLI_SETUP: Final = """
+mkdir -p $HOME/.icav2
+echo "server-url: ica.illumina.com" > /root/.icav2/config.yaml
+
+set +x
+gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq -r .apiKey > key
+gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq -r .projectID > projectID
+echo "x-api-key: $(cat key)" >> $HOME/.icav2/config.yaml
+icav2 projects enter $(cat projectID)
+set -x
+"""
 
 
 coloredlogs.install(level=logging.INFO)
@@ -45,20 +58,15 @@ def calculate_needed_storage(
 class PrepareIcaForDragenAnalysis(SequencingGroupStage):
     """Set up ICA for a single realignment run.
 
-    Creates a file ID for both the CRAM and CRAI file to upload to.
     Creates a folder ID for the Dragen output to be written into.
-
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_fids.json'
+        return sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_output_fid.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
-        cram: str = cram_path_components['file']
-        bucket_name: str = cram_path_components['bucket']
-        logging.info(bucket_name)
+        bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
 
         prepare_ica_job: PythonJob = get_batch().new_python_job(
             name='PrepareIcaForDragenAnalysis',
@@ -69,8 +77,6 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         output_fids = prepare_ica_job.call(
             prepare_ica_for_analysis.run,
-            cram=cram,
-            upload_folder=config_retrieve(['ica', 'data_prep', 'upload_folder']),
             ica_analysis_output_folder=config_retrieve(['ica', 'data_prep', 'output_folder']),
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
@@ -88,54 +94,49 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         )
 
 
-@stage(
-    analysis_type='ica_data_upload',
-    required_stages=[PrepareIcaForDragenAnalysis],
-)
+@stage
 class UploadDataToIca(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_data_upload_success.json'
+        return sg_bucket / GCP_FOLDER_FOR_ICA_PREP / f'{sequencing_group.name}_fids.json'
 
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
-        cram_path_components: dict[str, str] = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))
-        cram: str = f'{cram_path_components["suffix"]}{cram_path_components["file"]}'
-        bucket_name: str = cram_path_components['bucket']
-
-        cram_data_mapping: list[dict[str, str]] = [
-            {
-                'name': f'{sequencing_group.name}.cram',
-                'full_path': cram,
-            },
-            {
-                'name': f'{cram_path_components["file"]}.crai',
-                'full_path': f'{cram}.crai',
-            },
-        ]
-
-        upload_job: PythonJob = get_batch().new_python_job(
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        upload_job = get_batch().new_bash_job(
             name='UploadDataToIca',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
-        upload_job.image(image=image_path('cpg_workflows'))
+        upload_folder = config_retrieve(['ica', 'data_prep', 'upload_folder'])
+        bucket: str = get_path_components_from_gcp_path(str(sequencing_group.cram))['bucket']
 
+        upload_job.image(image=image_path('ica'))
         upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
-        output_success = upload_job.call(
-            upload_data_to_ica.run,
-            cram_data_mapping=cram_data_mapping,
-            ica_fids=str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis)),
-            bucket_name=bucket_name,
-            api_root=ICA_REST_ENDPOINT,
-        ).as_json()
+        output = self.expected_outputs(sequencing_group=sequencing_group)
+        authenticate_cloud_credentials_in_job(upload_job)
 
-        get_batch().write_output(
-            output_success,
-            str(outputs),
+        # Check if the CRAM already exists in ICA before uploading. If it exists, just return the ID for the CRAM and CRAI
+        upload_job.command(
+            f"""
+            {ICA_CLI_SETUP}
+            cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id.details.status')
+            if [[ $cram_status != "AVAILABLE" ]]
+            then
+                mkdir {sequencing_group.name}
+                gcloud storage cp {sequencing_group.cram} .
+                gcloud storage cp {sequencing_group.cram}.crai .
+                icav2 projectdata upload {sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
+                icav2 projectdata upload {sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
+            fi
+
+            icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
+            icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
+
+            jq -n --arg cram_id $(cat cram_id) --arg crai_id $(cat crai_id) '{{cram_fid: $cram_id, crai_fid: $crai_id}}' > {upload_job.ofile}
+            """,
         )
+        get_batch().write_output(upload_job.ofile, str(output))
         return self.make_outputs(
             target=sequencing_group,
-            data=outputs,
+            data=output,
             jobs=upload_job,
         )
 
@@ -172,7 +173,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_call = align_genotype_job.call(
             run_align_genotype_with_dragen.run,
-            ica_fids_path=str(inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis)),
+            ica_fids_path=inputs.as_path(target=sequencing_group, stage=UploadDataToIca),
+            analysis_output_fid_path=inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
@@ -247,16 +249,40 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
         pass
 
 
-@stage(required_stages=[AlignGenotypeWithDragen, GvcfMlrWithDragen])
+@stage(required_stages=[AlignGenotypeWithDragen])
 class CancelIcaPipelineRun(SequencingGroupStage):
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
-    ) -> None:
-        pass
+    ) -> cpg_utils.Path:
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        return (
+            sg_bucket
+            / GCP_FOLDER_FOR_RUNNING_PIPELINE
+            / f'{sequencing_group.name}_pipeline_cancelled_at{slugify(str(datetime.now()))}.json'
+        )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        pass
+        cancel_pipeline_run: PythonJob = get_batch().new_python_job(
+            name='CancelIcaPipelineRun',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+        )
+        cancel_pipeline_run.image(image=image_path('cpg_workflows'))
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        cancel_pipeline = cancel_pipeline_run.call(
+            cancel_ica_pipeline_run.run,
+            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
+            api_root=ICA_REST_ENDPOINT,
+        ).as_json()
+        get_batch().write_output(
+            cancel_pipeline,
+            str(outputs),
+        )
+        return self.make_outputs(
+            target=sequencing_group,
+            data=outputs,
+            jobs=cancel_pipeline_run,
+        )
 
 
 @stage(
@@ -289,18 +315,8 @@ class DownloadDataFromIca(SequencingGroupStage):
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
             f"""
-            set -x
-            mkdir -p $HOME/.icav2
-            echo "server-url: ica.illumina.com" > /root/.icav2/config.yaml
-
-            set +x
-            gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq .apiKey | sed 's/\\\"//g' > key
-            gcloud secrets versions access latest --secret=illumina_cpg_workbench_api --project=cpg-common | jq .projectID | sed 's/\\\"//g' > projectID
-            echo "x-api-key: $(cat key)" >> $HOME/.icav2/config.yaml
-            icav2 projects enter $(cat projectID)
-
-            set -x
-            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq .analysis_output_fid | sed 's/\\\"//g') .
+            {ICA_CLI_SETUP}
+            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) .
             mv {bucket_name}/{config_retrieve(["ica", "data_prep", "output_folder"])}/{sequencing_group.name}/* {sequencing_group.name}
             cd {sequencing_group.name} && cat *.md5sum > dragen.md5sum && md5sum -c dragen.md5sum
             gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}

@@ -79,6 +79,7 @@ def submit_dragen_run(
 
 def run(
     ica_fids_path: str,
+    analysis_output_fid_path: str,
     dragen_ht_id: str,
     cram_reference_id: str,
     dragen_pipeline_id: str,
@@ -99,6 +100,9 @@ def run(
     with open(cpg_utils.to_path(ica_fids_path), 'rt') as ica_fids_handle:
         ica_fids: dict[str, str] = json.load(ica_fids_handle)
 
+    with open(cpg_utils.to_path(analysis_output_fid_path), 'rt') as analysis_outputs_fid_handle:
+        analysis_output_fid: dict[str, str] = json.load(analysis_outputs_fid_handle)
+
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
         path_params: dict[str, str] = {'projectId': project_id}
@@ -108,7 +112,7 @@ def run(
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             dragen_pipeline_id=dragen_pipeline_id,
-            ica_output_folder_id=ica_fids['analysis_output_fid'],
+            ica_output_folder_id=analysis_output_fid['analysis_output_fid'],
             user_tags=user_tags,
             technical_tags=technical_tags,
             reference_tags=reference_tags,
