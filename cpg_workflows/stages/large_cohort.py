@@ -96,8 +96,8 @@ class Combiner(CohortStage):
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
-        j.memory(combiner_config.get('memory', "4Gi"))
-        j.storage(combiner_config.get('storage', "5Gi"))
+        j.memory(combiner_config.get('memory', '4Gi'))
+        j.storage(combiner_config.get('storage', '5Gi'))
 
         # Default to GRCh38 for reference if not specified
         j.call(
@@ -109,6 +109,7 @@ class Combiner(CohortStage):
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
             save_path=output_paths['combiner_plan'],
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner'], False),
         )
 
         return self.make_outputs(cohort, output_paths, [j])
@@ -337,8 +338,8 @@ class MakeSiteOnlyVcf(CohortStage):
         sitesvcf_config = config_retrieve('sitesvcf')
 
         j.image(image_path('cpg_workflows'))
-        j.memory(sitesvcf_config.get('memory', "4Gi"))
-        j.storage(sitesvcf_config.get('storage', "5Gi"))
+        j.memory(sitesvcf_config.get('memory', '4Gi'))
+        j.storage(sitesvcf_config.get('storage', '5Gi'))
 
         init_batch_args: dict[str, str | int] = {}
         for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:

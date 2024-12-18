@@ -14,6 +14,17 @@ highmem_workers = true
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
+# Override for QoB JAR to fix teh StreamConstraints issue
+jar_spec_revision = 'f5b65edb8f1ed8e431f1799546a8e96d0ddff7d9'
+
+[combiner]
+force_new_combiner = false
+vds_version = "0.1"
+memory = "8Gi"
+storage = "10Gi"
+vds_analysis_ids = []
+merge_only_vds = false
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
