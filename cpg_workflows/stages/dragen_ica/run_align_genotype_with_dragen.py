@@ -89,6 +89,23 @@ def run(
     user_reference: str,
     api_root: str,
 ) -> dict[str, str]:
+    """_summary_
+
+    Args:
+        ica_fids_path (str): Path to the JSON in GCP holding the file IDs for the input CRAM and CRAI
+        analysis_output_fid_path (str): Path to the JSON in GCP holding the folder ID to store the analysis outputs in ICA
+        dragen_ht_id (str): The ICA file ID for the Dragen hash table used for mapping
+        cram_reference_id (str): The ICA file ID for the FASTA reference that was used to align the CRAM file
+        dragen_pipeline_id (str): The ICA pipeline ID for the Dragen pipeline that is going to be run
+        user_tags (list[str]): List of user tags for the analysis (optional, can be empty)
+        technical_tags (list[str]): List of technical tags for the analysis (optional, can be empty)
+        reference_tags (list[str]): List of reference tags for the analysis (optional, can be empty)
+        user_reference (str): A reference name for the pipeline run
+        api_root (str): The ICA API root
+
+    Returns:
+        dict[str, str]: A dict holding the pipeline ID
+    """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']

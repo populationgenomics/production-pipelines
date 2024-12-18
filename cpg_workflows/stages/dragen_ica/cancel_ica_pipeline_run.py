@@ -11,6 +11,19 @@ from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
+    """Cancel a running ICA pipeline via the API
+
+    Args:
+        ica_pipeline_id_path (str): The path to the JSON file holding the pipeline ID
+        api_root (str): The root for the ICA API
+
+    Raises:
+        icasdk.ApiException: Any API error
+
+    Returns:
+        dict[str, str]: A cancelled dict to be recorded in GCP noting that the pipeline was cancelled.
+                        Includes a timestamp so that a single cancelled pipeline isn't blocking.
+    """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']

@@ -22,6 +22,9 @@ def run(
         api_root (str): The ICA API endpoint
         sg_name (str): The name of the sequencing group
         bucket_name (str): The  name of the GCP bucket that the data reside in
+
+    Returns:
+        dict [str, str] noting the analysis ID.
     """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
