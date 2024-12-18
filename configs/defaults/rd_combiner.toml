@@ -16,7 +16,9 @@ check_for_existing_vds = false
 
 ## number of partitions to coalesce the data into
 densify_partitions = 2500
+
 ## strategy to use for partitioning the data [none, naive, shuffle]
+## not currently in use (see #1078)
 partition_strategy = 'naive'
 
 # these are used when calculating how many fragments to send to each job
