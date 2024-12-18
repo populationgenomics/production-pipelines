@@ -15,7 +15,7 @@ highmem_workers = true
 #intervals_path =
 
 # Override for QoB JAR to fix teh StreamConstraints issue
-jar_spec_revision = 'f5b65edb8f1ed8e431f1799546a8e96d0ddff7d9'
+jar_spec_revision = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 
 [combiner]
 force_new_combiner = false
