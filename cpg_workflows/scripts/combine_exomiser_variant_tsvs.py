@@ -69,14 +69,14 @@ def process_and_sort_variants(all_variants: dict[str, list[str]]) -> list[dict]:
 
     # first, split the data up into component parts
     all_vars: list[dict] = []
-    for variant_key, sample_details in all_variants.items():
+    for variant_key, family_details in all_variants.items():
         chrom, pos, ref, alt = variant_key.split(':')
         all_vars.append(
             {
                 'contig': chrom,
                 'position': int(pos),
                 'alleles': [ref, alt],
-                'sample_details': '::'.join(sample_details)
+                'family_details': '::'.join(family_details)
             }
         )
 
@@ -111,7 +111,7 @@ def munge_into_hail_table(all_variants: dict[str, list[str]], output_path: str):
         'contig:str,'
         'position:int32,'
         'alleles:array<str>,'
-        'sample_details:str'
+        'family_details:str'
         '}',
     )
 
