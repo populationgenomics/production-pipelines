@@ -1,3 +1,13 @@
+[workflow]
+
+# When running the pipeline normally, you need to skip this stage, otherwise it will submit all the jobs to ICA
+# and then cancel them.
+# [skip_stages] = ["CancelIcaPipelineRun"]
+
+# To cancel all the pipeline jobs in ICA (due to the disconnect between Hail QoB and ICA, we need to submit another
+# workflow run, but only run the 'CancelIcaPipelineRun' stage
+# [only_stages] = ['CancelIcaPipelineRun']
+
 # Tha base folders in ICA where data are uploaded, and Dragen results are written.
 # Is automatically prefixed by the dataset and access level, so these values would result in
 # cpg-fewgenomes-test/new_upload_folder and cpg-fewgenomes-test/test_output_folder when run.
