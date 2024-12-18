@@ -24,8 +24,7 @@ from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
-# this is used to separate family IDs from their individual outputs in RunExomiser
-BREAKING_PUNCTUATION = '~~'
+
 HPO_KEY: str = 'HPO Terms (present)'
 
 
@@ -168,23 +167,24 @@ class RunExomiser(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         """
-        the pipeline logic only accepts a dictionary of paths
-        but we need a dictionary of families, each containing a dictionary of paths
-        I'm fudging this by putting some arbitrary punctuation in to split on later
-
-        Args:
-            dataset ():
-
-        Returns:
-            dict of outputs for this dataset
+        dict of outputs for this dataset, keyed on family ID
         """
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         family_dict = find_families(dataset)
+
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
 
-        # only the TSVs are required
-        return {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        # only the TSVs are required, but we need the gene and variant level TSVs
+        # populate gene-level results
+        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        return_dict.update(
+            {
+                family: dataset_prefix / f'{family}.variants.tsv'
+                for family in family_dict.keys()
+            }
+        )
+        return return_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
