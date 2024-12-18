@@ -96,8 +96,6 @@ class Combiner(CohortStage):
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
         j.image(image_path('cpg_workflows'))
-        j.memory(combiner_config.get('memory', '4Gi'))
-        j.storage(combiner_config.get('storage', '5Gi'))
 
         # Default to GRCh38 for reference if not specified
         j.call(
