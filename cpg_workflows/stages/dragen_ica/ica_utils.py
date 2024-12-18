@@ -3,10 +3,16 @@ import logging
 from typing import TYPE_CHECKING, Final, Literal
 
 import coloredlogs
-import icasdk
+
+# Make icasdk not a hard dependency for all workflows
+try:
+    import icasdk
+    from icasdk.apis.tags import project_analysis_api, project_data_api
+    from icasdk.model.create_data import CreateData
+except ImportError:
+    pass
+
 from google.cloud import secretmanager
-from icasdk.apis.tags import project_analysis_api, project_data_api
-from icasdk.model.create_data import CreateData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
