@@ -25,7 +25,6 @@ from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
-
 HPO_KEY: str = 'HPO Terms (present)'
 
 
@@ -181,10 +180,7 @@ class RunExomiser(DatasetStage):
         return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
         # add more keys pointing to the variant-level TSVs
         return_dict.update(
-            {
-                f'{family}_variants': dataset_prefix / f'{family}.variants.tsv'
-                for family in family_dict.keys()
-            }
+            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict.keys()},
         )
         return return_dict
 
@@ -281,10 +277,7 @@ class ExomiserVariantsTSV(DatasetStage):
 
         job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
         job.command(
-            f'combine_exomiser_variants '
-            f'--input {" ".join(family_files)} '
-            f'--output {job.output} '
-            f'--as_hail '
+            f'combine_exomiser_variants ' f'--input {" ".join(family_files)} ' f'--output {job.output} ' f'--as_hail ',
         )
 
         # recursive copy of the HT

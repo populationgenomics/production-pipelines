@@ -6,12 +6,11 @@ into a single JSON file, also written as a Hail Table
 import json
 from argparse import ArgumentParser
 from collections import defaultdict
+from csv import DictReader
 
 import hail as hl
 
 from cpg_utils import to_path
-from csv import DictReader
-
 
 ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
 
@@ -72,12 +71,7 @@ def process_and_sort_variants(all_variants: dict[str, list[str]]) -> list[dict]:
     for variant_key, family_details in all_variants.items():
         chrom, pos, ref, alt = variant_key.split(':')
         all_vars.append(
-            {
-                'contig': chrom,
-                'position': int(pos),
-                'alleles': [ref, alt],
-                'family_details': '::'.join(family_details)
-            }
+            {'contig': chrom, 'position': int(pos), 'alleles': [ref, alt], 'family_details': '::'.join(family_details)},
         )
 
     # then sort on chr and position
@@ -107,12 +101,7 @@ def munge_into_hail_table(all_variants: dict[str, list[str]], output_path: str):
 
     # define the schema for each written line
     schema = hl.dtype(
-        'struct{'
-        'contig:str,'
-        'position:int32,'
-        'alleles:array<str>,'
-        'family_details:str'
-        '}',
+        'struct{' 'contig:str,' 'position:int32,' 'alleles:array<str>,' 'family_details:str' '}',
     )
 
     # import the table, and transmute to top-level attributes
@@ -127,7 +116,7 @@ def munge_into_hail_table(all_variants: dict[str, list[str]], output_path: str):
     ht.write(f'{output_path}.ht', overwrite=True)
 
 
-def main(input_tsvs: list[str], output_path: str, as_hail: bool=True):
+def main(input_tsvs: list[str], output_path: str, as_hail: bool = True):
     """
     Combine the per-family TSVs into a single JSON file, and write as a Hail Table
 
