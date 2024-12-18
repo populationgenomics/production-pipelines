@@ -317,9 +317,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             f"""
             {ICA_CLI_SETUP}
             icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) .
-            mv {bucket_name}/{config_retrieve(["ica", "data_prep", "output_folder"])}/{sequencing_group.name}/* {sequencing_group.name}
-            cd {sequencing_group.name} && cat *.md5sum > dragen.md5sum && md5sum -c dragen.md5sum
-            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}
+            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}{sequencing_group.name}
         """,
         )
 
