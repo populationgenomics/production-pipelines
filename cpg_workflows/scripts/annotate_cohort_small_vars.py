@@ -45,10 +45,11 @@ def checkpoint_hail(
         return t
 
     path = join(checkpoint_prefix, file_name)
+
     if can_reuse(path) and allow_reuse:
         get_logger().info(f'Re-using {path}')
         method = hl.read_table if path.rstrip('/').endswith('.ht') else hl.read_matrix_table
-        method(path)
+        return method(path)
 
     get_logger().info(f'Checkpointing {path}')
     return t.checkpoint(path, overwrite=True)
