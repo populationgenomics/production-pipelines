@@ -309,6 +309,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
         )
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
+        ica_download_job.memory('8Gi')
         ica_download_job.image(image=image_path('ica'))
 
         # Download an entire folder with ICA. Don't log projectId or API key
@@ -316,7 +317,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         ica_download_job.command(
             f"""
             {ICA_CLI_SETUP}
-            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) . --exclude-source-path
+            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
             gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}
         """,
         )
