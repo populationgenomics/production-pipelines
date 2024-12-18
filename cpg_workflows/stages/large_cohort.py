@@ -107,7 +107,7 @@ class Combiner(CohortStage):
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
             save_path=output_paths['combiner_plan'],
-            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner'], False),
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
         )
 
         return self.make_outputs(cohort, output_paths, [j])
