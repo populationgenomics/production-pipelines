@@ -42,10 +42,10 @@ try:
     from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
 except ImportError:
 
-    class CancelIcaPipelineRun:  # type: ignore
+    class CancelIcaPipelineRun(SequencncingGroupStage):  # type: ignore
         pass
 
-    class DownloadDataFromIca:  # type: ignore
+    class DownloadDataFromIca(SequencncingGroupStage):  # type: ignore
         pass
 
 
