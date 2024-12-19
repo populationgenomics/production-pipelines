@@ -105,7 +105,7 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     TODO (mwelland): so we can lose a layer of the structure here
     """
     for dataset_name in sgs_by_dataset_for_cohort.keys():
-        dataset = cohort.create_dataset(dataset_name.removesuffix('-test'))
+        dataset = cohort.create_dataset(dataset_name)
         sgs = sgs_by_dataset_for_cohort[dataset_name]
 
         for entry in sgs:
