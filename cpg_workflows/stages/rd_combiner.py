@@ -218,7 +218,9 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         output = self.expected_outputs(multicohort)
 
         # partitions to coalesce the data into
-        partitions = config_retrieve(['workflow', 'densify_partitions'], 2000)
+        partitions = config_retrieve(['workflow', 'densify_partitions'], 2500)
+
+        # not currently in use (see #1078)
         partition_strategy = config_retrieve(['workflow', 'partition_strategy'], 'naive')
 
         densify_job = get_batch().new_job('CreateDenseMtFromVdsWithHail')
