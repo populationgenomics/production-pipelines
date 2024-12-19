@@ -203,6 +203,7 @@ class RunExomiser(DatasetStage):
                 'pheno': ppk_files[family],
             }
             for family in output_dict.keys()
+            if '_variants' not in family
         }
 
         if exomiser_version == 14:
