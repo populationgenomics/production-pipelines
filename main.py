@@ -45,17 +45,6 @@ from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
-try:
-    from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
-except ImportError:
-
-    class CancelIcaPipelineRun(SequencncingGroupStage):  # type: ignore
-        pass
-
-    class DownloadDataFromIca(SequencncingGroupStage):  # type: ignore
-        pass
-
-
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
@@ -93,7 +82,6 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
-    'realign_genotype_with_dragen': [CancelIcaPipelineRun, DownloadDataFromIca],
 }
 
 
