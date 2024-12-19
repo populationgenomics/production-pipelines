@@ -28,7 +28,6 @@ import hail as hl
 
 from cpg_utils.hail_batch import init_batch
 
-
 if __name__ == '__main__':
 
     logging.basicConfig(level=logging.INFO)
@@ -39,20 +38,16 @@ if __name__ == '__main__':
         help='Path to input VDS',
         required=True,
     )
-    parser.add_argument(
-        '--temp_location',
-        help='Path to temporary location',
-        required=True
-    )
+    parser.add_argument('--temp_location', help='Path to temporary location', required=True)
     parser.add_argument(
         '--fields',
         help='List of strings, fields to remove. So far only DRAGstr issues have been observed',
         nargs='+',
-        default=['DRAGstrInfo', 'DRAGstrParams']
+        default=['DRAGstrInfo', 'DRAGstrParams'],
     )
     args = parser.parse_args()
 
-    logging.info(f'Starting VDS entry field drop and overwrite')
+    logging.info('Starting VDS entry field drop and overwrite')
     logging.info(f'Input VDS: {args.input}')
     logging.info(f'Temp location: {args.temp_location}')
     logging.info(f'Fields to drop: {args.fields}')
@@ -68,7 +63,7 @@ if __name__ == '__main__':
     vds.variant_data = vds.variant_data.annotate_entries(
         gvcf_info=vds.variant_data.gvcf_info.drop(
             *args.fields,
-        )
+        ),
     )
     logging.info(f'Dropped fields: {args.fields}')
     vds.variant_data.describe()
