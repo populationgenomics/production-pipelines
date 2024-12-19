@@ -1,4 +1,5 @@
 [workflow]
+name = 'exomiser'
 status_reporter = 'metamist'
 
 # attributes to provision the Exomiser VMs
