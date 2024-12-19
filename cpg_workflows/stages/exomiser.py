@@ -12,6 +12,7 @@ from functools import cache
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.exomiser import (
     create_gvcf_to_vcf_jobs,
     extract_mini_ped_files,
@@ -24,8 +25,6 @@ from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
-# this is used to separate family IDs from their individual outputs in RunExomiser
-BREAKING_PUNCTUATION = '~~'
 HPO_KEY: str = 'HPO Terms (present)'
 
 
@@ -168,23 +167,22 @@ class RunExomiser(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         """
-        the pipeline logic only accepts a dictionary of paths
-        but we need a dictionary of families, each containing a dictionary of paths
-        I'm fudging this by putting some arbitrary punctuation in to split on later
-
-        Args:
-            dataset ():
-
-        Returns:
-            dict of outputs for this dataset
+        dict of outputs for this dataset, keyed on family ID
         """
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         family_dict = find_families(dataset)
+
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
 
-        # only the TSVs are required
-        return {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        # only the TSVs are required, but we need the gene and variant level TSVs
+        # populate gene-level results
+        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        # add more keys pointing to the variant-level TSVs
+        return_dict.update(
+            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict.keys()},
+        )
+        return return_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -217,7 +215,7 @@ class RunExomiser(DatasetStage):
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
 
-@stage(required_stages=[RunExomiser], analysis_type='custom', analysis_keys=['tsv'])
+@stage(required_stages=[RunExomiser], analysis_type='exomiser', analysis_keys=['tsv'])
 class ExomiserSeqrTSV(DatasetStage):
     """
     Parse the Exomiser results into a TSV for Seqr
@@ -244,3 +242,47 @@ class ExomiserSeqrTSV(DatasetStage):
         jobs = generate_seqr_summary(results, projects[dataset.name], str(self.expected_outputs(dataset)['tsv']))
 
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+
+
+@stage(required_stages=[RunExomiser], analysis_type='exomiser', analysis_keys=['json', 'ht'])
+class ExomiserVariantsTSV(DatasetStage):
+    """
+    Parse the Exomiser variant-level results into a JSON file and a Hail Table
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+
+        prefix = dataset.analysis_prefix() / get_workflow().output_version
+
+        return {
+            'json': prefix / f'exomiser_{exomiser_version}_variant_results.tsv',
+            'ht': prefix / f'exomiser_{exomiser_version}_variant_results.ht',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        outputs = self.expected_outputs(dataset)
+
+        results = inputs.as_dict(target=dataset, stage=RunExomiser)
+
+        # just collect the per-family variant-level TSVs
+        family_files: list = []
+        for family, file in results.items():
+            if family.endswith('_variants'):
+                family_files.append(get_batch().read_input(file))
+
+        job = get_batch().new_job('Combine Exomiser Variant-level TSVs')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+
+        job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
+        job.command(
+            f'combine_exomiser_variants ' f'--input {" ".join(family_files)} ' f'--output {job.output} ' f'--as_hail ',
+        )
+
+        # recursive copy of the HT
+        job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
+
+        get_batch().write_output(job.output, str(outputs['json']))
+
+        return self.make_outputs(dataset, data=outputs, jobs=job)
