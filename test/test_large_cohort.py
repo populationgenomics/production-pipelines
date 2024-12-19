@@ -111,6 +111,7 @@ def create_config(
             },
             'combiner': {
                 'intervals': ['chr20:start-end', 'chrX:start-end', 'chrY:start-end'],
+                'force_new_combiner': False,
             },
         },
     )
@@ -177,6 +178,7 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
         vds_paths=None,
         save_path=None,
         specific_intervals=conf['large_cohort']['combiner']['intervals'],
+        force_new_combiner=conf['large_cohort']['combiner']['force_new_combiner'],
     )
 
     # do some testing here
