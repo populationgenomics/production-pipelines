@@ -217,12 +217,20 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
+        # partitions to coalesce the data into
+        partitions = config_retrieve(['workflow', 'densify_partitions'], 2500)
+
+        # not currently in use (see #1078)
+        partition_strategy = config_retrieve(['workflow', 'partition_strategy'], 'naive')
+
         densify_job = get_batch().new_job('CreateDenseMtFromVdsWithHail')
         densify_job.image(config_retrieve(['workflow', 'driver_image']))
         densify_job.command(
             'mt_from_vds '
             f'--input {str(inputs.as_dict(multicohort, CreateVdsFromGvcfsWithHailCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
+            f'--partitions {partitions} '
+            f'--partition_strategy {partition_strategy} '
             f'--sites_only {output["hps_vcf_dir"]} '
             f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
