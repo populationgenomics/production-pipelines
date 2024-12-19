@@ -37,7 +37,18 @@ from cpg_workflows.stages.rd_combiner import (
     SubsetMatrixTableToDatasetUsingHailQuery,
     TrainVqsrSnpTranches,
 )
-from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
+
+try:
+    from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
+except ImportError:
+
+    class CancelIcaPipelineRun:  # type: ignore
+        pass
+
+    class DownloadDataFromIca:  # type: ignore
+        pass
+
+
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
