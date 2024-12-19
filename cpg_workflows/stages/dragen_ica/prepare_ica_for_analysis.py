@@ -2,13 +2,8 @@ import logging
 from typing import Literal
 
 import coloredlogs
-
-# Make icasdk not a hard dependency for all workflows
-try:
-    import icasdk
-    from icasdk.apis.tags import project_data_api
-except ImportError:
-    pass
+import icasdk
+from icasdk.apis.tags import project_data_api
 
 from cpg_workflows.stages.dragen_ica import ica_utils
 

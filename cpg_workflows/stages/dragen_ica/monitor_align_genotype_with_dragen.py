@@ -5,13 +5,8 @@ from random import randint
 from typing import Literal
 
 import coloredlogs
-
-# Make icasdk not a hard dependency for all workflows
-try:
-    import icasdk
-    from icasdk.apis.tags import project_analysis_api
-except ImportError:
-    pass
+import icasdk
+from icasdk.apis.tags import project_analysis_api
 
 import cpg_utils
 from cpg_workflows.stages.dragen_ica import ica_utils
