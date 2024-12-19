@@ -37,6 +37,13 @@ from cpg_workflows.stages.rd_combiner import (
     SubsetMatrixTableToDatasetUsingHailQuery,
     TrainVqsrSnpTranches,
 )
+from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
+from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
+from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
+from cpg_workflows.stages.stripy import Stripy
+from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
+from cpg_workflows.workflow import StageDecorator, run_workflow
 
 try:
     from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
@@ -48,14 +55,6 @@ except ImportError:
     class DownloadDataFromIca(SequencncingGroupStage):  # type: ignore
         pass
 
-
-from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
-from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
-from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
-from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
-from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
-from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
