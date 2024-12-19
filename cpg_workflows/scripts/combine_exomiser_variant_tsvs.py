@@ -13,11 +13,16 @@ import hail as hl
 from cpg_utils import to_path
 
 ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
+FAM_DICT = dict[str, dict[str, list[dict]]]
+VAR_DICT = dict[str, list[str]]
 
 
-def process_tsv(tsv_path: str) -> dict[str, list[str]]:
+def process_tsv(tsv_path: str) -> tuple[FAM_DICT, VAR_DICT]:
     """
-    Read a single TSV file, and return a dictionary of variant IDs to lists of sample IDs
+    Read a single TSV file, and return the parsed results
+    Return is in two forms:
+    - a dictionary of variant IDs to lists of sample IDs & details
+
 
     the return is a dictionary of variant keys to lists of details
     the same variant can apply to the same family with multiple MOIs so we retain all
@@ -28,12 +33,15 @@ def process_tsv(tsv_path: str) -> dict[str, list[str]]:
     Returns:
         a dictionary of variant keys to lists of the 'family_rank_moi'
     """
-    variant_dictionary: dict[str, list[str]] = defaultdict(list)
 
-    # this is on the assumption that we retain the FAMILY.variant.tsv naming convention
+    # this is on the assumption that we retain the path/to/file/FAMILY.variant.tsv naming convention
     # if we read into the batch as /tmp/path/FAMILY this logic is still valid
     file_as_path = to_path(tsv_path)
     family = file_as_path.name.split('.')[0]
+
+    variant_dictionary: VAR_DICT = defaultdict(list)
+    family_dictionary: FAM_DICT = {family: defaultdict(list)}
+
     with file_as_path.open() as handle:
         reader = DictReader(handle, delimiter='\t')
         for row in reader:
@@ -47,15 +55,25 @@ def process_tsv(tsv_path: str) -> dict[str, list[str]]:
 
             variant_key = f'{chrom}:{pos}:{ref}:{alt}'
 
-            rank = row['#RANK']
+            rank = int(row['#RANK'])
             moi = row['MOI']
 
-            variant_dictionary[variant_key].append(f'{family}_{rank}_{moi}')
+            # adds easily parsed details to the family dictionary, easily extensible
+            family_dictionary[family][variant_key].append(
+                {
+                    'rank': rank,
+                    'moi': moi,
+                },
+            )
 
-    return variant_dictionary
+            # compressed representation for exporting to Hail
+            squashed_details = f'{family}_{rank}_{moi}'
+            variant_dictionary[variant_key].append(squashed_details)
+
+    return family_dictionary, variant_dictionary
 
 
-def process_and_sort_variants(all_variants: dict[str, list[str]]) -> list[dict]:
+def process_and_sort_variants(all_variants: VAR_DICT) -> list[dict]:
     """
     applies dual-layer sorting to the list of all variants
 
@@ -78,7 +96,7 @@ def process_and_sort_variants(all_variants: dict[str, list[str]]) -> list[dict]:
     return sorted(all_vars, key=lambda x: (ORDERED_ALLELES.index(x['contig']), x['position']))
 
 
-def munge_into_hail_table(all_variants: dict[str, list[str]], output_path: str):
+def munge_into_hail_table(all_variants: VAR_DICT, output_path: str):
     """
     Reformat and sort the data into a Hail Table
 
@@ -128,15 +146,17 @@ def main(input_tsvs: list[str], output_path: str, as_hail: bool = True):
         as_hail (bool): if True, write the data out as a Hail Table
     """
 
-    variant_dictionary: dict[str, list[str]] = defaultdict(list)
+    variant_dictionary: VAR_DICT = defaultdict(list)
+    all_family_dictionary: FAM_DICT = {}
     for tsv in input_tsvs:
-        per_family_dict = process_tsv(tsv)
-        for key, value_list in per_family_dict.items():
+        family_dict, variant_dict = process_tsv(tsv)
+        all_family_dictionary.update(family_dict)
+        for key, value_list in variant_dict.items():
             variant_dictionary[key].extend(value_list)
 
     # write the JSON
     with open(f'{output_path}.json', 'w') as handle:
-        handle.write(json.dumps(variant_dictionary))
+        json.dump(all_family_dictionary, handle, indent=4)
 
     if as_hail:
         munge_into_hail_table(variant_dictionary, output_path)
