@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Entry point to run workflows.
+Entry point to run DRAGEN workflows.
 """
 
 import os
