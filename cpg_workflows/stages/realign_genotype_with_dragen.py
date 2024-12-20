@@ -72,7 +72,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             name='PrepareIcaForDragenAnalysis',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
-        prepare_ica_job.image(image=image_path('cpg_workflows'))
+        prepare_ica_job.image(image=image_path('ica'))
 
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         output_fids = prepare_ica_job.call(
@@ -169,7 +169,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             name='AlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
-        align_genotype_job.image(image=image_path('cpg_workflows'))
+        align_genotype_job.image(image=image_path('ica'))
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_call = align_genotype_job.call(
             run_align_genotype_with_dragen.run,
@@ -207,7 +207,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
 
-        monitor_pipeline_run.image(image=image_path('cpg_workflows'))
+        monitor_pipeline_run.image(image=image_path('ica'))
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
@@ -267,7 +267,7 @@ class CancelIcaPipelineRun(SequencingGroupStage):
             name='CancelIcaPipelineRun',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
-        cancel_pipeline_run.image(image=image_path('cpg_workflows'))
+        cancel_pipeline_run.image(image=image_path('ica'))
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         cancel_pipeline = cancel_pipeline_run.call(
             cancel_ica_pipeline_run.run,
