@@ -7,6 +7,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner import combiner
 from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
@@ -129,7 +130,6 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import combiner
 
         outputs: dict[str, str | Path] = self.expected_outputs(multicohort)
 
@@ -169,8 +169,9 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         combiner_job.image(config_retrieve(['workflow', 'driver_image']))
-        combiner_job.memory(config_retrieve(['combiner', 'memory']))
-        combiner_job.storage(config_retrieve(['combiner', 'storage']))
+        combiner_job.memory(config_retrieve(['combiner', 'driver_memory'], 'highmem'))
+        combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
+        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
 
         # Default to GRCh38 for reference if not specified
         combiner_job.call(
@@ -182,6 +183,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
             vds_paths=[vds_path] if vds_path else None,
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner'], False),
         )
 
         return self.make_outputs(multicohort, outputs, combiner_job)
@@ -215,12 +217,20 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
+        # partitions to coalesce the data into
+        partitions = config_retrieve(['workflow', 'densify_partitions'], 2500)
+
+        # not currently in use (see #1078)
+        partition_strategy = config_retrieve(['workflow', 'partition_strategy'], 'naive')
+
         densify_job = get_batch().new_job('CreateDenseMtFromVdsWithHail')
         densify_job.image(config_retrieve(['workflow', 'driver_image']))
         densify_job.command(
             'mt_from_vds '
             f'--input {str(inputs.as_dict(multicohort, CreateVdsFromGvcfsWithHailCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
+            f'--partitions {partitions} '
+            f'--partition_strategy {partition_strategy} '
             f'--sites_only {output["hps_vcf_dir"]} '
             f'--separate_header {output["separate_header_vcf_dir"]} ',
         )

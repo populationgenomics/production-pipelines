@@ -3,6 +3,7 @@
 """
 Entry point to run workflows.
 """
+
 import os
 
 import click
@@ -13,7 +14,7 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
 from cpg_workflows.stages.cram_qc import CramMultiQC
-from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, RunExomiser
+from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import FilterBatch, GenotypeBatch, MtToEsSv
@@ -36,6 +37,18 @@ from cpg_workflows.stages.rd_combiner import (
     SubsetMatrixTableToDatasetUsingHailQuery,
     TrainVqsrSnpTranches,
 )
+
+try:
+    from cpg_workflows.stages.realign_genotype_with_dragen import CancelIcaPipelineRun, DownloadDataFromIca
+except ImportError:
+
+    class CancelIcaPipelineRun:  # type: ignore
+        pass
+
+    class DownloadDataFromIca:  # type: ignore
+        pass
+
+
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
 from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
@@ -47,7 +60,7 @@ from cpg_workflows.workflow import StageDecorator, run_workflow
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
-    'exomiser': [RunExomiser, ExomiserSeqrTSV],
+    'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
@@ -81,6 +94,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
+    'realign_genotype_with_dragen': [CancelIcaPipelineRun, DownloadDataFromIca],
 }
 
 

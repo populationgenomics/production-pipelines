@@ -28,10 +28,25 @@ def run(
     tmp_prefix: str,
     genome_build: str,
     save_path: str | None,
+    force_new_combiner: bool,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
 ) -> None:
+    """
+    Runs the combiner
+
+    Args:
+        output_vds_path (str): eventual output path for the VDS
+        sequencing_type (str): genome/exome, relevant in selecting defaults
+        tmp_prefix (str): where to store temporary combiner intermediates
+        genome_build (str): GRCh38
+        save_path (str | None): where to store the combiner plan, or where to resume from
+        gvcf_paths (list[str] | None): list of paths to GVCFs
+        vds_paths (list[str] | None): list of paths to VDSs
+        specific_intervals (list[str] | None): list of intervals to use for the combiner, if using non-standard
+        force_new_combiner (bool): whether to force a new combiner run, or permit resume from a previous one
+    """
     import logging
 
     import hail as hl
@@ -41,12 +56,16 @@ def run(
 
     if not can_reuse(to_path(output_vds_path)):
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+
         if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
             override_jar_spec(jar_spec)
 
         # Load from save, if supplied
         if save_path:
-            logging.info(f'Loading combiner plan from {save_path}')
+            if force_new_combiner:
+                logging.info(f'Combiner plan {save_path} will be ignored/written new')
+            else:
+                logging.info(f'Resuming combiner plan from {save_path}')
 
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
@@ -68,7 +87,7 @@ def run(
             use_exome_default_intervals=sequencing_type == 'exome',
             use_genome_default_intervals=sequencing_type == 'genome',
             intervals=intervals,
-            force=True,
+            force=force_new_combiner,
         )
 
         combiner.run()

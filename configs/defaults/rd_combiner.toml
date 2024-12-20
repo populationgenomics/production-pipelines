@@ -14,7 +14,13 @@ check_for_existing_vds = false
 ## Subsetting and AnnotateDataset will only run for these datasets
 #write_mt_for_datasets = ['test_dataset', ]
 
-[rd_combiner]
+## number of partitions to coalesce the data into
+densify_partitions = 2500
+
+## strategy to use for partitioning the data [none, naive, shuffle]
+## not currently in use (see #1078)
+partition_strategy = 'naive'
+
 # these are used when calculating how many fragments to send to each job
 vqsr_training_fragments_per_job = 100
 vqsr_apply_fragments_per_job = 60
@@ -23,22 +29,26 @@ snps_gather_disc_size = 10
 snps_recal_disc_size = 20
 
 # choices of jar specs to use for the various steps
-# by default we match the native Hail version in the container
-[rd_combiner.subset]
-jar_spec_revision = false
-
-[rd_combiner.annotate_cohort]
-jar_spec_revision = false
-
-[rd_combiner.annotate_dataset]
-jar_spec_revision = false
-
-[rd_combiner.densify]
-jar_spec_revision = false
+# without this setting we would default to matching the native Hail version in the container
+# currently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
+[workflow.jar_spec_revisions]
+annotate_cohort = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+annotate_dataset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+combiner = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+densify = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+subset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 
 [combiner]
-memory = "8Gi"
-storage = "10Gi"
+# used to decide if we should resume from a previous combiner plan
+force_new_combiner = false
+# highem, standard, or a string, e.g. "4Gi"
+driver_memory = "standard"
+# string, e.g. "4Gi"
+driver_storage = "10Gi"
+# integer
+driver_cores = 1
+# highem, standard, or a string, e.g. "4Gi"
+worker_memory = "standard"
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
