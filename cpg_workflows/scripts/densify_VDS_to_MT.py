@@ -60,12 +60,12 @@ def main(
     # check here to see if we can reuse the dense MT
     if not can_reuse(dense_mt_out):
 
-        vds = hl.vds.read_vds(vds_in)
-
         get_logger().info(f'Densifying data, using {partitions} partitions')
 
         # providing n_partitions here gets Hail to calculate the intervals per partition on the VDS var and ref data
-        mt = hl.vds.to_dense_mt(vds, n_partitions=partitions)
+        vds = hl.vds.read_vds(vds_in, n_partitions=partitions)
+
+        mt = hl.vds.to_dense_mt(vds)
 
         # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
         # remove any monoallelic or non-ref-in-any-sample sites
