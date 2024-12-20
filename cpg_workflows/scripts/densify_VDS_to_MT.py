@@ -49,7 +49,12 @@ def main(
         sites_only (str): optional, if used write a sites-only VCF directory to this location
         separate_header (str): optional, if used write a sites-only VCF directory with a separate header to this location
     """
-    init_batch()
+
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
 
     get_logger().info(f'Partition strategy {partition_strategy} is not currently in use (see #1078)')
 
