@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.32.5',
+    version='1.32.6',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -16,9 +16,7 @@ setup(
         'cpg-utils>=5.1.1',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        # Pin Hail to the release prior to 0.2.133
-        # see https://centrepopgen.slack.com/archives/C018KFBCR1C/p1731047651300539
-        'hail==0.2.132',
+        'hail==0.2.133',  # Pin Hail at CPG's installed version
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
         'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
