@@ -263,6 +263,10 @@ class ExomiserVariantsTSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
+        if not find_families(dataset):
+            get_logger().info('No families found, skipping exomiser')
+            return self.make_outputs(dataset, jobs=None, skipped=True)
+
         outputs = self.expected_outputs(dataset)
 
         results = inputs.as_dict(target=dataset, stage=RunExomiser)
