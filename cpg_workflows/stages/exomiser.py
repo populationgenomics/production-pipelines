@@ -281,9 +281,7 @@ class ExomiserVariantsTSV(DatasetStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
 
         job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
-        job.command(
-            f'combine_exomiser_variants ' f'--input {" ".join(family_files)} ' f'--output {job.output} ' f'--as_hail ',
-        )
+        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output {job.output}')
 
         # recursive copy of the HT
         job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
