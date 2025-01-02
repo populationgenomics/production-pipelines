@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.32.7',
+    version='1.32.8',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -83,7 +83,9 @@ setup(
             # Reconfigure annotations for Seqr Export
             'annotate_dataset_small = cpg_workflows.scripts.annotate_dataset_small_vars:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
-            'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
+            'combine_exomiser_variants = cpg_workflows.scripts.combine_dataset_tsvs:cli_main',
+            # script for combining multiple per-family exomiser Gene-level TSVs into a single JSON
+            'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
         ],
     },
 )

@@ -11,7 +11,6 @@ from hailtop.batch.job import Job
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.scripts import collect_dataset_tsvs
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import chunks, exists
 
@@ -396,27 +395,3 @@ def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
                     str(content_dict[family]['output']).removesuffix('.tsv'),
                 )
     return all_jobs
-
-
-def generate_seqr_summary(tsv_dict: dict[str, Path], project: str, output: str):
-    """
-    Generate the summary TSV for Seqr by combining all per-family TSVs
-
-    Args:
-        tsv_dict (dict[str, Path]):
-        project ():
-        output ():
-    """
-
-    # path to the python script
-    script_path = collect_dataset_tsvs.__file__.removeprefix('/production-pipelines')
-
-    # read all the input files in
-    files_read_in = [get_batch().read_input(str(tsv)) for tsv in tsv_dict.values()]
-
-    job = get_batch().new_bash_job(f'Aggregate TSVs for {project}')
-    job.storage('10Gi')
-    job.image(get_config()['workflow']['driver_image'])
-    job.command(f'python3 {script_path} --project {project} --input {" ".join(files_read_in)} --output {job.output} ')
-    get_batch().write_output(job.output, output)
-    return [job]
