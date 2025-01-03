@@ -83,7 +83,7 @@ setup(
             # Reconfigure annotations for Seqr Export
             'annotate_dataset_small = cpg_workflows.scripts.annotate_dataset_small_vars:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
-            'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_dataset_tsvs:cli_main',
+            'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_gene_tsvs:cli_main',
             # script for combining multiple per-family exomiser Gene-level TSVs into a single JSON
             'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
         ],
