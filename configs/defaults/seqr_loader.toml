@@ -16,6 +16,12 @@ vep_version = '110'
 # (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
+# Write the sorted BAM file to the temp bucket after alignment and before MarkDuplicates
+# checkpoint_sorted_bam = false
+
+# Re-use the sorted BAM file from the temp bucket after alignment and before MarkDuplicates
+# reuse_sorted_bam = false
+
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
