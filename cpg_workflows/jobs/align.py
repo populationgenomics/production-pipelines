@@ -172,7 +172,7 @@ def align(
     sharded_align_jobs = []
     sorted_bams = []
 
-    if can_reuse(sorted_bam_path, overwrite):
+    if can_reuse(sorted_bam_path):
         # If the sorted BAM can be reused, skip the alignment job(s) and go straight to markdup.
         logging.info(f'{sequencing_group.id} :: Re-using sorted BAM: {sorted_bam_path}')
         # Its necessary to create this merge_or_align_j object to pass it to finalise_alignment,
@@ -621,7 +621,7 @@ def finalise_alignment(
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
-    if not can_reuse(sorted_bam_path, overwrite):
+    if not can_reuse(sorted_bam_path):
         # Submit the alignment job(s) if we're not reusing the sorted BAM
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
