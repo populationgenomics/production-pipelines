@@ -131,7 +131,7 @@ def align(
         - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
         because dragmap can't read streamed files from bazam.
 
-    - if the sorted bam already exists, skip the alignment job(s) and go straight to markdup.
+    - if the sorted bam can be reused, skip the alignment job(s) and go straight to markdup.
 
     - if the markdup tool:
         - is biobambam2, deduplication and alignment/merging are submitted within the same job.
@@ -173,7 +173,6 @@ def align(
     sorted_bams = []
 
     if can_reuse(sorted_bam_path):
-        # If the sorted BAM can be reused, skip the alignment job(s) and go straight to markdup.
         logging.info(f'{sequencing_group.id} :: Re-using sorted BAM: {sorted_bam_path}')
         # Its necessary to create this merge_or_align_j object to pass it to finalise_alignment,
         # and to declare the sorted_bam_path as a resource, so it can be written to the checkpoint.
@@ -622,7 +621,6 @@ def finalise_alignment(
         align_cmd += f' > {j.sorted_bam}'
 
     if not can_reuse(sorted_bam_path):
-        # Submit the alignment job(s) if we're not reusing the sorted BAM
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
     if (
@@ -630,7 +628,7 @@ def finalise_alignment(
         and not sorted_bam_path.exists()
         and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False)
     ):
-        # Only write the sorted BAM to the checkpoint if it doesn't already exist and the config is set
+        # Write the sorted BAM to the checkpoint if it doesn't already exist and the config is set
         logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
         b.write_output(j.sorted_bam, str(sorted_bam_path))
 
