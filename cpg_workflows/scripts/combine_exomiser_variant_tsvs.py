@@ -12,7 +12,7 @@ import hail as hl
 
 from cpg_utils import to_path
 
-ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM', 'chrMT']
+ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
 FAM_DICT = dict[str, dict[str, list[dict]]]
 VAR_DICT = dict[str, list[str]]
 
@@ -47,8 +47,13 @@ def process_tsv(tsv_path: str) -> tuple[FAM_DICT, VAR_DICT]:
         for row in reader:
             assert isinstance(row, dict)
 
+            # Exomiser contains "MT" on all genome builds, which Hail does not accept. Overrule this behaviour.
+            contig = row["CONTIG"]
+            if contig == 'MT':
+                contig = 'M'
+
             # this isn't prefixed with 'chr' in the TSV, so we add it
-            chrom = f'chr{row["CONTIG"]}'
+            chrom = f'chr{contig}'
             pos = row['START']
             ref = row['REF']
             alt = row['ALT']
@@ -118,9 +123,7 @@ def munge_into_hail_table(all_variants: VAR_DICT, output_path: str):
     hl.context.init_local(default_reference='GRCh38')
 
     # define the schema for each written line
-    schema = hl.dtype(
-        'struct{' 'contig:str,' 'position:int32,' 'alleles:array<str>,' 'family_details:str' '}',
-    )
+    schema = hl.dtype('struct{contig:str,position:int32,alleles:array<str>,family_details:str}')
 
     # import the table, and transmute to top-level attributes
     ht = hl.import_table(temp_filepath, no_header=True, types={'f0': schema})
