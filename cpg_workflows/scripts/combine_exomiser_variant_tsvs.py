@@ -12,7 +12,7 @@ import hail as hl
 
 from cpg_utils import to_path
 
-ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
+ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM', 'chrMT']
 FAM_DICT = dict[str, dict[str, list[dict]]]
 VAR_DICT = dict[str, list[str]]
 
