@@ -172,7 +172,13 @@ def align(
     sharded_align_jobs = []
     sorted_bams = []
 
-    if not sharded:  # Just running one alignment job
+    if sorted_bam_path and sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
+        logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
+        merge_or_align_j = b.new_job('Reusing sorted bam', job_attrs or {})
+        merge_or_align_j.sorted_bam = b.read_input(str(sorted_bam_path))
+        jobs.append(merge_or_align_j)
+
+    elif not sharded:  # Just running one alignment job
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
@@ -277,7 +283,7 @@ def align(
         if md_j.attributes.get('reusing_sorted_bam'):
             # Remove all jobs except markdup if sorted bam is reused
             logging.info(f'Reusing sorted bam from temp - only markdup job will be submitted for {sequencing_group.id}')
-            jobs = [md_j]
+            # jobs = [md_j]
 
     return jobs
 
@@ -618,8 +624,8 @@ def finalise_alignment(
     reusing_sorted_bam = False
     if sorted_bam_path:
         if sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
-            logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
-            j.sorted_bam = b.read_input(str(sorted_bam_path))
+            # logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
+            # j.sorted_bam = b.read_input(str(sorted_bam_path))
             reusing_sorted_bam = True
         elif not sorted_bam_path.exists() and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False):
             logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
