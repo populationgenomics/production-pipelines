@@ -172,11 +172,15 @@ def align(
     sharded_align_jobs = []
     sorted_bams = []
 
-    if sorted_bam_path and sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
-        logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
+    if can_reuse(sorted_bam_path, overwrite):
+        # If the sorted BAM can be reused, skip the alignment job(s) and go straight to markdup.
+        logging.info(f'{sequencing_group.id} :: Re-using sorted BAM: {sorted_bam_path}')
+        # Its necessary to create this merge_or_align_j object to pass it to finalise_alignment,
+        # and to declare the sorted_bam_path as a resource, so it can be written to the checkpoint.
         merge_or_align_j = b.new_job('Reusing sorted bam', job_attrs or {})
         merge_or_align_j.sorted_bam = b.read_input(str(sorted_bam_path))
         jobs.append(merge_or_align_j)
+        # The align_cmd and other parameters are not used but are necessary to pass to finalise_alignment.
         align_cmd = ''
         stdout_is_sorted = True
         output_fmt = 'bam'
@@ -281,9 +285,6 @@ def align(
     )
     if md_j and md_j != merge_or_align_j:
         jobs.append(md_j)
-
-    if md_j and md_j.attributes.get('reusing_sorted_bam'):
-        logging.info(f'Reusing sorted bam from temp - only markdup job will be submitted for {sequencing_group.id}')
 
     return jobs
 
@@ -620,21 +621,21 @@ def finalise_alignment(
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
-    # If sorted_bam_path is provided, skip to markdup if it exists and reuse_sorted_bam is true
-    md_j_reusing_sorted_bam = False
-    if sorted_bam_path and sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
-        md_j_reusing_sorted_bam = True
-    else:
+    if not can_reuse(sorted_bam_path, overwrite):
+        # Submit the alignment job(s) if we're not reusing the sorted BAM
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
-    if config_retrieve(['workflow', 'checkpoint_sorted_bam'], False):
+    if (
+        sorted_bam_path
+        and not sorted_bam_path.exists()
+        and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False)
+    ):
+        # Only write the sorted BAM to the checkpoint if it doesn't already exist and the config is set
         logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
         b.write_output(j.sorted_bam, str(sorted_bam_path))
 
     assert isinstance(j.sorted_bam, hb.ResourceFile)
     if markdup_tool == MarkDupTool.PICARD:
-        job_attrs = (job_attrs or {}).copy()
-        job_attrs['reusing_sorted_bam'] = md_j_reusing_sorted_bam
         md_j = picard.markdup(
             b,
             j.sorted_bam,
