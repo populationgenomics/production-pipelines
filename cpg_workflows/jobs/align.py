@@ -176,7 +176,9 @@ def align(
         logging.info(f'{sequencing_group.id} :: Re-using sorted BAM: {sorted_bam_path}')
         # Its necessary to create this merge_or_align_j object to pass it to finalise_alignment,
         # and to declare the sorted_bam_path as a resource, so it can be written to the checkpoint.
+        job_attrs = (job_attrs or {}) | dict(label='Reusing sorted bam', tool='Reusing sorted bam')
         merge_or_align_j = b.new_job('Reusing sorted bam', job_attrs or {})
+        merge_or_align_j.image(config_retrieve(['workflow', 'driver_image']))
         merge_or_align_j.sorted_bam = b.read_input(str(sorted_bam_path))
         jobs.append(merge_or_align_j)
         # The align_cmd and other parameters are not used but are necessary to pass to finalise_alignment.
