@@ -12,10 +12,7 @@ highmem_workers = true
 #realign_from_cram_version = 'v0'
 
 # Write the sorted BAM file to the temp bucket after alignment and before MarkDuplicates
-# checkpoint_sorted_bam = false
-
-# Re-use the sorted BAM file from the temp bucket after alignment and before MarkDuplicates
-# reuse_sorted_bam = false
+checkpoint_sorted_bam = false
 
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
