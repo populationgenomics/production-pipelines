@@ -177,6 +177,7 @@ def align(
         merge_or_align_j = b.new_job('Reusing sorted bam', job_attrs or {})
         merge_or_align_j.sorted_bam = b.read_input(str(sorted_bam_path))
         jobs.append(merge_or_align_j)
+        align_cmd = ''
 
     elif not sharded:  # Just running one alignment job
         if isinstance(alignment_input, FastqPairs):
