@@ -282,11 +282,8 @@ def align(
     if md_j and md_j != merge_or_align_j:
         jobs.append(md_j)
 
-    if md_j:
-        if md_j.attributes.get('reusing_sorted_bam'):
-            # Remove all jobs except markdup if sorted bam is reused
-            logging.info(f'Reusing sorted bam from temp - only markdup job will be submitted for {sequencing_group.id}')
-            # jobs = [md_j]
+    if md_j and md_j.attributes.get('reusing_sorted_bam'):
+        logging.info(f'Reusing sorted bam from temp - only markdup job will be submitted for {sequencing_group.id}')
 
     return jobs
 
@@ -624,27 +621,20 @@ def finalise_alignment(
         align_cmd += f' > {j.sorted_bam}'
 
     # If sorted_bam_path is provided, skip to markdup if it exists and reuse_sorted_bam is true
-    reusing_sorted_bam = False
-    if sorted_bam_path:
-        if sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
-            # logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
-            # j.sorted_bam = b.read_input(str(sorted_bam_path))
-            reusing_sorted_bam = True
-        elif not sorted_bam_path.exists() and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False):
-            logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
-            j.command(command(align_cmd, monitor_space=True))  # type: ignore
-            b.write_output(j.sorted_bam, str(sorted_bam_path))
-        else:
-            j.command(command(align_cmd, monitor_space=True))  # type: ignore
+    md_j_reusing_sorted_bam = False
+    if sorted_bam_path and sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
+        md_j_reusing_sorted_bam = True
     else:
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
+    if config_retrieve(['workflow', 'checkpoint_sorted_bam'], False):
+        logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
+        b.write_output(j.sorted_bam, str(sorted_bam_path))
+
     assert isinstance(j.sorted_bam, hb.ResourceFile)
     if markdup_tool == MarkDupTool.PICARD:
-        if reusing_sorted_bam:
-            # Update the md_j job's attributes dict to include this flag
-            job_attrs = (job_attrs or {}).copy()
-            job_attrs['reusing_sorted_bam'] = True
+        job_attrs = (job_attrs or {}).copy()
+        job_attrs['reusing_sorted_bam'] = md_j_reusing_sorted_bam
         md_j = picard.markdup(
             b,
             j.sorted_bam,
