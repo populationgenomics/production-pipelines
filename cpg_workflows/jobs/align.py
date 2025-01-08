@@ -617,14 +617,16 @@ def finalise_alignment(
     # If sorted_bam_path is provided, skip to markdup if it exists and reuse_sorted_bam is true
     reusing_sorted_bam = False
     if sorted_bam_path:
-        if sorted_bam_path.exists() and config_retrieve('workflow', 'reuse_sorted_bam', False):
+        if sorted_bam_path.exists() and config_retrieve(['workflow', 'reuse_sorted_bam'], False):
             logging.info(f'Skipping alignment job, {sorted_bam_path} already exists')
             j.sorted_bam = b.read_input(str(sorted_bam_path))
             reusing_sorted_bam = True
-        elif not sorted_bam_path.exists() and config_retrieve('workflow', 'checkpoint_sorted_bam', False):
+        elif not sorted_bam_path.exists() and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False):
             logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
             j.command(command(align_cmd, monitor_space=True))  # type: ignore
             b.write_output(j.sorted_bam, str(sorted_bam_path))
+        else:
+            j.command(command(align_cmd, monitor_space=True))  # type: ignore
     else:
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
 
