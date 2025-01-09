@@ -18,7 +18,7 @@ from cpg_workflows.stages.dragen_ica import (
     run_align_genotype_with_dragen,
 )
 from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import slugify
+from cpg_workflows.utils import can_reuse, slugify
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
 if TYPE_CHECKING:
@@ -300,6 +300,15 @@ class DownloadDataFromIca(SequencingGroupStage):
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
 
+        if can_reuse(self.expected_outputs(sequencing_group=sequencing_group)):
+            return self.make_outputs(
+                target=sequencing_group,
+                data=self.expected_outputs(sequencing_group=sequencing_group),
+                jobs=None,
+                reusable=True,
+                skipped=True,
+            )
+
         batch_instance: Batch = get_batch()
         ica_download_job: BashJob = batch_instance.new_bash_job(
             name='DownloadDataFromIca',
@@ -327,3 +336,25 @@ class DownloadDataFromIca(SequencingGroupStage):
             data=self.expected_outputs(sequencing_group=sequencing_group),
             jobs=ica_download_job,
         )
+
+
+# @stage(
+#     analysis_type='ica_outputs',
+#     required_stages=[DownloadDataFromIca],
+#     analysis_keys=,
+# )
+# class RegisterIcaOutputs(SequencingGroupStage):
+#     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+#         output_dir: cpg_utils.Path = sequencing_group.dataset.prefix() / GCP_FOLDER_FOR_ICA_DOWNLOAD / sequencing_group.name
+#         return {
+#             'insert_stats': f'{output_dir}.insert-stats.json',
+#             'cnv_vcf': f'{output_dir}.cnv.vcf.gz',
+#             'cnv_vcf_idx': f'{output_dir}.cnv.vcf.gz.tbi',
+#             'sv_vcf': f'{output_dir}.sv.vcf.gz',
+#             'sv_vcf_idx': f'{output_dir}.sv.vcf.gz.tbi',
+#             'gvcf': f'{output_dir}.hard-filtered..gvcf.gz',
+#             'gvcf_idx': f'{output_dir}.hard-filtered.gvcf.gz.tbi',
+#             'cram': f'{output_dir}.cram',
+#             'cram_idx': f'{output_dir}.cram.crai',
+
+#         }
