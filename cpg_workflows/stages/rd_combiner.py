@@ -173,6 +173,10 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
         combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
 
+        # set this job to be non-spot (i.e. non-preemptible)
+        # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
+        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
+
         # Default to GRCh38 for reference if not specified
         combiner_job.call(
             combiner.run,
