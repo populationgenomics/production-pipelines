@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Callable, Optional
 
+from gql.transport.exceptions import TransportServerError
 from tenacity import (
     retry,
     retry_if_exception_type,
@@ -66,6 +67,7 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
     """
     query SGByCohortQuery($cohort_id: String!) {
         cohorts(id: {eq: $cohort_id}) {
+            name
             sequencingGroups {
                 id
                 meta
@@ -184,6 +186,7 @@ class AnalysisType(Enum):
     MITO_CRAM = 'mito-cram'
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
+    COMBINER = 'combiner'
 
     @staticmethod
     def parse(val: str) -> 'AnalysisType':
@@ -321,25 +324,37 @@ class Metamist:
         """
         entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
 
-        # Create dictionary keying sequencing groups by project
-        # {project_id: [sequencing_group_1, sequencing_group_2, ...], ...}
-
+        # Create dictionary keying sequencing groups by project and including cohort name
+        # {
+        #     "sequencing_groups": {
+        #         project_id: [sequencing_group_1, sequencing_group_2, ...],
+        #         ...
+        #     },
+        #     "name": "CohortName"
+        # }
         if len(entries['cohorts']) != 1:
             raise MetamistError('We only support one cohort at a time currently')
         sequencing_groups = entries['cohorts'][0]['sequencingGroups']
-
+        cohort_name = entries['cohorts'][0]['name']
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
-        return sort_sgs_by_project(sequencing_groups)
+        return {
+            'sequencing_groups': sort_sgs_by_project(sequencing_groups),
+            'name': cohort_name,
+        }
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
+        retry=retry_if_exception_type(TransportServerError),
+        reraise=True,
+    )
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
         Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
-        metamist_proj = dataset_name
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset_name)
         logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
         skip_sgs = get_config()['workflow'].get('skip_sgs', [])
@@ -359,8 +374,7 @@ class Metamist:
             },
         )
 
-        sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
-        return sequencing_groups
+        return sequencing_group_entries['project']['sequencingGroups']
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
@@ -386,9 +400,7 @@ class Metamist:
         """
         Query the DB to find the last completed joint-calling analysis for the sequencing groups.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         data = self.make_aapi_call(
             self.aapi.get_latest_complete_analysis_for_type,
@@ -421,10 +433,7 @@ class Metamist:
         and sequencing type, one Analysis object per sequencing group. Assumes the analysis
         is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         analyses = query(
             GET_ANALYSES_QUERY,
@@ -468,10 +477,7 @@ class Metamist:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         if isinstance(type_, AnalysisType):
             type_ = type_.value
@@ -594,15 +600,22 @@ class Metamist:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
-
+        metamist_proj = self.get_metamist_proj(dataset)
         entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
         return pedigree_entries
+
+    def get_metamist_proj(self, dataset: str | None = None) -> str:
+        """
+        Return the Metamist project name, appending '-test' if the access level is 'test'.
+        """
+        metamist_proj = dataset or self.default_dataset
+        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
+            metamist_proj += '-test'
+
+        return metamist_proj
 
 
 @dataclass

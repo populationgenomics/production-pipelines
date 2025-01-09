@@ -35,6 +35,7 @@ from cpg_workflows.workflow import (
     MultiCohortStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -118,11 +119,11 @@ def check_for_cohort_overlaps(multicohort: MultiCohort):
     # grab all SG IDs per cohort
     for cohort in multicohort.get_cohorts():
         # shouldn't be possible, but guard against to be sure
-        if cohort.name in sgs_per_cohort:
-            raise ValueError(f'Cohort {cohort.name} already exists in {sgs_per_cohort}')
+        if cohort.id in sgs_per_cohort:
+            raise ValueError(f'Cohort {cohort.id} already exists in {sgs_per_cohort}')
 
         # collect the SG IDs for this cohort
-        sgs_per_cohort[cohort.name] = set(cohort.get_sequencing_group_ids())
+        sgs_per_cohort[cohort.id] = set(cohort.get_sequencing_group_ids())
 
     # pairwise iteration over cohort IDs
     for id1, id2 in combinations(sgs_per_cohort, 2):
@@ -227,7 +228,7 @@ class GatherBatchEvidence(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'samples': [sg.id for sg in sequencing_groups],
             'ped_file': str(pedigree_input),
             'counts': [
@@ -335,7 +336,7 @@ class ClusterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'del_bed': str(batch_evidence_d['merged_dels']),
             'dup_bed': str(batch_evidence_d['merged_dups']),
             'ped_file': str(pedigree_input),
@@ -409,7 +410,7 @@ class GenerateBatchMetrics(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'baf_metrics': gatherbatchevidence_d['merged_BAF'],
             'discfile': gatherbatchevidence_d['merged_PE'],
             'coveragefile': gatherbatchevidence_d['merged_bincov'],
@@ -512,7 +513,7 @@ class FilterBatch(CohortStage):
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'ped_file': str(pedigree_input),
             'evidence_metrics': metrics_d['metrics'],
             'evidence_metrics_common': metrics_d['metrics_common'],
@@ -575,8 +576,8 @@ class MergeBatchSites(MultiCohortStage):
 
         # take from previous per-cohort outputs
         filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
-        pesr_vcfs = [filter_batch_outputs[cohort.name]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
-        depth_vcfs = [filter_batch_outputs[cohort.name]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
+        pesr_vcfs = [filter_batch_outputs[cohort.id]['filtered_pesr_vcf'] for cohort in multicohort.get_cohorts()]
+        depth_vcfs = [filter_batch_outputs[cohort.id]['filtered_depth_vcf'] for cohort in multicohort.get_cohorts()]
 
         input_dict: dict = {'cohort': multicohort.name, 'depth_vcfs': depth_vcfs, 'pesr_vcfs': pesr_vcfs}
         input_dict |= get_images(['sv_pipeline_docker'])
@@ -620,7 +621,7 @@ class CombineExclusionLists(MultiCohortStage):
 
         filter_batch_outputs = inputs.as_dict_by_target(FilterBatch)
         all_filter_lists = [
-            str(filter_batch_outputs[cohort.name]['outlier_samples_excluded_file'])
+            str(filter_batch_outputs[cohort.id]['outlier_samples_excluded_file'])
             for cohort in multicohort.get_cohorts()
         ]
 
@@ -687,9 +688,12 @@ class GenotypeBatch(CohortStage):
         mergebatch_d = inputs.as_dict(this_multicohort, MergeBatchSites)
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
-            'n_per_split': 5000,
-            'n_RD_genotype_bins': 100000,
+            'batch': cohort.id,
+            'n_per_split': config_retrieve(['resource_overrides', 'GenotypeBatch', 'n_per_split'], 5000),
+            'n_RD_genotype_bins': config_retrieve(
+                ['resource_overrides', 'GenotypeBatch', 'n_RD_genotype_bins'],
+                100000,
+            ),
             'coveragefile': batchevidence_d['merged_bincov'],
             'coveragefile_index': batchevidence_d['merged_bincov_index'],
             'discfile': batchevidence_d['merged_PE'],
@@ -763,7 +767,7 @@ class MakeCohortVcf(MultiCohortStage):
         pedigree_input = inputs.as_path(target=multicohort, stage=MakeMultiCohortCombinedPed, key='multicohort_ped')
 
         # get the names of all contained cohorts
-        all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
+        all_batch_names: list[str] = [cohort.id for cohort in multicohort.get_cohorts()]
 
         pesr_vcfs = [genotypebatch_outputs[cohort]['genotyped_pesr_vcf'] for cohort in all_batch_names]
         depth_vcfs = [genotypebatch_outputs[cohort]['genotyped_depth_vcf'] for cohort in all_batch_names]
@@ -906,7 +910,7 @@ class JoinRawCalls(MultiCohortStage):
         clusterbatch_outputs = inputs.as_dict_by_target(ClusterBatch)
 
         # get the names of all contained cohorts
-        all_batch_names: list[str] = [cohort.name for cohort in multicohort.get_cohorts()]
+        all_batch_names: list[str] = [cohort.id for cohort in multicohort.get_cohorts()]
         for caller in SV_CALLERS + ['depth']:
             input_dict[f'clustered_{caller}_vcfs'] = [
                 clusterbatch_outputs[cohort][f'clustered_{caller}_vcf'] for cohort in all_batch_names
@@ -1107,8 +1111,50 @@ class UpdateStructuralVariantIDs(MultiCohortStage):
 @stage(
     required_stages=[FilterGenotypes, UpdateStructuralVariantIDs],
     analysis_type='sv',
-    analysis_keys=['annotated_vcf'],
+    analysis_keys=['wham_filtered_vcf'],
 )
+class FilterWham(MultiCohortStage):
+    """
+    Filters the VCF to remove deletions only called by Wham
+    github.com/broadinstitute/gatk-sv/blob/main/wdl/ApplyManualVariantFilter.wdl
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        # index here is implicit
+        return {'wham_filtered_vcf': self.prefix / 'filtered.vcf.bgz'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        configure and queue jobs for SV annotation
+        passing the VCF Index has become implicit, which may be a problem for us
+        """
+        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
+        if query_for_spicy_vcf(multicohort.analysis_dataset.name):
+            get_logger().info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(multicohort, UpdateStructuralVariantIDs)['concordance_vcf']
+        else:
+            get_logger().info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
+            input_vcf = inputs.as_dict(multicohort, FilterGenotypes)['filtered_vcf']
+
+        in_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})['vcf.gz']
+        job = get_batch().new_job('Filter Wham', attributes={'tool': 'bcftools'})
+        job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.command(
+            'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\' '
+            f'{in_vcf} | bgzip -c  > {job.output["vcf.bgz"]}',
+        )
+        job.command(f'tabix {job.output["vcf.bgz"]}')
+        get_batch().write_output(
+            job.output,
+            str(self.expected_outputs(multicohort)['wham_filtered_vcf']).replace('.vcf.bgz', ''),
+        )
+
+        expected_d = self.expected_outputs(multicohort)
+        return self.make_outputs(multicohort, data=expected_d, jobs=job)
+
+
+@stage(required_stages=[FilterWham], analysis_type='sv', analysis_keys=['annotated_vcf'])
 class AnnotateVcf(MultiCohortStage):
     """
     Add annotations, such as the inferred function and allele frequencies of variants,
@@ -1137,18 +1183,9 @@ class AnnotateVcf(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        configure and queue jobs for SV annotation
-        passing the VCF Index has become implicit, which may be a problem for us
+        Configure and queue jobs for SV annotation. Passing the VCF Index has become implicit
         """
-
-        # read the concordance-with-prev-batch VCF if appropriate, otherwise use the filtered VCF
-        if query_for_spicy_vcf(multicohort.analysis_dataset.name):
-            get_logger().info(f'Variant IDs were updated for {multicohort.analysis_dataset.name}')
-            input_vcf = inputs.as_dict(multicohort, UpdateStructuralVariantIDs)['concordance_vcf']
-        else:
-            get_logger().info(f'No Spicy VCF was found, default IDs for {multicohort.analysis_dataset.name}')
-            input_vcf = inputs.as_dict(multicohort, FilterGenotypes)['filtered_vcf']
-
+        input_vcf = inputs.as_dict(multicohort, FilterWham)['wham_filtered_vcf']
         expected_out = self.expected_outputs(multicohort)
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
         job_or_none = queue_annotate_sv_jobs(multicohort, self.prefix, input_vcf, expected_out, billing_labels)
@@ -1203,12 +1240,8 @@ class SpiceUpSVIDs(MultiCohortStage):
         # update the IDs using a PythonJob
         pyjob = get_batch().new_python_job('rename_sv_ids')
         pyjob.storage('10Gi')
-        pyjob.call(
-            rename_sv_ids,
-            input_vcf,
-            pyjob.output,
-            bool(query_for_spicy_vcf(multicohort.analysis_dataset.name)),
-        )
+        skip_prior_names = bool(query_for_spicy_vcf(multicohort.analysis_dataset.name))
+        pyjob.call(rename_sv_ids, input_vcf, pyjob.output, skip_prior_names)
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
@@ -1276,10 +1309,14 @@ class AnnotateDatasetSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortSv, key='mt')
-        exclusion_file = inputs.as_path(dataset.cohort.multicohort, stage=CombineExclusionLists, key='exclusion_list')
+        # only create dataset MTs for datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping AnnotateDatasetSv mt subsetting for {dataset}')
+            return None
+
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSv, key='mt')
+        exclusion_file = inputs.as_path(get_multicohort(), stage=CombineExclusionLists, key='exclusion_list')
 
         outputs = self.expected_outputs(dataset)
 
@@ -1322,6 +1359,11 @@ class MtToEsSv(DatasetStage):
         """
         Uses the non-DataProc MT-to-ES conversion script
         """
+        # only create the elasticsearch index for the datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping SV ES index creation for {dataset}')
+            return None
 
         # try to generate a password here - we'll find out inside the script anyway, but
         # by that point we'd already have localised the MT, wasting time and money

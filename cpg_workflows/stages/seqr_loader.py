@@ -7,7 +7,7 @@ from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -15,7 +15,15 @@ from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.workflow import (
+    DatasetStage,
+    MultiCohortStage,
+    StageInput,
+    StageOutput,
+    get_multicohort,
+    get_workflow,
+    stage,
+)
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -90,9 +98,13 @@ class AnnotateDataset(DatasetStage):
         """
         Annotate MT with genotype and consequence data for Seqr
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
+        # only create dataset MTs for datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
+            return None
+
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
@@ -184,6 +196,11 @@ class MtToEs(DatasetStage):
         """
         Transforms the MT into a Seqr index, no DataProc
         """
+        # only create the elasticsearch index for the datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping ES index creation for {dataset}')
+            return None
 
         # try to generate a password here - we'll find out inside the script anyway, but
         # by that point we'd already have localised the MT, wasting time and money
@@ -207,14 +224,17 @@ class MtToEs(DatasetStage):
         index_name = str(outputs['index_name'])
         flag_name = str(outputs['done_flag'])
 
-        job = get_batch().new_job(f'Generate {index_name} from {mt_path}')
+        job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
+        if config_retrieve(['workflow', 'es_index', 'spot_instance'], default=True) is False:
+            # Use a non-preemptible instance if spot_instance is False in the config
+            job = job.spot(is_spot=False)
 
-        required_storage = tshirt_mt_sizing(
+        req_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
             cohort_size=len(dataset.get_sequencing_group_ids()),
         )
 
-        job.cpu(4).storage(f'{required_storage}Gi').memory('lowmem')
+        job.cpu(4).storage(f'{req_storage}Gi').memory('lowmem').image(config_retrieve(['workflow', 'driver_image']))
 
         # localise the MT
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')

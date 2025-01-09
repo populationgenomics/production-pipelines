@@ -19,7 +19,7 @@ from cpg_utils.hail_batch import command
 from cpg_workflows.jobs.picard import get_intervals
 from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.resources import HIGHMEM, STANDARD, joint_calling_scatter_count
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, get_intervals_from_bed
 
 STANDARD_FEATURES = [
     'ReadPosRankSum',
@@ -192,13 +192,20 @@ def make_vqsr_jobs(
         b.write_output(model_j.model_file, str(snp_model_path))
     snp_model = b.read_input(str(snp_model_path))
 
-    intervals_j, intervals = get_intervals(
-        b=b,
-        scatter_count=scatter_count,
-        source_intervals_path=intervals_path,
-        job_attrs=job_attrs,
-        output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-    )
+    intervals: list[str] | list[hb.ResourceFile] = []
+    if intervals_path and intervals_path.suffix == '.bed':
+        # If intervals_path is a bed file, read the intervals directly
+        intervals_j = None
+        intervals = get_intervals_from_bed(intervals_path)
+        assert scatter_count == len(intervals)
+    else:
+        intervals_j, intervals = get_intervals(
+            b=b,
+            scatter_count=scatter_count,
+            source_intervals_path=intervals_path,
+            job_attrs=job_attrs,
+            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
+        )
     if intervals_j:
         jobs.append(intervals_j)
 
@@ -510,7 +517,7 @@ def snps_recalibrator_scattered(
     dbsnp_resource_vcf: hb.ResourceGroup,
     disk_size: int,
     use_as_annotations: bool,
-    interval: hb.Resource | None = None,
+    interval: hb.Resource | str | None = None,
     max_gaussians: int = 6,
     is_small_callset: bool = False,
     job_attrs: dict | None = None,
@@ -687,7 +694,7 @@ def apply_recalibration_snps(
     disk_size: int,
     use_as_annotations: bool,
     filter_level: float,
-    interval: hb.Resource | None = None,
+    interval: hb.Resource | str | None = None,
     job_attrs: dict | None = None,
 ) -> Job:
     """
@@ -745,7 +752,7 @@ def apply_recalibration_indels(
     disk_size: int,
     use_as_annotations: bool,
     filter_level: float,
-    interval: hb.Resource | None = None,
+    interval: hb.Resource | str | None = None,
     output_vcf_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> Job:

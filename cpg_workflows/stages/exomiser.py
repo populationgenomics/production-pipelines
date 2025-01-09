@@ -12,20 +12,17 @@ from functools import cache
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.exomiser import (
     create_gvcf_to_vcf_jobs,
     extract_mini_ped_files,
-    generate_seqr_summary,
     make_phenopackets,
-    run_exomiser_13,
     run_exomiser_14,
 )
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
-# this is used to separate family IDs from their individual outputs in RunExomiser
-BREAKING_PUNCTUATION = '~~'
 HPO_KEY: str = 'HPO Terms (present)'
 
 
@@ -168,23 +165,22 @@ class RunExomiser(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         """
-        the pipeline logic only accepts a dictionary of paths
-        but we need a dictionary of families, each containing a dictionary of paths
-        I'm fudging this by putting some arbitrary punctuation in to split on later
-
-        Args:
-            dataset ():
-
-        Returns:
-            dict of outputs for this dataset
+        dict of outputs for this dataset, keyed on family ID
         """
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         family_dict = find_families(dataset)
+
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
 
-        # only the TSVs are required
-        return {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        # only the TSVs are required, but we need the gene and variant level TSVs
+        # populate gene-level results
+        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        # add more keys pointing to the variant-level TSVs
+        return_dict.update(
+            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict.keys()},
+        )
+        return return_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -205,42 +201,102 @@ class RunExomiser(DatasetStage):
                 'pheno': ppk_files[family],
             }
             for family in output_dict.keys()
+            if '_variants' not in family
         }
 
-        if exomiser_version == 14:
-            jobs = run_exomiser_14(single_dict)
-        elif exomiser_version == 13:
-            jobs = run_exomiser_13(single_dict)
-        else:
+        # commenting out the 13 version as it's not maintained anymore
+        if exomiser_version != 14:
             raise ValueError(f'Exomiser version {exomiser_version} not supported')
+
+        jobs = run_exomiser_14(single_dict)
 
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
 
-@stage(required_stages=[RunExomiser], analysis_type='custom', analysis_keys=['tsv'])
+@stage(required_stages=[RunExomiser], analysis_type='exomiser')
 class ExomiserSeqrTSV(DatasetStage):
     """
     Parse the Exomiser results into a TSV for Seqr
     """
 
-    def expected_outputs(self, dataset: Dataset):
+    def expected_outputs(self, dataset: Dataset) -> Path:
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
-
-        return {
-            'tsv': dataset.analysis_prefix()
-            / get_workflow().output_version
-            / f'exomiser_{exomiser_version}_results.tsv',
-        }
+        return dataset.analysis_prefix() / get_workflow().output_version / f'exomiser_{exomiser_version}_results.tsv'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        output = self.expected_outputs(dataset)
+
         # is there a seqr project?
         projects = find_seqr_projects()
+
         if dataset.name not in projects:
             get_logger(__file__).info(f'No Seqr project found for {dataset.name}, skipping')
             return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[], skipped=True)
 
         results = inputs.as_dict(target=dataset, stage=RunExomiser)
 
-        jobs = generate_seqr_summary(results, projects[dataset.name], str(self.expected_outputs(dataset)['tsv']))
+        # just collect the per-family gene-level TSVs
+        local_files: list = []
+        for family, file in results.items():
+            if family.endswith('_variants'):
+                continue
 
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+            local_files.append(get_batch().read_input(file))
+
+        # assign the project name to a variable
+        project = projects[dataset.name]
+
+        job = get_batch().new_bash_job(f'Aggregate gene-level TSVs for {project}')
+        job.storage('10Gi')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(f'combine_exomiser_genes --project {project} --input {" ".join(local_files)} --output {job.output}')
+        get_batch().write_output(job.output, str(output))
+
+        return self.make_outputs(dataset, data=output, jobs=job)
+
+
+@stage(required_stages=[RunExomiser], analysis_type='exomiser', analysis_keys=['json', 'ht'])
+class ExomiserVariantsTSV(DatasetStage):
+    """
+    Parse the Exomiser variant-level results into a JSON file and a Hail Table
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+
+        prefix = dataset.analysis_prefix() / get_workflow().output_version
+
+        return {
+            'json': prefix / f'exomiser_{exomiser_version}_variant_results.tsv',
+            'ht': prefix / f'exomiser_{exomiser_version}_variant_results.ht',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        if not find_families(dataset):
+            get_logger().info('No families found, skipping exomiser')
+            return self.make_outputs(dataset, jobs=None, skipped=True)
+
+        outputs = self.expected_outputs(dataset)
+
+        results = inputs.as_dict(target=dataset, stage=RunExomiser)
+
+        # just collect the per-family variant-level TSVs
+        family_files: list = []
+        for family, file in results.items():
+            if family.endswith('_variants'):
+                family_files.append(get_batch().read_input(file))
+
+        job = get_batch().new_job('Combine Exomiser Variant-level TSVs')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+
+        job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
+        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output {job.output}')
+
+        # recursive copy of the HT
+        job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
+
+        get_batch().write_output(job.output, str(outputs['json']))
+
+        return self.make_outputs(dataset, data=outputs, jobs=job)

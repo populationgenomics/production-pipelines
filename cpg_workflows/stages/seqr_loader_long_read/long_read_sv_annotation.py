@@ -20,6 +20,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -114,7 +115,8 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             f'--vcf_out {mod_job.output} '
             f'--new_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sex} ',
+            f'--sex {sex} '
+            f'--sv',
         )
 
         # block-gzip and index that result
@@ -202,8 +204,8 @@ class AnnotateLongReadSVs(MultiCohortStage):
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         job_or_none = queue_annotate_sv_jobs(
-            cohort=multicohort,
-            cohort_prefix=self.prefix,
+            multicohort=multicohort,
+            prefix=self.prefix,
             input_vcf=inputs.as_dict(multicohort, MergeLongReadSVs)['vcf'],
             outputs=expected_out,
             labels=billing_labels,
@@ -290,9 +292,7 @@ class AnnotateDatasetLRSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSv, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortLRSv, key='mt')
 
         outputs = self.expected_outputs(dataset)
 

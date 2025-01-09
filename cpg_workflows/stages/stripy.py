@@ -7,7 +7,7 @@ See https://gitlab.com/andreassh/stripy-pipeline
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
@@ -61,11 +61,15 @@ class Stripy(SequencingGroupStage):
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        # When testing new loci, its useful to save the report to an alternate path
+        output_prefix = config_retrieve(['stripy', 'output_prefix'], default='stripy')
         return {
-            'stripy_html': sequencing_group.dataset.web_prefix() / 'stripy' / f'{sequencing_group.id}.stripy.html',
-            'stripy_json': sequencing_group.dataset.analysis_prefix() / 'stripy' / f'{sequencing_group.id}.stripy.json',
+            'stripy_html': sequencing_group.dataset.web_prefix() / output_prefix / f'{sequencing_group.id}.stripy.html',
+            'stripy_json': sequencing_group.dataset.analysis_prefix()
+            / output_prefix
+            / f'{sequencing_group.id}.stripy.json',
             'stripy_log': sequencing_group.dataset.analysis_prefix()
-            / 'stripy'
+            / output_prefix
             / f'{sequencing_group.id}.stripy.log.txt',
         }
 

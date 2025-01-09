@@ -139,7 +139,8 @@ def markdup(
     Make job that runs Picard MarkDuplicates and converts the result to CRAM.
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_MarkDuplicates')
-    j = b.new_job('MarkDuplicates', job_attrs)
+    job_name = 'MarkDuplicates' + (' mito' if 'mito' in str(output_path) else '')
+    j = b.new_job(job_name, job_attrs)
     if can_reuse(output_path, overwrite):
         return None
 

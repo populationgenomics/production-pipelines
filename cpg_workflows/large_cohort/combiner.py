@@ -1,122 +1,93 @@
-import collections
-import logging
+"""Runs the hail combiner
 
-import hail as hl
+Inputs:
+    - output_vds_path: str - The destination that the VDS will be saved at
+    - sequencing_type: str - Used to specify what intervals to use (exome or genome)
+    - tmp_prefix: str - Where to store temporary combiner plans
+    - genome_build: str - What reference genome to use for the combiner
+    - gvcf_paths: list[str] | None - The optional list of gvcf paths in string format to combine
+    - vds_paths: list[str] | None - The optional list of VDS paths in string format to combine
+"""
 
-from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build
-from cpg_workflows.inputs import get_multicohort
-from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import can_reuse, exists
+from typing import TYPE_CHECKING
+
+from hail.vds import new_combiner
+
+from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import init_batch
+from cpg_workflows.batch import override_jar_spec
+from cpg_workflows.utils import can_reuse, to_path
+
+if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
+    from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
 
-def _check_gvcfs(sequencing_groups: list[SequencingGroup]) -> list[SequencingGroup]:
+def run(
+    output_vds_path: str,
+    sequencing_type: str,
+    tmp_prefix: str,
+    genome_build: str,
+    save_path: str | None,
+    force_new_combiner: bool,
+    gvcf_paths: list[str] | None = None,
+    vds_paths: list[str] | None = None,
+    specific_intervals: list[str] | None = None,
+) -> None:
     """
-    Making sure each sequencing group has a GVCF
+    Runs the combiner
+
+    Args:
+        output_vds_path (str): eventual output path for the VDS
+        sequencing_type (str): genome/exome, relevant in selecting defaults
+        tmp_prefix (str): where to store temporary combiner intermediates
+        genome_build (str): GRCh38
+        save_path (str | None): where to store the combiner plan, or where to resume from
+        gvcf_paths (list[str] | None): list of paths to GVCFs
+        vds_paths (list[str] | None): list of paths to VDSs
+        specific_intervals (list[str] | None): list of intervals to use for the combiner, if using non-standard
+        force_new_combiner (bool): whether to force a new combiner run, or permit resume from a previous one
     """
-    for sequencing_group in sequencing_groups:
-        if not sequencing_group.gvcf:
-            if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
-                logging.warning(f'Skipping {sequencing_group} which is missing GVCF')
-                sequencing_group.active = False
-                continue
+    import logging
+
+    import hail as hl
+
+    # set up a quick logger inside the job
+    logging.basicConfig(level=logging.INFO)
+
+    if not can_reuse(to_path(output_vds_path)):
+        init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+
+        if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+            override_jar_spec(jar_spec)
+
+        # Load from save, if supplied
+        if save_path:
+            if force_new_combiner:
+                logging.info(f'Combiner plan {save_path} will be ignored/written new')
             else:
-                raise ValueError(
-                    f'Sequencing group {sequencing_group} is missing GVCF. '
-                    f'Use workflow/skip_sgs = [] or '
-                    f'workflow/skip_sgs_with_missing_input '
-                    f'to control behaviour',
-                )
+                logging.info(f'Resuming combiner plan from {save_path}')
 
-        if get_config()['workflow'].get('check_inputs', True):
-            if not exists(sequencing_group.gvcf.path):
-                if get_config()['workflow'].get('skip_sgs_with_missing_input', False):
-                    logging.warning(f'Skipping {sequencing_group} that is missing GVCF {sequencing_group.gvcf.path}')
-                    sequencing_group.active = False
-                else:
-                    raise ValueError(
-                        f'Sequencing group {sequencing_group} is missing GVCF. '
-                        f'Use workflow/skip_sgs = [] or '
-                        f'workflow/skip_sgs_with_missing_input '
-                        f'to control behaviour',
-                    )
-    return [s for s in sequencing_groups if s.active]
+        if specific_intervals:
+            logging.info(f'Using specific intervals: {specific_intervals}')
 
-
-def check_duplicates(iterable):
-    """
-    Throws error if input list contains repeated items.
-    """
-    duplicates = [item for item, count in collections.Counter(iterable).items() if count > 1]
-    if duplicates:
-        raise ValueError(f'Found {len(duplicates)} duplicates: {duplicates}')
-    return duplicates
-
-
-def run(out_vds_path: Path, tmp_prefix: Path, *sequencing_group_ids) -> hl.vds.VariantDataset:
-    """
-    run VDS combiner, assuming we are on a cluster.
-    @param out_vds_path: output path for VDS
-    @param tmp_prefix: tmp path for intermediate fields
-    @param sequencing_group_ids: optional list of sequencing groups to subset from get_multicohort()
-    @return: VDS object
-    """
-    if can_reuse(out_vds_path):
-        return hl.vds.read_vds(str(out_vds_path))
-
-    sequencing_groups = get_multicohort().get_sequencing_groups()
-    if sequencing_group_ids:
-        sequencing_groups = [s for s in sequencing_groups if s in sequencing_group_ids]
-
-    sequencing_groups = _check_gvcfs(sequencing_groups)
-
-    params = get_config().get('large_cohort', {}).get('combiner', {})
-
-    if intervals := params.get('intervals'):
-        if isinstance(intervals, list):
-            params['intervals'] = hl.eval(
-                [hl.parse_locus_interval(interval, reference_genome=genome_build()) for interval in intervals],
+            intervals = hl.eval(
+                [hl.parse_locus_interval(interval, reference_genome=genome_build) for interval in specific_intervals],
             )
+
         else:
-            params['intervals'] = hl.import_locus_intervals(params['intervals'])
-    elif get_config()['workflow']['sequencing_type'] == 'exome':
-        params.setdefault('use_exome_default_intervals', True)
-    elif get_config()['workflow']['sequencing_type'] == 'genome':
-        params.setdefault('use_genome_default_intervals', True)
-    else:
-        raise ValueError(
-            'Either combiner/intervals must be set, or workflow/sequencing_type must be one of: "exome", "genome"',
+            intervals = None
+
+        combiner: VariantDatasetCombiner = new_combiner(
+            output_path=output_vds_path,
+            save_path=save_path,
+            gvcf_paths=gvcf_paths,
+            vds_paths=vds_paths,
+            reference_genome=genome_build,
+            temp_path=tmp_prefix,
+            use_exome_default_intervals=sequencing_type == 'exome',
+            use_genome_default_intervals=sequencing_type == 'genome',
+            intervals=intervals,
+            force=force_new_combiner,
         )
 
-    sequencing_group_names = [s.id for s in sequencing_groups]
-    logging.info(
-        f'Combining {len(sequencing_groups)} sequencing groups: '
-        f'{", ".join(sequencing_group_names)}, using parameters: '
-        f'{params}',
-    )
-
-    gvcf_paths = [str(s.gvcf.path) for s in sequencing_groups if s.gvcf]
-    if not gvcf_paths:
-        raise ValueError('No sequencing groups with GVCFs found')
-
-    logging.info(f'Combining {len(sequencing_group_names)} sequencing groups: {", ".join(sequencing_group_names)}')
-
-    check_duplicates(sequencing_group_names)
-    check_duplicates(gvcf_paths)
-
-    combiner = hl.vds.new_combiner(
-        gvcf_paths=gvcf_paths,
-        gvcf_sample_names=sequencing_group_names,
-        # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
-        # will be ignored. The first gvcf path works fine as a header because it will
-        # be only read until the last line that begins with "#":
-        gvcf_external_header=gvcf_paths[0],
-        output_path=str(out_vds_path),
-        reference_genome='GRCh38',
-        temp_path=str(tmp_prefix),
-        force=True,
-        **params,
-    )
-    combiner.run()
-    return hl.vds.read_vds(str(out_vds_path))
+        combiner.run()

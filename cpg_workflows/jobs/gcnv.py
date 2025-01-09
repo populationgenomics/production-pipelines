@@ -11,7 +11,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_command
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
+from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.scripts import upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
@@ -540,7 +540,9 @@ def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict
     localised_vcf = get_batch().read_input_group(**{'vcf.gz': sg_vcf, 'vcf.gz.tbi': f'{sg_vcf}.tbi'})['vcf.gz']
     autosomes = ' '.join([f'chr{i}' for i in range(1, 23)])
     job.command('set -euo pipefail')
-    job.command(f'bcftools view {localised_vcf} {autosomes} | bgzip -c > {job.output["vcf.bgz"]}')  # type: ignore
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    job.command(f'bcftools view -Oz -o {job.output["vcf.bgz"]} {localised_vcf} {autosomes}')  # type: ignore
     job.command(f'tabix {job.output["vcf.bgz"]}')  # type: ignore
     get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
     return job
@@ -551,6 +553,8 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     This job will run a fast simple merge on per-SGID call files
     It then throws in a python script to add in two additional header lines
     and edit the SVLEN and SVTYPE attributes into each row
+
+    Escape here for single-VCF merges - the merge command is invalid, so we pass through the first step
 
     Args:
         sg_vcfs (list[str]): paths to all individual VCFs
@@ -576,16 +580,21 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz'],
         )
 
-    # option breakdown:
-    # -Oz: bgzip output
-    # -o: output file
-    # --threads: number of threads to use
-    # -m: merge strategy
-    # -0: compression level
-    merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
+    if len(batch_vcfs) == 0:
+        raise ValueError('No VCFs to merge')
+    elif len(batch_vcfs) == 1:
+        merge_job.command(f'mv {batch_vcfs[0]} {merge_job.tmp_vcf}')
+    else:
+        # option breakdown:
+        # -Oz: bgzip output
+        # -o: output file
+        # --threads: number of threads to use
+        # -m: merge strategy
+        # -0: compression level
+        merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
 
     # now normlise the result, splitting multiallelics
-    merge_job.command(f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}')
+    merge_job.command(f'bcftools norm -m -any -Oz -o {merge_job.tmp_vcf_split} {merge_job.tmp_vcf}')
 
     # create a python job to do the file content updates
     pyjob = get_batch().new_python_job('Update VCF content')
@@ -596,7 +605,9 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    third_job.command(f'bcftools view {pyjob.output} | bgzip -c > {third_job.output["vcf.bgz"]}')  # type: ignore
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    third_job.command(f'bcftools view -Oz -o {third_job.output["vcf.bgz"]} {pyjob.output}')  # type: ignore
     third_job.command(f'tabix {third_job.output["vcf.bgz"]}')  # type: ignore
 
     # dependency setting between jobs should be implicit due to temp file passing
@@ -670,7 +681,7 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 def annotate_dataset_jobs_cnv(
     mt_path: Path,
     sgids: list[str],
-    out_mt_path: Path,
+    out_mt_path: str,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -688,7 +699,7 @@ def annotate_dataset_jobs_cnv(
     subset_j: Job | None = None
     if not subset_mt_path.exists():
         subset_j = get_batch().new_job('subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
-        subset_j.image(image_path('cpg_workflows'))
+        subset_j.image(config_retrieve(['workflow', 'driver_image']))
         subset_j.command(
             query_command(
                 seqr_loader,
@@ -701,16 +712,15 @@ def annotate_dataset_jobs_cnv(
         )
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
-    annotate_j.image(image_path('cpg_workflows'))
+    annotate_j.image(config_retrieve(['workflow', 'driver_image']))
     annotate_j.command(
-        query_command(
-            seqr_loader_cnv,
-            seqr_loader_cnv.annotate_dataset_gcnv.__name__,
-            str(subset_mt_path),
-            str(out_mt_path),
-            setup_gcp=True,
-        ),
+        'seqr_loader_cnv '
+        f'--mt_out {out_mt_path} '
+        f'--checkpoint {str(tmp_prefix / "checkpoints")} '
+        'dataset '  # use the annotate_DATASET functionality
+        f'--mt_in {str(subset_mt_path)} ',
     )
+
     if subset_j:
         annotate_j.depends_on(subset_j)
         return [subset_j, annotate_j]

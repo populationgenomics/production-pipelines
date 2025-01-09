@@ -1,9 +1,10 @@
 import logging
+from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.targets import Cohort
+from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
@@ -12,53 +13,106 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
+from metamist.graphql import gql, query
 
-from .genotype import Genotype
+if TYPE_CHECKING:
+    from graphql import DocumentNode
+
+    from hailtop.batch.job import PythonJob
 
 
-@stage(required_stages=[Genotype])
+HAIL_QUERY: Final = 'hail query'
+
+
+@stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if vds_version := get_config()['workflow'].get('vds_version'):
-            vds_version = slugify(vds_version)
-            if not vds_version.startswith('v'):
-                vds_version = f'v{vds_version}'
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
+        workflow_config = config_retrieve('workflow')
+        combiner_config = config_retrieve('combiner')
+        output_vds_name: str = slugify(
+            f"{cohort.name}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
+        )
 
-        vds_version = vds_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / 'vds' / f'{vds_version}.vds'
+        # include the list of all VDS IDs in the plan name
+        if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
+            ids_list_as_string: str = '_'.join([str(id) for id in sorted(vds_ids)])
+            combiner_plan_name: str = f'combiner_{ids_list_as_string}'
+        else:
+            combiner_plan_name = f'combiner-{cohort.name}'
+        return {
+            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
+            'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
+        }
+
+    def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
+        get_vds_analysis_query: DocumentNode = gql(
+            """
+            query getVDSByAnalysisIds($vds_id: Int!) {
+                analyses(id: {eq: $vds_id}) {
+                    output
+                    sequencingGroups {
+                        id
+                    }
+                }
+            }
+        """,
+        )
+        query_results: dict[str, Any] = query(get_vds_analysis_query, variables={'vds_id': vds_id})
+        vds_path: str = query_results['analyses'][0]['output']
+        vds_sgids: list[str] = [sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']]
+        return (vds_path, vds_sgids)
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         # Can't import it before all configs are set:
         from cpg_workflows.large_cohort import combiner
 
-        j = get_batch().new_job('Combiner', (self.get_job_attrs() or {}) | {'tool': 'hail query'})
+        workflow_config = config_retrieve('workflow')
+        combiner_config = config_retrieve('combiner')
 
-        init_batch_args: dict[str, str | int] = {}
-        config = config_retrieve('workflow')
-
-        if config.get('highmem_workers'):
-            init_batch_args['worker_memory'] = 'highmem'
-        if config.get('highmem_drivers'):
-            init_batch_args['driver_memory'] = 'highmem'
-        if 'driver_cores' in config:
-            init_batch_args['driver_cores'] = config['driver_cores']
-        if not init_batch_args:
-            logging.warning(
-                "None of 'highmem_workers', 'highmem_drivers', or 'driver_cores' were specified in the config. If you're getting OOM errors, ensure these are included in the config.",
-            )
-
-        j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                combiner,
-                combiner.run.__name__,
-                str(self.expected_outputs(cohort)),
-                str(self.tmp_prefix),
-                setup_gcp=True,
-                init_batch_args=init_batch_args,
-            ),
+        output_paths = self.expected_outputs(cohort)
+        tmp_prefix = slugify(
+            f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
         )
-        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+
+        # create these as empty lists instead of None, they have the same truthiness
+        vds_paths: list[str] = []
+        sg_ids_in_vds: list[str] = []
+        new_sg_gvcfs: list[str] = []
+
+        if combiner_config.get('vds_analysis_ids', None) is not None:
+            for vds_id in combiner_config['vds_analysis_ids']:
+                tmp_query_res, tmp_sg_ids_in_vds = self.get_vds_ids_output(vds_id)
+                vds_paths.append(tmp_query_res)
+                sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
+
+        if combiner_config.get('merge_only_vds', False) is not True:
+            # Get SG IDs from the cohort object itself, rather than call Metamist.
+            # Get VDS IDs first and filter out from this list
+            cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
+            new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
+
+        if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
+            return self.make_outputs(cohort, output_paths)
+
+        j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
+        j.image(image_path('cpg_workflows'))
+        j.memory(combiner_config.get('memory'))
+        j.storage(combiner_config.get('storage'))
+
+        # Default to GRCh38 for reference if not specified
+        j.call(
+            combiner.run,
+            output_vds_path=str(output_paths['vds']),
+            sequencing_type=workflow_config['sequencing_type'],
+            tmp_prefix=tmp_prefix,
+            genome_build=genome_build(),
+            gvcf_paths=new_sg_gvcfs,
+            vds_paths=vds_paths,
+            save_path=output_paths['combiner_plan'],
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
+        )
+
+        return self.make_outputs(cohort, output_paths, [j])
 
 
 @stage(required_stages=[Combiner])
@@ -76,16 +130,26 @@ class SampleQC(CohortStage):
 
         j = get_batch().new_job(
             'Sample QC',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in workflow_config:
+            init_batch_args['driver_cores'] = workflow_config['driver_cores']
+
         j.image(image_path('cpg_workflows'))
         j.command(
             query_command(
                 sample_qc,
                 sample_qc.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )
@@ -109,7 +173,7 @@ class DenseSubset(CohortStage):
 
         j = get_batch().new_job(
             'Dense Subset',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -117,7 +181,7 @@ class DenseSubset(CohortStage):
             query_command(
                 dense_subset,
                 dense_subset.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
@@ -268,19 +332,32 @@ class MakeSiteOnlyVcf(CohortStage):
 
         j = get_batch().new_job(
             'MakeSiteOnlyVcf',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+
+        sitesvcf_config = config_retrieve('sitesvcf')
+
         j.image(image_path('cpg_workflows'))
+        j.memory(sitesvcf_config.get('memory', '4Gi'))
+        j.storage(sitesvcf_config.get('storage', '5Gi'))
+
+        init_batch_args: dict[str, str | int] = {}
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if sitesvcf_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in sitesvcf_config:
+            init_batch_args['driver_cores'] = sitesvcf_config['driver_cores']
 
         j.command(
             query_command(
                 site_only_vcf,
                 site_only_vcf.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )
@@ -323,7 +400,7 @@ class LoadVqsr(CohortStage):
 
         j = get_batch().new_job(
             'LoadVqsr',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
 
@@ -350,18 +427,29 @@ class Frequencies(CohortStage):
 
         j = get_batch().new_job(
             'Frequencies',
-            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        if 'driver_cores' in workflow_config:
+            init_batch_args['driver_cores'] = workflow_config['driver_cores']
+
         j.image(image_path('cpg_workflows'))
 
         j.command(
             query_command(
                 frequencies,
                 frequencies.run.__name__,
-                str(inputs.as_path(cohort, Combiner)),
+                str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)),
+                init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
         )

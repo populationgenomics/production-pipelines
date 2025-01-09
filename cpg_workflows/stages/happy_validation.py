@@ -4,131 +4,136 @@
 Content relating to the hap.py validation process
 """
 
-import logging
-
-from cpg_utils.config import get_config
+from cpg_utils import to_path
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.jobs.validation import parse_and_post_results, run_happy_on_vcf, validation_mt_to_vcf_job
+from cpg_workflows.jobs.validation import run_happy_on_vcf
+from cpg_workflows.stages.talos import query_for_latest_mt
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
 
-@stage(analysis_type='custom', analysis_keys=['vcf'])
+@stage()
 class ValidationMtToVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
-        return {
-            'vcf': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.vcf.bgz'
-            ),
-            'index': (
-                sequencing_group.dataset.prefix()
-                / 'validation'
-                / get_workflow().output_version
-                / f'{sequencing_group.id}.vcf.bgz.tbi'
-            ),
-        }
+        return (
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.id}.vcf.bgz'
+        )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
+        if not config_retrieve(['references', sequencing_group.external_id], False):
             return None
 
-        # generate the MT path from config
-        input_hash = get_config()['inputs']['sample_hash']
-        mt_path = sequencing_group.dataset.prefix() / 'mt' / f'{input_hash}-{sequencing_group.dataset.name}.mt'
+        # borrow the talos method to get the latest MT based on analysis entries
+        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(sequencing_group.dataset.name))
+        exp_output = self.expected_outputs(sequencing_group)
 
-        exp_outputs = self.expected_outputs(sequencing_group)
-
-        job = validation_mt_to_vcf_job(
-            b=get_batch(),
-            mt_path=str(mt_path),
-            sequencing_group_id=sequencing_group.id,
-            out_vcf_path=str(exp_outputs['vcf']),
-            job_attrs=self.get_job_attrs(sequencing_group),
+        job = get_batch().new_job(f'{sequencing_group.id} VCF from dataset MT')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(
+            f'ss_vcf_from_mt '
+            f'--input {input_mt} '
+            f'--sample_id {sequencing_group.id} '
+            f'--output {str(exp_output)} '
+            '--clean ',
         )
 
-        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
+        return self.make_outputs(sequencing_group, data=exp_output, jobs=job)
 
 
-@stage(required_stages=ValidationMtToVcf, analysis_type='qc', analysis_keys=['happy_csv'])
+def update_happy_meta(output_path: str) -> dict:
+    """
+    update
+    """
+    from csv import DictReader
+
+    from cpg_utils import to_path
+    from cpg_utils.config import config_retrieve
+    from cpg_workflows.jobs.validation import get_sample_truth_data
+
+    summary_keys = {
+        'TRUTH.TOTAL': 'true_variants',
+        'METRIC.Recall': 'recall',
+        'METRIC.Precision': 'precision',
+    }
+
+    happy_handle = to_path(output_path)
+    sample_ext_id: str = happy_handle.name.split('__')[0]
+
+    ref_data = get_sample_truth_data(sample_ext_id=sample_ext_id)
+
+    # populate a dictionary of results for this sequencing group
+    summary_data = {
+        'type': 'validation_result',
+        'truth_vcf': ref_data['vcf'],
+        'truth_bed': ref_data['bed'],
+    }
+
+    if stratification := config_retrieve(['references', 'stratification']):
+        summary_data['stratified'] = stratification
+
+    # read in the summary CSV file
+    with happy_handle.open() as handle:
+        summary_reader = DictReader(handle)
+        for line in summary_reader:
+            if line['Filter'] != 'PASS' or line['Subtype'] != '*':
+                continue
+
+            summary_key = f'{line["Type"]}_{line["Subset"]}'
+            for sub_key, sub_value in summary_keys.items():
+                summary_data[f'{summary_key}::{sub_value}'] = str(line[sub_key])
+    return summary_data
+
+
+@stage(
+    required_stages=ValidationMtToVcf,
+    analysis_type='validation',
+    analysis_keys=['happy_csv'],
+    update_analysis_meta=update_happy_meta,
+)
 class ValidationHappyOnVcf(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup):
         output_prefix = (
-            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.external_id}__{sequencing_group.id}'
         )
         return {
-            'vcf': f'{output_prefix}.happy.vcf.bgz',
-            'index': f'{output_prefix}.happy.vcf.bgz.tbi',
-            'happy_csv': f'{output_prefix}.happy_extended.csv',
-            'happy_roc': f'{output_prefix}.happy_roc.all.csv.gz',
-            'happy_metrics': f'{output_prefix}.happy_metrics.json.gz',
-            'happy_runinfo': f'{output_prefix}.happy_runinfo.json',
-            'happy_summary': f'{output_prefix}.summary.csv',
+            'vcf': to_path(f'{output_prefix}.happy.vcf.bgz'),
+            'index': to_path(f'{output_prefix}.happy.vcf.bgz.tbi'),
+            'happy_csv': to_path(f'{output_prefix}.happy_extended.csv'),
+            'happy_roc': to_path(f'{output_prefix}.happy_roc.all.csv.gz'),
+            'happy_metrics': to_path(f'{output_prefix}.happy_metrics.json.gz'),
+            'happy_runinfo': to_path(f'{output_prefix}.happy_runinfo.json'),
+            'happy_summary': to_path(f'{output_prefix}.summary.csv'),
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
-            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
+        if not config_retrieve(['references', sequencing_group.external_id], False):
             return None
 
         # get the input vcf for this sequence group
-        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf, key='vcf')
+        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf)
 
         # set the prefix to write outputs to
         output_prefix = (
-            sequencing_group.dataset.prefix() / 'validation' / get_workflow().output_version / sequencing_group.id
+            sequencing_group.dataset.prefix()
+            / 'validation'
+            / get_workflow().output_version
+            / f'{sequencing_group.external_id}__{sequencing_group.id}'
         )
 
         exp_outputs = self.expected_outputs(sequencing_group)
         job = run_happy_on_vcf(
-            b=get_batch(),
             vcf_path=str(input_vcf),
-            sequencing_group_ext_id=sequencing_group.external_id,
+            sample_ext_id=sequencing_group.external_id,
             out_prefix=str(output_prefix),
-            job_attrs=self.get_job_attrs(sequencing_group),
         )
 
         return self.make_outputs(sequencing_group, data=exp_outputs, jobs=job)
-
-
-@stage(required_stages=[ValidationMtToVcf, ValidationHappyOnVcf])
-class ValidationParseHappy(SequencingGroupStage):
-    def expected_outputs(self, sequencing_group: SequencingGroup):
-        return {
-            'json_summary': sequencing_group.dataset.prefix()
-            / 'validation'
-            / get_workflow().output_version
-            / f'{sequencing_group.id}.happy_summary.json',
-        }
-
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        # only keep the sequencing groups with reference data
-        if sequencing_group.external_id not in get_config()['references']:
-            logging.info(f'Skipping {sequencing_group.id}; not in the reference set')
-            return None
-
-        # get the input vcf for this sequence group
-        input_vcf = inputs.as_path(target=sequencing_group, stage=ValidationMtToVcf, key='vcf')
-        happy_csv = str(inputs.as_dict_by_target(stage=ValidationHappyOnVcf)[sequencing_group.id]['happy_csv'])
-
-        exp_outputs = self.expected_outputs(sequencing_group)
-
-        py_job = get_batch().new_python_job(
-            f'parse_{sequencing_group.id}_happy_result',
-            (self.get_job_attrs(sequencing_group) or {}) | {'tool': 'hap.py'},
-        )
-        py_job.image(get_config()['workflow']['driver_image'])
-        py_job.call(
-            parse_and_post_results,
-            str(input_vcf),
-            sequencing_group.id,
-            sequencing_group.external_id,
-            happy_csv,
-            str(exp_outputs['json_summary']),
-        )
-
-        return self.make_outputs(sequencing_group, data=exp_outputs, jobs=py_job)
