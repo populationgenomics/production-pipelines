@@ -33,6 +33,7 @@ def run(
     import logging
 
     import hail as hl
+    from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
     from cpg_utils.config import config_retrieve
     from cpg_utils.hail_batch import init_batch
@@ -76,6 +77,18 @@ def run(
         use_genome_default_intervals=sequencing_type == 'genome',
         intervals=intervals,
         force=force_new_combiner,
+        branch_factor=config_retrieve(
+            ['combiner', 'branch_factor'],
+            VariantDatasetCombiner._default_branch_factor,
+        ),
+        target_records=config_retrieve(
+            ['combiner', 'target_records'],
+            VariantDatasetCombiner._default_target_records,
+        ),
+        gvcf_batch_size=config_retrieve(
+            ['combiner', 'gvcf_batch_size'],
+            VariantDatasetCombiner._default_gvcf_batch_size,
+        ),
     )
 
     combiner.run()
