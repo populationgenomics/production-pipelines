@@ -49,6 +49,8 @@ driver_storage = "10Gi"
 driver_cores = 1
 # highem, standard, or a string, e.g. "4Gi"
 worker_memory = "standard"
+# if false, use non-preemptible VMs
+preemptible_vms = false
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
