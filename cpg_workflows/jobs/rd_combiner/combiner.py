@@ -77,6 +77,11 @@ def run(
         use_genome_default_intervals=sequencing_type == 'genome',
         intervals=intervals,
         force=force_new_combiner,
+        # we're defaulting to the protected class attributes here, which looks like a hack...
+        # for branch factor and target records, the argument uses a specific value as a default
+        # so if we don't find an entry in config, we can't pass None to the constructor...
+        # we either access the protected class attributes, hard-code the default on our side,
+        # or have two separate constructors depending on whether we override the default or not
         branch_factor=config_retrieve(
             ['combiner', 'branch_factor'],
             VariantDatasetCombiner._default_branch_factor,
@@ -85,9 +90,11 @@ def run(
             ['combiner', 'target_records'],
             VariantDatasetCombiner._default_target_records,
         ),
+        # this argument does default to None, and will be set to the default values within the constructor
+        # so we're happy to pass None, no need to access the protected class attributes
         gvcf_batch_size=config_retrieve(
             ['combiner', 'gvcf_batch_size'],
-            VariantDatasetCombiner._default_gvcf_batch_size,
+            None,
         ),
     )
 

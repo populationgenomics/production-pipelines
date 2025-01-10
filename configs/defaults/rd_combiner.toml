@@ -52,6 +52,21 @@ worker_memory = "standard"
 # if false, use non-preemptible VMs
 preemptible_vms = false
 
+# these settings alter the behaviour of the combiner, and don't all align with the documentation
+
+# In config: "The number of Variant Datasets to combine at once."
+# In practice: "The number of gVCFs to combine into each VDS?"
+# https://github.com/hail-is/hail/issues/14781
+branch_factor = 50
+
+# when merging multiple VDS, we find the largest VDS, repartition to target_records variants per partition
+# then repartition all VDSs to match those intervals prior to merging
+target_records = 24000
+
+# this is supposed to be the number of gVCFs to combine into a VDS
+# but that is not curretly working. See issue above
+gvcf_batch_size = 10
+
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
