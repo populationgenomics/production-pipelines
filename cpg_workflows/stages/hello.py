@@ -33,18 +33,18 @@ class HelloStage(SequencingGroupStage):
     def queue_jobs(self, seqgroup: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         outputs = self.expected_outputs(seqgroup)
 
-        print('Calling init_batch')
+        #print('Calling init_batch')
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
-        print('Done calling init_batch')
+        #print('Done calling init_batch')
 
-        print('Going to do the thing')
+        #print('Going to do the thing')
         if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
             override_jar_spec(jar_spec)
-        print('Done the thing')
+        #print('Done the thing')
 
         bkend = Env.backend()
-        print(f'{bkend=}')
-        print(bkend.debug_info())
+        #print(f'{bkend=}')
+        #print(bkend.debug_info())
 
         assert seqgroup.cram
         jobs = hello.hello_job(
