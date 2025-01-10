@@ -61,11 +61,11 @@ branch_factor = 50
 
 # when merging multiple VDS, we find the largest VDS, repartition to target_records variants per partition
 # then repartition all VDSs to match those intervals prior to merging
-target_records = 24000
+target_records = 30000
 
 # this is supposed to be the number of gVCFs to combine into a VDS
 # but that is not curretly working. See issue above
-gvcf_batch_size = 10
+gvcf_batch_size = 5
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
