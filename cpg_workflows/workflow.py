@@ -969,7 +969,7 @@ class Workflow:
         self.set_stages(_stages)
 
         if not self.dry_run:
-            get_batch().run(wait=wait)
+            get_batch().run(wait=wait, banana=get_config()['workflow'].get('banana', False))
 
     @staticmethod
     def _process_first_last_stages(
