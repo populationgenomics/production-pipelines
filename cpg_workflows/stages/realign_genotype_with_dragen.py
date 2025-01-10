@@ -143,8 +143,9 @@ class UploadDataToIca(SequencingGroupStage):
 
 @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, sequencing_group: SequencingGroup, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.sequencing_group = sequencing_group
         # Check if the output path contains 'cancelled' or 'failed'
         outputs = self.expected_outputs(sequencing_group=self.sequencing_group)
         self.forced = any(status in str(outputs) for status in ['cancelled', 'failed'])
