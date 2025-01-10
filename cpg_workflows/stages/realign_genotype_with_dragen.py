@@ -143,12 +143,25 @@ class UploadDataToIca(SequencingGroupStage):
 
 @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Check if the output path contains 'cancelled' or 'failed'
+        outputs = self.expected_outputs(sequencing_group=self.sequencing_group)
+        self.forced = any(status in str(outputs) for status in ['cancelled', 'failed'])
+
     # Output object with pipeline ID to GCP
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        for prev_result in ['cancelled', 'failed']:
+            if (
+                sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{prev_result}.json'
+            ).exists():
+                return (
+                    sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{prev_result}.json'
+                )
         return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -171,6 +184,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
         align_genotype_job.image(image=image_path('ica'))
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        previously_run = any(status in str(outputs) for status in ['cancelled', 'failed'])
+
         pipeline_call = align_genotype_job.call(
             run_align_genotype_with_dragen.run,
             ica_fids_path=inputs.as_path(target=sequencing_group, stage=UploadDataToIca),
@@ -199,7 +214,9 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json'
+        return {
+            'success': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
+        }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         monitor_pipeline_run: PythonJob = get_batch().new_python_job(
@@ -208,15 +225,23 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         )
 
         monitor_pipeline_run.image(image=image_path('ica'))
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
+
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        pipeline_result = pipeline_run_results['pipeline']  # does it need to be 'pipeline' as key?
+
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        outputs[pipeline_result] = (
+            sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{pipeline_result}.json'
+        )
+
         get_batch().write_output(
             pipeline_run_results,
-            str(outputs),
+            str(outputs[pipeline_result]),
         )
         return self.make_outputs(
             target=sequencing_group,
