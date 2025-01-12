@@ -142,14 +142,16 @@ class UploadDataToIca(SequencingGroupStage):
 
 
 @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
-class AlignGenotypeWithDragen(SequencingGroupStage):
-    def __init__(self, sequencing_group: SequencingGroup, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sequencing_group = sequencing_group
-        # Check if the output path contains 'cancelled' or 'failed'
-        outputs = self.expected_outputs(sequencing_group=self.sequencing_group)
-        self.forced = any(status in str(outputs) for status in ['cancelled', 'failed'])
+class RerunAlignGenotypeWithDragen(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group):
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json'
 
+    pass
+
+
+@stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
+class AlignGenotypeWithDragen(SequencingGroupStage):
     # Output object with pipeline ID to GCP
     def expected_outputs(
         self,
@@ -160,9 +162,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             if (
                 sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{prev_result}.json'
             ).exists():
-                return (
-                    sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{prev_result}.json'
-                )
+                self.forced = True
         return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
