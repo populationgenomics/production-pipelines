@@ -234,6 +234,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         ).as_json()
 
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        logging.info(f'Pipeline run results: {pipeline_run_results}')
         pipeline_result = json.loads(pipeline_run_results)['pipeline']  # does it need to be 'pipeline' as key?
 
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
