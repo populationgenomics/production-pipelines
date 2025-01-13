@@ -164,8 +164,9 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
         if prev_result_path.exists():
             logging.warning(f'Previous pipeline run for {sequencing_group.name} found')
-            with open(cpg_utils.to_path(prev_result_path), 'rt') as prev_result_status:
-                if any(status in prev_result_status.read() for status in ['cancelled', 'failed']):
+            with open(cpg_utils.to_path(prev_result_path), 'rt') as pipeline_status_handle:
+                prev_result_status: dict[str, str] = json.load(pipeline_status_handle)
+                if any(status in prev_result_status.get('pipeline', '') for status in ['cancelled', 'failed']):
                     logging.warning(f'Previous pipeline run for {sequencing_group.name} was cancelled or failed')
                     return (
                         sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id_rerun.json'
