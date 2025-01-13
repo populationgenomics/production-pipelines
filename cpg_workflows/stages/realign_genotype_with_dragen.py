@@ -166,6 +166,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             with open(cpg_utils.to_path(prev_result_path), 'rt') as prev_result_status:
                 if any(status in prev_result_status.read() for status in ['cancelled', 'failed']):
                     self.forced = True
+                    logging.info('Forcing a rerun of the pipeline')
+                    return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
         return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
