@@ -49,54 +49,67 @@ def main(
         sites_only (str): optional, if used write a sites-only VCF directory to this location
         separate_header (str): optional, if used write a sites-only VCF directory with a separate header to this location
     """
-    init_batch()
+
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
+
+    get_logger().info(f'Partition strategy {partition_strategy} is not currently in use (see #1078)')
 
     # if we need to manually specify a non-standard Hail QoB JAR file
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
         override_jar_spec(jar_spec)
 
-    vds = hl.vds.read_vds(vds_in)
-
-    get_logger().info('Densifying data...')
-    mt = hl.vds.to_dense_mt(vds)
-
-    # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
-    # remove any monoallelic or non-ref-in-any-sample sites
-    mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
-
-    # annotate site-level DP to avoid name collision
-    mt = mt.annotate_rows(
-        site_dp=hl.agg.sum(mt.DP),
-        ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
-    )
-
-    # content shared with large_cohort.site_only_vcf.py
-    info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
-    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
-
-    info_ht = adjust_vcf_incompatible_types(
-        info_ht,
-        # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
-        # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
-        # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-        # it as an array with a single string value "|132.1|140.2", leading to
-        # an IndexOutOfBound exception when trying to access value for second allele)
-        pipe_delimited_annotations=[],
-    )
-
-    # annotate this info back into the main MatrixTable
-    mt = mt.annotate_rows(info=info_ht[mt.row_key].info)
-
-    # unpack mt.info.info back into mt.info. Must be better syntax for this?
-    mt = mt.drop('gvcf_info')
-
-    get_logger().info('Splitting multiallelics, in a sparse way')
-    mt = hl.experimental.sparse_split_multi(mt)
-
     # check here to see if we can reuse the dense MT
     if not can_reuse(dense_mt_out):
+
+        get_logger().info(f'Densifying data, using {partitions} partitions')
+
+        # providing n_partitions here gets Hail to calculate the intervals per partition on the VDS var and ref data
+        vds = hl.vds.read_vds(vds_in, n_partitions=partitions)
+
+        mt = hl.vds.to_dense_mt(vds)
+
+        # taken from _filter_rows_and_add_tags in large_cohort/site_only_vcf.py
+        # remove any monoallelic or non-ref-in-any-sample sites
+        mt = mt.filter_rows((hl.len(mt.alleles) > 1) & (hl.agg.any(mt.LGT.is_non_ref())))
+
+        # annotate site-level DP to avoid name collision
+        mt = mt.annotate_rows(
+            site_dp=hl.agg.sum(mt.DP),
+            ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2,
+        )
+
+        # content shared with large_cohort.site_only_vcf.py
+        info_ht = default_compute_info(mt, site_annotations=True, n_partitions=mt.n_partitions())
+        info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
+
+        info_ht = adjust_vcf_incompatible_types(
+            info_ht,
+            # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
+            # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
+            # which breaks VQSR parser (it doesn't recognise the delimiter and treats
+            # it as an array with a single string value "|132.1|140.2", leading to
+            # an IndexOutOfBound exception when trying to access value for second allele)
+            pipe_delimited_annotations=[],
+        )
+
+        # annotate this info back into the main MatrixTable
+        mt = mt.annotate_rows(info=info_ht[mt.row_key].info)
+
+        # unpack mt.info.info back into mt.info. Must be better syntax for this?
+        mt = mt.drop('gvcf_info')
+
+        get_logger().info('Splitting multiallelics, in a sparse way')
+        mt = hl.experimental.sparse_split_multi(mt)
+
         get_logger().info(f'Writing fresh data into {dense_mt_out}')
         mt.write(dense_mt_out, overwrite=True)
+
+    else:
+        get_logger().info(f'Accepting existing data in {dense_mt_out}')
 
     if not (sites_only or separate_header):
         return
@@ -104,17 +117,19 @@ def main(
     # read the dense MT and obtain the sites-only HT
     mt = hl.read_matrix_table(dense_mt_out)
 
-    # coalesce the data into a predetermined number of partitions
-    if partition_strategy == 'naive':
-        get_logger().info(f'Coalescing data into {partitions} partitions using naive coalesce')
-        mt = mt.naive_coalesce(partitions)
-    elif partition_strategy == 'shuffle':
-        get_logger().info(f'Coalescing data into {partitions} partitions using shuffle repartition')
-        mt = mt.repartition(partitions, shuffle=True)
-    elif partition_strategy == 'none':
-        get_logger().info(f'Not coalesceing data into {partitions} partitions')
-    else:
-        raise ValueError(f'Invalid partition strategy: {partition_strategy}')
+    # changed plan here - attempting to read the VDS with set partitions, instead of only
+    # repartitioning the MT for VCF export
+    # # coalesce the data into a predetermined number of partitions
+    # if partition_strategy == 'naive':
+    #     get_logger().info(f'Coalescing data into {partitions} partitions using naive coalesce')
+    #     mt = mt.naive_coalesce(partitions)
+    # elif partition_strategy == 'shuffle':
+    #     get_logger().info(f'Coalescing data into {partitions} partitions using shuffle repartition')
+    #     mt = mt.repartition(partitions, shuffle=True)
+    # elif partition_strategy == 'none':
+    #     get_logger().info(f'Not coalesceing data into {partitions} partitions')
+    # else:
+    #     raise ValueError(f'Invalid partition strategy: {partition_strategy}')
 
     sites_only_ht = mt.rows()
 
