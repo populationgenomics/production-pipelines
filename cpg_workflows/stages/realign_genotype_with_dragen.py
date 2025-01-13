@@ -163,15 +163,22 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json'
         )
         if prev_result_path.exists():
+            logging.warning(f'Previous pipeline run for {sequencing_group.name} found')
             with open(cpg_utils.to_path(prev_result_path), 'rt') as prev_result_status:
                 if any(status in prev_result_status.read() for status in ['cancelled', 'failed']):
-                    self.forced = True
+                    logging.warning(f'Previous pipeline run for {sequencing_group.name} was cancelled or failed')
                     return (
                         sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id_rerun.json'
                     )
         return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        previously_run = any(status in str(outputs) for status in ['cancelled', 'failed'])
+
+        if previously_run:
+            self.forced = True
+
         dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
         dragen_ht_id: str = config_retrieve(['ica', 'pipelines', 'dragen_ht_id'])
 
