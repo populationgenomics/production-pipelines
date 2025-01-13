@@ -238,12 +238,8 @@ class RerunAlignGenotypeWithDragen(SequencingGroupStage):
                     )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        rerun_prefix: cpg_utils.Path = (
-            sequencing_group.dataset.prefix()
-            / GCP_FOLDER_FOR_RUNNING_PIPELINE
-            / f'{sequencing_group.name}_pipeline_id_rerun'
-        )
-        pattern = '*rerun*.json'
+        rerun_prefix: cpg_utils.Path = sequencing_group.dataset.prefix() / GCP_FOLDER_FOR_RUNNING_PIPELINE
+        pattern = f'{sequencing_group.name}_pipeline_id_rerun*.json'
         logging.warning(f'Looking for previous pipeline run with pattern {pattern}')
         globs = list(rerun_prefix.glob(pattern))
         logging.warning(f'Found {len(globs)} previous pipeline runs: {globs}')
