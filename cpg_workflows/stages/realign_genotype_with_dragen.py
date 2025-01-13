@@ -143,15 +143,6 @@ class UploadDataToIca(SequencingGroupStage):
 
 
 @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
-class RerunAlignGenotypeWithDragen(SequencingGroupStage):
-    def expected_outputs(self, sequencing_group):
-        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json'
-
-    pass
-
-
-@stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 class AlignGenotypeWithDragen(SequencingGroupStage):
     # Output object with pipeline ID to GCP
     def expected_outputs(
@@ -225,7 +216,93 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
 
 
-@stage(analysis_type='dragen_align_genotype', required_stages=[PrepareIcaForDragenAnalysis, AlignGenotypeWithDragen])
+@stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
+class RerunAlignGenotypeWithDragen(SequencingGroupStage):
+    # Output object with pipeline ID to GCP
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> cpg_utils.Path:
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        prev_result_path: cpg_utils.Path = (
+            sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json'
+        )
+        if prev_result_path.exists():
+            logging.warning(f'Previous pipeline run for {sequencing_group.name} found')
+            with open(cpg_utils.to_path(prev_result_path), 'rt') as pipeline_status_handle:
+                prev_result_status: dict[str, str] = json.load(pipeline_status_handle)
+                if any(status in prev_result_status.get('pipeline', '') for status in ['cancelled', 'failed']):
+                    logging.warning(f'Previous pipeline run for {sequencing_group.name} was cancelled or failed')
+                    return (
+                        sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id_rerun.json'
+                    )
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        rerun_prefix: cpg_utils.Path = (
+            sequencing_group.dataset.prefix()
+            / GCP_FOLDER_FOR_RUNNING_PIPELINE
+            / f'{sequencing_group.name}_pipeline_id_rerun'
+        )
+        pattern = f'{rerun_prefix}*.json'
+        logging.warning(f'Looking for previous pipeline run with pattern {pattern}')
+        globs = list(rerun_prefix.glob(pattern))
+        logging.warning(f'Found {len(globs)} previous pipeline runs: {globs}')
+
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        previously_run = any(status in str(outputs) for status in ['cancelled', 'failed'])
+
+        if previously_run:
+            self.forced = True
+
+        dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
+        dragen_ht_id: str = config_retrieve(['ica', 'pipelines', 'dragen_ht_id'])
+
+        # Get the correct CRAM reference ID based off the choice made in the config
+        cram_reference_id: str = config_retrieve(
+            ['ica', 'cram_references', config_retrieve(['ica', 'cram_references', 'old_cram_reference'])],
+        )
+
+        user_tags: list[str] = config_retrieve(['ica', 'tags', 'user_tags'])
+        technical_tags: list[str] = config_retrieve(['ica', 'tags', 'technical_tags'])
+        reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
+        user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
+
+        align_genotype_job: PythonJob = get_batch().new_python_job(
+            name='AlignGenotypeWithDragen',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+        )
+        align_genotype_job.image(image=image_path('ica'))
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        previously_run = any(status in str(outputs) for status in ['cancelled', 'failed'])
+
+        pipeline_call = align_genotype_job.call(
+            run_align_genotype_with_dragen.run,
+            ica_fids_path=inputs.as_path(target=sequencing_group, stage=UploadDataToIca),
+            analysis_output_fid_path=inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
+            dragen_ht_id=dragen_ht_id,
+            cram_reference_id=cram_reference_id,
+            dragen_pipeline_id=dragen_pipeline_id,
+            user_tags=user_tags,
+            technical_tags=technical_tags,
+            reference_tags=reference_tags,
+            user_reference=user_reference,
+            api_root=ICA_REST_ENDPOINT,
+        ).as_json()
+        get_batch().write_output(
+            pipeline_call,
+            str(outputs),
+        )
+        return self.make_outputs(
+            target=sequencing_group,
+            data=outputs,
+            jobs=align_genotype_job,
+        )
+
+
+@stage(
+    analysis_type='dragen_align_genotype',
+    required_stages=[PrepareIcaForDragenAnalysis, AlignGenotypeWithDragen, RerunAlignGenotypeWithDragen],
+)
 class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
