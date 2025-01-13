@@ -159,11 +159,13 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        for prev_result in ['cancelled', 'failed']:
-            if (
-                sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{prev_result}.json'
-            ).exists():
-                self.forced = True
+        prev_result_path: cpg_utils.Path = (
+            sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json'
+        )
+        if prev_result_path.exists():
+            with open(cpg_utils.to_path(prev_result_path), 'rt') as prev_result_status:
+                if any(status in prev_result_status.read() for status in ['cancelled', 'failed']):
+                    self.forced = True
         return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -217,7 +219,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
-            'success': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
+            'status': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
