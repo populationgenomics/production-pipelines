@@ -227,24 +227,15 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         )
 
         monitor_pipeline_run.image(image=image_path('ica'))
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
-
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
-        logging.info(f'Pipeline run results: {pipeline_run_results}')
-        pipeline_result = json.loads(pipeline_run_results)['pipeline']  # does it need to be 'pipeline' as key?
-
-        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        outputs[pipeline_result] = (
-            sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_{pipeline_result}.json'
-        )
-
         get_batch().write_output(
             pipeline_run_results,
-            str(outputs[pipeline_result]),
+            str(outputs),
         )
         return self.make_outputs(
             target=sequencing_group,
