@@ -220,9 +220,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return {
-            'status': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json',
-        }
+        return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_status.json'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         monitor_pipeline_run: PythonJob = get_batch().new_python_job(
