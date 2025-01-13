@@ -243,7 +243,7 @@ class RerunAlignGenotypeWithDragen(SequencingGroupStage):
             / GCP_FOLDER_FOR_RUNNING_PIPELINE
             / f'{sequencing_group.name}_pipeline_id_rerun'
         )
-        pattern = f'{rerun_prefix}*.json'
+        pattern = 'rerun*.json'
         logging.warning(f'Looking for previous pipeline run with pattern {pattern}')
         globs = list(rerun_prefix.glob(pattern))
         logging.warning(f'Found {len(globs)} previous pipeline runs: {globs}')
