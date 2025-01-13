@@ -230,7 +230,9 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
             api_root=ICA_REST_ENDPOINT,
-        ).as_json()
+        )
+
+        pipeline_run_results_json = pipeline_run_results.as_json()
 
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         pipeline_result = pipeline_run_results['pipeline']  # does it need to be 'pipeline' as key?
@@ -241,7 +243,7 @@ class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
         )
 
         get_batch().write_output(
-            pipeline_run_results,
+            pipeline_run_results_json,
             str(outputs[pipeline_result]),
         )
         return self.make_outputs(
