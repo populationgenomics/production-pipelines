@@ -113,17 +113,17 @@ class CreateFamilyVCFs(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        family_dict = find_probands(dataset)
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
+        proband_dict = find_probands(dataset)
+        prefix = dataset.prefix() / f'exomiser_inputs'
         return {
-            str(family): dataset.prefix() / f'exomiser_{exomiser_version}_inputs' / f'{family}.vcf.bgz'
-            for family in family_dict.keys()
+            str(family): prefix / f'{family}.vcf.bgz'
+            for family in proband_dict.keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        family_dict = find_probands(dataset)
+        proband_dict = find_probands(dataset)
         outputs = self.expected_outputs(dataset)
-        jobs = create_gvcf_to_vcf_jobs(families=family_dict, out_paths=outputs)
+        jobs = create_gvcf_to_vcf_jobs(families=proband_dict, out_paths=outputs)
         return self.make_outputs(dataset, outputs, jobs=jobs)
 
 
