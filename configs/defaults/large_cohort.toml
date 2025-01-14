@@ -24,6 +24,8 @@ memory = "8Gi"
 storage = "10Gi"
 vds_analysis_ids = []
 merge_only_vds = false
+# if false, use non-preemptible VMs
+preemptible_vms = false
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
