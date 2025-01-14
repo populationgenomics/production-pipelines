@@ -107,9 +107,9 @@ class Combiner(CohortStage):
             tmp_prefix=tmp_prefix,
             genome_build=genome_build(),
             save_path=output_paths['combiner_plan'],
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
-            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
         )
 
         return self.make_outputs(cohort, output_paths, [j])
