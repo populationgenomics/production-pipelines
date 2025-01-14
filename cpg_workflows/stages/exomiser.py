@@ -121,9 +121,11 @@ class CreateFamilyVCFs(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        proband_dict = find_probands(dataset)
         outputs = self.expected_outputs(dataset)
-        jobs = create_gvcf_to_vcf_jobs(families=proband_dict, out_paths=outputs)
+        jobs = create_gvcf_to_vcf_jobs(
+            families=find_probands(dataset),
+            out_paths=outputs,
+        )
         return self.make_outputs(dataset, outputs, jobs=jobs)
 
 
@@ -146,11 +148,12 @@ class MakePhenopackets(DatasetStage):
         bit of an anti-pattern in this pipeline?
         """
 
-        proband_dict = find_probands(dataset)
         expected_out = self.expected_outputs(dataset)
-        families_to_process = {k: v for k, v in proband_dict.items() if k in expected_out}
-        make_phenopackets(families_to_process, expected_out)
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset))
+        make_phenopackets(
+            family_dict=find_probands(dataset),
+            out_path=expected_out,
+        )
+        return self.make_outputs(dataset, data=expected_out)
 
 
 @stage
