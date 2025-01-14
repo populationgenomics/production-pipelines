@@ -47,12 +47,22 @@ def find_seqr_projects() -> dict[str, str]:
 
 
 @cache
-def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
+def find_probands(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
     """
     Find all the families in the project
     group on family ID and check for affected individuals & HPO terms
-    re-group the selected members by an external ID
-    at some point re-work this so that we have a better definition of proband
+    Export a dictionary with every affected member in the family separately
+
+    Do some management there to make sure we only retain affecteds at the leaf-end of the pedigree
+    - once we get all affected in the pedigree, scan them to see if any have parents
+    - if at least one has a parent, we don't include any affected without parents in the analysis
+    - they can be affected parents of probands, but shouldn't be the centre of an exomiser analysis?
+
+    Args:
+        dataset ():
+
+    Returns:
+        dict[str, list[SequencingGroup]]: a dictionary of affected individuals to all family members
     """
 
     dict_by_family: dict[str, list[SequencingGroup]] = {}
@@ -60,7 +70,7 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
         family_id = str(sg.pedigree.fam_id)
         dict_by_family.setdefault(family_id, []).append(sg)
 
-    dict_by_ext_id: dict[str, list[SequencingGroup]] = {}
+    dict_of_affecteds: dict[str, list[SequencingGroup]] = {}
     # now remove families with no affected individuals
     for family, members in dict_by_family.items():
 
@@ -77,10 +87,23 @@ def find_families(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
             get_logger(__file__).info(f'Family {family} has affected individuals with no HPO terms, skipping')
             continue
 
-        # key up those badbois using an affected external ID
-        dict_by_ext_id[affected[0].external_id] = members
+        # check to see if any affected member has parents
+        # (if so, we don't treat any affected-without-parents as relevant for Exomiser; cannot be a proband)
+        # mom and dad here are SGs, not just empty pedigree members
+        affected_with_parents: bool = False
+        for member in affected:
+            if member.pedigree.mom or member.pedigree.dad:
+                affected_with_parents = True
+                break
 
-    return dict_by_ext_id
+        for member in affected:
+            if not (member.pedigree.mom or member.pedigree.dad) and affected_with_parents:
+                # if there are affected members without parents, we don't want to include them
+                continue
+
+            dict_of_affecteds[member.id] = members
+
+    return dict_of_affecteds
 
 
 @stage
@@ -90,7 +113,7 @@ class CreateFamilyVCFs(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        family_dict = find_families(dataset)
+        family_dict = find_probands(dataset)
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
         return {
             str(family): dataset.prefix() / f'exomiser_{exomiser_version}_inputs' / f'{family}.vcf.bgz'
@@ -98,7 +121,7 @@ class CreateFamilyVCFs(DatasetStage):
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        family_dict = find_families(dataset)
+        family_dict = find_probands(dataset)
         outputs = self.expected_outputs(dataset)
         jobs = create_gvcf_to_vcf_jobs(families=family_dict, out_paths=outputs)
         return self.make_outputs(dataset, outputs, jobs=jobs)
@@ -111,7 +134,7 @@ class MakePhenopackets(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        family_dict = find_families(dataset)
+        family_dict = find_probands(dataset)
 
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
@@ -123,7 +146,7 @@ class MakePhenopackets(DatasetStage):
         bit of an anti-pattern in this pipeline?
         """
 
-        dataset_families = find_families(dataset)
+        dataset_families = find_probands(dataset)
         expected_out = self.expected_outputs(dataset)
         families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
         make_phenopackets(families_to_process, expected_out)
@@ -137,7 +160,7 @@ class MakePedExtracts(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        family_dict = find_families(dataset)
+        family_dict = find_probands(dataset)
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
@@ -148,7 +171,7 @@ class MakePedExtracts(DatasetStage):
         this actually doesn't run as Jobs, but as a function...
         bit of an anti-pattern in this pipeline?
         """
-        dataset_families = find_families(dataset)
+        dataset_families = find_probands(dataset)
         expected_out = self.expected_outputs(dataset)
         families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
         extract_mini_ped_files(families_to_process, expected_out)
@@ -169,7 +192,7 @@ class RunExomiser(DatasetStage):
         """
         exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
-        family_dict = find_families(dataset)
+        family_dict = find_probands(dataset)
 
         dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
 
@@ -274,7 +297,7 @@ class ExomiserVariantsTSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        if not find_families(dataset):
+        if not find_probands(dataset):
             get_logger().info('No families found, skipping exomiser')
             return self.make_outputs(dataset, jobs=None, skipped=True)
 
