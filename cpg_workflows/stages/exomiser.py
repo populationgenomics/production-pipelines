@@ -163,7 +163,7 @@ class MakePedExtracts(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        dataset_prefix = dataset.analysis_prefix() / f'exomiser_inputs'
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
         return {
             family: dataset_prefix / f'{family}.ped'
             for family in find_probands(dataset)
@@ -194,19 +194,18 @@ class RunExomiser(DatasetStage):
         """
         dict of outputs for this dataset, keyed on family ID
         """
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
-
         family_dict = find_probands(dataset)
 
-        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_results'
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_results'
 
         # only the TSVs are required, but we need the gene and variant level TSVs
         # populate gene-level results
-        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict.keys()}
+        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict}
         # add more keys pointing to the variant-level TSVs
         return_dict.update(
-            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict.keys()},
+            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict},
         )
+
         return return_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -231,10 +230,6 @@ class RunExomiser(DatasetStage):
             if '_variants' not in family
         }
 
-        # commenting out the 13 version as it's not maintained anymore
-        if exomiser_version != 14:
-            raise ValueError(f'Exomiser version {exomiser_version} not supported')
-
         jobs = run_exomiser_14(single_dict)
 
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
@@ -247,8 +242,7 @@ class ExomiserSeqrTSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
-        return dataset.analysis_prefix() / get_workflow().output_version / f'exomiser_{exomiser_version}_results.tsv'
+        return dataset.analysis_prefix() / get_workflow().output_version / f'exomiser_results.tsv'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -290,13 +284,12 @@ class ExomiserVariantsTSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         prefix = dataset.analysis_prefix() / get_workflow().output_version
 
         return {
-            'json': prefix / f'exomiser_{exomiser_version}_variant_results.tsv',
-            'ht': prefix / f'exomiser_{exomiser_version}_variant_results.ht',
+            'json': prefix / f'exomiser_variant_results.tsv',
+            'ht': prefix / f'exomiser_variant_results.ht',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
