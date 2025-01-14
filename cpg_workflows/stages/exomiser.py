@@ -134,11 +134,11 @@ class MakePhenopackets(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        family_dict = find_probands(dataset)
-
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
-        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
-        return {family: dataset_prefix / f'{family}_phenopacket.json' for family in family_dict.keys()}
+        dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
+        return {
+            family: dataset_prefix / f'{family}_phenopacket.json'
+            for family in find_probands(dataset).keys()
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -146,11 +146,11 @@ class MakePhenopackets(DatasetStage):
         bit of an anti-pattern in this pipeline?
         """
 
-        dataset_families = find_probands(dataset)
+        proband_dict = find_probands(dataset)
         expected_out = self.expected_outputs(dataset)
-        families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
+        families_to_process = {k: v for k, v in proband_dict.items() if k in expected_out}
         make_phenopackets(families_to_process, expected_out)
-        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=[])
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset))
 
 
 @stage
