@@ -88,7 +88,8 @@ def run(
     reference_tags: list[str],
     user_reference: str,
     api_root: str,
-) -> dict[str, str]:
+    output_path: str,
+):
     """_summary_
 
     Args:
@@ -102,10 +103,9 @@ def run(
         reference_tags (list[str]): List of reference tags for the analysis (optional, can be empty)
         user_reference (str): A reference name for the pipeline run
         api_root (str): The ICA API root
-
-    Returns:
-        dict[str, str]: A dict holding the pipeline ID
+        output_path (str): The path to write the pipeline ID to
     """
+
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
@@ -139,4 +139,5 @@ def run(
         )
 
         logging.info(f'Submitted ICA run with pipeline ID: {analysis_run_id}')
-        return {'pipeline_id': analysis_run_id}
+        with cpg_utils.to_path(output_path).open('w') as f:
+            f.write(analysis_run_id)

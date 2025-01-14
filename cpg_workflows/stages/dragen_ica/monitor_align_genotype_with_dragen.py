@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 from random import randint
@@ -19,7 +18,7 @@ def run(
     """Monitor a pipeline running in ICA
 
     Args:
-        ica_pipeline_id_path (str): The path to the JSON file holding the pipeline ID
+        ica_pipeline_id_path (str): The path to the file holding the pipeline ID
         api_root (str): The root API endpoint for ICA
 
     Raises:
@@ -39,7 +38,7 @@ def run(
     configuration.api_key['ApiKeyAuth'] = api_key
 
     with open(cpg_utils.to_path(ica_pipeline_id_path), 'rt') as pipeline_fid_handle:
-        ica_pipeline_id: str = json.load(pipeline_fid_handle)['pipeline_id']
+        ica_pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
@@ -58,7 +57,7 @@ def run(
             )
         if pipeline_status == 'SUCCEEDED':
             logging.info(f'Pipeline run {ica_pipeline_id} has succeeded')
-            return {'pipeline': 'success'}
+            return {'pipeline': ica_pipeline_id, 'status': 'success'}
         elif pipeline_status in ['ABORTING', 'ABORTED']:
             raise Exception(f'Pipeline run {ica_pipeline_id} has been cancelled.')
         else:
