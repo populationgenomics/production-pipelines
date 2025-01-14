@@ -95,7 +95,7 @@ class Combiner(CohortStage):
             return self.make_outputs(cohort, output_paths)
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
-        j.image(image_path('cpg_workflows'))
+        j.image(config_retrieve(['workflow', 'driver_image']))
         j.memory(combiner_config.get('memory'))
         j.storage(combiner_config.get('storage'))
 
