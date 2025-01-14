@@ -163,22 +163,23 @@ class MakePedExtracts(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset):
-        family_dict = find_probands(dataset)
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
-
-        dataset_prefix = dataset.analysis_prefix() / f'exomiser_{exomiser_version}_inputs'
-        return {family: dataset_prefix / f'{family}.ped' for family in family_dict.keys()}
+        dataset_prefix = dataset.analysis_prefix() / f'exomiser_inputs'
+        return {
+            family: dataset_prefix / f'{family}.ped'
+            for family in find_probands(dataset)
+        }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         this actually doesn't run as Jobs, but as a function...
         bit of an anti-pattern in this pipeline?
         """
-        dataset_families = find_probands(dataset)
         expected_out = self.expected_outputs(dataset)
-        families_to_process = {k: v for k, v in dataset_families.items() if k in expected_out}
-        extract_mini_ped_files(families_to_process, expected_out)
-        return self.make_outputs(dataset, data=expected_out, jobs=[])
+        extract_mini_ped_files(
+            family_dict=find_probands(dataset),
+            out_paths=expected_out,
+        )
+        return self.make_outputs(dataset, data=expected_out)
 
 
 @stage(required_stages=[CreateFamilyVCFs, MakePedExtracts, MakePhenopackets])
