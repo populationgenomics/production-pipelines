@@ -15,7 +15,7 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.32.15
+  VERSION: 1.33.1
 
 jobs:
   docker:
