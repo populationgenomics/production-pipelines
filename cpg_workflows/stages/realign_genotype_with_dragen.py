@@ -149,7 +149,11 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
             'output': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_concluded.json',
-            'pipeline_id': str(sequencing_group.dataset.prefix(test=True) / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'),
+            'pipeline_id': str(
+                sequencing_group.dataset.prefix(test=True)
+                / GCP_FOLDER_FOR_RUNNING_PIPELINE
+                / f'{sequencing_group.name}_pipeline_id.json',
+            ),
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -159,10 +163,9 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         stage_jobs: list[BashJob | PythonJob] = []
 
         # test if a previous pipeline should be re-monitored
-        if (
-                (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False))
-                and cpg_utils.to_path(outputs['pipeline_id']).exists()
-        ):
+        if (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False)) and cpg_utils.to_path(
+            outputs['pipeline_id'],
+        ).exists():
             logging.info(f'Previous pipeline found for {sequencing_group.name}, not setting off a new one')
         elif resume:
             logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
@@ -294,7 +297,7 @@ class CancelIcaPipelineRun(SequencingGroupStage):
 
 @stage(
     analysis_type='ica_data_download',
-    required_stages=[PrepareIcaForDragenAnalysis, MonitorAlignGenotypeWithDragen, GvcfMlrWithDragen],
+    required_stages=[PrepareIcaForDragenAnalysis, GvcfMlrWithDragen],
 )
 class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
