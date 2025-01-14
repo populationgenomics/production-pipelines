@@ -32,6 +32,7 @@ from cpg_workflows.stages.rd_combiner import (
     ConcatenateVcfFragmentsWithGcloud,
     CreateDenseMtFromVdsWithHail,
     CreateVdsFromGvcfsWithHailCombiner,
+    ExportMtAsEsIndex,
     GatherTrainedVqsrSnpTranches,
     RunTrainedIndelVqsrOnCombinedVcf,
     SubsetMatrixTableToDatasetUsingHailQuery,
@@ -63,6 +64,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         AnnotateCohortSmallVariantsWithHailQuery,
         SubsetMatrixTableToDatasetUsingHailQuery,
         AnnotateDatasetSmallVariantsWithHailQuery,
+        ExportMtAsEsIndex,
     ],
     'seqr_loader': [
         DatasetVCF,
