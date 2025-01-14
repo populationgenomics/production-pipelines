@@ -42,10 +42,10 @@ def run(
         tmp_prefix (str): where to store temporary combiner intermediates
         genome_build (str): GRCh38
         save_path (str | None): where to store the combiner plan, or where to resume from
+        force_new_combiner (bool): whether to force a new combiner run, or permit resume from a previous one
         gvcf_paths (list[str] | None): list of paths to GVCFs
         vds_paths (list[str] | None): list of paths to VDSs
         specific_intervals (list[str] | None): list of intervals to use for the combiner, if using non-standard
-        force_new_combiner (bool): whether to force a new combiner run, or permit resume from a previous one
     """
     import logging
 

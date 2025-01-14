@@ -95,9 +95,13 @@ class Combiner(CohortStage):
             return self.make_outputs(cohort, output_paths)
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
-        j.image(image_path('cpg_workflows'))
+        j.image(config_retrieve(['workflow', 'driver_image']))
         j.memory(combiner_config.get('memory'))
         j.storage(combiner_config.get('storage'))
+
+        # set this job to be non-spot (i.e. non-preemptible)
+        # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
+        j.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
 
         # Default to GRCh38 for reference if not specified
         j.call(
@@ -106,10 +110,10 @@ class Combiner(CohortStage):
             sequencing_type=workflow_config['sequencing_type'],
             tmp_prefix=tmp_prefix,
             genome_build=genome_build(),
-            gvcf_paths=new_sg_gvcfs,
-            vds_paths=vds_paths,
             save_path=output_paths['combiner_plan'],
             force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
+            gvcf_paths=new_sg_gvcfs,
+            vds_paths=vds_paths,
         )
 
         return self.make_outputs(cohort, output_paths, [j])
