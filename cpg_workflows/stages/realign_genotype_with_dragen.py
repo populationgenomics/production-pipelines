@@ -148,9 +148,10 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
     ) -> dict[str, cpg_utils.Path | str]:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
-            'output': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_concluded.json',
+            'success': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
+            'fail': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_failed.json',
             'pipeline_id': str(
-                sequencing_group.dataset.prefix(test=True)
+                sequencing_group.dataset.tmp_prefix()
                 / GCP_FOLDER_FOR_RUNNING_PIPELINE
                 / f'{sequencing_group.name}_pipeline_id.json',
             ),
@@ -161,16 +162,16 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
 
         stage_jobs: list[BashJob | PythonJob] = []
-
-        # test if a previous pipeline should be re-monitored
-        if (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False)) and cpg_utils.to_path(
-            outputs['pipeline_id'],
-        ).exists():
-            logging.info(f'Previous pipeline found for {sequencing_group.name}, not setting off a new one')
-        elif resume:
-            logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
-            # IDK, return nothing?
+        # happy to complete, already finished
+        if outputs['success'].exists():
+            logging.info(f'Pipeline already completed for {sequencing_group.name}')
             return self.make_outputs(target=sequencing_group)
+
+        # success and failure both don't exist, but the pipeline ID does - monitor the previous pipeline
+        if cpg_utils.to_path(outputs['pipeline_id']).exists() and not outputs['fail'].exists():
+            pass
+
+        # pipeline ID exists and the fail file exists, submit a totally new analysis
         else:
             dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
             dragen_ht_id: str = config_retrieve(['ica', 'pipelines', 'dragen_ht_id'])
@@ -215,15 +216,12 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
 
         monitor_pipeline_run.image(image=image_path('ica'))
-        pipeline_run_results = monitor_pipeline_run.call(
+        monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id_path=outputs['pipeline_id'],
             api_root=ICA_REST_ENDPOINT,
-        ).as_json()
-
-        get_batch().write_output(
-            pipeline_run_results,
-            str(outputs['output']),
+            success_file=str(outputs['success']),
+            fail_file=str(outputs['fail']),
         )
 
         stage_jobs.append(monitor_pipeline_run)

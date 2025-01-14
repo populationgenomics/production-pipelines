@@ -14,19 +14,20 @@ from cpg_workflows.stages.dragen_ica import ica_utils
 def run(
     ica_pipeline_id_path: str,
     api_root: str,
-) -> dict[str, str]:
+    success_file: str,
+    fail_file: str,
+):
     """Monitor a pipeline running in ICA
 
     Args:
         ica_pipeline_id_path (str): The path to the file holding the pipeline ID
         api_root (str): The root API endpoint for ICA
+        success_file (str): The path to write a success file
+        fail_file (str): The path to write a fail file
 
     Raises:
         Exception: An exception if the pipeline is cancelled
         Exception: Any other exception if the pipeline gets into a FAILED state
-
-    Returns:
-        dict[str, str]: A dict noting success of the pipeline run.
     """
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
@@ -57,8 +58,12 @@ def run(
             )
         if pipeline_status == 'SUCCEEDED':
             logging.info(f'Pipeline run {ica_pipeline_id} has succeeded')
-            return {'pipeline': ica_pipeline_id, 'status': 'success'}
+            with open(success_file, 'w') as handle:
+                handle.write(ica_pipeline_id)
+
         elif pipeline_status in ['ABORTING', 'ABORTED']:
-            raise Exception(f'Pipeline run {ica_pipeline_id} has been cancelled.')
+            logging.info(f'Pipeline run {ica_pipeline_id} has been cancelled.')
         else:
-            raise Exception(f'The pipeline run {ica_pipeline_id} has failed, please check ICA for more info.')
+            logging.info(f'The pipeline run {ica_pipeline_id} has failed, please check ICA for more info.')
+        with open(fail_file, 'w') as handle:
+            handle.write(ica_pipeline_id)
