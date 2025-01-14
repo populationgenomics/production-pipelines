@@ -99,6 +99,10 @@ class Combiner(CohortStage):
         j.memory(combiner_config.get('memory'))
         j.storage(combiner_config.get('storage'))
 
+        # set this job to be non-spot (i.e. non-preemptible)
+        # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
+        j.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
+
         # Default to GRCh38 for reference if not specified
         j.call(
             combiner.run,
