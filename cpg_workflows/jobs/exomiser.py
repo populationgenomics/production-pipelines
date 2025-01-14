@@ -159,7 +159,7 @@ def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: d
             json.dump(phenopacket, ppk_file, indent=2)
 
 
-def run_exomiser_14(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
+def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     """
     run jobs through Exomiser 14
     type hint is still wild
