@@ -28,6 +28,7 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
     mt = mt.select_entries('GT', 'GQ', 'DP', 'AD')
-    logging.info(f'Number of predetermined QC variants found in the VDS: {mt.count_rows()}')
     mt = mt.naive_coalesce(5000)
-    return mt.checkpoint(out_dense_mt_path, overwrite=True)
+    mt = mt.checkpoint(out_dense_mt_path, overwrite=True)
+    logging.info(f'Number of predetermined QC variants found in the VDS: {mt.count_rows()}')
+    return mt
