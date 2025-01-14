@@ -28,7 +28,7 @@ def run(
     tmp_prefix: str,
     genome_build: str,
     save_path: str | None,
-    force_new_combiner: bool,
+    force_new_combiner: bool = False,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
