@@ -591,8 +591,8 @@ class ValidateMOI(DatasetStage):
     run the labelled VCF -> results JSON stage
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'summary_json': dataset.prefix() / get_date_folder() / 'summary_output.json'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'summary_output.json'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
@@ -624,7 +624,7 @@ class ValidateMOI(DatasetStage):
 
         panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
         labelled_vcf = get_batch().read_input_group(
-            **{'vcf.bgz': str(hail_inputs['labelled_vcf']), 'vcf.bgz.tbi': str(hail_inputs['labelled_vcf']) + '.tbi'},
+            **{'vcf.bgz': str(hail_inputs), 'vcf.bgz.tbi': str(hail_inputs) + '.tbi'},
         )['vcf.bgz']
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
@@ -637,8 +637,8 @@ class ValidateMOI(DatasetStage):
             f'--participant_panels {hpo_panels} '
             f'{sv_vcf_arg}',
         )
-        get_batch().write_output(job.output, str(self.expected_outputs(dataset)['summary_json']))
         expected_out = self.expected_outputs(dataset)
+        get_batch().write_output(job.output, str(expected_out))
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
@@ -671,7 +671,7 @@ class HPOFlagging(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
+        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)))
         gene_map = get_batch().read_input(str(inputs.as_dict(dataset, FindGeneSymbolMap)['symbol_lookup']))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
@@ -692,7 +692,7 @@ class HPOFlagging(DatasetStage):
 
 
 @stage(
-    required_stages=[HPOFlagging, QueryPanelapp, RunHailFiltering, MakeRuntimeConfig],
+    required_stages=[HPOFlagging, QueryPanelapp, MakeRuntimeConfig],
     analysis_type='aip-report',
     analysis_keys=['results_html', 'latest_html'],
     tolerate_missing_output=True,
@@ -768,7 +768,6 @@ class MinimiseOutputForSeqr(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
-
         # if it doesn't exist for this sequencing type, fail gracefully
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
         try:
