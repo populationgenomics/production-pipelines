@@ -435,8 +435,8 @@ class RunHailFiltering(DatasetStage):
     hail job to filter & label the MT
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'labelled_vcf': dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
@@ -484,7 +484,16 @@ class RunHailFiltering(DatasetStage):
         job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
         job.command('echo "ClinvArbitration decisions copied"')
 
-        # find, localise, and use the clinvar PM5 table
+        # find, localise, and use the SpliceVarDB table, if available - if not, don't pass the flag
+        # currently just passed in from config, will eventually be generated a different way
+        if svdb := config_retrieve(['RunHailFiltering', 'svdb_mt'], None):
+            svdb_name = svdb.split('/')[-1]
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {svdb} $BATCH_TMPDIR')
+            job.command('echo "SpliceVarDB MT copied"')
+            svdb_argument = f'--svdb "${{BATCH_TMPDIR}}/{svdb_name}"'
+        else:
+            svdb_argument = ''
+
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
         job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
@@ -504,9 +513,10 @@ class RunHailFiltering(DatasetStage):
             f'--output {job.output["vcf.bgz"]} '
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
             f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
-            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" ',
+            f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
+            f'{svdb_argument}',
         )
-        get_batch().write_output(job.output, str(expected_out["labelled_vcf"]).removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
