@@ -1382,7 +1382,6 @@ class CohortStage(Stage, ABC):
         output_by_target: dict[str, StageOutput | None] = dict()
         for cohort in multicohort.get_cohorts():
             action = self._get_action(cohort)
-            logging.info(f'{self.name}: {cohort} [{action.name}]')
             output_by_target[cohort.target_id] = self._queue_jobs_with_checks(cohort, action)
         return output_by_target
 
