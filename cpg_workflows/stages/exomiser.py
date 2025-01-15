@@ -40,7 +40,8 @@ query MyQuery($dataset: String!, $analysis_type: String!) {
     }
   }
 }
-""")
+""",
+)
 
 
 @cache
@@ -83,7 +84,6 @@ def find_previous_analyses(dataset: str) -> set[str]:
             if nameroot := outputs.get('nameroot'):
                 completed_runs.add(nameroot)
     return completed_runs
-
 
 
 @cache
@@ -161,11 +161,8 @@ class CreateFamilyVCFs(DatasetStage):
         this now writes to a temporary bucket, we don't need these VCFs again in the future
         they cost more to keep than to regenerate
         """
-        prefix = dataset.tmp_prefix() / f'exomiser_inputs'
-        return {
-            proband: prefix / f'{proband}.vcf.bgz'
-            for proband in find_probands(dataset).keys()
-        }
+        prefix = dataset.tmp_prefix() / 'exomiser_inputs'
+        return {proband: prefix / f'{proband}.vcf.bgz' for proband in find_probands(dataset).keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(dataset)
@@ -185,10 +182,7 @@ class MakePhenopackets(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
-        return {
-            proband: dataset_prefix / f'{proband}_phenopacket.json'
-            for proband in find_probands(dataset).keys()
-        }
+        return {proband: dataset_prefix / f'{proband}_phenopacket.json' for proband in find_probands(dataset).keys()}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -211,10 +205,7 @@ class MakePedExtracts(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset):
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
-        return {
-            proband: dataset_prefix / f'{proband}.ped'
-            for proband in find_probands(dataset)
-        }
+        return {proband: dataset_prefix / f'{proband}.ped' for proband in find_probands(dataset)}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -282,7 +273,9 @@ class RunExomiser(DatasetStage):
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
 
-@stage(analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE)
+@stage(
+    analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE,
+)
 class RegisterSingleSampleExomiserResults(SequencingGroupStage):
     """
     this is a tricky little fella'
@@ -330,7 +323,7 @@ class ExomiserSeqrTSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.analysis_prefix() / get_workflow().output_version / f'exomiser_results.tsv'
+        return dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.tsv'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -376,8 +369,8 @@ class ExomiserVariantsTSV(DatasetStage):
         prefix = dataset.analysis_prefix() / get_workflow().output_version
 
         return {
-            'json': prefix / f'exomiser_variant_results.tsv',
-            'ht': prefix / f'exomiser_variant_results.ht',
+            'json': prefix / 'exomiser_variant_results.tsv',
+            'ht': prefix / 'exomiser_variant_results.ht',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:

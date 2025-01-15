@@ -79,7 +79,11 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     return job
 
 
-def create_gvcf_to_vcf_jobs(proband_dict: dict[str, list[SequencingGroup]], previous_completions: set[str], out_paths: dict[str, Path],) -> list[Job]:
+def create_gvcf_to_vcf_jobs(
+    proband_dict: dict[str, list[SequencingGroup]],
+    previous_completions: set[str],
+    out_paths: dict[str, Path],
+) -> list[Job]:
     """
     Create Joint VCFs for families of SG IDs
 
