@@ -227,12 +227,12 @@ class GeneratePED(DatasetStage):
     revert to just using the metamist/CPG-flow Pedigree generation
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'pedigree': dataset.prefix() / get_date_folder() / 'pedigree.ped'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'pedigree.ped'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        pedigree = dataset.write_ped_file(out_path=expected_out['pedigree'])
+        pedigree = dataset.write_ped_file(out_path=expected_out)
         get_logger().info(f'PED file for {dataset.name} written to {pedigree}')
 
         return self.make_outputs(dataset, data=expected_out)
@@ -468,7 +468,7 @@ class RunHailFiltering(DatasetStage):
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+        pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
         expected_out = self.expected_outputs(dataset)
 
         # copy vcf & index out manually
@@ -543,7 +543,7 @@ class RunHailFilteringSV(DatasetStage):
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
         )
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')
+        pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
         local_ped = get_batch().read_input(str(pedigree))
 
         required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
@@ -604,7 +604,7 @@ class ValidateMOI(DatasetStage):
         conf_in_batch = get_batch().read_input(runtime_config)
 
         hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
-        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED, key='pedigree')))
+        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
         # If there are SV VCFs, read each one in and add to the arguments
