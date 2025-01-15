@@ -79,12 +79,12 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     return job
 
 
-def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]) -> list[Job]:
+def create_gvcf_to_vcf_jobs(proband_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]) -> list[Job]:
     """
     Create Joint VCFs for families of SG IDs
 
     Args:
-        families (): dict of proband ID to list of SG IDs
+        proband_dict (): dict of proband ID to list of SG IDs
         out_paths (): dict of family ID to output path
     Returns:
         list of Jobs
@@ -93,7 +93,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
     jobs: list[Job] = []
 
     # take each family
-    for proband, members in families.items():
+    for proband, members in proband_dict.items():
 
         # skip if already done
         if exists(out_paths[proband]):
@@ -117,7 +117,7 @@ def extract_mini_ped_files(proband_dict: dict[str, list[SequencingGroup]], out_p
 
         ped_path = out_paths[proband_id]
         # don't recreate if it exists
-        if not ped_path.exists():
+        if not exists(ped_path):
             # make the pedigree for this family
             df = pd.DataFrame([sg.pedigree.get_ped_dict() for sg in members])
             with ped_path.open('w') as ped_file:

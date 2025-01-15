@@ -111,6 +111,9 @@ def find_probands(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
 class CreateFamilyVCFs(DatasetStage):
     """
     it's a gVCF combiner, densification, Mt -> VCF
+    we do this densification per-proband, not per-family... If there are multiple probands in the family we'll
+    produce multiple versions of the same VCF. It's simpler to just do it per-proband rather than implement some
+    sharing logic here, which would be more complex for a marginal benefit
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
@@ -120,14 +123,14 @@ class CreateFamilyVCFs(DatasetStage):
         """
         prefix = dataset.tmp_prefix() / f'exomiser_inputs'
         return {
-            str(family): prefix / f'{family}.vcf.bgz'
-            for family in find_probands(dataset).keys()
+            proband: prefix / f'{proband}.vcf.bgz'
+            for proband in find_probands(dataset).keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(dataset)
         jobs = create_gvcf_to_vcf_jobs(
-            families=find_probands(dataset),
+            proband_dict=find_probands(dataset),
             out_paths=outputs,
         )
         return self.make_outputs(dataset, outputs, jobs=jobs)
@@ -142,8 +145,8 @@ class MakePhenopackets(DatasetStage):
     def expected_outputs(self, dataset: Dataset):
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
         return {
-            family: dataset_prefix / f'{family}_phenopacket.json'
-            for family in find_probands(dataset).keys()
+            proband: dataset_prefix / f'{proband}_phenopacket.json'
+            for proband in find_probands(dataset).keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -162,14 +165,14 @@ class MakePhenopackets(DatasetStage):
 @stage
 class MakePedExtracts(DatasetStage):
     """
-    from the dataset MT, we make a PED per-family
+    from the dataset MT, we make a PED per-proband
     """
 
     def expected_outputs(self, dataset: Dataset):
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_inputs'
         return {
-            family: dataset_prefix / f'{family}.ped'
-            for family in find_probands(dataset)
+            proband: dataset_prefix / f'{proband}.ped'
+            for proband in find_probands(dataset)
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -191,6 +194,9 @@ class RunExomiser(DatasetStage):
     Run exomiser on the family VCFs
 
     Only run this for families with at least one affected individual
+
+    frustratingly due to the output format we can't really register these in metamist
+    we could if it was a SequencingGroupStage, but it's not
     """
 
     def expected_outputs(self, dataset: Dataset):
@@ -203,7 +209,7 @@ class RunExomiser(DatasetStage):
 
         # only the TSVs are required, but we need the gene and variant level TSVs
         # populate gene-level results
-        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in proband_dict}
+        return_dict = {proband: dataset_prefix / f'{proband}.tsv' for proband in proband_dict}
         # add more keys pointing to the variant-level TSVs
         return_dict.update(
             {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in proband_dict},
