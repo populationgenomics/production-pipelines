@@ -114,11 +114,14 @@ class CreateFamilyVCFs(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        proband_dict = find_probands(dataset)
-        prefix = dataset.prefix() / f'exomiser_inputs'
+        """
+        this now writes to a temporary bucket, we don't need these VCFs again in the future
+        they cost more to keep than to regenerate
+        """
+        prefix = dataset.tmp_prefix() / f'exomiser_inputs'
         return {
             str(family): prefix / f'{family}.vcf.bgz'
-            for family in proband_dict.keys()
+            for family in find_probands(dataset).keys()
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -145,8 +148,7 @@ class MakePhenopackets(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
-        this actually doesn't run as Jobs, but as a function...
-        bit of an anti-pattern in this pipeline?
+        this actually doesn't run as Jobs, but as a function
         """
 
         expected_out = self.expected_outputs(dataset)
