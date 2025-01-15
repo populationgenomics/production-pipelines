@@ -345,11 +345,11 @@ class GeneratePanelData(DatasetStage):
     PythonJob to find HPO-matched panels
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict:
+    def expected_outputs(self, dataset: Dataset) -> Path:
         """
         only one output, the panel data
         """
-        return {'hpo_panels': dataset.prefix() / get_date_folder() / 'hpo_panel_data.json'}
+        return dataset.prefix() / get_date_folder() / 'hpo_panel_data.json'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
@@ -362,16 +362,14 @@ class GeneratePanelData(DatasetStage):
         expected_out = self.expected_outputs(dataset)
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
-        local_phenopacket = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=MakePhenopackets)),
-        )
+        local_phenopacket = get_batch().read_input(str(inputs.as_path(target=dataset, stage=MakePhenopackets)))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
 
         job.command(f'sleep {randint(0, 30)}')
         job.command(f'GeneratePanelData --input {local_phenopacket} --output {job.output} --hpo {hpo_file}')
-        get_batch().write_output(job.output, str(expected_out["hpo_panels"]))
+        get_batch().write_output(job.output, str(expected_out))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -393,7 +391,7 @@ class QueryPanelapp(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
+        hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData)
         expected_out = self.expected_outputs(dataset)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
@@ -603,7 +601,7 @@ class ValidateMOI(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
+        hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)))
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
 
