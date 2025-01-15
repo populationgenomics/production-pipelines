@@ -23,8 +23,24 @@ from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import DatasetStage, SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
+from metamist.graphql import gql, query
 
 HPO_KEY: str = 'HPO Terms (present)'
+EXOMISER_ANALYSIS_TYPE: str = 'exomiser'
+
+
+# GraphQl query for all analysis entries in this Dataset of type: exomiser
+# this is used to find the exomiser results for the current dataset
+ANALYSIS_QUERY = gql(
+    """
+query MyQuery($dataset: String!, $analysis_type: String!) {
+  project(name: $dataset) {
+    analyses(type: {eq: $analysis_type}) {
+      outputs
+    }
+  }
+}
+""")
 
 
 @cache
@@ -45,6 +61,29 @@ def find_seqr_projects() -> dict[str, str]:
                 return_dict[element['dataset']] = meta_proj
 
     return return_dict
+
+
+@cache
+def find_previous_analyses(dataset: str) -> set[str]:
+    """
+    Find all the analysis entries in this dataset of type: exomiser
+
+    Args:
+        dataset (str): the name of the dataset to find analysis entries for
+
+    Returns:
+        set[str]: analysis paths in metamist for this Dataset
+    """
+
+    metamist_results = query(ANALYSIS_QUERY, variables={'dataset': dataset, 'analysis_type': EXOMISER_ANALYSIS_TYPE})
+    completed_runs: set[str] = set()
+    for analysis in metamist_results['project']['analyses']:
+        # uses the new metamist outputs formatted block
+        if outputs := analysis['outputs']:
+            if nameroot := outputs.get('nameroot'):
+                completed_runs.add(nameroot)
+    return completed_runs
+
 
 
 @cache
@@ -132,6 +171,7 @@ class CreateFamilyVCFs(DatasetStage):
         outputs = self.expected_outputs(dataset)
         jobs = create_gvcf_to_vcf_jobs(
             proband_dict=find_probands(dataset),
+            previous_completions=find_previous_analyses(dataset.name),
             out_paths=outputs,
         )
         return self.make_outputs(dataset, outputs, jobs=jobs)
@@ -239,11 +279,10 @@ class RunExomiser(DatasetStage):
         }
 
         jobs = run_exomiser(single_dict)
-
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
 
 
-@stage(analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type='exomiser')
+@stage(analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE)
 class RegisterSingleSampleExomiserResults(SequencingGroupStage):
     """
     this is a tricky little fella'
@@ -284,7 +323,7 @@ class RegisterSingleSampleExomiserResults(SequencingGroupStage):
         return self.make_outputs(sequencing_group, jobs=ghost_job, data=outputs)
 
 
-@stage(required_stages=[RunExomiser], analysis_type='exomiser')
+@stage(required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE)
 class ExomiserSeqrTSV(DatasetStage):
     """
     Parse the Exomiser results into a TSV for Seqr
@@ -326,7 +365,7 @@ class ExomiserSeqrTSV(DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-@stage(required_stages=[RunExomiser], analysis_type='exomiser', analysis_keys=['json', 'ht'])
+@stage(required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE, analysis_keys=['json', 'ht'])
 class ExomiserVariantsTSV(DatasetStage):
     """
     Parse the Exomiser variant-level results into a JSON file and a Hail Table

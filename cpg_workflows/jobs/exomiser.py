@@ -79,12 +79,13 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
     return job
 
 
-def create_gvcf_to_vcf_jobs(proband_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]) -> list[Job]:
+def create_gvcf_to_vcf_jobs(proband_dict: dict[str, list[SequencingGroup]], previous_completions: set[str], out_paths: dict[str, Path],) -> list[Job]:
     """
     Create Joint VCFs for families of SG IDs
 
     Args:
         proband_dict (): dict of proband ID to list of SG IDs
+        previous_completions (set[str]): set of analyses we've already completed
         out_paths (): dict of family ID to output path
     Returns:
         list of Jobs
@@ -96,7 +97,7 @@ def create_gvcf_to_vcf_jobs(proband_dict: dict[str, list[SequencingGroup]], out_
     for proband, members in proband_dict.items():
 
         # skip if already done
-        if exists(out_paths[proband]):
+        if exists(out_paths[proband]) or proband in previous_completions:
             continue
 
         jobs.append(family_vcf_from_gvcf(members, str(out_paths[proband])))
