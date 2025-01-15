@@ -84,7 +84,7 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
     Create Joint VCFs for families of SG IDs
 
     Args:
-        families (): dict of family ID to list of SG IDs
+        families (): dict of proband ID to list of SG IDs
         out_paths (): dict of family ID to output path
     Returns:
         list of Jobs
@@ -93,29 +93,29 @@ def create_gvcf_to_vcf_jobs(families: dict[str, list[SequencingGroup]], out_path
     jobs: list[Job] = []
 
     # take each family
-    for family, members in families.items():
+    for proband, members in families.items():
 
         # skip if already done
-        if exists(out_paths[family]):
+        if exists(out_paths[proband]):
             continue
 
-        jobs.append(family_vcf_from_gvcf(members, str(out_paths[family])))
+        jobs.append(family_vcf_from_gvcf(members, str(out_paths[proband])))
     return jobs
 
 
-def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):
+def extract_mini_ped_files(proband_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):
     """
     write the mini-ped for each family
 
     Args:
-        family_dict (dict[str, list[SequencingGroup]]): family ID to list of SG IDs
+        proband_dict (dict[str, list[SequencingGroup]]): proband SG ID to list of SG IDs
         out_paths (Path): temp dir to write the mini-peds to
     """
 
     # query for SG entities, group by family
-    for family_id, members in family_dict.items():
+    for proband_id, members in proband_dict.items():
 
-        ped_path = out_paths[family_id]
+        ped_path = out_paths[proband_id]
         # don't recreate if it exists
         if not ped_path.exists():
             # make the pedigree for this family
@@ -124,38 +124,39 @@ def extract_mini_ped_files(family_dict: dict[str, list[SequencingGroup]], out_pa
                 df.to_csv(ped_file, sep='\t', index=False, header=False)
 
 
-def make_phenopackets(family_dict: dict[str, list[SequencingGroup]], out_path: dict[str, Path]):
+def make_phenopackets(proband_dict: dict[str, list[SequencingGroup]], out_paths: dict[str, Path]):
     """
     find the minimal data to run an exomiser analysis
     n.b. these are not actually phenopackets - they are a simplified version
 
     Args:
-        family_dict (dict[str, list[SequencingGroup]]): members per family
-        out_path (dict[str, Path]): corresponding output paths per family
+        proband_dict (dict[str, list[SequencingGroup]]): proband CPG ID: [family members]
+        out_paths (dict[str, Path]): corresponding output paths per family
     """
 
-    for family, members in family_dict.items():
+    for proband, members in proband_dict.items():
 
-        if out_path[family].exists():
+        # skip if already done
+        if exists(out_paths[proband]):
             continue
 
         # get all affected and unaffected
         affected = [sg for sg in members if str(sg.pedigree.phenotype) == '2']
 
         if not affected:
-            raise ValueError(f'Family {family} has no affected individuals, should not have reached here')
+            raise ValueError(f'Family {proband} has no affected individuals, should not have reached here')
 
-        # arbitrarily select a proband for now
-        proband = affected.pop()
+        # select the specific proband SG based on the ID (key in the dictionary)
+        proband_sg = [sg for sg in members if sg.id == proband][0]
 
-        hpo_term_string = proband.meta['phenotypes'].get(HPO_KEY, '')
+        hpo_term_string = proband_sg.meta['phenotypes'].get(HPO_KEY, '')
 
         hpo_terms = hpo_term_string.split(',')
 
         # https://github.com/exomiser/Exomiser/blob/master/exomiser-cli/src/test/resources/pfeiffer-family.yml
-        phenopacket: dict = {'family': family, 'proband': proband.id, 'hpoIds': hpo_terms}
+        phenopacket: dict = {'family': proband, 'proband': proband_sg.id, 'hpoIds': hpo_terms}
 
-        with out_path[family].open('w') as ppk_file:
+        with out_paths[proband].open('w') as ppk_file:
             json.dump(phenopacket, ppk_file, indent=2)
 
 
@@ -175,10 +176,10 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     )
 
     # now chunk the jobs - load resources, then run a bunch of families
-    families = sorted(content_dict.keys())
+    probands = sorted(content_dict.keys())
     all_jobs = []
-    for chunk_number, family_chunk in enumerate(
-        chunks(families, config_retrieve(['workflow', 'exomiser_chunk_size'], 8)),
+    for chunk_number, proband_chunk in enumerate(
+        chunks(probands, config_retrieve(['workflow', 'exomiser_chunk_size'], 8)),
     ):
         # see https://exomiser.readthedocs.io/en/latest/installation.html#linux-install
         job = get_batch().new_bash_job(f'Run Exomiser for chunk {chunk_number}')
@@ -191,31 +192,31 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
         # unpack references, see linux-install link above
         job.command(f'unzip {inputs}/\* -d "{exomiser_dir}/data"')
 
-        job.command(f'echo "This job contains families {" ".join(family_chunk)}"')
+        job.command(f'echo "This job contains families {" ".join(proband_chunk)}"')
 
         # number of chunks should match cpu, accessible in config
         # these will all run simultaneously using backgrounded tasks and a wait
         for parallel_chunk in chunks(
-            family_chunk,
+            proband_chunk,
             chunk_size=config_retrieve(['workflow', 'exomiser_parallel_chunks'], 4),
         ):
-            for family in parallel_chunk:
+            for proband in parallel_chunk:
                 # read in VCF & index
                 vcf = get_batch().read_input_group(
                     **{
-                        f'{family}_vcf': str(content_dict[family]['vcf']),
-                        f'{family}_vcf_index': f'{content_dict[family]["vcf"]}.tbi',
+                        f'{proband}_vcf': str(content_dict[proband]['vcf']),
+                        f'{proband}_vcf_index': f'{content_dict[proband]["vcf"]}.tbi',
                     },
-                )[f'{family}_vcf']
+                )[f'{proband}_vcf']
 
                 # read in ped & phenotype JSON
-                ped = get_batch().read_input(str(content_dict[family]['ped']))
-                ppk = get_batch().read_input(str(content_dict[family]['pheno']))
+                ped = get_batch().read_input(str(content_dict[proband]['ped']))
+                ppk = get_batch().read_input(str(content_dict[proband]['pheno']))
 
                 # # this was really satisfying syntax to work out
                 job.declare_resource_group(
                     **{
-                        family: {
+                        proband: {
                             'json': '{root}.json',
                             'tsv': '{root}.tsv',
                             'variants.tsv': '{root}.variants.tsv',
@@ -225,12 +226,12 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
                 )
 
                 # generate a config file based on the batch tmp locations
-                job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[family]["yaml"]} {ped} {vcf} ')
+                job.command(f'python3 {exomiser_dir}/config_shuffle.py {ppk} {job[proband]["yaml"]} {ped} {vcf} ')
 
                 # now run it, as a backgrounded process
                 job.command(
                     f'java -Xmx10g -Xms4g -jar {exomiser_dir}/exomiser-cli-{exomiser_version}.jar '
-                    f'--analysis {job[family]["yaml"]} --ped {ped} '
+                    f'--analysis {job[proband]["yaml"]} --ped {ped} '
                     f'--spring.config.location={exomiser_dir}/application.properties &',
                 )
 
@@ -238,13 +239,13 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
             job.command('wait && ls results')
 
             # move the results, then copy out
-            for family in parallel_chunk:
-                job.command(f'mv results/{family}.json {job[family]["json"]}')
-                job.command(f'mv results/{family}.genes.tsv {job[family]["tsv"]}')
-                job.command(f'mv results/{family}.variants.tsv {job[family]["variants.tsv"]}')
+            for proband in parallel_chunk:
+                job.command(f'mv results/{proband}.json {job[proband]["json"]}')
+                job.command(f'mv results/{proband}.genes.tsv {job[proband]["tsv"]}')
+                job.command(f'mv results/{proband}.variants.tsv {job[proband]["variants.tsv"]}')
 
                 get_batch().write_output(
-                    job[family],
-                    str(content_dict[family]['output']).removesuffix('.tsv'),
+                    job[proband],
+                    str(content_dict[proband]['output']).removesuffix('.tsv'),
                 )
     return all_jobs

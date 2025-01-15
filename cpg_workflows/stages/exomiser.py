@@ -71,6 +71,7 @@ def find_probands(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
         dict_by_family.setdefault(family_id, []).append(sg)
 
     dict_of_affecteds: dict[str, list[SequencingGroup]] = {}
+
     # now remove families with no affected individuals
     for family, members in dict_by_family.items():
 
@@ -150,8 +151,8 @@ class MakePhenopackets(DatasetStage):
 
         expected_out = self.expected_outputs(dataset)
         make_phenopackets(
-            family_dict=find_probands(dataset),
-            out_path=expected_out,
+            proband_dict=find_probands(dataset),
+            out_paths=expected_out,
         )
         return self.make_outputs(dataset, data=expected_out)
 
@@ -172,11 +173,11 @@ class MakePedExtracts(DatasetStage):
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         this actually doesn't run as Jobs, but as a function...
-        bit of an anti-pattern in this pipeline?
+        these outputs will be written by the time the pipeline starts
         """
         expected_out = self.expected_outputs(dataset)
         extract_mini_ped_files(
-            family_dict=find_probands(dataset),
+            proband_dict=find_probands(dataset),
             out_paths=expected_out,
         )
         return self.make_outputs(dataset, data=expected_out)
@@ -194,23 +195,21 @@ class RunExomiser(DatasetStage):
         """
         dict of outputs for this dataset, keyed on family ID
         """
-        family_dict = find_probands(dataset)
+        proband_dict = find_probands(dataset)
 
         dataset_prefix = dataset.analysis_prefix() / 'exomiser_results'
 
         # only the TSVs are required, but we need the gene and variant level TSVs
         # populate gene-level results
-        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in family_dict}
+        return_dict = {family: dataset_prefix / f'{family}.tsv' for family in proband_dict}
         # add more keys pointing to the variant-level TSVs
         return_dict.update(
-            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in family_dict},
+            {f'{family}_variants': dataset_prefix / f'{family}.variants.tsv' for family in proband_dict},
         )
 
         return return_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
-        exomiser_version = config_retrieve(['workflow', 'exomiser_version'], 14)
 
         output_dict = self.expected_outputs(dataset)
 
@@ -300,11 +299,9 @@ class ExomiserVariantsTSV(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        results = inputs.as_dict(target=dataset, stage=RunExomiser)
-
-        # just collect the per-family variant-level TSVs
+        # collect the per-family variant-level TSVs
         family_files: list = []
-        for family, file in results.items():
+        for family, file in inputs.as_dict(target=dataset, stage=RunExomiser).items():
             if family.endswith('_variants'):
                 family_files.append(get_batch().read_input(file))
 
