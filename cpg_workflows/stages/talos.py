@@ -380,8 +380,8 @@ class QueryPanelapp(DatasetStage):
     query PanelApp for up-to-date gene lists
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'panel_data': dataset.prefix() / get_date_folder() / 'panelapp_data.json'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'panelapp_data.json'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
@@ -397,7 +397,7 @@ class QueryPanelapp(DatasetStage):
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
         job.command(f'QueryPanelapp --input {get_batch().read_input(str(hpo_panel_json))} --output {job.output}')
-        get_batch().write_output(job.output, str(expected_out['panel_data']))
+        get_batch().write_output(job.output, str(expected_out))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -416,7 +416,7 @@ class FindGeneSymbolMap(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
+        panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp))
         expected_out = self.expected_outputs(dataset)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
@@ -463,9 +463,7 @@ class RunHailFiltering(DatasetStage):
         # doubling storage due to the repartitioning
         job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory(required_mem)
 
-        panelapp_json = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
-        )
+        panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
         expected_out = self.expected_outputs(dataset)
 
@@ -538,9 +536,7 @@ class RunHailFilteringSV(DatasetStage):
         expected_out = self.expected_outputs(dataset)
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
-        panelapp_json = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
-        )
+        panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
         pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
         local_ped = get_batch().read_input(str(pedigree))
 
@@ -620,7 +616,7 @@ class ValidateMOI(DatasetStage):
         if sv_vcf_arg:
             sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
 
-        panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
+        panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
             **{'vcf.bgz': str(hail_inputs), 'vcf.bgz.tbi': str(hail_inputs) + '.tbi'},
         )['vcf.bgz']
@@ -713,7 +709,7 @@ class CreateTalosHTML(DatasetStage):
         conf_in_batch = get_batch().read_input(runtime_config)
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, HPOFlagging)['pheno_annotated']))
-        panel_input = get_batch().read_input(str(inputs.as_dict(dataset, QueryPanelapp)['panel_data']))
+        panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         expected_out = self.expected_outputs(dataset)
 
         # this + copy_common_env (called by default) will be enough to do a gcloud copy of the outputs
