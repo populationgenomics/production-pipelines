@@ -56,8 +56,9 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import Dataset, DatasetStage, StageInput, StageOutput, stage
+from cpg_workflows.targets import Dataset
+from cpg_workflows.utils import exists, get_logger, tshirt_mt_sizing
+from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -486,7 +487,9 @@ class RunHailFiltering(DatasetStage):
 
         # find, localise, and use the SpliceVarDB table, if available - if not, don't pass the flag
         # currently just passed in from config, will eventually be generated a different way
-        if svdb := config_retrieve(['RunHailFiltering', 'svdb_mt'], None):
+        if svdb := config_retrieve(['RunHailFiltering', 'svdb_ht'], None):
+            if not exists(svdb):
+                raise ValueError(f'SVDB {svdb} does not exist')
             svdb_name = svdb.split('/')[-1]
             job.command(f'gcloud --no-user-output-enabled storage cp -r {svdb} $BATCH_TMPDIR')
             job.command('echo "SpliceVarDB MT copied"')
