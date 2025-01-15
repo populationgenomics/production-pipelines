@@ -274,7 +274,9 @@ class RunExomiser(DatasetStage):
 
 
 @stage(
-    analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE,
+    analysis_keys=['gene_level', 'variant_level'],
+    required_stages=[RunExomiser],
+    analysis_type=EXOMISER_ANALYSIS_TYPE,
 )
 class RegisterSingleSampleExomiserResults(SequencingGroupStage):
     """
