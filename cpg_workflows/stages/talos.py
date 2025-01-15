@@ -405,8 +405,8 @@ class QueryPanelapp(DatasetStage):
 @stage(required_stages=[MakeRuntimeConfig, QueryPanelapp])
 class FindGeneSymbolMap(DatasetStage):
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'symbol_lookup': dataset.prefix() / get_date_folder() / 'symbol_to_ensg.json'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'symbol_to_ensg.json'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
@@ -423,7 +423,7 @@ class FindGeneSymbolMap(DatasetStage):
         job.command(f'sleep {randint(0, 30)}')
         job.command(f'FindGeneSymbolMap --input {panel_json} --output {job.output}')
 
-        get_batch().write_output(job.output, str(expected_out['symbol_lookup']))
+        get_batch().write_output(job.output, str(expected_out))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -666,7 +666,7 @@ class HPOFlagging(DatasetStage):
         conf_in_batch = get_batch().read_input(runtime_config)
 
         results_json = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
-        gene_map = get_batch().read_input(str(inputs.as_dict(dataset, FindGeneSymbolMap)['symbol_lookup']))
+        gene_map = get_batch().read_input(str(inputs.as_path(dataset, FindGeneSymbolMap)))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
