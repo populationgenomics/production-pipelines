@@ -246,8 +246,8 @@ class MakeRuntimeConfig(DatasetStage):
     this new unambiguous config file should be used in all jobs
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'config': dataset.prefix() / get_date_folder() / 'config.toml'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'config.toml'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -289,7 +289,7 @@ class MakeRuntimeConfig(DatasetStage):
 
         expected_outputs = self.expected_outputs(dataset)
 
-        with expected_outputs['config'].open('w') as write_handle:
+        with expected_outputs.open('w') as write_handle:
             toml.dump(new_config, write_handle)
 
         return self.make_outputs(target=dataset, data=expected_outputs)
@@ -356,7 +356,7 @@ class GeneratePanelData(DatasetStage):
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         expected_out = self.expected_outputs(dataset)
@@ -390,7 +390,7 @@ class QueryPanelapp(DatasetStage):
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData, key='hpo_panels')
@@ -415,7 +415,7 @@ class FindGeneSymbolMap(DatasetStage):
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data'))
@@ -451,7 +451,7 @@ class RunHailFiltering(DatasetStage):
         job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'small_variants'], 15000))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one, Genomes ~500GB
@@ -538,7 +538,7 @@ class RunHailFilteringSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
         panelapp_json = get_batch().read_input(
             str(inputs.as_path(target=dataset, stage=QueryPanelapp, key='panel_data')),
@@ -600,7 +600,7 @@ class ValidateMOI(DatasetStage):
             config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
         ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')).image(image_path('talos'))
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)['hpo_panels']))
@@ -668,7 +668,7 @@ class HPOFlagging(DatasetStage):
         job.cpu(2.0).memory('highmem').image(image_path('talos')).storage('20Gi')
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)))
@@ -711,7 +711,7 @@ class CreateTalosHTML(DatasetStage):
         job.image(image_path('talos')).memory('standard').cpu(1.0)
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, HPOFlagging)['pheno_annotated']))
@@ -783,7 +783,7 @@ class MinimiseOutputForSeqr(DatasetStage):
         job.image(image_path('talos')).cpu(1.0).memory('lowmem')
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig, 'config'))
+        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         lookup_in_batch = get_batch().read_input(seqr_lookup)
