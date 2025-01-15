@@ -19,8 +19,9 @@ from cpg_workflows.jobs.exomiser import (
     make_phenopackets,
     run_exomiser,
 )
+from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import Dataset, DatasetStage, SequencingGroup, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.workflow import DatasetStage, SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 from metamist.apis import ProjectApi
 
 HPO_KEY: str = 'HPO Terms (present)'
@@ -240,6 +241,47 @@ class RunExomiser(DatasetStage):
         jobs = run_exomiser(single_dict)
 
         return self.make_outputs(dataset, data=output_dict, jobs=jobs)
+
+
+@stage(analysis_keys=['gene_level', 'variant_level'], required_stages=[RunExomiser], analysis_type='exomiser')
+class RegisterSingleSampleExomiserResults(SequencingGroupStage):
+    """
+    this is a tricky little fella'
+    The previous Stage, RunExomiser, runs per-Dataset, but writes output per-Proband
+    The reason is that Exomiser instances are expensive (time and compute) to start up, so we start a few instances,
+    and really crush high numbers of samples through each VM. That's really cost effective, but it means that the
+    expected_outputs dict is populated at runtime, so the individual output files can't be entered into analysis_keys
+    That means that we can't write the per-proband result entries to metamist, from the previous stage, so we do it here
+    """
+
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
+        """
+        These output paths are identical to the previous Stage, but will be registered in metamist
+        """
+        # check if we're interested in this SG ID
+        proband_dict = find_probands(sequencing_group.dataset)
+        if sequencing_group.id not in proband_dict:
+            return {}
+        output_prefix = sequencing_group.dataset.analysis_prefix() / 'exomiser_results'
+        return {
+            'gene_level': output_prefix / f'{sequencing_group.id}.tsv',
+            'variant_level': output_prefix / f'{sequencing_group.id}.variants.tsv',
+        }
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput:
+        """
+        get the dictionary of all probands to generate an analysis for
+        if an entry in that dict exists for this SG ID, create a ghost job to get it registered in metamist
+        metamist/status_reporter registrations won't run unless there's a job in the Stage
+        """
+
+        if not (outputs := self.expected_outputs(sequencing_group)):
+            return self.make_outputs(sequencing_group, jobs=None)
+
+        # if we're interested in this SG ID, create a spooky ghost job - exists, but no actions
+        ghost_job = get_batch().new_job(f'Register {sequencing_group.id} Exomiser files in metamist')
+        ghost_job.command(f'echo "I am the ghost of {sequencing_group.id}, oOOooOooOoOo"')
+        return self.make_outputs(sequencing_group, jobs=ghost_job, data=outputs)
 
 
 @stage(required_stages=[RunExomiser], analysis_type='exomiser')
