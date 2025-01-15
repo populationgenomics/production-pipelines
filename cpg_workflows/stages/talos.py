@@ -302,8 +302,8 @@ class MakePhenopackets(DatasetStage):
     and generates a phenopacket file (GA4GH compliant)
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {'phenopackets': dataset.prefix() / get_date_folder() / 'phenopackets.json'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'phenopackets.json'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -333,8 +333,8 @@ class MakePhenopackets(DatasetStage):
             f'--type {seq_type} '
             f'--hpo {hpo_file}',
         )
-        get_batch().write_output(job.output, str(expected_out['phenopackets']))
-        get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out["phenopackets"]}')
+        get_batch().write_output(job.output, str(expected_out))
+        get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out}')
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -363,7 +363,7 @@ class GeneratePanelData(DatasetStage):
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
         local_phenopacket = get_batch().read_input(
-            str(inputs.as_path(target=dataset, stage=MakePhenopackets, key='phenopackets')),
+            str(inputs.as_path(target=dataset, stage=MakePhenopackets)),
         )
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
