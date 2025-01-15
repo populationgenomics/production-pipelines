@@ -597,9 +597,9 @@ class ValidateMOI(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        hpo_panels = get_batch().read_input(str(inputs.as_dict(dataset, GeneratePanelData)))
+        hpo_panels = get_batch().read_input(str(inputs.as_path(dataset, GeneratePanelData)))
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
-        hail_inputs = inputs.as_dict(dataset, RunHailFiltering)
+        hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
         # If there are SV VCFs, read each one in and add to the arguments
         sv_paths_or_empty = query_for_sv_mt(dataset.name)
@@ -665,7 +665,7 @@ class HPOFlagging(DatasetStage):
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        results_json = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)))
+        results_json = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
         gene_map = get_batch().read_input(str(inputs.as_dict(dataset, FindGeneSymbolMap)['symbol_lookup']))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
@@ -770,7 +770,7 @@ class MinimiseOutputForSeqr(DatasetStage):
             get_logger().warning(f'No Seqr lookup file for {dataset.name} {seq_type}')
             return self.make_outputs(dataset, skipped=True)
 
-        input_localised = get_batch().read_input(str(inputs.as_dict(dataset, ValidateMOI)['summary_json']))
+        input_localised = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'Talos Prep for Seqr: {dataset.name}')
