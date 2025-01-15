@@ -1344,9 +1344,8 @@ class DatasetStage(Stage, ABC):
         """
         output_by_target: dict[str, StageOutput | None] = dict()
         # iterate directly over the datasets in this multicohort
-        for dataset_i, dataset in enumerate(multicohort.get_datasets()):
+        for dataset in multicohort.get_datasets():
             action = self._get_action(dataset)
-            logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
         return output_by_target
 
@@ -1413,6 +1412,5 @@ class MultiCohortStage(Stage, ABC):
         """
         output_by_target: dict[str, StageOutput | None] = dict()
         action = self._get_action(multicohort)
-        logging.info(f'{self.name}: {multicohort} [{action.name}]')
         output_by_target[multicohort.target_id] = self._queue_jobs_with_checks(multicohort, action)
         return output_by_target
