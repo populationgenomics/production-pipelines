@@ -369,7 +369,7 @@ class ExomiserVariantsTSV(DatasetStage):
         prefix = dataset.analysis_prefix() / get_workflow().output_version
 
         return {
-            'json': prefix / 'exomiser_variant_results.tsv',
+            'json': prefix / 'exomiser_variant_results.json',
             'ht': prefix / 'exomiser_variant_results.ht',
         }
 
@@ -396,6 +396,6 @@ class ExomiserVariantsTSV(DatasetStage):
         # recursive copy of the HT
         job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
 
-        get_batch().write_output(job.output, str(outputs['json']))
+        get_batch().write_output(job.output['json'], str(outputs['json']))
 
         return self.make_outputs(dataset, data=outputs, jobs=job)
