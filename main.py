@@ -14,7 +14,7 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
 from cpg_workflows.stages.cram_qc import CramMultiQC
-from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV
+from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
 from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import FilterBatch, GenotypeBatch, MtToEsSv
@@ -49,7 +49,7 @@ from cpg_workflows.workflow import StageDecorator, run_workflow
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
-    'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV],
+    'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
     'pre_alignment': [FastQCMultiQC],
