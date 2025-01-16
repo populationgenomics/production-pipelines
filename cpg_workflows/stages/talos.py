@@ -148,21 +148,26 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
 
 @lru_cache(maxsize=None)
-def query_for_latest_mt(dataset: str, entry_type: str = 'custom') -> str:
+def query_for_latest_mt(dataset: str) -> str:
     """
     query for the latest MT for a dataset
+    the exact metamist entry type to search for is handled by config, defaulting to the new rd_combiner MT
     Args:
         dataset (str): project to query for
-        entry_type (str): type of analysis entry to query for
     Returns:
         str, the path to the latest MT for the given type
     """
 
     # hot swapping to a string we can freely modify
     query_dataset = dataset
-
     if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
+
+    # the rd_combiner writes MTs to metamist as 'matrixtable', seqr_loader used 'custom'
+    # using a config entry we can decide which type to use
+    entry_type: str = config_retrieve(['workflow', 'mt_entry_type'], 'matrixtable')
+    get_logger().info(f'Querying for {entry_type} in {query_dataset}')
+
     result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': entry_type})
     mt_by_date = {}
 
