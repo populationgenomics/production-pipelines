@@ -316,6 +316,7 @@ class RegisterSingleSampleExomiserResults(SequencingGroupStage):
 
         # if we're interested in this SG ID, create a spooky ghost job - exists, but no actions
         ghost_job = get_batch().new_job(f'Register {sequencing_group.id} Exomiser files in metamist')
+        ghost_job.image(config_retrieve(['workflow', 'driver_image']))
         ghost_job.command(f'echo "I am the ghost of {sequencing_group.id}, oOOooOooOoOo"')
         return self.make_outputs(sequencing_group, jobs=ghost_job, data=outputs)
 
@@ -394,12 +395,9 @@ class ExomiserVariantsTSV(DatasetStage):
         job = get_batch().new_job('Combine Exomiser Variant-level TSVs')
         job.image(config_retrieve(['workflow', 'driver_image']))
 
-        job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
-        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output {job.output}')
+        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output output')
 
         # recursive copy of the HT
-        job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
-
-        get_batch().write_output(job.output['json'], str(outputs['json']))
-
+        job.command(f'gcloud storage cp -r output.ht {str(outputs["ht"])}')
+        job.command(f'gcloud storage cp -r output.json {str(outputs["json"])}')
         return self.make_outputs(dataset, data=outputs, jobs=job)
