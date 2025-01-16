@@ -394,12 +394,9 @@ class ExomiserVariantsTSV(DatasetStage):
         job = get_batch().new_job('Combine Exomiser Variant-level TSVs')
         job.image(config_retrieve(['workflow', 'driver_image']))
 
-        job.declare_resource_group(output={'json': '{root}.json', 'ht': '{root}.ht'})
-        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output {job.output}')
+        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output output')
 
         # recursive copy of the HT
-        job.command(f'gcloud storage cp -r {job.output["ht"]} {str(outputs["ht"])}')
-
-        get_batch().write_output(job.output['json'], str(outputs['json']))
-
+        job.command(f'gcloud storage cp -r output.ht {str(outputs["ht"])}')
+        job.command(f'gcloud storage cp -r output.json {str(outputs["json"])}')
         return self.make_outputs(dataset, data=outputs, jobs=job)
