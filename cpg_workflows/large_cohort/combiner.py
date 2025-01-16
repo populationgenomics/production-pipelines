@@ -88,6 +88,14 @@ def run(
             use_genome_default_intervals=sequencing_type == 'genome',
             intervals=intervals,
             force=force_new_combiner,
+            branch_factor=config_retrieve(
+                ['combiner', 'branch_factor'],
+                VariantDatasetCombiner._default_branch_factor,
+            ),
+            gvcf_batch_size=config_retrieve(
+                ['combiner', 'gvcf_batch_size'],
+                None,
+            ),
         )
 
         combiner.run()

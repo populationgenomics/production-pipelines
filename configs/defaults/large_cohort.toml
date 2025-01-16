@@ -26,6 +26,11 @@ vds_analysis_ids = []
 merge_only_vds = false
 # if false, use non-preemptible VMs
 preemptible_vms = false
+# for each combiner step, generate 5 intermediate VDSs, each combining 50 gVCFs
+gvcf_batch_size = 5
+branch_factor = 50
+
+
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
