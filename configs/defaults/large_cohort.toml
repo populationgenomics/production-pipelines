@@ -31,7 +31,6 @@ gvcf_batch_size = 5
 branch_factor = 50
 
 
-
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
 # sensitivities. The tool matches them internally to a VQSLOD score cutoff
