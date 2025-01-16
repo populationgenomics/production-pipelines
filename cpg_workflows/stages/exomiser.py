@@ -316,6 +316,7 @@ class RegisterSingleSampleExomiserResults(SequencingGroupStage):
 
         # if we're interested in this SG ID, create a spooky ghost job - exists, but no actions
         ghost_job = get_batch().new_job(f'Register {sequencing_group.id} Exomiser files in metamist')
+        ghost_job.image(config_retrieve(['workflow', 'driver_image']))
         ghost_job.command(f'echo "I am the ghost of {sequencing_group.id}, oOOooOooOoOo"')
         return self.make_outputs(sequencing_group, jobs=ghost_job, data=outputs)
 
