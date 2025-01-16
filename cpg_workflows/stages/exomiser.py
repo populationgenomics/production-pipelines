@@ -10,7 +10,7 @@ As a dataset Stage
 
 from functools import cache
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.exomiser import (
@@ -81,8 +81,10 @@ def find_previous_analyses(dataset: str) -> set[str]:
     for analysis in metamist_results['project']['analyses']:
         # uses the new metamist outputs formatted block
         if outputs := analysis['outputs']:
-            if nameroot := outputs.get('nameroot'):
+            if isinstance(outputs, dict) and (nameroot := outputs.get('nameroot')):
                 completed_runs.add(nameroot)
+            elif isinstance(outputs, str):
+                completed_runs.add(to_path(outputs).stem)
     return completed_runs
 
 
