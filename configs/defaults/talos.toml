@@ -81,7 +81,6 @@ sv = 10
 small_variants = 15000
 sv = 3600
 
-
 [categories]
 1 = 'ClinVar Pathogenic'
 3 = 'High Impact Variant'
@@ -90,7 +89,9 @@ sv = 3600
 6 = 'AlphaMissense P/LP'
 pm5 = 'ACMG PM5 - missense in same residue as known pathogenic'
 support = 'High in Silico Scores'
+svdb = 'SpliceVarDB Predicted Splice-Altering'
 sv1 = 'Predicted LOF SV'
+exomiser = 'Variant prioritised by Exomiser'
 
 # cohort specific parts of the config are not stored in this repository due to data protection concerns.
 # Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration

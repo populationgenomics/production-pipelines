@@ -90,10 +90,10 @@ def process_and_sort_variants(all_variants: VAR_DICT) -> list[dict]:
 
     # first, split the data up into component parts
     all_vars: list[dict] = []
-    for variant_key, family_details in all_variants.items():
+    for variant_key, proband_data in all_variants.items():
         chrom, pos, ref, alt = variant_key.split(':')
         all_vars.append(
-            {'contig': chrom, 'position': int(pos), 'alleles': [ref, alt], 'family_details': '::'.join(family_details)},
+            {'contig': chrom, 'position': int(pos), 'alleles': [ref, alt], 'proband_details': '::'.join(proband_data)},
         )
 
     # then sort on chr and position
@@ -134,6 +134,7 @@ def munge_into_hail_table(all_variants: VAR_DICT, output_path: str):
 
     # write out to the specified location
     ht.write(f'{output_path}.ht', overwrite=True)
+    ht.show()
 
 
 def main(input_tsvs: list[str], output_path: str, as_hail: bool = True):
