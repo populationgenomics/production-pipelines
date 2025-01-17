@@ -12,14 +12,12 @@ Inputs:
 from typing import TYPE_CHECKING
 
 from hail.vds import new_combiner
+from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, to_path
-
-if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
-    from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
 
 def run(
@@ -88,6 +86,14 @@ def run(
             use_genome_default_intervals=sequencing_type == 'genome',
             intervals=intervals,
             force=force_new_combiner,
+            branch_factor=config_retrieve(
+                ['combiner', 'branch_factor'],
+                VariantDatasetCombiner._default_branch_factor,
+            ),
+            gvcf_batch_size=config_retrieve(
+                ['combiner', 'gvcf_batch_size'],
+                None,
+            ),
         )
 
         combiner.run()
