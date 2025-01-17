@@ -109,6 +109,9 @@ def find_probands(dataset: Dataset) -> dict[str, list[SequencingGroup]]:
 
     dict_by_family: dict[str, list[SequencingGroup]] = {}
     for sg in dataset.get_sequencing_groups():
+        # skip over members without a gVCF - unusable in this analysis
+        if sg.gvcf is None:
+            continue
         family_id = str(sg.pedigree.fam_id)
         dict_by_family.setdefault(family_id, []).append(sg)
 

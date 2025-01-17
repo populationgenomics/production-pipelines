@@ -42,6 +42,9 @@ phenotype_match = ['6']
 ## all these labels will be removed
 #ignore_categories = ['categoryboolean6']
 
+# by default, only consider the top 2 exomiser results
+exomiser_rank_threshold = 2
+
 [RunHailFiltering]
 # variables for the hail operations, including CSQ sets and filter thresholds
 ac_threshold = 0.01
@@ -81,7 +84,6 @@ sv = 10
 small_variants = 15000
 sv = 3600
 
-
 [categories]
 1 = 'ClinVar Pathogenic'
 3 = 'High Impact Variant'
@@ -90,7 +92,9 @@ sv = 3600
 6 = 'AlphaMissense P/LP'
 pm5 = 'ACMG PM5 - missense in same residue as known pathogenic'
 support = 'High in Silico Scores'
+svdb = 'SpliceVarDB Predicted Splice-Altering'
 sv1 = 'Predicted LOF SV'
+exomiser = 'Variant prioritised by Exomiser'
 
 # cohort specific parts of the config are not stored in this repository due to data protection concerns.
 # Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration
