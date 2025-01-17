@@ -137,6 +137,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
             position = int(l_split[1])
             new_base = fasta_client.get_seq(chrom, position, position)
 
+            l_split[3] = l_split[3].upper()
             # a quick check, if we can
             if l_split[3] != 'N':
                 assert new_base == l_split[3][0], f'Discrepancy between faidx and Sniffles: {new_base}, {l_split[3]}'

@@ -62,16 +62,11 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
     """
     return_dict: dict[str, str] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
-    for sg_id_section in analysis_results['project']['sequencingGroups']:
-        for analysis in sg_id_section['analyses']:
-            # check 'output' (old string path format) and 'outputs' (new dict format)
-            if analysis['output'].endswith('SNPs_Indels.phased.vcf.gz'):
-                return_dict[sg_id_section['id']] = analysis['output']
+    for sg in analysis_results['project']['sequencingGroups']:
+        for analysis in sg['analyses']:
+            if analysis['output'].endswith('snp_indel.phased.vcf.gz'):
+                return_dict[sg['id']] = analysis['output']
                 continue
-            if isinstance(analysis['outputs'], dict):
-                if analysis['outputs'].get('path', '').endswith('SNPs_Indels.phased.vcf.gz'):
-                    return_dict[sg_id_section['id']] = analysis['outputs'].get('path', '')
-                    break
 
     return return_dict
 
