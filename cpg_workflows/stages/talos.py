@@ -507,7 +507,7 @@ class RunHailFiltering(DatasetStage):
             )
             exomiser_name = exomiser_ht.split('/')[-1]
             job.command(f'gcloud --no-user-output-enabled storage cp -r {exomiser_ht} $BATCH_TMPDIR')
-            job.command('echo "SpliceVarDB MT copied"')
+            job.command('echo "Exomiser HT copied"')
             exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/{exomiser_name}" '
         except ValueError:
             get_logger().info(f'No exomiser results found for {dataset.name}, skipping')
