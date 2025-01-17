@@ -443,7 +443,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.name,
+                dataset=self.name.removesuffix('-test'),
                 **kwargs,
             ),
         )
