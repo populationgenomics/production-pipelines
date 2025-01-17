@@ -14,7 +14,13 @@ check_for_existing_vds = false
 ## Subsetting and AnnotateDataset will only run for these datasets
 #write_mt_for_datasets = ['test_dataset', ]
 
-[rd_combiner]
+## number of partitions to coalesce the data into
+densify_partitions = 2500
+
+## strategy to use for partitioning the data [none, naive, shuffle]
+## not currently in use (see #1078)
+partition_strategy = 'naive'
+
 # these are used when calculating how many fragments to send to each job
 vqsr_training_fragments_per_job = 100
 vqsr_apply_fragments_per_job = 60
@@ -22,23 +28,48 @@ indel_recal_disc_size = 20
 snps_gather_disc_size = 10
 snps_recal_disc_size = 20
 
+[workflow.es_index]
+# if false, use a non-preemptible instance to run the ES export
+spot_instance = false
+
 # choices of jar specs to use for the various steps
-# by default we match the native Hail version in the container
-[rd_combiner.subset]
-jar_spec_revision = false
-
-[rd_combiner.annotate_cohort]
-jar_spec_revision = false
-
-[rd_combiner.annotate_dataset]
-jar_spec_revision = false
-
-[rd_combiner.densify]
-jar_spec_revision = false
+# without this setting we would default to matching the native Hail version in the container
+# currently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
+[workflow.jar_spec_revisions]
+annotate_cohort = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+annotate_dataset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+combiner = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+densify = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+subset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 
 [combiner]
-memory = "8Gi"
-storage = "10Gi"
+# used to decide if we should resume from a previous combiner plan
+force_new_combiner = false
+# highem, standard, or a string, e.g. "4Gi"
+driver_memory = "highmem"
+# string, e.g. "4Gi"
+driver_storage = "10Gi"
+# integer
+driver_cores = 2
+# highem, standard, or a string, e.g. "4Gi"
+worker_memory = "highmem"
+# if false, use non-preemptible VMs
+preemptible_vms = false
+
+# these settings alter the behaviour of the combiner, and don't all align with the documentation
+
+# In config: "The number of Variant Datasets to combine at once."
+# In practice: "The number of gVCFs to combine into each VDS?"
+# https://github.com/hail-is/hail/issues/14781
+branch_factor = 50
+
+# when merging multiple VDS, we find the largest VDS, repartition to target_records variants per partition
+# then repartition all VDSs to match those intervals prior to merging
+target_records = 30000
+
+# this is supposed to be the number of gVCFs to combine into a VDS
+# but that is not curretly working. See issue above
+gvcf_batch_size = 5
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
@@ -54,3 +85,12 @@ storage = "10Gi"
 [references]
 # this might be a holdover until the references file is corrected. Working in Main.
 vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'

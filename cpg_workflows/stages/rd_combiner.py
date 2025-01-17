@@ -3,10 +3,14 @@ All Stages relating to the seqr_loader pipeline, reimplemented from scratch to
 use the gVCF combiner instead of joint-calling.
 """
 
+from google.api_core.exceptions import PermissionDenied
+
 from cpg_utils import Path, to_path
+from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
+from cpg_workflows.jobs.rd_combiner import combiner
 from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.jobs.rd_combiner.vqsr import (
     apply_recalibration_indels,
@@ -17,7 +21,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import Dataset, MultiCohort
-from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger
+from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -129,7 +133,6 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import combiner
 
         outputs: dict[str, str | Path] = self.expected_outputs(multicohort)
 
@@ -169,8 +172,13 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         combiner_job.image(config_retrieve(['workflow', 'driver_image']))
-        combiner_job.memory(config_retrieve(['combiner', 'memory']))
-        combiner_job.storage(config_retrieve(['combiner', 'storage']))
+        combiner_job.memory(config_retrieve(['combiner', 'driver_memory'], 'highmem'))
+        combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
+        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
+
+        # set this job to be non-spot (i.e. non-preemptible)
+        # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
+        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
 
         # Default to GRCh38 for reference if not specified
         combiner_job.call(
@@ -182,6 +190,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
             vds_paths=[vds_path] if vds_path else None,
+            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner'], False),
         )
 
         return self.make_outputs(multicohort, outputs, combiner_job)
@@ -215,12 +224,20 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
+        # partitions to coalesce the data into
+        partitions = config_retrieve(['workflow', 'densify_partitions'], 2500)
+
+        # not currently in use (see #1078)
+        partition_strategy = config_retrieve(['workflow', 'partition_strategy'], 'naive')
+
         densify_job = get_batch().new_job('CreateDenseMtFromVdsWithHail')
         densify_job.image(config_retrieve(['workflow', 'driver_image']))
         densify_job.command(
             'mt_from_vds '
             f'--input {str(inputs.as_dict(multicohort, CreateVdsFromGvcfsWithHailCombiner)["vds"])} '
             f'--output {str(output["mt"])} '
+            f'--partitions {partitions} '
+            f'--partition_strategy {partition_strategy} '
             f'--sites_only {output["hps_vcf_dir"]} '
             f'--separate_header {output["separate_header_vcf_dir"]} ',
         )
@@ -626,3 +643,90 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         job.cpu(2).memory('highmem').storage('10Gi')
         job.command(f'annotate_dataset_small --input {str(input_mt)} --output {str(outputs)} ')
         return self.make_outputs(dataset, data=outputs, jobs=job)
+
+
+def es_password() -> str:
+    """
+    Get Elasticsearch password. Moved into a separate method to simplify
+    mocking in tests.
+    """
+    return read_secret(
+        project_id=config_retrieve(['elasticsearch', 'password_project_id']),
+        secret_name=config_retrieve(['elasticsearch', 'password_secret_id']),
+        fail_gracefully=False,
+    )
+
+
+@stage(
+    required_stages=[AnnotateDatasetSmallVariantsWithHailQuery],
+    analysis_type='es-index',
+    analysis_keys=['index_name'],
+    update_analysis_meta=lambda x: {'seqr-dataset-type': 'VARIANTS'},
+)
+class ExportMtAsEsIndex(DatasetStage):
+    """
+    Create a Seqr index.
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        """
+        Expected to generate a Seqr index, which is not a file
+        """
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        index_name = f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
+        return {
+            'index_name': index_name,
+            'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Transforms the MT into a Seqr index, no DataProc
+        """
+        # only create the elasticsearch index for the datasets specified in the config
+        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        if dataset.name not in eligible_datasets:
+            get_logger().info(f'Skipping ES index creation for {dataset}')
+            return None
+
+        # try to generate a password here - we'll find out inside the script anyway, but
+        # by that point we'd already have localised the MT, wasting time and money
+        try:
+            _es_password_string = es_password()
+        except PermissionDenied:
+            get_logger().warning(f'No permission to access ES password, skipping for {dataset}')
+            return self.make_outputs(dataset)
+        except KeyError:
+            get_logger().warning(f'ES section not in config, skipping for {dataset}')
+            return self.make_outputs(dataset)
+
+        # get the absolute path to the MT
+        mt_path = str(inputs.as_path(target=dataset, stage=AnnotateDatasetSmallVariantsWithHailQuery))
+        # and just the name, used after localisation
+        mt_name = mt_path.split('/')[-1]
+
+        outputs = self.expected_outputs(dataset)
+
+        # get the expected outputs as Strings
+        index_name = str(outputs['index_name'])
+        flag_name = str(outputs['done_flag'])
+
+        job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
+        if config_retrieve(['workflow', 'es_index', 'spot_instance'], default=True) is False:
+            # Use a non-preemptible instance if spot_instance is False in the config
+            job = job.spot(is_spot=False)
+
+        req_storage = tshirt_mt_sizing(
+            sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
+            cohort_size=len(dataset.get_sequencing_group_ids()),
+        )
+
+        job.cpu(4).storage(f'{req_storage}Gi').memory('lowmem').image(config_retrieve(['workflow', 'driver_image']))
+
+        # localise the MT
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt_path} $BATCH_TMPDIR')
+
+        # run the export from the localised MT - this job writes no new data, just transforms and exports over network
+        job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
+
+        return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)

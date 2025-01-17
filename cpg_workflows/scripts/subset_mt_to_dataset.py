@@ -28,7 +28,7 @@ def subset_mt_to_samples(input_mt: str, sg_id_file: str, output: str):
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods
     # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
-    if jar_spec := config_retrieve(['rd_combiner', 'subset', 'jar_spec_revision'], False):
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'subset'], False):
         override_jar_spec(jar_spec)
 
     mt = hl.read_matrix_table(input_mt)

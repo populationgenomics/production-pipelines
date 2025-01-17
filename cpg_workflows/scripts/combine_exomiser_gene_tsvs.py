@@ -112,7 +112,7 @@ def main(project: str, input_files: list[str], p_threshold: float = 0.05):
     return output_lines
 
 
-if __name__ == '__main__':
+def cli_main():
 
     parser = ArgumentParser()
     parser.add_argument('--project', help='Name of Seqr Project')
@@ -127,3 +127,7 @@ if __name__ == '__main__':
     with open(args.output, 'w') as handle:
         for line in data_lines:
             handle.write('\t'.join(line) + '\n')
+
+
+if __name__ == '__main__':
+    cli_main()
