@@ -148,14 +148,17 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
 
 @lru_cache(maxsize=None)
-def query_for_latest_mt(dataset: str) -> str:
+def query_for_latest_hail_object(dataset: str, analysis_type: str, object_suffix: str = '.mt') -> str:
     """
     query for the latest MT for a dataset
     the exact metamist entry type to search for is handled by config, defaulting to the new rd_combiner MT
     Args:
         dataset (str): project to query for
+        analysis_type (str): analysis type to query for - rd_combiner writes MTs to metamist as 'matrixtable',
+                             seqr_loader used 'custom': using a config entry we can decide which type to use
+        object_suffix (str): suffix to detect on analysis path (choose between .mt or .ht)
     Returns:
-        str, the path to the latest MT for the given type
+        str, the path to the latest object for the given type
     """
 
     # hot swapping to a string we can freely modify
@@ -163,18 +166,16 @@ def query_for_latest_mt(dataset: str) -> str:
     if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
-    # the rd_combiner writes MTs to metamist as 'matrixtable', seqr_loader used 'custom'
-    # using a config entry we can decide which type to use
-    entry_type: str = config_retrieve(['workflow', 'mt_entry_type'], 'matrixtable')
-    get_logger().info(f'Querying for {entry_type} in {query_dataset}')
+    get_logger().info(f'Querying for {analysis_type} in {query_dataset}')
 
-    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': entry_type})
+    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': analysis_type})
+
+    # get all the relevant entries, and bin by date
     mt_by_date = {}
-
     for analysis in result['project']['analyses']:
         if (
             analysis['output']
-            and analysis['output'].endswith('.mt')
+            and analysis['output'].endswith(object_suffix)
             and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
         ):
             mt_by_date[analysis['timestampCompleted']] = analysis['output']
@@ -443,7 +444,18 @@ class RunHailFiltering(DatasetStage):
         return dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(dataset.name))
+        input_mt = config_retrieve(
+            ['workflow', 'matrix_table'],
+            default=query_for_latest_hail_object(
+                dataset=dataset.name,
+                analysis_type=config_retrieve(
+                    ['workflow', 'mt_entry_type'],
+                    default='matrixtable',
+                ),
+                object_suffix='.mt',
+            ),
+        )
+
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
         job.command('set -eux pipefail')
@@ -486,6 +498,21 @@ class RunHailFiltering(DatasetStage):
         job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
         job.command('echo "ClinvArbitration decisions copied"')
 
+        # see if we can find any exomiser results to integrate
+        try:
+            exomiser_ht = query_for_latest_hail_object(
+                dataset=dataset.name,
+                analysis_type='exomiser',
+                object_suffix='.ht',
+            )
+            exomiser_name = exomiser_ht.split('/')[-1]
+            job.command(f'gcloud --no-user-output-enabled storage cp -r {exomiser_ht} $BATCH_TMPDIR')
+            job.command('echo "Exomiser HT copied"')
+            exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/{exomiser_name}" '
+        except ValueError:
+            get_logger().info(f'No exomiser results found for {dataset.name}, skipping')
+            exomiser_argument = ' '
+
         # find, localise, and use the SpliceVarDB table, if available - if not, don't pass the flag
         # currently just passed in from config, will eventually be generated a different way
         if svdb := config_retrieve(['RunHailFiltering', 'svdb_ht'], None):
@@ -494,9 +521,9 @@ class RunHailFiltering(DatasetStage):
             svdb_name = svdb.split('/')[-1]
             job.command(f'gcloud --no-user-output-enabled storage cp -r {svdb} $BATCH_TMPDIR')
             job.command('echo "SpliceVarDB MT copied"')
-            svdb_argument = f'--svdb "${{BATCH_TMPDIR}}/{svdb_name}"'
+            svdb_argument = f'--svdb "${{BATCH_TMPDIR}}/{svdb_name}" '
         else:
-            svdb_argument = ''
+            svdb_argument = ' '
 
         pm5 = get_clinvar_table('clinvar_pm5')
         pm5_name = pm5.split('/')[-1]
@@ -518,7 +545,8 @@ class RunHailFiltering(DatasetStage):
             f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
             f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
-            f'{svdb_argument}',
+            f'{svdb_argument} '
+            f'{exomiser_argument} ',
         )
         get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
 

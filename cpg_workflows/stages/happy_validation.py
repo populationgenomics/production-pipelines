@@ -8,7 +8,7 @@ from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.validation import run_happy_on_vcf
-from cpg_workflows.stages.talos import query_for_latest_mt
+from cpg_workflows.stages.talos import query_for_latest_hail_object
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, get_workflow, stage
 
@@ -29,7 +29,19 @@ class ValidationMtToVcf(SequencingGroupStage):
             return None
 
         # borrow the talos method to get the latest MT based on analysis entries
-        input_mt = config_retrieve(['workflow', 'matrix_table'], query_for_latest_mt(sequencing_group.dataset.name))
+        # we allow overriding from config to use a specific table
+        # otherwise we query for the latest MT, using analysis_type to allow swapping between rd_combiner & seqr_loader
+        input_mt = config_retrieve(
+            ['workflow', 'matrix_table'],
+            default=query_for_latest_hail_object(
+                sequencing_group.dataset.name,
+                analysis_type=config_retrieve(
+                    ['workflow', 'mt_entry_type'],
+                    default='matrixtable',
+                ),
+                object_suffix='.mt',
+            ),
+        )
         exp_output = self.expected_outputs(sequencing_group)
 
         job = get_batch().new_job(f'{sequencing_group.id} VCF from dataset MT')
