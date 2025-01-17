@@ -42,6 +42,9 @@ phenotype_match = ['6']
 ## all these labels will be removed
 #ignore_categories = ['categoryboolean6']
 
+# by default, only consider the top 2 exomiser results
+exomiser_rank_threshold = 2
+
 [RunHailFiltering]
 # variables for the hail operations, including CSQ sets and filter thresholds
 ac_threshold = 0.01
