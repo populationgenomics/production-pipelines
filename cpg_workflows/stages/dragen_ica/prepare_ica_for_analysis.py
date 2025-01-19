@@ -47,4 +47,5 @@ def run(
             folder_path=folder_path,
             object_type='FOLDER',
         )
+        logging.info(f'Created folder ID {object_id} for analysis outputs')
     return {'analysis_output_fid': object_id}
