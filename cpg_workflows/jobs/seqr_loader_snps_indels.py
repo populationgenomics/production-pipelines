@@ -37,7 +37,7 @@ def annotate_cohort_jobs_snps_indels(
             str(vep_ht_path),
             None,  # site_only_vqsr_vcf_path
             str(checkpoint_prefix),
-            True,  # long_read
+            # True,  # long_read
         ),
     )
     return j
