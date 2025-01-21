@@ -204,6 +204,39 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
 
 
+@stage(
+    analysis_type='dragen_align_genotype',
+    required_stages=[PrepareIcaForDragenAnalysis, AlignGenotypeWithDragen],
+)
+class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+        return sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json'
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        monitor_pipeline_run: PythonJob = get_batch().new_python_job(
+            name='MonitorAlignGenotypeWithDragen',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+        )
+
+        monitor_pipeline_run.image(image=image_path('ica'))
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        pipeline_run_results = monitor_pipeline_run.call(
+            monitor_align_genotype_with_dragen.run,
+            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
+            api_root=ICA_REST_ENDPOINT,
+        ).as_json()
+        get_batch().write_output(
+            pipeline_run_results,
+            str(outputs),
+        )
+        return self.make_outputs(
+            target=sequencing_group,
+            data=outputs,
+            jobs=monitor_pipeline_run,
+        )
+
+
 # @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
 # class RerunAlignGenotypeWithDragen(SequencingGroupStage):
 #     # Output object with pipeline ID to GCP
@@ -307,45 +340,6 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 #                 data=outputs,
 #                 jobs=rerun_align_genotype_job,
 #             )
-
-
-@stage(
-    analysis_type='dragen_align_genotype',
-    required_stages=[PrepareIcaForDragenAnalysis, AlignGenotypeWithDragen],
-)
-class MonitorAlignGenotypeWithDragen(SequencingGroupStage):
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
-        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return {
-            'success': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
-            'cancelled': sg_bucket
-            / GCP_FOLDER_FOR_RUNNING_PIPELINE
-            / f'{sequencing_group.name}_pipeline_cancelled.json',
-            'failed': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_failed.json',
-        }
-
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        monitor_pipeline_run: PythonJob = get_batch().new_python_job(
-            name='MonitorAlignGenotypeWithDragen',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
-        )
-
-        monitor_pipeline_run.image(image=image_path('ica'))
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
-        pipeline_run_results = monitor_pipeline_run.call(
-            monitor_align_genotype_with_dragen.run,
-            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
-            api_root=ICA_REST_ENDPOINT,
-        ).as_json()
-        get_batch().write_output(
-            pipeline_run_results,
-            str(outputs),
-        )
-        return self.make_outputs(
-            target=sequencing_group,
-            data=outputs,
-            jobs=monitor_pipeline_run,
-        )
 
 
 @stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
