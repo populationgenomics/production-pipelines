@@ -192,7 +192,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             align_genotype_job.image(image=image_path('ica'))
 
             # this writes the pipeline ID to a temp file
-            align_genotype_job.call(
+            align_genotype_job_result = align_genotype_job.call(
                 run_align_genotype_with_dragen.run,
                 ica_fids_path=inputs.as_path(target=sequencing_group, stage=UploadDataToIca),
                 analysis_output_fid_path=inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
@@ -205,7 +205,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 user_reference=user_reference,
                 api_root=ICA_REST_ENDPOINT,
                 output_path=outputs['pipeline_id'],
-            )
+            ).as_json()
             stage_jobs.append(align_genotype_job)
 
         # now monitor that job
@@ -217,7 +217,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         monitor_pipeline_run.image(image=image_path('ica'))
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
-            ica_pipeline_id_path=outputs['pipeline_id'],
+            ica_pipeline_id_path=align_genotype_job_result['pipeline_id'],
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
 
