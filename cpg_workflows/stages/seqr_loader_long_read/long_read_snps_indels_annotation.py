@@ -125,12 +125,12 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             f'--sex {sex} ',
         )
 
-        # block-gzip and index that result
-        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sg.id}', {'tool': 'bcftools'})
+        # normalise, then block-gzip and index that result
+        tabix_job = get_batch().new_job(f'Normalising, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {mod_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(f'bcftools view {mod_job.output} | bcftools norm -m -any | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
