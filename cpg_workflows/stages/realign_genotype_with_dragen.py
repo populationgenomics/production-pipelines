@@ -4,6 +4,7 @@ from math import ceil
 from typing import TYPE_CHECKING, Final
 
 import coloredlogs
+from tomlkit import key
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
@@ -283,7 +284,13 @@ class CancelIcaPipelineRun(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         cancel_pipeline = cancel_pipeline_run.call(
             cancel_ica_pipeline_run.run,
-            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
+            ica_pipeline_id_path=str(
+                inputs.as_path(
+                    target=sequencing_group,
+                    stage=AlignGenotypeWithDragen,
+                    key='pipeline_id',
+                ),
+            ),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
         get_batch().write_output(
