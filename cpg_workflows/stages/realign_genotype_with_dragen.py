@@ -215,14 +215,11 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             name='MonitorAlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
-        logging.info(
-            f'Monitoring pipeline run {align_genotype_job_result} which of type {type(align_genotype_job_result)}',
-        )
 
         monitor_pipeline_run.image(image=image_path('ica'))
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
-            ica_pipeline_id=align_genotype_job_result['pipeline_id'],
+            ica_pipeline_id=align_genotype_job_result,
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
 
