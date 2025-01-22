@@ -37,9 +37,6 @@ def run(
     configuration = icasdk.Configuration(host=api_root)
     configuration.api_key['ApiKeyAuth'] = api_key
 
-    # with open(cpg_utils.to_path(ica_pipeline_id), 'rt') as pipeline_fid_handle:
-    #     ica_pipeline_id: str = pipeline_fid_handle.read().rstrip()
-    # ica_pipeline_id: str = ica_pipeline_id['pipeline_id']
     logging.info(f'Monitoring pipeline run {ica_pipeline_id} which of type {type(ica_pipeline_id)}')
     with icasdk.ApiClient(configuration=configuration) as api_client:
         api_instance = project_analysis_api.ProjectAnalysisApi(api_client)
