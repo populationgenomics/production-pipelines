@@ -166,7 +166,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         ).exists():
             logging.info(f'Previous pipeline found for {sequencing_group.name}, not setting off a new one')
             with open(cpg_utils.to_path(outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
-                align_genotype_job_result: dict[str, str] = {'pipeline_id': pipeline_fid_handle.read().rstrip()}
+                align_genotype_job_result: str = pipeline_fid_handle.read().rstrip()
         elif resume:
             logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
             # IDK, return nothing?
