@@ -259,7 +259,7 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
         pass
 
 
-@stage
+@stage(required_stages=[AlignGenotypeWithDragen])
 class CancelIcaPipelineRun(SequencingGroupStage):
     def expected_outputs(
         self,
