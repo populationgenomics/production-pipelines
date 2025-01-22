@@ -219,7 +219,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         monitor_pipeline_run.image(image=image_path('ica'))
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
-            ica_pipeline_id_path=align_genotype_job_result,
+            ica_pipeline_id=align_genotype_job_result,
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
 
