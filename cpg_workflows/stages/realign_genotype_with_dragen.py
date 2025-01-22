@@ -215,6 +215,9 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             name='MonitorAlignGenotypeWithDragen',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
         )
+        logging.info(
+            f'Monitoring pipeline run {align_genotype_job_result} which of type {type(align_genotype_job_result)}',
+        )
 
         monitor_pipeline_run.image(image=image_path('ica'))
         pipeline_run_results = monitor_pipeline_run.call(
