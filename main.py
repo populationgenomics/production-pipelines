@@ -76,7 +76,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MitoReport,
     ],
     'seqr_loader_long_read': [
-        BamToCram,
+        BamToCram, CramMultiQC,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],

@@ -155,12 +155,13 @@ class SomalierPedigree(DatasetStage):
         if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
-        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
+        sg_hash = dataset.alignment_inputs_hash()
+        prefix = dataset.prefix() / 'somalier' / 'cram' / sg_hash
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.web_prefix() / 'cram-somalier-pedigree.html',
+            'html': dataset.web_prefix() / 'somalier' / 'cram' / sg_hash / 'cram-somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
