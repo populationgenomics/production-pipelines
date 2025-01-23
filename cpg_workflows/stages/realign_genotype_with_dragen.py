@@ -140,7 +140,7 @@ class UploadDataToIca(SequencingGroupStage):
 
 
 @stage(required_stages=[PrepareIcaForDragenAnalysis, UploadDataToIca])
-class AlignGenotypeWithDragen(SequencingGroupStage):
+class ManageDragenPipeline(SequencingGroupStage):
     # Output object with pipeline ID to GCP
     def expected_outputs(
         self,
@@ -195,7 +195,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 jobs=stage_jobs,
             )
 
-        # test if a previous pipeline should be re-monitored
+        # test if a previous pipeline should be re-monitored. Used for when monitor stage on batch crashes and we want to resume
         if (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False)) and cpg_utils.to_path(
             outputs['pipeline_id'],
         ).exists():
@@ -204,7 +204,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 align_genotype_job_result: str = pipeline_fid_handle.read().rstrip()
         elif resume:
             logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
-            # IDK, return nothing?
+            # return nothing?
             return self.make_outputs(target=sequencing_group)
         else:
             dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
@@ -270,7 +270,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
         )
 
 
-@stage(analysis_type='dragen_mlr', required_stages=[AlignGenotypeWithDragen])
+@stage(analysis_type='dragen_mlr', required_stages=[ManageDragenPipeline])
 class GvcfMlrWithDragen(SequencingGroupStage):
     def expected_outputs(
         self,
@@ -294,7 +294,7 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
         pass
 
 
-@stage(required_stages=[AlignGenotypeWithDragen])
+@stage(required_stages=[ManageDragenPipeline])
 class CancelIcaPipelineRun(SequencingGroupStage):
     def expected_outputs(
         self,
@@ -316,7 +316,7 @@ class CancelIcaPipelineRun(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         cancel_pipeline = cancel_pipeline_run.call(
             cancel_ica_pipeline_run.run,
-            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
+            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=ManageDragenPipeline)),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
         get_batch().write_output(
