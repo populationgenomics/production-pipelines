@@ -13,6 +13,11 @@ from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
 
+CHROMOSOMES = [
+    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
+    '22', 'X', 'Y', 'M',
+]
+standard_contigs = hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES])
 
 def annotate_cohort(
     vcf_path: str,
@@ -72,6 +77,7 @@ def annotate_cohort(
             ),
         )
         mt = mt.drop('variant_qc')
+        mt = mt.filter_rows(standard_contigs.contains(mt.locus.contig))
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
@@ -98,10 +104,11 @@ def annotate_cohort(
 
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
     # these elements become a 1-element array
+    index_correction = 0 if long_read else 1
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - 1]],
-            AC=[mt.info.AC[mt.a_index - 1]],
+            AF=[mt.info.AF[mt.a_index - index_correction]],
+            AC=[mt.info.AC[mt.a_index - index_correction]],
         ),
     )
 

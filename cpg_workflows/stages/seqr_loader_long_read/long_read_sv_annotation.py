@@ -34,6 +34,7 @@ VCF_QUERY = gql(
       id
       analyses(type: {eq: "pacbio_vcf"}) {
         output
+        meta
       }
     }
   }
@@ -55,11 +56,12 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
         a dictionary of the SG IDs and their phased SV VCF
     """
     return_dict: dict[str, str] = {}
+    get_logger().info(f'Querying for SV VCFs for {dataset_name}')
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
-    for sg_id_section in analysis_results['project']['sequencingGroups']:
-        for analysis in sg_id_section['analyses']:
-            if analysis['output'].endswith('.SVs.phased.vcf.gz'):
-                return_dict[sg_id_section['id']] = analysis['output']
+    for sg in analysis_results['project']['sequencingGroups']:
+        for analysis in sg['analyses']:
+            if analysis['meta'].get('variant_type') == 'SV':
+                return_dict[sg['id']] = analysis['output']
 
     return return_dict
 
@@ -89,6 +91,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
 
         # find the vcf for this SG
         query_result = query_for_sv_vcfs(dataset_name=sg.dataset.name)
+        get_logger().info(f'keys: {query_result.keys()}')
 
         expected_outputs = self.expected_outputs(sg)
 

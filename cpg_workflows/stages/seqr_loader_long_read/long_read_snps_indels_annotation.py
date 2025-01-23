@@ -62,16 +62,11 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
     """
     return_dict: dict[str, str] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
-    for sg_id_section in analysis_results['project']['sequencingGroups']:
-        for analysis in sg_id_section['analyses']:
-            # check 'output' (old string path format) and 'outputs' (new dict format)
-            if analysis['output'].endswith('SNPs_Indels.phased.vcf.gz'):
-                return_dict[sg_id_section['id']] = analysis['output']
+    for sg in analysis_results['project']['sequencingGroups']:
+        for analysis in sg['analyses']:
+            if analysis['output'].endswith('snp_indel.phased.vcf.gz'):
+                return_dict[sg['id']] = analysis['output']
                 continue
-            if isinstance(analysis['outputs'], dict):
-                if analysis['outputs'].get('path', '').endswith('SNPs_Indels.phased.vcf.gz'):
-                    return_dict[sg_id_section['id']] = analysis['outputs'].get('path', '')
-                    break
 
     return return_dict
 
@@ -130,12 +125,12 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             f'--sex {sex} ',
         )
 
-        # block-gzip and index that result
-        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sg.id}', {'tool': 'bcftools'})
+        # normalise, then block-gzip and index that result
+        tabix_job = get_batch().new_job(f'Normalising, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {mod_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
