@@ -185,7 +185,7 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
             user_tags: list[str] = config_retrieve(['ica', 'tags', 'user_tags'])
             technical_tags: list[str] = config_retrieve(['ica', 'tags', 'technical_tags'])
             reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
-            user_reference: str = config_retrieve(['ica', 'tags', 'user_reference'])
+            user_reference: str = sequencing_group.name
 
             align_genotype_job: PythonJob = get_batch().new_python_job(
                 name='AlignGenotypeWithDragen',
