@@ -104,10 +104,11 @@ def annotate_cohort(
 
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
     # these elements become a 1-element array
+    index_correction = 0 if long_read else 1
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - 1]],
-            AC=[mt.info.AC[mt.a_index - 1]],
+            AF=[mt.info.AF[mt.a_index - index_correction]],
+            AC=[mt.info.AC[mt.a_index - index_correction]],
         ),
     )
 
