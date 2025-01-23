@@ -6,3 +6,7 @@ bam_to_cram_analysis_type = 'pacbio_cram'
 
 [resource_overrides]
 bam_to_cram_storage_gb = 50
+
+[cramqc]
+assume_sorted = true
+num_pcs = 4

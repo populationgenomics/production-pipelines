@@ -38,7 +38,7 @@ class BamToCram(SequencingGroupStage):
         else:
             cram_path = make_long_read_cram_path(sequencing_group)
 
-        return {'cram': cram_path.path, 'cram.crai': cram_path.index_path}
+        return {'cram': cram_path.path, 'crai': cram_path.index_path}
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
