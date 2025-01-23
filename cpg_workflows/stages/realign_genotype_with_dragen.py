@@ -156,6 +156,8 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
 
+        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
+
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
 
         stage_jobs: list[BashJob | PythonJob] = []
@@ -207,6 +209,30 @@ class AlignGenotypeWithDragen(SequencingGroupStage):
                 output_path=outputs['pipeline_id'],
             )
             stage_jobs.append(align_genotype_job)
+
+        # cancel if requested
+        if config_retrieve(['ica', 'pipelines', 'cancel_cohort_run'], False):
+            logging.info('Cancelling pipeline run')
+            cancel_job = get_batch().new_python_job(
+                name='CancelIcaPipelineRun',
+                attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+            )
+            cancel_job.image(image=image_path('ica'))
+            cancel_pipeline_result = cancel_job.call(
+                cancel_ica_pipeline_run.run,
+                ica_pipeline_id_path=str(outputs['pipeline_id']),
+                api_root=ICA_REST_ENDPOINT,
+            ).as_json()
+            logging.info(f'Pipeline cancelled: {cancel_pipeline_result}')
+            get_batch().write_output(
+                cancel_pipeline_result,
+                str(
+                    sg_bucket
+                    / GCP_FOLDER_FOR_RUNNING_PIPELINE
+                    / f'{sequencing_group.name}_pipeline_cancelled_at{slugify(str(datetime.now()))}.json',
+                ),
+            )
+            stage_jobs.append(cancel_job)
 
         # now monitor that job
         monitor_pipeline_run: PythonJob = get_batch().new_python_job(
@@ -281,9 +307,7 @@ class CancelIcaPipelineRun(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         cancel_pipeline = cancel_pipeline_run.call(
             cancel_ica_pipeline_run.run,
-            ica_pipeline_id_path=str(
-                inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen, key='pipeline_id'),
-            ),
+            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=AlignGenotypeWithDragen)),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
         get_batch().write_output(
