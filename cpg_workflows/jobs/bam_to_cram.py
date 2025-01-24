@@ -60,7 +60,7 @@ def bam_to_cram(
 
     cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | '
     if add_rg:
-        cmd += f'samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -r "LB:{sg}" -r "DT:{sg}" -r "CN:{sg}" -r "DS:{sg}" -r "PG:{sg}" -r "PI:{sg}" -r "PM:{sg}" -r "DS:{sg}" -r "DT:{sg}" -r "CO:{sg}" | '
+        cmd += f'samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -r "LB:{sg}" -r "DT:{sg}" -r "CN:{sg}" -r "DS:{sg}" -r "PG:{sg}" -r "PI:{sg}" -r "PM:{sg}" -r "DS:{sg}" -r "DT:{sg}" -r "CO:{sg}" - | '
     cmd += f'tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
 
     # cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
