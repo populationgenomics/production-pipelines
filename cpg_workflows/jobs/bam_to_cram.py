@@ -60,7 +60,7 @@ def bam_to_cram(
 
     if add_rg:
         cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | \
-samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -w - > {j.sorted_cram["cram"]} && \
+samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -w -o {j.sorted_cram["cram"]} - && \
 samtools index -@ {res.get_nthreads() - 1} {j.sorted_cram["cram"]} {j.sorted_cram["crai"]}'
     else:
         cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
