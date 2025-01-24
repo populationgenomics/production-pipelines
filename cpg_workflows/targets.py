@@ -462,7 +462,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.name,
+                dataset=self.name.removesuffix('-test'),
                 **kwargs,
             ),
         )
@@ -474,7 +474,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.name,
+                dataset=self.name.removesuffix('-test'),
                 category='tmp',
                 **kwargs,
             ),
@@ -487,7 +487,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.name,
+                dataset=self.name.removesuffix('-test'),
                 category='analysis',
                 **kwargs,
             ),
@@ -501,7 +501,7 @@ class Dataset(Target):
         return to_path(
             dataset_path(
                 self._seq_type_subdir(),
-                dataset=self.name,
+                dataset=self.name.removesuffix('-test'),
                 category='web',
                 **kwargs,
             ),
@@ -513,7 +513,7 @@ class Dataset(Target):
         """
         return web_url(
             self._seq_type_subdir(),
-            dataset=self.name,
+            dataset=self.name.removesuffix('-test'),
         )
 
     def add_sequencing_group(
