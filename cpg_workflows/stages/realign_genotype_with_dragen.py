@@ -296,7 +296,7 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
 
 @stage(
     analysis_type='ica_data_download',
-    required_stages=[PrepareIcaForDragenAnalysis, GvcfMlrWithDragen],
+    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen],
 )
 class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
