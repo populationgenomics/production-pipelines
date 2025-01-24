@@ -18,6 +18,7 @@ def bam_to_cram(
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
     reference_fasta_path: Path | None = None,
+    add_rg: bool = False,
 ) -> tuple[Job, ResourceGroup]:
     """
     Convert a BAM file to a CRAM file.
@@ -55,7 +56,14 @@ def bam_to_cram(
         },
     )
 
-    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
+    sg = job_attrs.get('sequencing_group', 'unknown')
+
+    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} |'
+    if add_rg:
+        cmd += f'samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -r "LB:{sg}" -r "DT:{sg}" -r "CN:{sg}" -r "DS:{sg}" -r "PG:{sg}" -r "PI:{sg}" -r "PM:{sg}" -r "DS:{sg}" -r "DT:{sg}" -r "CO:{sg}" |'
+    cmd += f'tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
+
+    # cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
     j.command(command(cmd, monitor_space=True))
 
     return j, j.sorted_cram
