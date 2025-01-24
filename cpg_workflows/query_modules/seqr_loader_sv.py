@@ -65,13 +65,13 @@ GENCODE_FILE_HEADER = [
 ]
 
 
-CHROMOSOMES = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
-    '22', 'X', 'Y', 'M',
-]
-hail_contigs = hl.literal(
-    hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES]),
-)
+# CHROMOSOMES = [
+#     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
+#     '22', 'X', 'Y', 'M',
+# ]
+# hail_contigs = hl.literal(
+#     hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES]),
+# )
 
 # yoinking some methods out of hail_scripts.computed_fields
 # removes dependency on submodule completely
@@ -187,9 +187,9 @@ def annotate_cohort_sv(
         skip_invalid_loci=True,
         force_bgz=True,
     )
-    if remove_invalid_contigs:
-        logger.info('Removing invalid contigs')
-        mt = mt.filter_rows(hail_contigs.contains(mt.locus.contig))
+    # if remove_invalid_contigs:
+        # logger.info('Removing invalid contigs')
+        # mt = mt.filter_rows(hail_contigs.contains(mt.locus.contig))
 
     # add attributes required for Seqr
     mt = mt.annotate_globals(
