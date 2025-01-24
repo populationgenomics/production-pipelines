@@ -19,7 +19,7 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     return CramPath(
         path=path,
         index_path=path.with_suffix('.cram.crai'),
-        reference_assembly=reference_path('broad/ref_fasta'),
+        reference_assembly=config_retrieve(['workflow', 'ref_fasta']),
     )
 
 
