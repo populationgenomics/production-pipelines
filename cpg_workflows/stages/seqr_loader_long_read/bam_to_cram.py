@@ -3,7 +3,7 @@ Stage that converts a BAM file to a CRAM file.
 Intended for use with long-read BAM files from PacBio.
 """
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
@@ -55,7 +55,7 @@ class BamToCram(SequencingGroupStage):
             extra_label='long_read',
             job_attrs=self.get_job_attrs(sequencing_group),
             requested_nthreads=1,
-            reference_fasta_path=reference_path('broad/ref_fasta'),
+            reference_fasta_path=to_path(config_retrieve(['workflow', 'ref_fasta'])),
             add_rg=True,
         )
         b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
