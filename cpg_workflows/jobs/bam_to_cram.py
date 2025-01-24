@@ -59,9 +59,12 @@ def bam_to_cram(
     sg = job_attrs.get('sequencing_group', 'unknown')
 
     if add_rg:
-        cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | \
-samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -w -o {j.sorted_cram["cram"]} - && \
-samtools index -@ {res.get_nthreads() - 1} {j.sorted_cram["cram"]} {j.sorted_cram["crai"]}'
+#         cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | \
+# samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -w -o {j.sorted_cram["cram"]} - && \
+# samtools index -@ {res.get_nthreads() - 1} {j.sorted_cram["cram"]} {j.sorted_cram["crai"]}'
+        # Try doing addreplacerg first, then view, then index
+        cmd = f'samtools addreplacerg -@ {res.get_nthreads() - 1} -r "ID:{sg}" -r "SM:{sg}" -r "PL:PACBIO" -r "PU:{sg}" -w {input_bam.bam} | \
+samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C - | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
     else:
         cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
     j.command(command(cmd, monitor_space=True))
