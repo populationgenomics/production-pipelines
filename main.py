@@ -44,6 +44,7 @@ from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
+from cpg_workflows.stages.trim_align import TrimAlignRNA
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
@@ -82,7 +83,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
-    'rare_disease_rnaseq': [Outrider, Fraser],
+    'rare_disease_rnaseq': [TrimAlignRNA, Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV],
 }
 
