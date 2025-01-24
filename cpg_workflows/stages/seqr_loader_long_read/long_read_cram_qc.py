@@ -15,7 +15,7 @@ from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import picard_collect_metrics, picard_hs_metrics, picard_wgs_metrics
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
-from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram, make_long_read_cram_path
 from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
@@ -106,10 +106,9 @@ class LRCramQC(SequencingGroupStage):
         for qc in qc_functions():
             for key, out in qc.outs.items():
                 if key == 'somalier':
-                    # Somalier outputs will be written to self.dataset.prefix() / 'cram' / f'{self.id}.cram.somalier' regardless of input cram path.
-                    outs[key] = sequencing_group.make_cram_path().somalier_path
+                    outs[key] = make_long_read_cram_path(sequencing_group).somalier_path
                 elif out:
-                    outs[key] = sequencing_group.dataset.prefix() / 'qc' / key / f'{sequencing_group.id}{out.suf}'
+                    outs[key] = sequencing_group.dataset.prefix() / 'long_read' / 'qc' / key / f'{sequencing_group.id}{out.suf}'
         return outs
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
