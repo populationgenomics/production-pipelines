@@ -1,5 +1,5 @@
 """
-script for taking the per-family TSVs from Exomiser and combining them
+script for taking the per-proband TSVs from Exomiser and combining them
 into a single JSON file, also written as a Hail Table
 """
 
@@ -13,34 +13,33 @@ import hail as hl
 from cpg_utils import to_path
 
 ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
-FAM_DICT = dict[str, dict[str, list[dict]]]
+PROBAND_DICT = dict[str, dict[str, list[dict]]]
 VAR_DICT = dict[str, list[str]]
 
 
-def process_tsv(tsv_path: str) -> tuple[FAM_DICT, VAR_DICT]:
+def process_tsv(tsv_path: str) -> tuple[PROBAND_DICT, VAR_DICT]:
     """
     Read a single TSV file, and return the parsed results
     Return is in two forms:
     - a dictionary of variant IDs to lists of sample IDs & details
 
-
     the return is a dictionary of variant keys to lists of details
-    the same variant can apply to the same family with multiple MOIs so we retain all
+    the same variant can apply to the same proband with multiple MOIs so we retain all
 
     Args:
         tsv_path (str): path to this TSV file
 
     Returns:
-        a dictionary of variant keys to lists of the 'family_rank_moi'
+        a dictionary of variant keys to lists of the 'proband_rank_moi'
     """
 
-    # this is on the assumption that we retain the path/to/file/FAMILY.variant.tsv naming convention
-    # if we read into the batch as /tmp/path/FAMILY this logic is still valid
+    # this is on the assumption that we retain the path/to/file/PROBAND.variant.tsv naming convention
+    # if we read into the batch as /tmp/path/PROBAND this logic is still valid
     file_as_path = to_path(tsv_path)
-    family = file_as_path.name.split('.')[0]
+    proband = file_as_path.name.split('.')[0]
 
     variant_dictionary: VAR_DICT = defaultdict(list)
-    family_dictionary: FAM_DICT = {family: defaultdict(list)}
+    proband_dictionary: PROBAND_DICT = {proband: defaultdict(list)}
 
     with file_as_path.open() as handle:
         reader = DictReader(handle, delimiter='\t')
@@ -64,7 +63,7 @@ def process_tsv(tsv_path: str) -> tuple[FAM_DICT, VAR_DICT]:
             moi = row['MOI']
 
             # adds easily parsed details to the family dictionary, easily extensible
-            family_dictionary[family][variant_key].append(
+            proband_dictionary[proband][variant_key].append(
                 {
                     'rank': rank,
                     'moi': moi,
@@ -72,10 +71,10 @@ def process_tsv(tsv_path: str) -> tuple[FAM_DICT, VAR_DICT]:
             )
 
             # compressed representation for exporting to Hail
-            squashed_details = f'{family}_{rank}_{moi}'
+            squashed_details = f'{proband}_{rank}_{moi}'
             variant_dictionary[variant_key].append(squashed_details)
 
-    return family_dictionary, variant_dictionary
+    return proband_dictionary, variant_dictionary
 
 
 def process_and_sort_variants(all_variants: VAR_DICT) -> list[dict]:
@@ -91,10 +90,10 @@ def process_and_sort_variants(all_variants: VAR_DICT) -> list[dict]:
 
     # first, split the data up into component parts
     all_vars: list[dict] = []
-    for variant_key, family_details in all_variants.items():
+    for variant_key, proband_data in all_variants.items():
         chrom, pos, ref, alt = variant_key.split(':')
         all_vars.append(
-            {'contig': chrom, 'position': int(pos), 'alleles': [ref, alt], 'family_details': '::'.join(family_details)},
+            {'contig': chrom, 'position': int(pos), 'alleles': [ref, alt], 'proband_details': '::'.join(proband_data)},
         )
 
     # then sort on chr and position
@@ -123,7 +122,7 @@ def munge_into_hail_table(all_variants: VAR_DICT, output_path: str):
     hl.context.init_local(default_reference='GRCh38')
 
     # define the schema for each written line
-    schema = hl.dtype('struct{contig:str,position:int32,alleles:array<str>,family_details:str}')
+    schema = hl.dtype('struct{contig:str,position:int32,alleles:array<str>,proband_details:str}')
 
     # import the table, and transmute to top-level attributes
     ht = hl.import_table(temp_filepath, no_header=True, types={'f0': schema})
@@ -135,31 +134,32 @@ def munge_into_hail_table(all_variants: VAR_DICT, output_path: str):
 
     # write out to the specified location
     ht.write(f'{output_path}.ht', overwrite=True)
+    ht.show()
 
 
 def main(input_tsvs: list[str], output_path: str, as_hail: bool = True):
     """
-    Combine the per-family TSVs into a single JSON file, and write as a Hail Table
+    Combine the per-proband TSVs into a single JSON file, and write as a Hail Table
 
-    The data will be aggregated per variant, not per family
+    The data will be aggregated per variant, not per proband
 
     Args:
-        input_tsvs (list[str]): list of paths to the per-family TSVs
+        input_tsvs (list[str]): list of paths to the per-proband TSVs
         output_path (str): where to write the output
         as_hail (bool): if True, write the data out as a Hail Table
     """
 
     variant_dictionary: VAR_DICT = defaultdict(list)
-    all_family_dictionary: FAM_DICT = {}
+    all_proband_dictionary: PROBAND_DICT = {}
     for tsv in input_tsvs:
-        family_dict, variant_dict = process_tsv(tsv)
-        all_family_dictionary.update(family_dict)
+        proband_dict, variant_dict = process_tsv(tsv)
+        all_proband_dictionary.update(proband_dict)
         for key, value_list in variant_dict.items():
             variant_dictionary[key].extend(value_list)
 
     # write the JSON
     with open(f'{output_path}.json', 'w') as handle:
-        json.dump(all_family_dictionary, handle, indent=4)
+        json.dump(all_proband_dictionary, handle, indent=4)
 
     if as_hail:
         munge_into_hail_table(variant_dictionary, output_path)
@@ -167,7 +167,7 @@ def main(input_tsvs: list[str], output_path: str, as_hail: bool = True):
 
 def cli_main():
     parser = ArgumentParser()
-    parser.add_argument('--input', help='Path to the per-family TSVs', nargs='+', required=True)
+    parser.add_argument('--input', help='Path to the Variant result TSVs', nargs='+', required=True)
     parser.add_argument('--output', help='Where to write the output, extended as .json and .ht', required=True)
     args = parser.parse_args()
 

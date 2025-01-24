@@ -8,6 +8,11 @@ status_reporter = 'metamist'
 #clinvar_decisions = "HailTable path to private ClinVar"
 #clinvar_pm5 = "HailTable path to ClinVar PM5"
 
+# this can be "custom" or "matrixtable"
+# "custom" if the analysis entry type written by seqr_loader
+# "matrixtable" if the analysis entry type written by the rd_combiner
+mt_entry_type = 'matrixtable'
+
 [GeneratePanelData]
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
@@ -36,6 +41,9 @@ phenotype_match = ['6']
 
 ## all these labels will be removed
 #ignore_categories = ['categoryboolean6']
+
+# by default, only consider the top 2 exomiser results
+exomiser_rank_threshold = 2
 
 [RunHailFiltering]
 # variables for the hail operations, including CSQ sets and filter thresholds
@@ -76,7 +84,6 @@ sv = 10
 small_variants = 15000
 sv = 3600
 
-
 [categories]
 1 = 'ClinVar Pathogenic'
 3 = 'High Impact Variant'
@@ -85,7 +92,9 @@ sv = 3600
 6 = 'AlphaMissense P/LP'
 pm5 = 'ACMG PM5 - missense in same residue as known pathogenic'
 support = 'High in Silico Scores'
+svdb = 'SpliceVarDB Predicted Splice-Altering'
 sv1 = 'Predicted LOF SV'
+exomiser = 'Variant prioritised by Exomiser'
 
 # cohort specific parts of the config are not stored in this repository due to data protection concerns.
 # Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration
