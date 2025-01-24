@@ -294,42 +294,6 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
         pass
 
 
-@stage(required_stages=[ManageDragenPipeline])
-class CancelIcaPipelineRun(SequencingGroupStage):
-    def expected_outputs(
-        self,
-        sequencing_group: SequencingGroup,
-    ) -> cpg_utils.Path:
-        sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return (
-            sg_bucket
-            / GCP_FOLDER_FOR_RUNNING_PIPELINE
-            / f'{sequencing_group.name}_pipeline_cancelled_at{slugify(str(datetime.now()))}.json'
-        )
-
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cancel_pipeline_run: PythonJob = get_batch().new_python_job(
-            name='CancelIcaPipelineRun',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
-        )
-        cancel_pipeline_run.image(image=image_path('ica'))
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
-        cancel_pipeline = cancel_pipeline_run.call(
-            cancel_ica_pipeline_run.run,
-            ica_pipeline_id_path=str(inputs.as_path(target=sequencing_group, stage=ManageDragenPipeline)),
-            api_root=ICA_REST_ENDPOINT,
-        ).as_json()
-        get_batch().write_output(
-            cancel_pipeline,
-            str(outputs),
-        )
-        return self.make_outputs(
-            target=sequencing_group,
-            data=outputs,
-            jobs=cancel_pipeline_run,
-        )
-
-
 @stage(
     analysis_type='ica_data_download',
     required_stages=[PrepareIcaForDragenAnalysis, GvcfMlrWithDragen],
