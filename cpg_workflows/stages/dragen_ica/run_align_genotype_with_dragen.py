@@ -142,4 +142,4 @@ def run(
         with cpg_utils.to_path(output_path).open('w') as f:
             f.write(analysis_run_id)
 
-    return {'pipeline_id': analysis_run_id}
+    return analysis_run_id
