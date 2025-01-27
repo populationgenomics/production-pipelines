@@ -145,7 +145,7 @@ class ManageDragenPipeline(SequencingGroupStage):
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
-    ) -> dict[str, cpg_utils.Path | str]:
+    ) -> dict[str, cpg_utils.Path]:
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
             'output': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
