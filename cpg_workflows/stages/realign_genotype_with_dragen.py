@@ -178,7 +178,6 @@ class ManageDragenPipeline(SequencingGroupStage):
                 ica_pipeline_id_path=str(outputs['pipeline_id']),
                 api_root=ICA_REST_ENDPOINT,
             ).as_json()
-            logging.info(f'Pipeline cancelled: {cancel_pipeline_result}')
             get_batch().write_output(
                 cancel_pipeline_result,
                 str(
