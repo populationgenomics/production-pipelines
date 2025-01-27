@@ -335,3 +335,52 @@ class DownloadDataFromIca(SequencingGroupStage):
             data=self.expected_outputs(sequencing_group=sequencing_group),
             jobs=ica_download_job,
         )
+
+
+@stage(
+    analysis_type='cram',
+    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
+    forced=True,
+)
+class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
+    def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
+        bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
+        pipeline_id_path = bucket_name / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
+
+        with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
+            pipeline_id = pipeline_fid_handle.read().strip()
+
+        download_path = bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / f'{sequencing_group.name}-{pipeline_id}'
+
+        return {
+            'cram': download_path / f'{sequencing_group.name}.cram',
+            'crai': download_path / f'{sequencing_group.name}.cram.crai',
+        }
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        outputs = self.expected_outputs(sequencing_group=sequencing_group)
+        ica_outputs = {
+            'pipeline_id': inputs.as_path(target=sequencing_group, stage=ManageDragenPipeline, key='pipeline_id'),
+            'downloaded_data': inputs.as_path(target=sequencing_group, stage=DownloadDataFromIca),
+        }
+
+        with open(cpg_utils.to_path(ica_outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
+            pipeline_id: str = pipeline_fid_handle.read().rstrip()
+
+        # Confirm existence of CRAM and CRAI files
+        download_path = ica_outputs['downloaded_data'] / f'{sequencing_group.name}-{pipeline_id}'
+        if not (outputs['cram']).exists():
+            raise FileNotFoundError(f'CRAM not found in {download_path}')
+        if not (outputs['crai']).exists():
+            raise FileNotFoundError(f'CRAI not found in {download_path}')
+
+        return self.make_outputs(
+            target=sequencing_group,
+            data=ica_outputs['downloaded_data'] / 'metamist_cram_register_succes.json',
+            jobs=None,
+        )
+
+
+@stage(required_stages=[RegisterCramIcaOutputsInMetamist])
+class RegisterAllIcaOutputsInMetamist(SequencingGroupStage):
+    pass
