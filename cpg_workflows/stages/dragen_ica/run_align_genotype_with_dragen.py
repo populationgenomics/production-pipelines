@@ -89,7 +89,7 @@ def run(
     user_reference: str,
     api_root: str,
     output_path: str,
-):
+) -> str:
     """_summary_
 
     Args:
