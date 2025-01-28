@@ -387,10 +387,25 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         if not (outputs['crai']).exists():
             raise FileNotFoundError(f'CRAI not found in {download_path}')
 
+        batch_instance: Batch = get_batch()
+        register_cram_job: BashJob = batch_instance.new_bash_job(
+            name='RegisterCramIcaOutputsInMetamist',
+            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+        )
+
+        register_cram_job.memory('8Gi')
+        register_cram_job.image(image=image_path('ica'))
+
+        register_cram_job.command(
+            """
+            echo 'Registering CRAM and CRAI files in Metamist'
+        """,
+        )
+
         return self.make_outputs(
             target=sequencing_group,
             data=ica_outputs['downloaded_data'] / 'metamist_cram_register_succes.json',
-            jobs=None,
+            jobs=register_cram_job,
         )
 
 
