@@ -340,12 +340,15 @@ class DownloadDataFromIca(SequencingGroupStage):
 @stage(
     analysis_type='cram',
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-    forced=True,
+    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
         bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
         pipeline_id_path = bucket_name / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
+
+        if not pipeline_id_path.exists():
+            raise FileNotFoundError(f'Pipeline ID not found in {pipeline_id_path}')
 
         with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
             pipeline_id = pipeline_fid_handle.read().strip()
@@ -353,7 +356,6 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         download_path = (
             bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / sequencing_group.name
             / sequencing_group.name
             / f'{sequencing_group.name}-{pipeline_id}'
             / sequencing_group.name
@@ -375,17 +377,10 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         # Confirm existence of CRAM and CRAI files
-        download_path = (
-            ica_outputs['downloaded_data']
-            / sequencing_group.name
-            / f'{sequencing_group.name}-{pipeline_id}'
-            / sequencing_group.name
-        )
-        logging.info(f'download_path: {download_path} and outputs: {outputs}')
         if not (outputs['cram']).exists():
-            raise FileNotFoundError(f'CRAM not found in {download_path}')
+            raise FileNotFoundError(f'CRAM not found in {outputs["cram"]}')
         if not (outputs['crai']).exists():
-            raise FileNotFoundError(f'CRAI not found in {download_path}')
+            raise FileNotFoundError(f'CRAI not found in {outputs["crai"]}')
 
         batch_instance: Batch = get_batch()
         register_cram_job: BashJob = batch_instance.new_bash_job(
@@ -399,7 +394,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         register_cram_job.command(
             """
             echo 'Registering CRAM and CRAI files in Metamist'
-        """,
+            """,
         )
 
         return self.make_outputs(
