@@ -148,15 +148,22 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
 
 @lru_cache(maxsize=None)
-def query_for_latest_hail_object(dataset: str, analysis_type: str, object_suffix: str = '.mt') -> str:
+def query_for_latest_hail_object(
+        dataset: str,
+        analysis_type: str,
+        object_suffix: str = '.mt',
+        exact_string: str | None = None
+) -> str:
     """
     query for the latest MT for a dataset
     the exact metamist entry type to search for is handled by config, defaulting to the new rd_combiner MT
     Args:
-        dataset (str): project to query for
+        dataset (str):       project to query for
         analysis_type (str): analysis type to query for - rd_combiner writes MTs to metamist as 'matrixtable',
                              seqr_loader used 'custom': using a config entry we can decide which type to use
         object_suffix (str): suffix to detect on analysis path (choose between .mt or .ht)
+        exact_string (str):  if set, analysis entries will only be considered if this substring is in the path
+                             the intended use here is targeting outputs from a single Stage (annotate cohort vs dataset)
     Returns:
         str, the path to the latest object for the given type
     """
@@ -178,7 +185,9 @@ def query_for_latest_hail_object(dataset: str, analysis_type: str, object_suffix
             and analysis['output'].endswith(object_suffix)
             and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
         ):
-            mt_by_date[analysis['timestampCompleted']] = analysis['output']
+            # if exact string is absent, or set and in this output path, use it
+            if (exact_string is None) or (exact_string in analysis['output']):
+                mt_by_date[analysis['timestampCompleted']] = analysis['output']
 
     if not mt_by_date:
         raise ValueError(f'No MT found for dataset {query_dataset}')
