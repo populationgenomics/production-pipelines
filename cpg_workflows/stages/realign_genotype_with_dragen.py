@@ -326,7 +326,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             f"""
             {ICA_CLI_SETUP}
             icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
-            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
+            gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
         """,
         )
 
@@ -350,7 +350,9 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
             pipeline_id = pipeline_fid_handle.read().strip()
 
-        download_path = bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / f'{sequencing_group.name}-{pipeline_id}'
+        download_path = (
+            bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / sequencing_group.name / f'{sequencing_group.name}-{pipeline_id}'
+        )
 
         return {
             'cram': download_path / f'{sequencing_group.name}.cram',
@@ -368,7 +370,10 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         # Confirm existence of CRAM and CRAI files
-        download_path = ica_outputs['downloaded_data'] / f'{sequencing_group.name}-{pipeline_id}'
+        download_path = (
+            ica_outputs['downloaded_data'] / sequencing_group.name / f'{sequencing_group.name}-{pipeline_id}'
+        )
+        logging.info(f'download_path: {download_path} and outputs: {outputs}')
         if not (outputs['cram']).exists():
             raise FileNotFoundError(f'CRAM not found in {download_path}')
         if not (outputs['crai']).exists():
