@@ -404,7 +404,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 
         return self.make_outputs(
             target=sequencing_group,
-            data=ica_outputs['downloaded_data'] / 'metamist_cram_register_succes.json',
+            data=outputs['cram'],
             jobs=register_cram_job,
         )
 
