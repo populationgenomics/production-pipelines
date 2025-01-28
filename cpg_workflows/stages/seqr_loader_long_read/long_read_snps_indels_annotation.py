@@ -77,7 +77,6 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
     take each of the long-read SNPs Indels VCFs, and re-format the contents
     the huge REF strings are just not required
     a symbolic ALT allele (instead of "N") is required for annotation
-    adds a unique ID to each record, so that GATK-SV can do its weird sorting (is this necessary for SNPs?)
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
@@ -130,11 +129,16 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(
+            f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
+        )
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
-        get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
+        get_batch().write_output(
+            tabix_job.vcf_out,
+            str(expected_outputs['vcf']).removesuffix('.vcf.bgz'),
+        )
 
         return self.make_outputs(target=sg, jobs=[mod_job, tabix_job], data=expected_outputs)
 

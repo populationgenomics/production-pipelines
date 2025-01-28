@@ -31,7 +31,8 @@ def bam_to_cram(
         job_name += f' {extra_label}'
 
     convert_tool = 'samtools_view'
-    j_attrs = (job_attrs or {}) | dict(label=job_name, tool=convert_tool)
+    job_attrs = job_attrs or {}
+    j_attrs = job_attrs | dict(label=job_name, tool=convert_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
 
@@ -46,7 +47,7 @@ def bam_to_cram(
     res = STANDARD.set_resources(
         j,
         ncpu=nthreads,
-        storage_gb=config_retrieve(['resource_overrides', 'bam_to_cram_storage_gb'], 50),
+        storage_gb=config_retrieve(['resource_overrides', 'bam_to_cram', 'storage_gb'], 50),
     )
 
     j.declare_resource_group(

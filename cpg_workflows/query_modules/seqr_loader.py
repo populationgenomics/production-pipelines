@@ -14,10 +14,34 @@ from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
 
 CHROMOSOMES = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
-    '22', 'X', 'Y', 'M',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9',
+    '10',
+    '11',
+    '12',
+    '13',
+    '14',
+    '15',
+    '16',
+    '17',
+    '18',
+    '19',
+    '20',
+    '21',
+    '22',
+    'X',
+    'Y',
+    'M',
 ]
 standard_contigs = hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES])
+
 
 def annotate_cohort(
     vcf_path: str,

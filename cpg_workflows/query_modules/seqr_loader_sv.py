@@ -73,6 +73,7 @@ GENCODE_FILE_HEADER = [
 #     hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES]),
 # )
 
+
 # yoinking some methods out of hail_scripts.computed_fields
 # removes dependency on submodule completely
 def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
@@ -157,9 +158,9 @@ def parse_gtf_from_local(gtf_path: str, chunk_size: int | None = None) -> hl.dic
 
 
 def annotate_cohort_sv(
-    vcf_path: str, 
-    out_mt_path: str, 
-    gencode_gz: str, 
+    vcf_path: str,
+    out_mt_path: str,
+    gencode_gz: str,
     checkpoint: str | None = None,
     remove_invalid_contigs: bool = True,
 ):
@@ -188,8 +189,8 @@ def annotate_cohort_sv(
         force_bgz=True,
     )
     # if remove_invalid_contigs:
-        # logger.info('Removing invalid contigs')
-        # mt = mt.filter_rows(hail_contigs.contains(mt.locus.contig))
+    # logger.info('Removing invalid contigs')
+    # mt = mt.filter_rows(hail_contigs.contains(mt.locus.contig))
 
     # add attributes required for Seqr
     mt = mt.annotate_globals(

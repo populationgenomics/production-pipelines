@@ -15,7 +15,7 @@ from cpg_workflows.jobs.multiqc import multiqc
 from cpg_workflows.jobs.picard import picard_collect_metrics, picard_hs_metrics, picard_wgs_metrics
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
-from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram, make_long_read_cram_path
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import ConvertPacBioBamToCram, make_long_read_cram_path
 from cpg_workflows.targets import Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
@@ -95,7 +95,7 @@ def qc_functions() -> list[Qc]:
     return qcs
 
 
-@stage(required_stages=BamToCram)
+@stage(required_stages=ConvertPacBioBamToCram)
 class LRCramQC(SequencingGroupStage):
     """
     Calling tools that process CRAM for QC purposes.
@@ -108,12 +108,14 @@ class LRCramQC(SequencingGroupStage):
                 if key == 'somalier':
                     outs[key] = make_long_read_cram_path(sequencing_group).somalier_path
                 elif out:
-                    outs[key] = sequencing_group.dataset.prefix() / 'long_read' / 'qc' / key / f'{sequencing_group.id}{out.suf}'
+                    outs[key] = (
+                        sequencing_group.dataset.prefix() / 'long_read' / 'qc' / key / f'{sequencing_group.id}{out.suf}'
+                    )
         return outs
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        cram_path = inputs.as_path(sequencing_group, BamToCram, 'cram')
-        crai_path = inputs.as_path(sequencing_group, BamToCram, 'crai')
+        cram_path = inputs.as_path(sequencing_group, ConvertPacBioBamToCram, 'cram')
+        crai_path = inputs.as_path(sequencing_group, ConvertPacBioBamToCram, 'crai')
 
         jobs = []
         # This should run if either the stage or the sequencing group is being forced.

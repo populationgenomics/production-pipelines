@@ -2,10 +2,16 @@
 name = 'seqr_loader_long_read'
 dataset_gcp_project = 'seqr-308602'
 status_reporter = 'metamist'
-bam_to_cram_analysis_type = 'pacbio_cram'
 
-[resource_overrides]
-bam_to_cram_storage_gb = 50
+[workflow.bam_to_cram]
+analysis_type = 'pacbio_cram'
+# Use samtools addreplacerg to add read groups to the CRAM file
+add_rg = false
+
+[resource_overrides.bam_to_cram]
+nthreads = 1
+storage_gb = 50
+
 
 [cramqc]
 assume_sorted = true

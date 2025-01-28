@@ -19,14 +19,14 @@ def make_long_read_cram_path(sequencing_group: SequencingGroup) -> CramPath:
     return CramPath(
         path=path,
         index_path=path.with_suffix('.cram.crai'),
-        reference_assembly=config_retrieve(['workflow', 'ref_fasta']),
+        reference_assembly=config_retrieve(['workflow', 'ref_fasta'], reference_path('broad/ref_fasta')),
     )
 
 
-@stage(analysis_type=config_retrieve(['workflow', 'bam_to_cram_analysis_type'], 'cram'), analysis_keys=['cram'])
-class BamToCram(SequencingGroupStage):
+@stage(analysis_type=config_retrieve(['workflow', 'bam_to_cram', 'analysis_type'], 'cram'), analysis_keys=['cram'])
+class ConvertPacBioBamToCram(SequencingGroupStage):
     """
-    Convert a BAM to a CRAM file.
+    Convert a PacBio BAM to a CRAM file.
     """
 
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, Path]:
@@ -47,16 +47,16 @@ class BamToCram(SequencingGroupStage):
         b = get_batch()
         assert (
             sequencing_group.sequencing_type == 'genome'
-        ), f'Only genome sequencing type is supported for BAM to CRAM conversion, unavailable for {sequencing_group.id}'
+        ), f'Only genomes are supported for BAM to CRAM conversion, unavailable for {sequencing_group.id}'
         input_bam = b.read_input_group(bam=str(sequencing_group.alignment_input))
         job, output_cram = bam_to_cram.bam_to_cram(
             b=get_batch(),
             input_bam=input_bam,
             extra_label='long_read',
             job_attrs=self.get_job_attrs(sequencing_group),
-            requested_nthreads=1,
-            reference_fasta_path=to_path(config_retrieve(['workflow', 'ref_fasta'])),
-            add_rg=True,
+            requested_nthreads=config_retrieve(['resource_overrides', 'bam_to_cram', 'nthreads'], 1),
+            reference_fasta_path=to_path(config_retrieve(['workflow', 'ref_fasta'], reference_path('broad/ref_fasta'))),
+            add_rg=config_retrieve(['workflow', 'bam_to_cram', 'add_rg'], False),
         )
         b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
 

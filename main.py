@@ -39,8 +39,7 @@ from cpg_workflows.stages.rd_combiner import (
     TrainVqsrSnpTranches,
 )
 from cpg_workflows.stages.seqr_loader import AnnotateDataset, DatasetVCF, MtToEs
-from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import BamToCram
-from cpg_workflows.stages.seqr_loader_long_read.long_read_cram_qc import LRCramMultiQC
+from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import ConvertPacBioBamToCram
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
 from cpg_workflows.stages.stripy import Stripy
@@ -77,7 +76,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         MitoReport,
     ],
     'seqr_loader_long_read': [
-        BamToCram, LRCramMultiQC,
+        ConvertPacBioBamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
