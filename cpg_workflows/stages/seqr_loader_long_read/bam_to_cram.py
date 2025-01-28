@@ -64,7 +64,7 @@ class ConvertPacBioBamToCram(SequencingGroupStage):
                 raise ValueError('Reheadering requires a file containing the new @SQ header lines')
             sq_file = b.read_input(sq_reheadering_file)
             reheader_job = b.new_bash_job(name='reheader_cram_sq_lines')
-            reheader_job.storage(str(config_retrieve(['resource_overrides', 'bam_to_cram', 'storage_gb']))+'Gi', '50Gi')
+            reheader_job.storage('50Gi')
             reheader_job.image(config_retrieve(['workflow', 'driver_image']))
             reheader_job.command(
                 f'reheader_cram_sq_lines --input_cram {output_cram} --sq_file {sq_file}',
