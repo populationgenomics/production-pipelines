@@ -367,6 +367,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             'crai': download_path / f'{sequencing_group.name}.cram.crai',
             'register_success': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
+            / sequencing_group.name
             / f'{sequencing_group.name}-{pipeline_id}'
             / f'{sequencing_group.name}_registered_CRAM_success.txt',
         }
