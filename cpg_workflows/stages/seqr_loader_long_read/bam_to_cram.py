@@ -67,7 +67,7 @@ class ConvertPacBioBamToCram(SequencingGroupStage):
             reheader_job.storage('50Gi')
             reheader_job.image(image_path('samtools'))
             reheader_job.command(
-                f'reheader_cram_sq_lines --input_cram {output_cram} --sq_file {sq_file}',
+                f'reheader_cram_sq_lines --cram {output_cram.cram} --crai {output_cram.crai} --sq_file {sq_file}',
             )
 
             b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))

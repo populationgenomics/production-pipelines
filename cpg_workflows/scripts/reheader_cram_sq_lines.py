@@ -6,30 +6,32 @@ from argparse import ArgumentParser
 
 def cli_main():
     parser = ArgumentParser(description='CLI for the CRAM @SQ line reheadering script')
-    parser.add_argument('--input_cram', help='Path to a localised CRAM, this will be modified in place', required=True)
+    parser.add_argument('--cram', help='Path to a localised CRAM, this will be modified in place', required=True)
+    parser.add_argument('--crai', help='Path to a localised CRAM index file', required=True)
     parser.add_argument('--sq_file', help='Path to a localised file containing the new @SQ header lines', required=True)
     args = parser.parse_args()
 
     reheader_cram_sq_lines(
-        input_cram=args.input_cram,
+        cram=args.cram,
+        crai=args.crai,
         sq_file=args.sq_file,
     )
 
 def reheader_cram_sq_lines(
-    input_cram: str, sq_file: str,
+    cram: str, crai: str, sq_file: str,
 ):
     """
     Reads the CRAM header lines and replaces each @SQ line with the corresponding lines from the SQ file.
     Leaves all other header lines unchanged.
 
     args:
-        input_cram: str, path to the input CRAM file
-        output_cram: str, path to the output CRAM file
+        cram: str, path to the CRAM file
+        crai: str, path to the crai index file
         sq_file: str, path to the SQ header lines file
     """
-    header_lines, sq_index = read_headers(input_cram)
+    header_lines, sq_index = read_headers(cram)
     if header_lines is None:
-        print(f'Error: Could not read the headers from {input_cram}', file=sys.stderr)
+        print(f'Error: Could not read the headers from {cram}', file=sys.stderr)
         sys.exit(1)
 
     sq_lines = read_sq_lines(sq_file)
@@ -45,24 +47,24 @@ def reheader_cram_sq_lines(
 
 
     run = sb.run(
-        ['samtools', 'reheader', '--no-PG', '--in-place', new_header_file, input_cram],
+        ['samtools', 'reheader', '--no-PG', '--in-place', new_header_file, cram],
         check=True,
     )
     if run.returncode != 0:
         print(f'Error: Could not reheader the CRAM file: {run.stderr}', file=sys.stderr)
         sys.exit(1)
     else:
-        print(f'Successfully reheadered the CRAM file: {input_cram}')
+        print(f'Successfully reheadered the CRAM file: {cram}')
 
     run_index = sb.run(
-        ['samtools', 'index', input_cram],
+        ['samtools', 'index', cram, '--output', crai],
         check=True,
     )
     if run_index.returncode != 0:
         print(f'Error: Could not index the CRAM file: {run_index.stderr}', file=sys.stderr)
         sys.exit(1)
     else:
-        print(f'Successfully indexed the CRAM file: {input_cram}.crai')
+        print(f'Successfully indexed the CRAM file: {crai}')
 
 
 def add_sq_lines_to_header(cram_header: list[str], sq_index: int, sq_lines: list[str]):
