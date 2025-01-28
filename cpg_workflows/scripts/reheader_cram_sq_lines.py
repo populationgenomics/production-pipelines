@@ -6,12 +6,12 @@ from argparse import ArgumentParser
 
 def cli_main():
     parser = ArgumentParser(description='CLI for the CRAM @SQ line reheadering script')
-    parser.add_argument('--cram_in', help='Path to a localised CRAM, this will be modified in place', required=True)
+    parser.add_argument('--input_cram', help='Path to a localised CRAM, this will be modified in place', required=True)
     parser.add_argument('--sq_file', help='Path to a localised file containing the new @SQ header lines', required=True)
     args = parser.parse_args()
 
     reheader_cram_sq_lines(
-        file_in=args.cram_in,
+        input_cram=args.input_cram,
         sq_file=args.sq_file,
     )
 
