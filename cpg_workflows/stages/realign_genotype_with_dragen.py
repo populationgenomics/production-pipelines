@@ -354,6 +354,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
             / sequencing_group.name
+            / sequencing_group.name
             / f'{sequencing_group.name}-{pipeline_id}'
             / sequencing_group.name
         )
