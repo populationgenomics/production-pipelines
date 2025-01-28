@@ -14,7 +14,6 @@ from cpg_workflows.stages.talos import query_for_latest_hail_object
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
-
 # this pipeline is only ever expected to run for one project
 VALIDATION_PROJECT: str = 'validation'
 # default Stage-as-source is the RD_Combiner version
@@ -81,8 +80,8 @@ class ValidationMtToVcf(SequencingGroupStage):
             dataset_path(
                 dataset=VALIDATION_PROJECT,
                 # repeat "validation" as pipeline folder, within the validation bucket
-                suffix=f'validation/{hash_str}/{sequencing_group.id}.vcf.bgz'
-            )
+                suffix=f'validation/{hash_str}/{sequencing_group.id}.vcf.bgz',
+            ),
         )
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -164,7 +163,7 @@ class ValidationHappyOnVcf(SequencingGroupStage):
         output_prefix = dataset_path(
             dataset=VALIDATION_PROJECT,
             # repeat "validation" as pipeline folder, within the validation bucket
-            suffix=f'validation/{hash_str}/{sequencing_group.external_id}__{sequencing_group.id}'
+            suffix=f'validation/{hash_str}/{sequencing_group.external_id}__{sequencing_group.id}',
         )
 
         return {

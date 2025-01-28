@@ -149,10 +149,10 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
 @lru_cache(maxsize=None)
 def query_for_latest_hail_object(
-        dataset: str,
-        analysis_type: str,
-        object_suffix: str = '.mt',
-        exact_string: str | None = None
+    dataset: str,
+    analysis_type: str,
+    object_suffix: str = '.mt',
+    exact_string: str | None = None,
 ) -> str:
     """
     query for the latest MT for a dataset

@@ -3,6 +3,7 @@ A couple of quick validation tests
 """
 
 import pytest
+
 from cpg_workflows.stages.happy_validation import find_hash_from_path
 
 
