@@ -65,6 +65,8 @@ setup(
         'console_scripts': [
             # script for modifying the content of a sniffles VCF, used in Long-Read SV pipeline
             'modify_sniffles = cpg_workflows.scripts.long_read_sniffles_vcf_modifier:cli_main',
+            # script for reheadering the @SQ lines in a CRAM file, used in long-read pipeline
+            'reheader_cram_sq_lines = cpg_workflows.scripts.reheader_cram_sq_lines:cli_main',
             # for use in translating a MatrixTable to an ES index, first localising the MT
             'mt_to_es = cpg_workflows.scripts.mt_to_es_without_dataproc:main',
             # Generate new intervals from a MatrixTable

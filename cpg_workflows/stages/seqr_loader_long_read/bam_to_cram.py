@@ -58,6 +58,20 @@ class ConvertPacBioBamToCram(SequencingGroupStage):
             reference_fasta_path=to_path(config_retrieve(['workflow', 'ref_fasta'], reference_path('broad/ref_fasta'))),
             add_rg=config_retrieve(['workflow', 'bam_to_cram', 'add_rg'], False),
         )
-        b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
+        if config_retrieve(['workflow', 'bam_to_cram', 'reheader'], False):
+            sq_reheadering_file = config_retrieve(['workflow', 'bam_to_cram', 'sq_file'], None)
+            if not sq_reheadering_file:
+                raise ValueError('Reheadering requires a file containing the new @SQ header lines')
+            sq_file = b.read_input(sq_reheadering_file)
+            reheader_job = b.new_bash_job(name='reheader_cram_sq_lines')
+            reheader_job.storage(str(config_retrieve(['resource_overrides', 'bam_to_cram', 'storage_gb'])+'Gi', '50Gi'))
+            reheader_job.image(config_retrieve(['workflow', 'driver_image']))
+            reheader_job.command(
+                f'reheader_cram_sq_lines --input_cram {output_cram} --sq_file {sq_file}',
+            )
 
+            b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
+            return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[job, reheader_job])
+
+        b.write_output(output_cram, str(self.expected_outputs(sequencing_group)['cram']).removesuffix('.cram'))
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=[job])
