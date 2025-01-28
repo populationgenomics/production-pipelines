@@ -4,7 +4,7 @@ Intended for use with long-read BAM files from PacBio.
 """
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import config_retrieve, reference_path
+from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import bam_to_cram
@@ -65,7 +65,7 @@ class ConvertPacBioBamToCram(SequencingGroupStage):
             sq_file = b.read_input(sq_reheadering_file)
             reheader_job = b.new_bash_job(name='reheader_cram_sq_lines')
             reheader_job.storage('50Gi')
-            reheader_job.image(config_retrieve(['workflow', 'driver_image']))
+            reheader_job.image(image_path('samtools'))
             reheader_job.command(
                 f'reheader_cram_sq_lines --input_cram {output_cram} --sq_file {sq_file}',
             )
