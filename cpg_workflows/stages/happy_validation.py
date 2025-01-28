@@ -19,7 +19,6 @@ VALIDATION_PROJECT: str = 'validation'
 # default Stage-as-source is the RD_Combiner version
 ANNOTATE_DATASET: str = 'AnnotateDatasetSmallVariantsWithHailQuery'
 # a regex to pull the output_version hash from the full output path
-# ends with `.+`, requires additional content after the Hash
 OUTPUT_VERSION_REGEX = re.compile(r'gs://.+/(?P<hash>\w+_\d+)')
 
 
