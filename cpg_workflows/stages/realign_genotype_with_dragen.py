@@ -339,8 +339,9 @@ class DownloadDataFromIca(SequencingGroupStage):
 
 @stage(
     analysis_type='cram',
+    analysis_keys=['register_success'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
+    # forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
@@ -364,6 +365,10 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         return {
             'cram': download_path / f'{sequencing_group.name}.cram',
             'crai': download_path / f'{sequencing_group.name}.cram.crai',
+            'register_success': bucket_name
+            / GCP_FOLDER_FOR_ICA_DOWNLOAD
+            / f'{sequencing_group.name}-{pipeline_id}'
+            / f'{sequencing_group.name}_registered_CRAM_success.txt',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -392,14 +397,15 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         register_cram_job.image(image=image_path('ica'))
 
         register_cram_job.command(
-            """
-            echo 'Registering CRAM and CRAI files in Metamist'
+            f"""
+            echo 'Pipeline run {pipeline_id} CRAM and CRAI files successfully registered in Metamist' > {register_cram_job.ofile}
             """,
         )
+        get_batch().write_output(register_cram_job.ofile, str(outputs['register_success']))
 
         return self.make_outputs(
             target=sequencing_group,
-            data=outputs['cram'],
+            data=outputs,
             jobs=register_cram_job,
         )
 
