@@ -65,15 +65,6 @@ GENCODE_FILE_HEADER = [
 ]
 
 
-# CHROMOSOMES = [
-#     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18', '19', '20', '21',
-#     '22', 'X', 'Y', 'M',
-# ]
-# hail_contigs = hl.literal(
-#     hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES]),
-# )
-
-
 # yoinking some methods out of hail_scripts.computed_fields
 # removes dependency on submodule completely
 def get_expr_for_contig_number(locus: hl.LocusExpression) -> hl.Int32Expression:
@@ -162,7 +153,6 @@ def annotate_cohort_sv(
     out_mt_path: str,
     gencode_gz: str,
     checkpoint: str | None = None,
-    remove_invalid_contigs: bool = True,
 ):
     """
     Translate an annotated SV VCF into a Seqr-ready format
@@ -175,7 +165,6 @@ def annotate_cohort_sv(
         out_mt_path (str): And where do you need output!?
         gencode_gz (str): The path to a compressed GENCODE GTF file
         checkpoint (str): CHECKPOINT!@!!
-        remove_invalid_contigs (bool): Remove rows with invalid contigs from the mt
     """
 
     logger = logging.getLogger('annotate_cohort_sv')
@@ -188,9 +177,6 @@ def annotate_cohort_sv(
         skip_invalid_loci=True,
         force_bgz=True,
     )
-    # if remove_invalid_contigs:
-    # logger.info('Removing invalid contigs')
-    # mt = mt.filter_rows(hail_contigs.contains(mt.locus.contig))
 
     # add attributes required for Seqr
     mt = mt.annotate_globals(

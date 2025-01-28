@@ -13,43 +13,15 @@ from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
 
-CHROMOSOMES = [
-    '1',
-    '2',
-    '3',
-    '4',
-    '5',
-    '6',
-    '7',
-    '8',
-    '9',
-    '10',
-    '11',
-    '12',
-    '13',
-    '14',
-    '15',
-    '16',
-    '17',
-    '18',
-    '19',
-    '20',
-    '21',
-    '22',
-    'X',
-    'Y',
-    'M',
-]
-standard_contigs = hl.literal([f'chr{chrom}' for chrom in CHROMOSOMES])
-
 
 def annotate_cohort(
     vcf_path: str,
     out_mt_path: str,
     vep_ht_path: str,
-    site_only_vqsr_vcf_path=None,
-    checkpoint_prefix=None,
-    long_read=False,
+    site_only_vqsr_vcf_path: str | None = None,
+    checkpoint_prefix: str | None = None,
+    long_read: bool = False,
+    remove_invalid_contigs: bool = False,
 ):
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
@@ -101,6 +73,16 @@ def annotate_cohort(
             ),
         )
         mt = mt.drop('variant_qc')
+
+    if remove_invalid_contigs:
+        logging.info('Removing invalid contigs')
+        chromosomes = [
+            '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', 
+            '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y', 'M',
+        ]
+        standard_contigs = hl.literal(
+            hl.literal([f'chr{chrom}' for chrom in chromosomes]),
+        )
         mt = mt.filter_rows(standard_contigs.contains(mt.locus.contig))
 
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
