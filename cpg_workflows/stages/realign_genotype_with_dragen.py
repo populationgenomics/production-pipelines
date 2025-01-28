@@ -351,7 +351,11 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             pipeline_id = pipeline_fid_handle.read().strip()
 
         download_path = (
-            bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / sequencing_group.name / f'{sequencing_group.name}-{pipeline_id}'
+            bucket_name
+            / GCP_FOLDER_FOR_ICA_DOWNLOAD
+            / sequencing_group.name
+            / f'{sequencing_group.name}-{pipeline_id}'
+            / sequencing_group.name
         )
 
         return {
@@ -371,7 +375,10 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 
         # Confirm existence of CRAM and CRAI files
         download_path = (
-            ica_outputs['downloaded_data'] / sequencing_group.name / f'{sequencing_group.name}-{pipeline_id}'
+            ica_outputs['downloaded_data']
+            / sequencing_group.name
+            / f'{sequencing_group.name}-{pipeline_id}'
+            / sequencing_group.name
         )
         logging.info(f'download_path: {download_path} and outputs: {outputs}')
         if not (outputs['cram']).exists():
