@@ -75,10 +75,13 @@ def run_happy_on_vcf(
         f'mkdir {happy_j.output} && '
         f'hap.py {truth_input["vcf"]} {vcf_input["vcf"]} '
         f'-r {fasta_res_group(get_batch())["base"]} -R {truth_input["bed"]} '
-        f'-o {happy_j.output}/output --leftshift '
-        f'--threads 4 --preprocess-truth '
+        f'-o {happy_j.output}/output '
+        f'--leftshift '
+        f'--threads 4 '
+        f'--preprocess-truth '
         f'--engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg '
-        f'--engine-vcfeval-template {sdf} --engine=vcfeval '
+        f'--engine-vcfeval-template {sdf} '
+        f'--engine=vcfeval '
     )
 
     # region: stratification BED files
