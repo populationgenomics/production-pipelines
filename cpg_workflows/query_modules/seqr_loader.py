@@ -18,9 +18,10 @@ def annotate_cohort(
     vcf_path: str,
     out_mt_path: str,
     vep_ht_path: str,
-    site_only_vqsr_vcf_path=None,
-    checkpoint_prefix=None,
-    long_read=False,
+    site_only_vqsr_vcf_path: str | None = None,
+    checkpoint_prefix: str | None = None,
+    long_read: bool = False,
+    remove_invalid_contigs: bool = False,
 ):
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
@@ -73,6 +74,41 @@ def annotate_cohort(
         )
         mt = mt.drop('variant_qc')
 
+    # Remove any contigs not in the 22 autosomes, X, Y, M
+    if remove_invalid_contigs:
+        logging.info('Removing invalid contigs')
+        chromosomes = [
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            '6',
+            '7',
+            '8',
+            '9',
+            '10',
+            '11',
+            '12',
+            '13',
+            '14',
+            '15',
+            '16',
+            '17',
+            '18',
+            '19',
+            '20',
+            '21',
+            '22',
+            'X',
+            'Y',
+            'M',
+        ]
+        standard_contigs = hl.literal(
+            hl.literal([f'chr{chrom}' for chrom in chromosomes]),
+        )
+        mt = mt.filter_rows(standard_contigs.contains(mt.locus.contig))
+
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
@@ -98,10 +134,13 @@ def annotate_cohort(
 
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
     # these elements become a 1-element array
+    # the index_correction is required to align the AC/AF with the correct allele
+    # in the split multi-allelics
+    index_correction = 0 if long_read else 1
     mt = mt.annotate_rows(
         info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - 1]],
-            AC=[mt.info.AC[mt.a_index - 1]],
+            AF=[mt.info.AF[mt.a_index - index_correction]],
+            AC=[mt.info.AC[mt.a_index - index_correction]],
         ),
     )
 
