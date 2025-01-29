@@ -1,9 +1,14 @@
 [workflow]
-name = 'hap.py_validation'
+name = 'validation'
 status_reporter = 'metamist'
 
+input_datasets = ['validation']
+
+# if True, the single sample VCF extracted from the MT will be filtered to PASS-only, otherwise it will be the full VCF
+vcf_pass_only = false
+
 # if this is populated, the validation workflow will start from this specific MatrixTable
-#matrixtable = "placeholder"
+#matrixtable = "gs://cpg-seqr-main/seqr_loader/d6cc67110be4b232067508037bd50b8212f2d5_4205/AnnotateCohort/cohort.mt"
 
 # by default validation runs on output from the rd_combiner AnnotateDataset Stage
 # to choose output from a different Stage, use this String
