@@ -12,11 +12,14 @@ import coloredlogs
 from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
-from cpg_workflows.stages.realign_genotype_with_dragen import RegisterCramIcaOutputsInMetamist
+from cpg_workflows.stages.realign_genotype_with_dragen import (
+    RegisterCramIcaOutputsInMetamist,
+    RegisterGvcfIcaOutputsInMetamist,
+)
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
-    'realign_genotype_with_dragen': [RegisterCramIcaOutputsInMetamist],
+    'realign_genotype_with_dragen': [RegisterCramIcaOutputsInMetamist, RegisterGvcfIcaOutputsInMetamist],
 }
 
 
