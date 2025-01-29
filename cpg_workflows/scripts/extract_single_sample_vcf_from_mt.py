@@ -31,6 +31,10 @@ def single_sample_vcf_from_dataset_vcf(
     # read full MT
     mt = hl.read_matrix_table(input_mt)
 
+    # assert that the sample_id is in the MT
+    if sample_id not in mt.s.collect():
+        raise ValueError(f"Sample ID {sample_id} not found in input MT")
+
     # filter to this column
     mt = mt.filter_cols(mt.s == sample_id)
 
