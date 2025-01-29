@@ -435,8 +435,8 @@ class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
         )
 
         return {
-            'gvcf': download_path / f'{sequencing_group.name}.gvcf.gz',
-            'gvcf_tbi': download_path / f'{sequencing_group.name}.gvcf.gz.tbi',
+            'gvcf': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
+            'gvcf_tbi': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
             'register_success': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
             / sequencing_group.name
