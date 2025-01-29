@@ -139,7 +139,11 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
 
             # a quick check, if we can
             if l_split[3] != 'N':
-                assert new_base == l_split[3][0], f'Discrepancy between faidx and Sniffles: {new_base}, {l_split[3]}'
+                # If using the hg38 masked reference, the base will always be upper case
+                # So make sure the compairson to the Sniffles REF is upper case too
+                assert (
+                    new_base == l_split[3][0].upper()
+                ), f'Discrepancy between faidx and Sniffles: {new_base}, {l_split[3]}'
 
             # replace the REF String
             l_split[3] = new_base
