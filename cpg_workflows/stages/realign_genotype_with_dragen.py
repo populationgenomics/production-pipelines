@@ -339,7 +339,7 @@ class DownloadDataFromIca(SequencingGroupStage):
 
 @stage(
     analysis_type='cram',
-    analysis_keys=['register_success'],
+    analysis_keys=['cram', 'crai', 'register_success'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
@@ -412,7 +412,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 
 @stage(
     analysis_type='gvcf',
-    analysis_keys=['register_success'],
+    analysis_keys=['gvcf', 'gvcf_tbi', 'register_success'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
 )
 class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
