@@ -339,8 +339,8 @@ class DownloadDataFromIca(SequencingGroupStage):
 
 @stage(
     analysis_type='cram',
-    # analysis_keys=['cram'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
+    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
@@ -364,11 +364,6 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         return {
             'cram': download_path / f'{sequencing_group.name}.cram',
             'crai': download_path / f'{sequencing_group.name}.cram.crai',
-            'register_success': bucket_name
-            / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / sequencing_group.name
-            / f'{sequencing_group.name}-{pipeline_id}'
-            / f'{sequencing_group.name}_registered_CRAM_success.txt',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -412,8 +407,8 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 
 @stage(
     analysis_type='gvcf',
-    # analysis_keys=['gvcf'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
+    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
@@ -437,11 +432,6 @@ class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
         return {
             'gvcf': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
             'gvcf_tbi': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
-            'register_success': bucket_name
-            / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / sequencing_group.name
-            / f'{sequencing_group.name}-{pipeline_id}'
-            / f'{sequencing_group.name}_registered_GVCF_success.txt',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
