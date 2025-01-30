@@ -13,18 +13,17 @@ Examples of workflows can be found in the `production-workflows` repository.
 
 import functools
 import logging
-import pathlib
+import os
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from enum import Enum
 from typing import Callable, Generic, Optional, Sequence, Type, TypeVar, Union, cast
 
 import networkx as nx
-from cloudpathlib import CloudPath
 
 from hailtop.batch.job import Job
 
-from cpg_utils import Path
+from cpg_utils import to_path, Path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
@@ -159,24 +158,35 @@ class StageOutput:
 
     def as_str(self, key=None) -> str:
         """
-        Cast the result to a simple string. Throw an exception when can't cast.
-        `key` is used to extract the value when the result is a dictionary.
+        Return the requested value as a simple string.
+        The value here can be a String or PathLike, which will be returned as a String
+        This is a type change, not a cast
+
+        Args:
+            key (str | None): used to extract the value when the result is a dictionary.
+
+        Returns:
+            string representation of the value
         """
         res = self._get(key)
-        if not isinstance(res, str):
-            raise ValueError(f'{res} is not a str.')
-        return cast(str, res)
+        if not isinstance(res, (os.PathLike, str)):
+            raise ValueError(f'{res} is not a str or valid Pathlike, will not convert.')
+        if isinstance(res, str):
+            return res
+        return str(res)
 
     def as_path(self, key=None) -> Path:
         """
-        Cast the result to a path object. Throw an exception when can't cast.
+        Return the result as a Path object.
+        This Throw an exception when can't cast.
         `key` is used to extract the value when the result is a dictionary.
         """
         res = self._get(key)
-        if not isinstance(res, CloudPath | pathlib.Path):
-            raise ValueError(f'{res} is not a path object.')
-
-        return cast(Path, res)
+        if not isinstance(res, (os.PathLike, str)):
+            raise ValueError(f'{res} is not a path object or a valid String, cannot return as Path.')
+        if isinstance(res, os.PathLike):
+            return res
+        return to_path(res)
 
     def as_dict(self) -> dict[str, Path]:
         """
