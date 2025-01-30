@@ -473,6 +473,6 @@ class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
         )
 
 
-@stage(required_stages=[RegisterCramIcaOutputsInMetamist])
+@stage(required_stages=[RegisterCramIcaOutputsInMetamist, RegisterGvcfIcaOutputsInMetamist])
 class RegisterAllIcaOutputsInMetamist(SequencingGroupStage):
     pass
