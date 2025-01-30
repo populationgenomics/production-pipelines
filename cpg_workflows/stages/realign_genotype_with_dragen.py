@@ -393,10 +393,9 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 
         register_cram_job.command(
             f"""
-            echo 'Pipeline run {pipeline_id} CRAM and CRAI files successfully registered in Metamist' > {register_cram_job.ofile}
+            echo 'Pipeline run {pipeline_id} CRAM and CRAI files successfully registered in Metamist'
             """,
         )
-        get_batch().write_output(register_cram_job.ofile, str(outputs['register_success']))
 
         return self.make_outputs(
             target=sequencing_group,
@@ -461,10 +460,9 @@ class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
 
         register_cram_job.command(
             f"""
-            echo 'Pipeline run {pipeline_id} GVCF and GVCF_TBI files successfully registered in Metamist' > {register_cram_job.ofile}
+            echo 'Pipeline run {pipeline_id} GVCF and GVCF_TBI files successfully registered in Metamist'
             """,
         )
-        get_batch().write_output(register_cram_job.ofile, str(outputs['register_success']))
 
         return self.make_outputs(
             target=sequencing_group,
