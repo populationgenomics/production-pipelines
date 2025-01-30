@@ -23,7 +23,7 @@ import networkx as nx
 
 from hailtop.batch.job import Job
 
-from cpg_utils import to_path, Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
@@ -1073,8 +1073,8 @@ class Workflow:
         # We want to run stages only appearing in only_stages, and check outputs of
         # imediate predecessor stages, but skip everything else.
         required_stages: set[str] = set()
-        for os in only_stages:
-            rs = nx.descendants_at_distance(graph, os, 1)
+        for only_stage in only_stages:
+            rs = nx.descendants_at_distance(graph, only_stage, 1)
             required_stages |= set(rs)
 
         for stage in stages:
