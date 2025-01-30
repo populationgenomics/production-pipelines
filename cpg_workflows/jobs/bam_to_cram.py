@@ -45,17 +45,17 @@ def bam_to_cram(
     res = STANDARD.set_resources(
         j,
         ncpu=nthreads,
-        storage_gb=config_retrieve(['resource_overrides', 'bam_to_cram_storage_gb'], 50),
+        storage_gb=config_retrieve(['resource_overrides', 'bam_to_cram', 'storage_gb'], 50),
     )
 
     j.declare_resource_group(
         sorted_cram={
             'cram': '{root}.cram',
-            'cram.crai': '{root}.cram.crai',
+            'crai': '{root}.cram.crai',
         },
     )
 
-    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["cram.crai"]}'
+    cmd = f'samtools view -@ {res.get_nthreads() - 1} -T {fasta.fasta} -C {input_bam.bam} | tee {j.sorted_cram["cram"]} | samtools index -@ {res.get_nthreads() - 1} - {j.sorted_cram["crai"]}'
     j.command(command(cmd, monitor_space=True))
 
     return j, j.sorted_cram
