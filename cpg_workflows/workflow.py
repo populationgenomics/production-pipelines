@@ -171,8 +171,6 @@ class StageOutput:
         res = self._get(key)
         if not isinstance(res, (os.PathLike, str)):
             raise ValueError(f'{res} is not a str or valid Pathlike, will not convert.')
-        if isinstance(res, str):
-            return res
         return str(res)
 
     def as_path(self, key=None) -> Path:
@@ -184,8 +182,6 @@ class StageOutput:
         res = self._get(key)
         if not isinstance(res, (os.PathLike, str)):
             raise ValueError(f'{res} is not a path object or a valid String, cannot return as Path.')
-        if isinstance(res, os.PathLike):
-            return res
         return to_path(res)
 
     def as_dict(self) -> dict[str, Path]:
