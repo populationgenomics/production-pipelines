@@ -75,7 +75,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         output_fids = prepare_ica_job.call(
             prepare_ica_for_analysis.run,
-            ica_analysis_output_folder=config_retrieve(['workflow', 'input_cohorts']),
+            ica_analysis_output_folder=config_retrieve(['ica', 'data_prep', 'output_folder']),
             api_root=ICA_REST_ENDPOINT,
             sg_name=sequencing_group.name,
             bucket_name=bucket_name,
