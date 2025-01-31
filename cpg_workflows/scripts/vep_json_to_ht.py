@@ -201,14 +201,13 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
 
     ht = hl.import_table(paths=vep_result_paths, no_header=True, types={'f0': json_schema})
     ht = ht.transmute(vep=ht.f0)
-    # Can't use ht.vep.start for start because it can be modified by VEP (e.g. it
-    # happens for indels). So instead parsing POS from the original VCF line stored
-    # as ht.vep.input field.
-    original_vcf_line = ht.vep.input
-    start = hl.parse_int(original_vcf_line.split('\t')[1])
-    chrom = ht.vep.seq_region_name
-    ht = ht.annotate(locus=hl.locus(chrom, start))
     # we're using split multiallelics, so we need to compound key on chr/pos/ref/alt
+    ht = ht.annotate(
+        locus=hl.locus(
+            ht.vep.seq_region_name, hl.parse_int(ht.vep.input.split('\t')[1])
+        ),
+        alleles=ht.vep.allele_string.split('/'),
+    )
     ht = ht.key_by(ht.locus, ht.alleles)
     ht.write(out_path, overwrite=True)
 
