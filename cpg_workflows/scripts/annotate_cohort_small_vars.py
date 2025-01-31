@@ -170,7 +170,7 @@ def annotate_cohort(
             AN=mt.variant_qc.AN,
             AC=mt.variant_qc.AC,
         ),
-        vep=vep_ht[mt.locus].vep,
+        vep=vep_ht[mt.row_key].vep,
     )
     mt = mt.drop('variant_qc')
 
