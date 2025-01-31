@@ -17,7 +17,11 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
     Add dataset-level annotations.
     """
 
-    init_batch()
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
 
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods

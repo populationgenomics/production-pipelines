@@ -120,7 +120,11 @@ def annotate_cohort(
         Nothing, but hopefully writes out a new MT
     """
 
-    init_batch()
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
 
     # this overrides the jar spec for the current session
     # and requires `init_batch()` to be called before any other hail methods
