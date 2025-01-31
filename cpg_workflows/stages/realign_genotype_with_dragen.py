@@ -115,7 +115,7 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.command(
             f"""
             {ICA_CLI_SETUP}
-            cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id.details.status')
+            cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
             if [[ $cram_status != "AVAILABLE" ]]
             then
                 mkdir {sequencing_group.name}
