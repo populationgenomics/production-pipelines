@@ -14,15 +14,11 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.realign_genotype_with_dragen import (
     DownloadDataFromIca,
-    RegisterCramIcaOutputsInMetamist,
-    RegisterGvcfIcaOutputsInMetamist,
 )
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'realign_genotype_with_dragen': [
-        RegisterCramIcaOutputsInMetamist,
-        RegisterGvcfIcaOutputsInMetamist,
         DownloadDataFromIca,
     ],
 }
