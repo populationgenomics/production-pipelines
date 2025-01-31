@@ -8,7 +8,6 @@ import hail as hl
 
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
-from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import get_logger
 
 
@@ -22,11 +21,6 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
         driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
         driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
     )
-
-    # this overrides the jar spec for the current session
-    # and requires `init_batch()` to be called before any other hail methods
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'annotate_dataset'], False):
-        override_jar_spec(jar_spec)
 
     mt = hl.read_matrix_table(mt_path)
 

@@ -10,7 +10,6 @@ import hail as hl
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import genome_build, init_batch
-from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, get_logger
 from hail_scripts.computed_fields import variant_id, vep
 
@@ -125,12 +124,6 @@ def annotate_cohort(
         driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
         driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
     )
-
-    # this overrides the jar spec for the current session
-    # and requires `init_batch()` to be called before any other hail methods
-    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'annotate_cohort'], False):
-        override_jar_spec(jar_spec)
 
     # hail.zulipchat.com/#narrow/stream/223457-Hail-Batch-support/topic/permissions.20issues/near/398711114
     # don't override the block size, as it explodes the number of partitions when processing TB+ datasets
