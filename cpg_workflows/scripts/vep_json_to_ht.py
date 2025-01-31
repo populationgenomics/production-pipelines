@@ -203,9 +203,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
     ht = ht.transmute(vep=ht.f0)
     # we're using split multiallelics, so we need to compound key on chr/pos/ref/alt
     ht = ht.annotate(
-        locus=hl.locus(
-            ht.vep.seq_region_name, hl.parse_int(ht.vep.input.split('\t')[1])
-        ),
+        locus=hl.locus(ht.vep.seq_region_name, hl.parse_int(ht.vep.input.split('\t')[1])),
         alleles=ht.vep.allele_string.split('/'),
     )
     ht = ht.key_by(ht.locus, ht.alleles)
