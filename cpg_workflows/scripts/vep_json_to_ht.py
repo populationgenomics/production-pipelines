@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 
 import hail as hl
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
 
@@ -39,7 +40,11 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
         out_path ():
     """
 
-    init_batch()
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
 
     # Differences relative to the 105 schema:
     # - minimised, int32, new field at top level
