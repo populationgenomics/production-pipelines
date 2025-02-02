@@ -330,9 +330,8 @@ class DownloadDataFromIca(SequencingGroupStage):
             f"""
             {ICA_CLI_SETUP}
             icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
-            gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
+            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
         """,
-            # gcloud storage cp --recursive {sequencing_group.name}/*/{sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
         )
 
         return self.make_outputs(
