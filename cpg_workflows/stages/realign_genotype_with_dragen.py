@@ -15,6 +15,7 @@ from cpg_workflows.stages.dragen_ica import (
     prepare_ica_for_analysis,
     run_align_genotype_with_dragen,
 )
+from cpg_workflows.status import MetamistStatusReporter
 from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
@@ -342,10 +343,10 @@ class DownloadDataFromIca(SequencingGroupStage):
 
 
 @stage(
-    analysis_type='cram',  # Add separate analysis_type 'ica_cram' to metamist?
-    analysis_keys=['cram', 'crai'],
+    # analysis_type='cram',  # Add separate analysis_type 'ica_cram' to metamist?
+    # analysis_keys=['cram', 'crai'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
+    # forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
@@ -384,6 +385,20 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
             echo 'Pipeline run {pipeline_id} CRAM and CRAI files successfully registered in Metamist'
             """,
         )
+
+        # Register via status reporter
+        if self.status_reporter is not None:
+            self.status_reporter.create_analysis(
+                b=batch_instance,
+                output=download_path / f'{sequencing_group.name}.cram',
+                analysis_type='cram',
+                target=sequencing_group,
+                jobs=[register_cram_job],
+                project_name=sequencing_group.dataset.name,
+                meta={'pipeline_id': pipeline_id},
+            )
+        else:
+            logging.warning("Status reporter is not set. Skipping analysis registration.")
 
         return self.make_outputs(
             target=sequencing_group,
