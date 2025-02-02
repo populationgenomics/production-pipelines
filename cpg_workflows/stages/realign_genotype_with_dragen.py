@@ -365,9 +365,9 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         download_path: cpg_utils.Path = outputs / f'{sequencing_group.name}-{pipeline_id}' / sequencing_group.name
 
         # Confirm existence of CRAM and CRAI files
-        if not (cram_path := download_path / f'{sequencing_group}.cram').exists():
+        if not (cram_path := download_path / f'{sequencing_group.name}.cram').exists():
             raise FileNotFoundError(f'CRAM not found in {cram_path}')
-        if not (crai_path := download_path / f'{sequencing_group}.cram.crai').exists():
+        if not (crai_path := download_path / f'{sequencing_group.name}.cram.crai').exists():
             raise FileNotFoundError(f'CRAI not found in {crai_path}')
 
         batch_instance: Batch = get_batch()
