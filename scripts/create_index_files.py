@@ -14,8 +14,7 @@ from cpg_workflows.resources import STANDARD
 
 def find_files_to_index(
     path: Path,
-    extensions: tuple[str, str] = ('.bam', '.cram'),
-):
+) -> list[Path]:
     """Finds bam and cram files and queues them for indexing if they are not already indexed."""
     client = storage.Client()
     bucket_name = path.as_uri().split('/')[2]
@@ -25,7 +24,7 @@ def find_files_to_index(
     # Find all files with the given extensions
     files_to_index = []
     blobs = bucket.list_blobs(prefix=prefix)
-    blob_names = [[f'gs://{bucket_name}/{blob.name}' for blob in blobs]]
+    blob_names = [f'gs://{bucket_name}/{blob.name}' for blob in blobs]
     for blob_name in blob_names:
         # Check if the index file exists
         if blob_name.endswith('.bam'):
