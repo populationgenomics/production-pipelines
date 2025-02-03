@@ -350,12 +350,79 @@ class DownloadCramFromIca(SequencingGroupStage):
             icav2 projectdata download $cram_id {sequencing_group.name}.cram --exclude-source-path
             icav2 projectdata download $crai_id {sequencing_group.name}.cram.crai --exclude-source-path
             icav2 projectdata download $cram_md5 {sequencing_group.name}.cram.md5sum --exclude-source-path
-            ls
-            cat {sequencing_group.name}.cram.md5sum
             gcloud storage cp {sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
             gcloud storage cp {sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
             gcloud storage cp {sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
+        """,
+        )
 
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=ica_download_job,
+        )
+
+
+@stage(
+    analysis_type='gvcf',
+    analysis_keys=['gvcf', 'gvcf_tbi'],
+    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline],
+)
+class DownloadGvcfFromIca(SequencingGroupStage):
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> cpg_utils.Path:
+        bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
+        return {
+            'gvcf': bucket_name
+            / GCP_FOLDER_FOR_ICA_DOWNLOAD
+            / 'ica_gvcf'
+            / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
+            'gvcf_tbi': bucket_name
+            / GCP_FOLDER_FOR_ICA_DOWNLOAD
+            / 'ica_gvcf'
+            / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
+        }
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
+        ica_analysis_output_folder = config_retrieve(['ica', 'data_prep', 'output_folder'])
+
+        batch_instance: Batch = get_batch()
+        ica_download_job: BashJob = batch_instance.new_bash_job(
+            name='DownloadGvcfFromIca',
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
+        )
+        ica_analysis_folder_id_path: str = batch_instance.read_input(
+            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
+        )
+        pipeline_id_path: cpg_utils.Path = inputs.as_path(
+            target=sequencing_group,
+            stage=ManageDragenPipeline,
+            key='pipeline_id',
+        )
+        with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
+            pipeline_id: str = pipeline_fid_handle.read().rstrip()
+
+        ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
+        ica_download_job.memory('8Gi')
+        ica_download_job.image(image=image_path('ica'))
+
+        # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
+        authenticate_cloud_credentials_in_job(ica_download_job)
+        ica_download_job.command(
+            f"""
+            {ICA_CLI_SETUP}
+            gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
+            gvcf_tbi_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --match-mode EXACT -o json | jq -r '.items[].id')
+            gvcf_md5_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
+            icav2 projectdata download $gvcf_id {sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
+            icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
+            icav2 projectdata download $gvcf_md5_id {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
+            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
+            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
+            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
         """,
         )
 
