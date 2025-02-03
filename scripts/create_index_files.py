@@ -90,7 +90,7 @@ def index_with_samtools(
                 'bam.bai': '{root}.bam.bai',
             },
         )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {j.bam} -o {j.out_bam["bam.bai"]}'
+        cmd = f'samtools index -@ {res.get_nthreads() - 1} {f.bam} -o {j.out_bam["bam.bai"]}'
         j.command(command(cmd, monitor_space=True))
         b.write_output(j.out_bam, str(file_to_index).removesuffix(".bai"))
     elif file_to_index.suffix == '.cram':
@@ -100,7 +100,7 @@ def index_with_samtools(
                 'cram.crai': '{root}.cram.crai',
             },
         )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {j.cram} -o {j.out_cram["cram.crai"]}'
+        cmd = f'samtools index -@ {res.get_nthreads() - 1} {f.cram} -o {j.out_cram["cram.crai"]}'
         j.command(command(cmd, monitor_space=True))
         b.write_output(j.out_cram,  str(file_to_index).removesuffix(".crai"))
     else:
