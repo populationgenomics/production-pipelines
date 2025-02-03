@@ -111,7 +111,6 @@ def index_with_samtools(
 @click.option(
     '--input-path',
     help='Path to the input files',
-    type=click.Path(exists=True),
 )
 def main(input_path: str):
     # Find all bam and cram files that need to be indexed
