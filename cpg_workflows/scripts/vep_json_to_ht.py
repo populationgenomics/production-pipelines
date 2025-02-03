@@ -214,8 +214,8 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
     # didn't use alleles at all (joining only on chr:pos, multiallelics were not split)
     split_vep_input = ht.vep.input.split('\t')
     ht = ht.annotate(
-        locy=hl.locus(ht.vep.seq_region_name, hl.parse_int(split_vep_input[1])),
-        alleles2=[split_vep_input[3], split_vep_input[4]],
+        locus=hl.locus(ht.vep.seq_region_name, hl.parse_int(split_vep_input[1])),
+        alleles=[split_vep_input[3], split_vep_input[4]],
     )
     ht = ht.key_by(ht.locus, ht.alleles)
     ht.write(out_path, overwrite=True)
