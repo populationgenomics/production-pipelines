@@ -53,22 +53,23 @@ def index_files(
     for file_to_index in files_to_index:
         if file_to_index.suffix == '.bam':
             f = b.read_input_group(bam=file_to_index)
-            index_with_samtools(b, f)
+            index_with_samtools(b, f, file_to_index)
         elif file_to_index.suffix == '.cram':
             f = b.read_input_group(cram=file_to_index)
-            index_with_samtools(b, f)
+            index_with_samtools(b, f, file_to_index)
         else:
             raise ValueError(f'Unknown file extension: {file_to_index.suffix}')
 
 
 def index_with_samtools(
     b: Batch,
-    file_to_index: ResourceGroup,
+    f: ResourceGroup,
+    file_to_index: Path,
 ):
     """
     Index a bam or cram file using samtools and return the job and the index file.
     """
-    assert isinstance(file_to_index, ResourceGroup)
+    assert isinstance(f, ResourceGroup)
 
     job_name = 'Samtools index'
     j_attrs = dict(label=job_name, tool='samtools')
@@ -82,7 +83,7 @@ def index_with_samtools(
         ncpu=nthreads,
         storage_gb=100,
     )
-    if file_to_index.bam:
+    if f.bam:
         j.declare_resource_group(
             out_bam={
                 'bam': '{root}.bam',
@@ -91,8 +92,8 @@ def index_with_samtools(
         )
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {j.bam} -o {j.out_bam["bam.bai"]}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_bam, f'{j.out_bam["bam.bai"].removesuffix(".bai")}')
-    elif file_to_index.cram:
+        b.write_output(j.out_bam, str(file_to_index).removesuffix(".bai"))
+    elif f.cram:
         j.declare_resource_group(
             out_cram={
                 'cram': '{root}.cram',
@@ -101,7 +102,7 @@ def index_with_samtools(
         )
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {j.cram} -o {j.out_cram["cram.crai"]}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_cram, f'{j.out_cram["cram.crai"].removesuffix(".crai")}')
+        b.write_output(j.out_cram,  str(file_to_index).removesuffix(".crai"))
     else:
         raise ValueError('Resource group must contain a bam or cram file')
 
