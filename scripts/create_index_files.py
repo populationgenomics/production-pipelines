@@ -32,7 +32,7 @@ def find_files_to_index(
         elif blob_name.endswith('.cram'):
             index_blob_name = f'{blob_name}.crai'
         else:
-            raise ValueError(f'Unknown file extension: {blob_name}')
+            continue
 
         index_blob = bucket.blob(index_blob_name)
         if not index_blob.exists():
