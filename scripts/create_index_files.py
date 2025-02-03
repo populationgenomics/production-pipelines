@@ -52,11 +52,11 @@ def index_files(
     """
     for file_to_index in files_to_index:
         if file_to_index.suffix == '.bam':
-            b.read_input_group(bam=file_to_index)
-            index_with_samtools(b, file_to_index)
+            f = b.read_input_group(bam=file_to_index)
+            index_with_samtools(b, f)
         elif file_to_index.suffix == '.cram':
-            b.read_input_group(cram=file_to_index)
-            index_with_samtools(b, file_to_index)
+            f = b.read_input_group(cram=file_to_index)
+            index_with_samtools(b, f)
         else:
             raise ValueError(f'Unknown file extension: {file_to_index.suffix}')
 
