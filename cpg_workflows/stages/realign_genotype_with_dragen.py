@@ -4,6 +4,7 @@ from math import ceil
 from typing import TYPE_CHECKING, Final
 
 import coloredlogs
+from sklearn import pipeline
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
@@ -296,6 +297,66 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         pass
+
+
+@stage(
+    analysis_type='cram',
+    analysis_keys=['cram', 'crai'],
+    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline],
+)
+class DownloadCramFromIca(SequencingGroupStage):
+    def expected_outputs(
+        self,
+        sequencing_group: SequencingGroup,
+    ) -> cpg_utils.Path:
+        bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
+        return {
+            'cram': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'ica_cram' / f'{sequencing_group.name}.cram',
+            'crai': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'ica_cram' / f'{sequencing_group.name}.cram.crai',
+        }
+
+    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
+        ica_analysis_output_folder = config_retrieve(['ica', 'data_prep', 'output_folder'])
+
+        batch_instance: Batch = get_batch()
+        ica_download_job: BashJob = batch_instance.new_bash_job(
+            name='DownloadCramFromIca',
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
+        )
+        ica_analysis_folder_id_path: str = batch_instance.read_input(
+            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
+        )
+        pipeline_id_path: cpg_utils.Path = inputs.as_path(
+            target=sequencing_group,
+            stage=ManageDragenPipeline,
+            key='pipeline_id',
+        )
+        with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
+            pipeline_id: str = pipeline_fid_handle.read().rstrip()
+
+        ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
+        ica_download_job.memory('8Gi')
+        ica_download_job.image(image=image_path('ica'))
+
+        # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
+        authenticate_cloud_credentials_in_job(ica_download_job)
+        ica_download_job.command(
+            f"""
+            {ICA_CLI_SETUP}
+            cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
+            crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
+            icav2 projectdata download $cram_id {sequencing_group.name} --exclude-source-path
+            icav2 projectdata download $crai_id {sequencing_group.name} --exclude-source-path
+            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram
+        """,
+        )
+
+        return self.make_outputs(
+            target=sequencing_group,
+            data=self.expected_outputs(sequencing_group=sequencing_group),
+            jobs=ica_download_job,
+        )
 
 
 @stage(
