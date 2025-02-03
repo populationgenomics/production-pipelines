@@ -346,7 +346,7 @@ class DownloadDataFromIca(SequencingGroupStage):
     # analysis_type='cram',  # Add separate analysis_type 'ica_cram' to metamist?
     # analysis_keys=['cram', 'crai'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-    # forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
+    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
 )
 class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
     def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
