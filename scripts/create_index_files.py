@@ -70,17 +70,18 @@ def index_with_samtools(
     """
     assert isinstance(input_file, ResourceGroup)
 
-    job_name = 'Samtools index'
+    job_name = 'Samtools index ' + file_to_index.name
     j_attrs = dict(label=job_name, tool='samtools')
     j = b.new_job(name=job_name, attributes=j_attrs)
     j.image(image_path('samtools'))
 
     # Set resource requirements
+    storage_gb = 20 if file_to_index.stat().st_size < 1e9 else 100
     nthreads = 8
     res = STANDARD.set_resources(
         j,
         ncpu=nthreads,
-        storage_gb=100,
+        storage_gb=storage_gb,
     )
     if file_to_index.suffix == '.bam':
         j.declare_resource_group(
