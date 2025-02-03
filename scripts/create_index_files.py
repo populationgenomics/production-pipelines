@@ -34,8 +34,7 @@ def find_files_to_index(
         else:
             continue
 
-        index_blob = bucket.blob(index_blob_name)
-        if not index_blob.exists():
+        if index_blob_name not in blob_names:
             files_to_index.append(to_path(blob_name))
         else:
             print(f'Index file already exists: {index_blob_name}')
@@ -52,24 +51,24 @@ def index_files(
     """
     for file_to_index in files_to_index:
         if file_to_index.suffix == '.bam':
-            f = b.read_input_group(bam=file_to_index)
-            index_with_samtools(b, f, file_to_index)
+            input_bam = b.read_input_group(bam=file_to_index)
+            index_with_samtools(b, input_bam, file_to_index)
         elif file_to_index.suffix == '.cram':
-            f = b.read_input_group(cram=file_to_index)
-            index_with_samtools(b, f, file_to_index)
+            input_cram = b.read_input_group(cram=file_to_index)
+            index_with_samtools(b, input_cram, file_to_index)
         else:
             raise ValueError(f'Unknown file extension: {file_to_index.suffix}')
 
 
 def index_with_samtools(
     b: Batch,
-    f: ResourceGroup,
+    input_file: ResourceGroup,
     file_to_index: Path,
 ):
     """
     Index a bam or cram file using samtools and return the job and the index file.
     """
-    assert isinstance(f, ResourceGroup)
+    assert isinstance(input_file, ResourceGroup)
 
     job_name = 'Samtools index'
     j_attrs = dict(label=job_name, tool='samtools')
@@ -90,7 +89,7 @@ def index_with_samtools(
                 'bam.bai': '{root}.bam.bai',
             },
         )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {f.bam} -o {j.out_bam["bam.bai"]}'
+        cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.bam} -o {j.out_bam["bam.bai"]}'
         j.command(command(cmd, monitor_space=True))
         b.write_output(j.out_bam["bam.bai"], str(file_to_index).removesuffix(".bai"))
     elif file_to_index.suffix == '.cram':
@@ -100,7 +99,7 @@ def index_with_samtools(
                 'cram.crai': '{root}.cram.crai',
             },
         )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {f.cram} -o {j.out_cram["cram.crai"]}'
+        cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.cram} -o {j.out_cram["cram.crai"]}'
         j.command(command(cmd, monitor_space=True))
         b.write_output(j.out_cram["cram.crai"],  str(file_to_index).removesuffix(".crai"))
     else:
