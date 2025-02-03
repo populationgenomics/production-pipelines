@@ -348,6 +348,7 @@ class DownloadCramFromIca(SequencingGroupStage):
             crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
             icav2 projectdata download $cram_id {sequencing_group.name} --exclude-source-path
             icav2 projectdata download $crai_id {sequencing_group.name} --exclude-source-path
+            ls -R {sequencing_group.name}
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
 
