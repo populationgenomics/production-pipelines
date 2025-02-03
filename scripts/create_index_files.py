@@ -83,7 +83,7 @@ def index_with_samtools(
         ncpu=nthreads,
         storage_gb=100,
     )
-    if f.bam:
+    if file_to_index.suffix == '.bam':
         j.declare_resource_group(
             out_bam={
                 'bam': '{root}.bam',
@@ -93,7 +93,7 @@ def index_with_samtools(
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {j.bam} -o {j.out_bam["bam.bai"]}'
         j.command(command(cmd, monitor_space=True))
         b.write_output(j.out_bam, str(file_to_index).removesuffix(".bai"))
-    elif f.cram:
+    elif file_to_index.suffix == '.cram':
         j.declare_resource_group(
             out_cram={
                 'cram': '{root}.cram',
