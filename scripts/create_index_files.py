@@ -25,7 +25,7 @@ def find_files_to_index(
     # Find all files with the given extensions
     files_to_index = []
     blobs = bucket.list_blobs(prefix=prefix)
-    blob_names = [blob.path for blob in blobs if blob.path.endswith(extensions)]
+    blob_names = [[f'gs://{bucket_name}/{blob.name}' for blob in blobs]]
     for blob_name in blob_names:
         # Check if the index file exists
         if blob_name.endswith('.bam'):
