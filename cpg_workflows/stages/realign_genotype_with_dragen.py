@@ -344,15 +344,16 @@ class DownloadCramFromIca(SequencingGroupStage):
         ica_download_job.command(
             f"""
             {ICA_CLI_SETUP}
+            mkdir -p {sequencing_group.name}
             cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
             crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
             cram_md5=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
-            icav2 projectdata download $cram_id {sequencing_group.name}.cram --exclude-source-path
-            icav2 projectdata download $crai_id {sequencing_group.name}.cram.crai --exclude-source-path
-            icav2 projectdata download $cram_md5 {sequencing_group.name}.cram.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
-            gcloud storage cp {sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
-            gcloud storage cp {sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_cram/
+            icav2 projectdata download $cram_id {sequencing_group.name}/{sequencing_group.name}.cram --exclude-source-path
+            icav2 projectdata download $crai_id {sequencing_group.name}/{sequencing_group.name}.cram.crai --exclude-source-path
+            icav2 projectdata download $cram_md5 {sequencing_group.name}/{sequencing_group.name}.cram.md5sum --exclude-source-path
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
         """,
         )
 
@@ -414,15 +415,16 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         ica_download_job.command(
             f"""
             {ICA_CLI_SETUP}
+            mkdir -p {sequencing_group.name}
             gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
             gvcf_tbi_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --match-mode EXACT -o json | jq -r '.items[].id')
             gvcf_md5_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
-            icav2 projectdata download $gvcf_id {sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
-            icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
-            icav2 projectdata download $gvcf_md5_id {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
-            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
-            gcloud storage cp {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcf/
+            icav2 projectdata download $gvcf_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
+            icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
+            icav2 projectdata download $gvcf_md5_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
         """,
         )
 
@@ -482,7 +484,6 @@ class DownloadDataFromIca(SequencingGroupStage):
                 echo "Downloading $name with ID $id"
                 icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
             done <<< "$files_and_ids"
-            ls -R {sequencing_group.name}
             gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
         """,
         )
