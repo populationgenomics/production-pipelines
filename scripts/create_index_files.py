@@ -50,7 +50,7 @@ def index_with_samtools(
     """
     for file_to_index_path, index_file_path in input_files:
         input_file = b.read_input(file_to_index_path)
-        j = b.new_bash_job(b, f'samtools index {file_to_index_path}')
+        j = b.new_bash_job(f'samtools index {file_to_index_path}')
         j.image(image_path('samtools'))
         # Set resource requirements
         storage_gb = 20 if to_path(file_to_index_path).stat().st_size < 1e10 else 100
