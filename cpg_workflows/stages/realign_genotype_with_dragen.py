@@ -313,11 +313,11 @@ class DownloadCramFromIca(SequencingGroupStage):
         return {
             'cram': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / {sequencing_group.name}
+            / f'{sequencing_group.name}'
             / f'{sequencing_group.name}.cram',
             'crai': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / {sequencing_group.name}
+            / f'{sequencing_group.name}'
             / f'{sequencing_group.name}.cram.crai',
         }
 
@@ -384,11 +384,11 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         return {
             'gvcf': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / {sequencing_group.name}
+            / f'{sequencing_group.name}'
             / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
             'gvcf_tbi': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / {sequencing_group.name}
+            / f'{sequencing_group.name}'
             / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
         }
 
