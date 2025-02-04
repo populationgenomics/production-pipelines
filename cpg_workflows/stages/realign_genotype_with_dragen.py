@@ -483,7 +483,7 @@ class DownloadDataFromIca(SequencingGroupStage):
                 icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
             done <<< "$files_and_ids"
             ls -R {sequencing_group.name}
-            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}-{pipeline_id}
+            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}
         """,
         )
 
