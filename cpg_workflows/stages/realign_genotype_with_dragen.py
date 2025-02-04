@@ -189,7 +189,7 @@ class ManageDragenPipeline(SequencingGroupStage):
                 str(
                     sg_bucket
                     / GCP_FOLDER_FOR_RUNNING_PIPELINE
-                    / f'{sequencing_group.name}_{cancel_pipeline_result["cancelled"]}_cancelled.json',
+                    / f'{sequencing_group.name}_pipeline_cancelled_at{slugify(str(datetime.now()))}.json',
                 ),
             )
             stage_jobs.append(cancel_job)
