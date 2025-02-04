@@ -330,9 +330,7 @@ class DownloadCramFromIca(SequencingGroupStage):
             name='DownloadCramFromIca',
             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
-        ica_analysis_folder_id_path: str = batch_instance.read_input(
-            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
-        )
+
         pipeline_id_path: cpg_utils.Path = inputs.as_path(
             target=sequencing_group,
             stage=ManageDragenPipeline,
@@ -401,9 +399,7 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             name='DownloadGvcfFromIca',
             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
-        ica_analysis_folder_id_path: str = batch_instance.read_input(
-            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
-        )
+
         pipeline_id_path: cpg_utils.Path = inputs.as_path(
             target=sequencing_group,
             stage=ManageDragenPipeline,
