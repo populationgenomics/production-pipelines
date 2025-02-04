@@ -373,7 +373,7 @@ class DownloadCramFromIca(SequencingGroupStage):
 @stage(
     analysis_type='gvcf',
     analysis_keys=['gvcf', 'gvcf_tbi'],
-    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline],
+    required_stages=[ManageDragenPipeline],
 )
 class DownloadGvcfFromIca(SequencingGroupStage):
     def expected_outputs(
@@ -443,7 +443,7 @@ class DownloadGvcfFromIca(SequencingGroupStage):
 
 @stage(
     analysis_type='ica_data_download',
-    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen],
+    required_stages=[ManageDragenPipeline, DownloadCramFromIca, DownloadGvcfFromIca],
 )
 class DownloadDataFromIca(SequencingGroupStage):
     def expected_outputs(
