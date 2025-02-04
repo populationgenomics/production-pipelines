@@ -102,7 +102,7 @@ def index_with_samtools(
         )
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.cram} -o {j.out_cram["cram.crai"]}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_cram["cram.crai"],  str(file_to_index) + '.crai')
+        b.write_output(j.out_cram["cram.crai"], str(file_to_index) + '.crai')
     else:
         raise ValueError('Resource group must contain a bam or cram file')
 
