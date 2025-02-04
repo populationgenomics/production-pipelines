@@ -70,7 +70,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
 
         prepare_ica_job: PythonJob = get_batch().new_python_job(
             name='PrepareIcaForDragenAnalysis',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
         prepare_ica_job.image(image=image_path('ica'))
 
@@ -103,7 +103,7 @@ class UploadDataToIca(SequencingGroupStage):
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         upload_job = get_batch().new_bash_job(
             name='UploadDataToIca',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
         upload_folder = config_retrieve(['ica', 'data_prep', 'upload_folder'])
         bucket: str = get_path_components_from_gcp_path(str(sequencing_group.cram))['bucket']
@@ -176,7 +176,7 @@ class ManageDragenPipeline(SequencingGroupStage):
             logging.info('Cancelling pipeline run')
             cancel_job = get_batch().new_python_job(
                 name='CancelIcaPipelineRun',
-                attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+                attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
             )
             cancel_job.image(image=image_path('ica'))
             cancel_pipeline_result = cancel_job.call(
@@ -463,7 +463,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         batch_instance: Batch = get_batch()
         ica_download_job: BashJob = batch_instance.new_bash_job(
             name='DownloadDataFromIca',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
@@ -529,7 +529,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
         batch_instance: Batch = get_batch()
         register_cram_job: BashJob = batch_instance.new_bash_job(
             name='RegisterCramIcaOutputsInMetamist',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
 
         register_cram_job.memory('8Gi')
@@ -611,7 +611,7 @@ class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
 #         batch_instance: Batch = get_batch()
 #         register_cram_job: BashJob = batch_instance.new_bash_job(
 #             name='RegisterGvcfIcaOutputsInMetamist',
-#             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
+#             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
 #         )
 
 #         register_cram_job.memory('8Gi')
