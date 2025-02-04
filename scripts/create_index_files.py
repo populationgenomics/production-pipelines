@@ -14,7 +14,7 @@ from cpg_workflows.resources import STANDARD
 
 def find_files_to_index(
     path: Path,
-) -> list[Path]:
+) -> list[tuple[str, str]]:
     """Finds bam and cram files and queues them for indexing if they are not already indexed."""
     client = storage.Client()
     bucket_name = path.as_uri().split('/')[2]
@@ -33,78 +33,36 @@ def find_files_to_index(
             index_blob_name = f'{blob_name}.crai'
         else:
             continue
-
         if index_blob_name not in blob_names:
-            files_to_index.append(to_path(blob_name))
+            files_to_index.append((blob_name, index_blob_name))
         else:
-            print(f'Index file already exists: {index_blob_name}')
+            continue
 
     return files_to_index
 
 
-def index_files(
-    b: Batch,
-    files_to_index: list[Path],
-):
-    """
-    Index a list of bam or cram files using samtools.
-    """
-    for file_to_index in files_to_index:
-        if file_to_index.suffix == '.bam':
-            input_bam = b.read_input_group(bam=file_to_index)
-            index_with_samtools(b, input_bam, file_to_index)
-        elif file_to_index.suffix == '.cram':
-            input_cram = b.read_input_group(cram=file_to_index)
-            index_with_samtools(b, input_cram, file_to_index)
-        else:
-            raise ValueError(f'Unknown file extension: {file_to_index.suffix}')
-
-
 def index_with_samtools(
     b: Batch,
-    input_file: ResourceGroup,
-    file_to_index: Path,
+    input_files: list[tuple[str, str]],
 ):
     """
-    Index a bam or cram file using samtools and return the job and the index file.
+    Index bam or cram files using samtools.
     """
-    assert isinstance(input_file, ResourceGroup)
-
-    job_name = 'Samtools index ' + file_to_index.name
-    j_attrs = dict(label=job_name, tool='samtools')
-    j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('samtools'))
-
-    # Set resource requirements
-    storage_gb = 20 if file_to_index.stat().st_size < 1e10 else 100
-    nthreads = 8
-    res = STANDARD.set_resources(
-        j,
-        ncpu=nthreads,
-        storage_gb=storage_gb,
-    )
-    if file_to_index.suffix == '.bam':
-        j.declare_resource_group(
-            out_bam={
-                'bam': '{root}.bam',
-                'bam.bai': '{root}.bam.bai',
-            },
+    for file_to_index_path, index_file_path in input_files:
+        input_file = b.read_input(file_to_index_path)
+        j = b.new_bash_job(b, f'samtools index {file_to_index_path}')
+        j.image(image_path('samtools'))
+        # Set resource requirements
+        storage_gb = 20 if to_path(file_to_index_path).stat().st_size < 1e10 else 100
+        nthreads = 8
+        res = STANDARD.set_resources(
+            j,
+            ncpu=nthreads,
+            storage_gb=storage_gb,
         )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.bam} -o {j.out_bam["bam.bai"]}'
+        cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file} -o {j.output}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_bam["bam.bai"], str(file_to_index) + '.bai')
-    elif file_to_index.suffix == '.cram':
-        j.declare_resource_group(
-            out_cram={
-                'cram': '{root}.cram',
-                'cram.crai': '{root}.cram.crai',
-            },
-        )
-        cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.cram} -o {j.out_cram["cram.crai"]}'
-        j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_cram["cram.crai"], str(file_to_index) + '.crai')
-    else:
-        raise ValueError('Resource group must contain a bam or cram file')
+        b.write_output(j.output, index_file_path)
 
 
 @click.command()
@@ -116,7 +74,7 @@ def main(input_path: str):
     # Find all bam and cram files that need to be indexed
     files_to_index = find_files_to_index(to_path(input_path))
     # Index the files
-    index_files(get_batch(), files_to_index)
+    index_with_samtools(get_batch(), files_to_index)
     get_batch().run()
 
 
