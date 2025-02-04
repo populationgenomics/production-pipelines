@@ -92,7 +92,7 @@ def index_with_samtools(
         )
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.bam} -o {j.out_bam["bam.bai"]}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_bam["bam.bai"], str(file_to_index).removesuffix('.bam'))
+        b.write_output(j.out_bam["bam.bai"], str(file_to_index) + '.bam')
     elif file_to_index.suffix == '.cram':
         j.declare_resource_group(
             out_cram={
@@ -102,7 +102,7 @@ def index_with_samtools(
         )
         cmd = f'samtools index -@ {res.get_nthreads() - 1} {input_file.cram} -o {j.out_cram["cram.crai"]}'
         j.command(command(cmd, monitor_space=True))
-        b.write_output(j.out_cram["cram.crai"],  str(file_to_index).removesuffix('.cram'))
+        b.write_output(j.out_cram["cram.crai"],  str(file_to_index) + '.cram')
     else:
         raise ValueError('Resource group must contain a bam or cram file')
 
