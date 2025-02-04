@@ -447,6 +447,14 @@ class DownloadDataFromIca(SequencingGroupStage):
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
+        ica_analysis_output_folder = config_retrieve(['ica', 'data_prep', 'output_folder'])
+        pipeline_id_path: cpg_utils.Path = inputs.as_path(
+            target=sequencing_group,
+            stage=ManageDragenPipeline,
+            key='pipeline_id',
+        )
+        with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
+            pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         batch_instance: Batch = get_batch()
         ica_download_job: BashJob = batch_instance.new_bash_job(
@@ -465,11 +473,20 @@ class DownloadDataFromIca(SequencingGroupStage):
         ica_download_job.command(
             f"""
             {ICA_CLI_SETUP}
-            icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
-            gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
+            # List all files in the folder except crams and gvcf and download them
+            files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
+            while IFS= read -r line; do
+                name=$(echo "$line" | awk '{{print $1}}')
+                id=$(echo "$line" | awk '{{print $2}}')
+                echo "Downloading $name with ID $id"
+                icav2 projectdata download $id $name --exclude-source-path
+            done <<< "$files_and_ids"
+            ls -R
         """,
         )
 
+        # icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
+        # gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
         return self.make_outputs(
             target=sequencing_group,
             data=self.expected_outputs(sequencing_group=sequencing_group),
