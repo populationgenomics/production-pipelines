@@ -227,7 +227,7 @@ class ManageDragenPipeline(SequencingGroupStage):
 
             align_genotype_job: PythonJob = get_batch().new_python_job(
                 name='AlignGenotypeWithDragen',
-                attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+                attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
             )
             align_genotype_job.image(image=image_path('ica'))
 
@@ -251,7 +251,7 @@ class ManageDragenPipeline(SequencingGroupStage):
         # now monitor that job
         monitor_pipeline_run: PythonJob = get_batch().new_python_job(
             name='MonitorAlignGenotypeWithDragen',
-            attributes=(self.get_job_attrs() or {}) | {'tool': 'Dragen'},
+            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
         )
 
         monitor_pipeline_run.image(image=image_path('ica'))
