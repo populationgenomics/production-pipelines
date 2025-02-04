@@ -465,9 +465,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             name='DownloadDataFromIca',
             attributes=(self.get_job_attrs() or {}) | {'tool': 'ICA'},
         )
-        ica_analysis_folder_id_path: str = batch_instance.read_input(
-            inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
-        )
+
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
         ica_download_job.image(image=image_path('ica'))
