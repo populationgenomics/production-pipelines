@@ -474,6 +474,7 @@ class DownloadDataFromIca(SequencingGroupStage):
             f"""
             {ICA_CLI_SETUP}
             # List all files in the folder except crams and gvcf and download them
+            mkdir -p {sequencing_group.name}
             files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-{pipeline_id}/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
             while IFS= read -r line; do
                 name=$(echo "$line" | awk '{{print $1}}')
