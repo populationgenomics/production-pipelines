@@ -76,7 +76,7 @@ def index_with_samtools(
     j.image(image_path('samtools'))
 
     # Set resource requirements
-    storage_gb = 20 if file_to_index.stat().st_size < 1e9 else 100
+    storage_gb = 20 if file_to_index.stat().st_size < 1e10 else 100
     nthreads = 8
     res = STANDARD.set_resources(
         j,
