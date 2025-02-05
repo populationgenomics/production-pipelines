@@ -20,7 +20,6 @@ import hail as hl
 
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
-from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, get_logger
 from gnomad.utils.sparse_mt import default_compute_info
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
@@ -57,10 +56,6 @@ def main(
     )
 
     get_logger().info(f'Partition strategy {partition_strategy} is not currently in use (see #1078)')
-
-    # if we need to manually specify a non-standard Hail QoB JAR file
-    if jar_spec := config_retrieve(['workflow', 'jar_spec_revisions', 'densify'], False):
-        override_jar_spec(jar_spec)
 
     # check here to see if we can reuse the dense MT
     if not can_reuse(dense_mt_out):
