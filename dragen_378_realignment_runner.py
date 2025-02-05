@@ -14,7 +14,6 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.realign_genotype_with_dragen import (
     DownloadDataFromIca,
-    RegisterCramIcaOutputsInMetamist,
 )
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
