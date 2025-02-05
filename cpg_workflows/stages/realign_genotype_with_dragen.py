@@ -147,7 +147,18 @@ class UploadDataToIca(SequencingGroupStage):
     analysis_keys=['pipeline_id'],
 )
 class ManageDragenPipeline(SequencingGroupStage):
-    # Output object with pipeline ID to GCP
+    """
+    Due to the nature of the Dragen pipeline and stage dependencies, we need to run, monitor and cancel the pipeline in the same stage.
+
+    This stage handles the following tasks:
+    1. Cancels a previous pipeline running on ICA if requested.
+        - Set the `cancel_cohort_run` flag to `true` in the config and the stage will read the pipeline ID from the JSON file and cancel it.
+    2. Resumes monitoring a previous pipeline run if it was interrupted.
+        - Set the `monitor_previous` flag to `true` in the config. This will read the pipeline ID from the JSON file and monitor it.
+    3. Initiates a new Dragen pipeline run if no previous run is found or if resuming is not requested.
+    4. Monitors the progress of the Dragen pipeline run.
+    """
+
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
@@ -172,7 +183,10 @@ class ManageDragenPipeline(SequencingGroupStage):
             config_retrieve(['ica', 'pipelines', 'cancel_cohort_run'], False)
             and cpg_utils.to_path(outputs['pipeline_id']).exists()
         ):
-            # cancel if requested
+            # Can only cancel a pipeline if the pipeline ID JSON exists
+            with open(cpg_utils.to_path(outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
+                pipeline_id: str = pipeline_fid_handle.read().rstrip()
+            # Cancel if requested
             logging.info('Cancelling pipeline run')
             cancel_job = get_batch().new_python_job(
                 name='CancelIcaPipelineRun',
@@ -189,7 +203,7 @@ class ManageDragenPipeline(SequencingGroupStage):
                 str(
                     sg_bucket
                     / GCP_FOLDER_FOR_RUNNING_PIPELINE
-                    / f'{sequencing_group.name}_pipeline_cancelled_at{slugify(str(datetime.now()))}.json',
+                    / f'{sequencing_group.name}_pipeline_{pipeline_id}_cancelled.json',
                 ),
             )
             stage_jobs.append(cancel_job)
@@ -200,7 +214,7 @@ class ManageDragenPipeline(SequencingGroupStage):
                 jobs=stage_jobs,
             )
 
-        # test if a previous pipeline should be re-monitored. Used for when monitor stage on batch crashes and we want to resume
+        # Test if a previous pipeline should be re-monitored. Used for when monitor stage on batch crashes and we want to resume
         if (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False)) and cpg_utils.to_path(
             outputs['pipeline_id'],
         ).exists():
@@ -209,7 +223,6 @@ class ManageDragenPipeline(SequencingGroupStage):
                 align_genotype_job_result: str = pipeline_fid_handle.read().rstrip()
         elif resume:
             logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
-            # return nothing?
             return self.make_outputs(target=sequencing_group)
         else:
             dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
@@ -231,7 +244,6 @@ class ManageDragenPipeline(SequencingGroupStage):
             )
             align_genotype_job.image(image=image_path('ica'))
 
-            # this writes the pipeline ID to a temp file
             align_genotype_job_result = align_genotype_job.call(
                 run_align_genotype_with_dragen.run,
                 ica_fids_path=inputs.as_path(target=sequencing_group, stage=UploadDataToIca),
@@ -305,6 +317,12 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline],
 )
 class DownloadCramFromIca(SequencingGroupStage):
+    """
+    Download cram and crai files from ICA separately. This is to allow registrations of the cram files
+    in metamist to be done via stage decorators. The pipeline ID needs to be read within the Hail BashJob to get the current
+    pipeline ID. If read outside the job, it will get the pipeline ID from the previous pipeline run.
+    """
+
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
@@ -336,8 +354,6 @@ class DownloadCramFromIca(SequencingGroupStage):
             stage=ManageDragenPipeline,
             key='pipeline_id',
         )
-        # with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
-        #     pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
@@ -351,7 +367,6 @@ class DownloadCramFromIca(SequencingGroupStage):
             mkdir -p {sequencing_group.name}
             pipeline_id_filename=$(basename {pipeline_id_path})
             gcloud storage cp {pipeline_id_path} .
-            ls
             pipeline_id=$(cat $pipeline_id_filename)
             echo "Pipeline ID: $pipeline_id"
             cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
@@ -396,6 +411,11 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
+        """
+        Download gVCF and gVCF TBI files from ICA separately. This is to allow registrations of the gVCF files
+        in metamist to be done via stage decorators. The pipeline ID needs to be read within the Hail BashJob to get the current
+        pipeline ID. If read outside the job, it will get the pipeline ID from the previous pipeline run.
+        """
         bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
         ica_analysis_output_folder = config_retrieve(['ica', 'data_prep', 'output_folder'])
 
@@ -410,8 +430,6 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             stage=ManageDragenPipeline,
             key='pipeline_id',
         )
-        # with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
-        #     pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
@@ -425,7 +443,6 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             mkdir -p {sequencing_group.name}
             pipeline_id_filename=$(basename {pipeline_id_path})
             gcloud storage cp {pipeline_id_path} .
-            ls
             pipeline_id=$(cat $pipeline_id_filename)
             echo "Pipeline ID: $pipeline_id"
             gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
@@ -452,6 +469,12 @@ class DownloadGvcfFromIca(SequencingGroupStage):
     required_stages=[ManageDragenPipeline, DownloadCramFromIca, DownloadGvcfFromIca],
 )
 class DownloadDataFromIca(SequencingGroupStage):
+    """
+    Download all files from ICA for a single realignment run except the CRAM and GVCF files.
+    Register this batch download in Metamist.
+    Does not register individual files in Metamist.
+    """
+
     def expected_outputs(
         self,
         sequencing_group: SequencingGroup,
@@ -467,8 +490,6 @@ class DownloadDataFromIca(SequencingGroupStage):
             stage=ManageDragenPipeline,
             key='pipeline_id',
         )
-        # with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
-        #     pipeline_id: str = pipeline_fid_handle.read().rstrip()
 
         batch_instance: Batch = get_batch()
         ica_download_job: BashJob = batch_instance.new_bash_job(
@@ -480,7 +501,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         ica_download_job.memory('8Gi')
         ica_download_job.image(image=image_path('ica'))
 
-        # Download an entire folder with ICA. Don't log projectId or API key
+        # Download an entire folder (except crams and gvcfs) with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
             f"""
@@ -489,7 +510,6 @@ class DownloadDataFromIca(SequencingGroupStage):
             mkdir -p {sequencing_group.name}
             pipeline_id_filename=$(basename {pipeline_id_path})
             gcloud storage cp {pipeline_id_path} .
-            ls
             pipeline_id=$(cat $pipeline_id_filename)
             echo "Pipeline ID: $pipeline_id"
             files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
@@ -503,148 +523,8 @@ class DownloadDataFromIca(SequencingGroupStage):
         """,
         )
 
-        # icav2 projectdata download $(cat {ica_analysis_folder_id_path} | jq -r .analysis_output_fid) {sequencing_group.name} --exclude-source-path
-        # gcloud storage cp --recursive {sequencing_group.name} gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}
         return self.make_outputs(
             target=sequencing_group,
             data=self.expected_outputs(sequencing_group=sequencing_group),
             jobs=ica_download_job,
         )
-
-
-@stage(
-    # analysis_type='cram',  # Add separate analysis_type 'ica_cram' to metamist?
-    # analysis_keys=['cram', 'crai'],
-    required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-    forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
-)
-class RegisterCramIcaOutputsInMetamist(SequencingGroupStage):
-    def expected_outputs(self, sequencing_group: SequencingGroup) -> cpg_utils.Path:
-        bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / f'{sequencing_group.name}'
-
-    def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-        outputs = self.expected_outputs(sequencing_group=sequencing_group)
-        ica_outputs = {
-            'pipeline_id': inputs.as_path(target=sequencing_group, stage=ManageDragenPipeline, key='pipeline_id'),
-            'downloaded_data': inputs.as_path(target=sequencing_group, stage=DownloadDataFromIca),
-        }
-
-        with open(cpg_utils.to_path(ica_outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
-            pipeline_id: str = pipeline_fid_handle.read().rstrip()
-
-        download_path: cpg_utils.Path = outputs / f'{sequencing_group.name}-{pipeline_id}' / sequencing_group.name
-
-        # Confirm existence of CRAM and CRAI files
-        if not (cram_path := download_path / f'{sequencing_group.name}.cram').exists():
-            raise FileNotFoundError(f'CRAM not found in {cram_path}')
-        if not (crai_path := download_path / f'{sequencing_group.name}.cram.crai').exists():
-            raise FileNotFoundError(f'CRAI not found in {crai_path}')
-
-        batch_instance: Batch = get_batch()
-        register_cram_job: BashJob = batch_instance.new_bash_job(
-            name='RegisterCramIcaOutputsInMetamist',
-            attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
-        )
-
-        register_cram_job.memory('8Gi')
-        register_cram_job.image(image=image_path('ica'))
-
-        register_cram_job.command(
-            f"""
-            echo 'Pipeline run {pipeline_id} CRAM and CRAI files successfully registered in Metamist'
-            """,
-        )
-
-        # Register via status reporter
-        if self.status_reporter is not None:
-            self.status_reporter.create_analysis(
-                b=batch_instance,
-                output=download_path / f'{sequencing_group.name}.cram',
-                analysis_type='cram',
-                target=sequencing_group,
-                jobs=[register_cram_job],
-                project_name=sequencing_group.dataset.name,
-                meta={'pipeline_id': pipeline_id},
-            )
-        else:
-            logging.warning("Status reporter is not set. Skipping analysis registration.")
-
-        return self.make_outputs(
-            target=sequencing_group,
-            data=outputs,
-            jobs=register_cram_job,
-        )
-
-
-# @stage(
-#     analysis_type='gvcf',
-#     analysis_keys=['gvcf', 'gvcf_tbi'],
-#     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline, GvcfMlrWithDragen, DownloadDataFromIca],
-#     forced=True,  # Forcing stage as expected_outputs should always exist before running this stage
-# )
-# class RegisterGvcfIcaOutputsInMetamist(SequencingGroupStage):
-#     def expected_outputs(self, sequencing_group: SequencingGroup) -> dict[str, cpg_utils.Path]:
-#         bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
-#         pipeline_id_path = bucket_name / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_id.json'
-
-#         if not pipeline_id_path.exists():
-#             raise FileNotFoundError(f'Pipeline ID not found in {pipeline_id_path}')
-
-#         with open(cpg_utils.to_path(pipeline_id_path), 'rt') as pipeline_fid_handle:
-#             pipeline_id = pipeline_fid_handle.read().strip()
-
-#         download_path = (
-#             bucket_name
-#             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-#             / sequencing_group.name
-#             / f'{sequencing_group.name}-{pipeline_id}'
-#             / sequencing_group.name
-#         )
-
-#         return {
-#             'gvcf': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
-#             'gvcf_tbi': download_path / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
-#         }
-
-#     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-#         outputs = self.expected_outputs(sequencing_group=sequencing_group)
-#         ica_outputs = {
-#             'pipeline_id': inputs.as_path(target=sequencing_group, stage=ManageDragenPipeline, key='pipeline_id'),
-#             'downloaded_data': inputs.as_path(target=sequencing_group, stage=DownloadDataFromIca),
-#         }
-
-#         with open(cpg_utils.to_path(ica_outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
-#             pipeline_id: str = pipeline_fid_handle.read().rstrip()
-
-#         # Confirm existence of CRAM and CRAI files
-#         if not (outputs['gvcf']).exists():
-#             raise FileNotFoundError(f'GVCF not found in {outputs["gvcf"]}')
-#         if not (outputs['gvcf_tbi']).exists():
-#             raise FileNotFoundError(f'GVCF_tbi not found in {outputs["gvcf_tbi"]}')
-
-#         batch_instance: Batch = get_batch()
-#         register_cram_job: BashJob = batch_instance.new_bash_job(
-#             name='RegisterGvcfIcaOutputsInMetamist',
-#             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
-#         )
-
-#         register_cram_job.memory('8Gi')
-#         register_cram_job.image(image=image_path('ica'))
-
-#         register_cram_job.command(
-#             f"""
-#             echo 'Pipeline run {pipeline_id} GVCF and GVCF_TBI files successfully registered in Metamist'
-#             """,
-#         )
-
-#         return self.make_outputs(
-#             target=sequencing_group,
-#             data=outputs,
-#             jobs=register_cram_job,
-#         )
-
-
-# @stage(required_stages=[RegisterCramIcaOutputsInMetamist, RegisterGvcfIcaOutputsInMetamist])
-# class RegisterAllIcaOutputsInMetamist(SequencingGroupStage):
-#     pass
