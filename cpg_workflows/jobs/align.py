@@ -160,7 +160,7 @@ def align(
         realignment_shards_num = 10
     else:
         assert sequencing_group.sequencing_type == 'exome'
-        realignment_shards_num = 5
+        realignment_shards_num = config_retrieve(['workflow', 'exome_realignment_shards'], 1)
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = (
