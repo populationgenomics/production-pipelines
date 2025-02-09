@@ -7,22 +7,32 @@ from cpg_utils.config import config_retrieve
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
+from gnomad.resources.grch38.reference_data import (
+    lcr_intervals,
+    seg_dup_intervals,
+)
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (
     age_hists_expr,
+    annotate_adj,
+    annotate_freq,
     bi_allelic_site_inbreeding_expr,
     faf_expr,
+    gen_anc_faf_max_expr,
     get_adj_expr,
     pop_max_expr,
     qual_hist_expr,
+    region_flag_expr,
 )
-from gnomad.utils.release import make_faf_index_dict
+from gnomad.utils.release import make_faf_index_dict, make_freq_index_dict, make_freq_index_dict_from_meta
 
 
 def run(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
+    infer_pop_ht_path: str,
+    site_only_ht_path: str,
     out_ht_path: str,
 ):
     if can_reuse(out_ht_path):
@@ -34,11 +44,15 @@ def run(
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
+    inferred_pop_ht = hl.read_table(str(infer_pop_ht_path))
+    site_only_ht = hl.read_table(str(site_only_ht_path))
 
     freq_ht = frequency_annotations(
         vds,
         sample_qc_ht,
         relateds_to_drop_ht,
+        inferred_pop_ht,
+        site_only_ht,
     )
     logging.info(f'Writing out frequency data to {out_ht_path}...')
     freq_ht.write(str(out_ht_path), overwrite=True)
@@ -48,6 +62,8 @@ def frequency_annotations(
     vds: hl.vds.VariantDataset,
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
+    inferred_pop_ht: hl.Table,
+    site_only_ht: hl.Table,
 ) -> hl.Table:
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
@@ -88,12 +104,51 @@ def frequency_annotations(
     # The algorithm assumes all samples are unrelated:
     mt = mt.annotate_rows(InbreedingCoeff=bi_allelic_site_inbreeding_expr(mt.GT))
 
+    mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
+    mt = _compute_filtering_af_and_popmax(mt)
+    # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
+    # mt = _compute_age_hists(mt, sample_qc_ht)
+    mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
+
+    # Annotate quality metrics histograms
+    qual_hist_ht = _annotate_quality_metrics_hist(mt)
+    mt = mt.annotate_rows(
+        histograms=hl.struct(
+            qual_hists=qual_hist_ht[mt.row_key].qual_hists,
+            raw_qual_hists=qual_hist_ht[mt.row_key].raw_qual_hists,
+        ),
+    )
+
     freq_ht = mt.rows()
+    freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
+    freq_ht = freq_ht.annotate(
+        region_flags=region_flag_expr(
+            freq_ht,
+            prob_regions={'lcr': lcr_intervals.ht(), 'segdup': seg_dup_intervals.ht()},
+        ),
+    )
+    mono_allelic_flag_expr = (freq_ht.freq[0].AC > 0) & (freq_ht.freq[1].AF == 1)
+    freq_ht = freq_ht.annotate(info=freq_ht.info.annotate(monoallelic=mono_allelic_flag_expr))
     freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
     freq_ht = freq_ht.drop('variant_qc')
     freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
 
     return freq_ht
+
+
+def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht: hl.Table) -> hl.MatrixTable:
+    # prepare_gnomad_v4_variants_helper requires ancestry to be annotated
+    mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
+    # prepare_gnomad_v4_variants_helper requires sex to be annotated
+    mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
+    mt = mt.annotate_cols(subset='tenk10k')
+    mt = annotate_freq(
+        mt,
+        sex_expr=mt.sex,
+        additional_strata_expr=[{'gen_anc': mt.gen_anc}],
+        pop_expr=mt.gen_anc,
+    )
+    return mt
 
 
 def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixTable:
@@ -130,6 +185,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     mt = mt.select_rows(
         'InbreedingCoeff',
         'freq',
+        'rsid',
         faf=faf,
         popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX),
     )
@@ -139,6 +195,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
             faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
         ),
     )
+    mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
     return mt
 
 
