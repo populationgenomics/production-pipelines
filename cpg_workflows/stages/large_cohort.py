@@ -427,7 +427,11 @@ class LoadVqsr(CohortStage):
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'frequencies.ht'
+        if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
+            frequencies_version = slugify(frequencies_version)
+
+        frequencies_version = frequencies_version or get_workflow().output_version
+        return get_workflow().prefix / frequencies_version / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import frequencies
@@ -456,8 +460,8 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, Ancestry, key='inferred_pop')),
-                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')),
                 str(self.tmp_prefix / 'siteonly.ht'),
+                str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
