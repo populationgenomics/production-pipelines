@@ -47,6 +47,7 @@ def run(
     inferred_pop_ht = hl.read_table(str(infer_pop_ht_path))
     site_only_ht = hl.read_table(str(site_only_ht_path))
 
+    logging.info('Generating frequency annotations...')
     freq_ht = frequency_annotations(
         vds,
         sample_qc_ht,
