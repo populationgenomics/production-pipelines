@@ -130,8 +130,8 @@ def frequency_annotations(
     )
     mono_allelic_flag_expr = (freq_ht.freq[0].AC > 0) & (freq_ht.freq[1].AF == 1)
     freq_ht = freq_ht.annotate(info=freq_ht.info.annotate(monoallelic=mono_allelic_flag_expr))
-    freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
-    freq_ht = freq_ht.drop('variant_qc')
+    freq_ht = freq_ht.annotate(**mt.variant_qc)
+    # freq_ht = freq_ht.drop('variant_qc')
     freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
 
     return freq_ht
