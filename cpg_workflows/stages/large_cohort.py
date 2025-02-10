@@ -460,7 +460,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, Ancestry, key='inferred_pop')),
-                str(self.tmp_prefix / 'siteonly.ht'),
+                str(self.tmp_prefix / 'MakeSiteOnlyVcf' / 'siteonly.ht'),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
