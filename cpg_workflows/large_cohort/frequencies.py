@@ -109,7 +109,7 @@ def frequency_annotations(
 
     mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
     mt = _compute_filtering_af_and_popmax(mt)
-    mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'))
+    mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'), overwrite=True)
     # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
     # mt = _compute_age_hists(mt, sample_qc_ht)
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
