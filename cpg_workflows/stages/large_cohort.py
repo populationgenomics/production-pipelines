@@ -431,7 +431,7 @@ class Frequencies(CohortStage):
             frequencies_version = slugify(frequencies_version)
 
         frequencies_version = frequencies_version or get_workflow().output_version
-        return get_workflow().prefix / frequencies_version / 'frequencies.ht'
+        return cohort.analysis_dataset.prefix() / get_workflow().name / frequencies_version / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import frequencies
@@ -461,7 +461,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, Ancestry, key='inferred_pop')),
                 str(get_workflow().tmp_prefix / 'MakeSiteOnlyVcf' / 'siteonly.ht'),
-                str(self.expected_outputs(cohort)),
+                self.expected_outputs(cohort),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),

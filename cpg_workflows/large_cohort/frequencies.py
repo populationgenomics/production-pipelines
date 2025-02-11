@@ -3,7 +3,7 @@ import logging
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve
+from cpg_utils.config import config_retrieve, output_path
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
 from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
@@ -33,7 +33,7 @@ def run(
     relateds_to_drop_ht_path: str,
     infer_pop_ht_path: str,
     site_only_ht_path: str,
-    out_ht_path: str,
+    out_ht_path: Path,
 ):
     if can_reuse(out_ht_path):
         return
@@ -54,6 +54,7 @@ def run(
         relateds_to_drop_ht,
         inferred_pop_ht,
         site_only_ht,
+        out_ht_path,
     )
     logging.info(f'Writing out frequency data to {out_ht_path}...')
     freq_ht.write(str(out_ht_path), overwrite=True)
@@ -65,6 +66,7 @@ def frequency_annotations(
     relateds_to_drop_ht: hl.Table,
     inferred_pop_ht: hl.Table,
     site_only_ht: hl.Table,
+    out_ht_path: Path,
 ) -> hl.Table:
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
@@ -107,6 +109,7 @@ def frequency_annotations(
 
     mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
     mt = _compute_filtering_af_and_popmax(mt)
+    mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'))
     # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
     # mt = _compute_age_hists(mt, sample_qc_ht)
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
