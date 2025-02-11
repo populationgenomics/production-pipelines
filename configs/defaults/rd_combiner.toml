@@ -6,7 +6,8 @@ status_reporter = 'metamist'
 #last_stages = ['CreateDenseMtFromVdsWithHail']
 
 ## if this is False, we will not check for existing VDS - always create fresh VDS from gVCFs
-check_for_existing_vds = false
+# as of 11-02-2025 we have a base VDS for all exome and genome datasets, so by default, do check
+check_for_existing_vds = true
 
 ## If this is populated with an integer, we will use the VDS with this ID in Metamist as the starting point
 #use_specific_vds = 1234
