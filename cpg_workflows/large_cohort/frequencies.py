@@ -185,7 +185,7 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
 
 def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     logging.info('Computing filtering allele frequencies and popmax...')
-    faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX)
+    faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX, pop_label='gen_anc')
     mt = mt.select_rows(
         'InbreedingCoeff',
         'freq',
