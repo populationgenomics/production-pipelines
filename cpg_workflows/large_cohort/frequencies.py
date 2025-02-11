@@ -33,7 +33,7 @@ def run(
     relateds_to_drop_ht_path: str,
     infer_pop_ht_path: str,
     site_only_ht_path: str,
-    out_ht_path: Path,
+    out_ht_path: str,
 ):
     if can_reuse(out_ht_path):
         return
@@ -66,7 +66,7 @@ def frequency_annotations(
     relateds_to_drop_ht: hl.Table,
     inferred_pop_ht: hl.Table,
     site_only_ht: hl.Table,
-    out_ht_path: Path,
+    out_ht_path: str,
 ) -> hl.Table:
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
