@@ -512,7 +512,6 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
 
 
 @stage(
-    analysis_type='matrixtable',
     required_stages=[
         CreateDenseMtFromVdsWithHail,
         AnnotateFragmentedVcfWithVep,
@@ -557,7 +556,7 @@ class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AnnotateCohortSmallVariantsWithHailQuery], analysis_type='matrixtable', analysis_keys=['mt'])
+@stage(required_stages=[AnnotateCohortSmallVariantsWithHailQuery])
 class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
     """
     Subset the MT to a single dataset
