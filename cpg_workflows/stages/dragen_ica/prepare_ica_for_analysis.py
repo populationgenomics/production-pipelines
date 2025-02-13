@@ -2,10 +2,6 @@ import logging
 from typing import Literal
 
 import coloredlogs
-import icasdk
-from icasdk.apis.tags import project_data_api
-
-from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(
@@ -26,6 +22,11 @@ def run(
     Returns:
         dict [str, str] noting the analysis ID.
     """
+    import icasdk
+    from icasdk.apis.tags import project_data_api
+
+    from cpg_workflows.stages.dragen_ica import ica_utils
+
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
