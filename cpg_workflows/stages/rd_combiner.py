@@ -683,7 +683,7 @@ class ExportMtAsEsIndex(DatasetStage):
         Transforms the MT into a Seqr index, no DataProc
         """
         # only create the elasticsearch index for the datasets specified in the config
-        eligible_datasets = config_retrieve(['workflow', 'write_mt_for_datasets'], default=[])
+        eligible_datasets = config_retrieve(['workflow', 'create_es_index_for_datasets'], default=[])
         if dataset.name not in eligible_datasets:
             get_logger().info(f'Skipping ES index creation for {dataset}')
             return None
