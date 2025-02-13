@@ -4,7 +4,9 @@ use the gVCF combiner instead of joint-calling.
 """
 
 from google.api_core.exceptions import PermissionDenied
+
 from hail.vds import read_vds
+
 from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, genome_build
@@ -21,7 +23,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import Dataset, MultiCohort
-from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing, exists
+from cpg_workflows.utils import exists, get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
