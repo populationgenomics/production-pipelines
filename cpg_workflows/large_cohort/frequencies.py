@@ -145,7 +145,7 @@ def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht:
     mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
     # prepare_gnomad_v4_variants_helper requires sex to be annotated
     mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
-    mt = mt.annotate_cols(subset='tenk10k')
+    # mt = mt.annotate_cols(subset='tenk10k')
     mt = annotate_freq(
         mt,
         sex_expr=mt.sex,
