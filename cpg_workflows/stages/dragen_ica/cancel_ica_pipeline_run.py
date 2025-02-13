@@ -5,7 +5,6 @@ from typing import Literal
 import coloredlogs
 
 import cpg_utils
-from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
@@ -24,6 +23,8 @@ def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
     """
     import icasdk
     from icasdk.apis.tags import project_analysis_api
+
+    from cpg_workflows.stages.dragen_ica import ica_utils
 
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
