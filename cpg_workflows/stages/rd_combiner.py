@@ -5,10 +5,12 @@ use the gVCF combiner instead of joint-calling.
 
 from google.api_core.exceptions import PermissionDenied
 
+from hail.vds import read_vds
+
 from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, genome_build
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import get_batch, init_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner import combiner
 from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
@@ -21,7 +23,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import Dataset, MultiCohort
-from cpg_workflows.utils import get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
+from cpg_workflows.utils import exists, get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -124,6 +126,27 @@ def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | N
     return analyses_by_date[sorted(analyses_by_date)[-1]]
 
 
+def manually_find_ids_from_vds(vds_path: str) -> set[str]:
+    """
+    during development and the transition to input_cohorts over input_datasets, there are some instances
+    where we have VDS entries in Metamist, but the analysis entry contains SG IDs which weren't combined into the VDS
+
+    This check bypasses the quick "get all SG IDs in the VDS analysis entry" check,
+    and instead checks the exact contents of the VDS
+
+    Args:
+        vds_path (str): path to the VDS. Assuming it exists, this will be checked before calling this method
+
+    Returns:
+        set[str]: the set of sample IDs in the VDS
+    """
+    init_batch()
+    vds = read_vds(vds_path)
+
+    # find the samples in the Variant Data MT
+    return set(vds.variant_data.s.collect())
+
+
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path | str]:
@@ -158,6 +181,15 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         else:
             get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
+
+        # quick check - if we found a VDS, guarantee it exists
+        if vds_path and not exists(vds_path):
+            raise ValueError(f'VDS {vds_path} does not exist, but has an Analysis Entry')
+
+        # this is a more computationally expensive, but much more certain check, on prior VDS contents
+        # it is not used by default, but can be enabled by setting manually_check_vds_sg_ids to true
+        if vds_path and config_retrieve(['workflow', 'manually_check_vds_sg_ids'], False):
+            sg_ids_in_vds = manually_find_ids_from_vds(vds_path)
 
         new_sg_gvcfs: list[str] = [
             str(sg.gvcf)
