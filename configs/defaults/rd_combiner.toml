@@ -9,6 +9,11 @@ status_reporter = 'metamist'
 # as of 11-02-2025 we have a base VDS for all exome and genome datasets, so by default, do check
 check_for_existing_vds = true
 
+# during development and the transition to input_cohorts over input_datasets, there are some instances
+# where we have VDS entries in Metamist, but the analysis entry contains SG IDs which weren't combined into the VDS
+# this is not expected to be a long term problem, but is a way of confirming explicitly which SGs still need combining
+manually_check_vds_sg_ids = true
+
 ## If this is populated with an integer, we will use the VDS with this ID in Metamist as the starting point
 #use_specific_vds = 1234
 
