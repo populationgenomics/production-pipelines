@@ -1,11 +1,18 @@
 import json
 import logging
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 import coloredlogs
+import icasdk
+from icasdk.apis.tags import project_analysis_api
+from icasdk.model.analysis_data_input import AnalysisDataInput
+from icasdk.model.analysis_parameter_input import AnalysisParameterInput
+from icasdk.model.analysis_tag import AnalysisTag
+from icasdk.model.create_nextflow_analysis import CreateNextflowAnalysis
+from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
 
-if TYPE_CHECKING:
-    from icasdk.apis.tags import project_analysis_api
+import cpg_utils
+from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def submit_dragen_run(
@@ -20,19 +27,8 @@ def submit_dragen_run(
     reference_tags: list[str],
     user_reference: str,
     project_id: dict[str, str],
-    api_instance: 'project_analysis_api.ProjectAnalysisApi',
+    api_instance: project_analysis_api.ProjectAnalysisApi,
 ) -> str:
-    import icasdk
-    from icasdk.apis.tags import project_analysis_api
-    from icasdk.model.analysis_data_input import AnalysisDataInput
-    from icasdk.model.analysis_parameter_input import AnalysisParameterInput
-    from icasdk.model.analysis_tag import AnalysisTag
-    from icasdk.model.create_nextflow_analysis import CreateNextflowAnalysis
-    from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
-
-    import cpg_utils
-    from cpg_workflows.stages.dragen_ica import ica_utils
-
     header_params: dict[Any, Any] = {}
     body = CreateNextflowAnalysis(
         userReference=user_reference,
@@ -109,16 +105,6 @@ def run(
         api_root (str): The ICA API root
         output_path (str): The path to write the pipeline ID to
     """
-    import icasdk
-    from icasdk.apis.tags import project_analysis_api
-    from icasdk.model.analysis_data_input import AnalysisDataInput
-    from icasdk.model.analysis_parameter_input import AnalysisParameterInput
-    from icasdk.model.analysis_tag import AnalysisTag
-    from icasdk.model.create_nextflow_analysis import CreateNextflowAnalysis
-    from icasdk.model.nextflow_analysis_input import NextflowAnalysisInput
-
-    import cpg_utils
-    from cpg_workflows.stages.dragen_ica import ica_utils
 
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']

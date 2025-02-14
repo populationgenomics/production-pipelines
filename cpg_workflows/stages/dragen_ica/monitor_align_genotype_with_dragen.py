@@ -4,6 +4,11 @@ from random import randint
 from typing import Literal
 
 import coloredlogs
+import icasdk
+from icasdk.apis.tags import project_analysis_api
+
+import cpg_utils
+from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(
@@ -23,12 +28,6 @@ def run(
     Returns:
         dict[str, str]: A dict noting success of the pipeline run.
     """
-    import icasdk
-    from icasdk.apis.tags import project_analysis_api
-
-    import cpg_utils
-    from cpg_workflows.stages.dragen_ica import ica_utils
-
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
