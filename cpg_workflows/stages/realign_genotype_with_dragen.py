@@ -72,7 +72,7 @@ class PrepareIcaForDragenAnalysis(SequencingGroupStage):
             name='PrepareIcaForDragenAnalysis',
             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'ICA'},
         )
-        prepare_ica_job.image(image=image_path('ica'))
+        prepare_ica_job.image(image=config_retrieve(['workflow', 'driver_image']))
 
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
         output_fids = prepare_ica_job.call(
@@ -108,7 +108,7 @@ class UploadDataToIca(SequencingGroupStage):
         upload_folder = config_retrieve(['ica', 'data_prep', 'upload_folder'])
         bucket: str = get_path_components_from_gcp_path(str(sequencing_group.cram))['bucket']
 
-        upload_job.image(image=image_path('ica'))
+        upload_job.image(image=config_retrieve(['workflow', 'driver_image']))
         upload_job.storage(calculate_needed_storage(cram=str(sequencing_group.cram)))
         output = self.expected_outputs(sequencing_group=sequencing_group)
         authenticate_cloud_credentials_in_job(upload_job)
@@ -192,7 +192,7 @@ class ManageDragenPipeline(SequencingGroupStage):
                 name='CancelIcaPipelineRun',
                 attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
             )
-            cancel_job.image(image=image_path('ica'))
+            cancel_job.image(image=config_retrieve(['workflow', 'driver_image']))
             cancel_pipeline_result = cancel_job.call(
                 cancel_ica_pipeline_run.run,
                 ica_pipeline_id_path=str(outputs['pipeline_id']),
@@ -242,7 +242,7 @@ class ManageDragenPipeline(SequencingGroupStage):
                 name='AlignGenotypeWithDragen',
                 attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
             )
-            align_genotype_job.image(image=image_path('ica'))
+            align_genotype_job.image(image=config_retrieve(['workflow', 'driver_image']))
 
             align_genotype_job_result = align_genotype_job.call(
                 run_align_genotype_with_dragen.run,
@@ -266,7 +266,7 @@ class ManageDragenPipeline(SequencingGroupStage):
             attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
         )
 
-        monitor_pipeline_run.image(image=image_path('ica'))
+        monitor_pipeline_run.image(image=config_retrieve(['workflow', 'driver_image']))
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id=align_genotype_job_result,
@@ -357,7 +357,7 @@ class DownloadCramFromIca(SequencingGroupStage):
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
-        ica_download_job.image(image=image_path('ica'))
+        ica_download_job.image(image=config_retrieve(['workflow', 'driver_image']))
 
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
@@ -433,7 +433,7 @@ class DownloadGvcfFromIca(SequencingGroupStage):
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
-        ica_download_job.image(image=image_path('ica'))
+        ica_download_job.image(image=config_retrieve(['workflow', 'driver_image']))
 
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
@@ -499,7 +499,7 @@ class DownloadDataFromIca(SequencingGroupStage):
 
         ica_download_job.storage(storage=calculate_needed_storage(cram=str(sequencing_group.cram)))
         ica_download_job.memory('8Gi')
-        ica_download_job.image(image=image_path('ica'))
+        ica_download_job.image(image=config_retrieve(['workflow', 'driver_image']))
 
         # Download an entire folder (except crams and gvcfs) with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)

@@ -3,8 +3,11 @@ import logging
 from typing import Literal
 
 import coloredlogs
+import icasdk
+from icasdk.apis.tags import project_analysis_api
 
 import cpg_utils
+from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
@@ -21,11 +24,6 @@ def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
         dict[str, str]: A cancelled dict to be recorded in GCP noting that the pipeline was cancelled.
                         Includes a timestamp so that a single cancelled pipeline isn't blocking.
     """
-    import icasdk
-    from icasdk.apis.tags import project_analysis_api
-
-    from cpg_workflows.stages.dragen_ica import ica_utils
-
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
