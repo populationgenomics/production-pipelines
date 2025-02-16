@@ -194,7 +194,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         faf=faf,
         popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX),
     )
-    mt = mt.annotate_globals(faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta))
+    mt = mt.annotate_globals(faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth']))
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
             faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
