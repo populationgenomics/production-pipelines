@@ -466,6 +466,18 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
+
+            # Check the md5sum of the downloaded gVCF file
+            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz | grep 'md5_hash' | awk '{{print $2}}')
+            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
+            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
+                echo "Error: MD5 checksums do not match!"
+                echo "GCS MD5: $gcloud_md5_hash"
+                echo "ICA MD5: $ica_md5_hash"
+                exit 1
+            else
+                echo "MD5 checksums match."
+            fi
         """,
         )
 
