@@ -124,10 +124,10 @@ def frequency_annotations(
     )
 
     freq_ht = mt.rows()
+    freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
     freq_ht = freq_ht.annotate(
         info=freq_ht.info.annotate(InbreedingCoeff=freq_ht.InbreedingCoeff),
     )
-    freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
     freq_ht = freq_ht.annotate(
         region_flags=region_flag_expr(
             freq_ht,
