@@ -124,6 +124,9 @@ def frequency_annotations(
     )
 
     freq_ht = mt.rows()
+    freq_ht = freq_ht.annotate(
+        info=freq_ht.info.annotate(InbreedingCoeff=freq_ht.InbreedingCoeff),
+    )
     freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
     freq_ht = freq_ht.annotate(
         region_flags=region_flag_expr(
@@ -201,6 +204,9 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         ),
     )
     mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
+
+    # Populating 'filters' field with empty set for now
+    mt = mt.annotate_rows(filters=hl.empty_set(hl.tstr))
     return mt
 
 
