@@ -105,7 +105,7 @@ def frequency_annotations(
     # NOTE: This is not the ideal location to calculate this, but added here
     # to avoid another densify.
     # The algorithm assumes all samples are unrelated:
-    mt = mt.annotate_rows(InbreedingCoeff=hl.array(bi_allelic_site_inbreeding_expr(mt.GT)))
+    mt = mt.annotate_rows(InbreedingCoeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
 
     mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
     mt = _compute_filtering_af_and_popmax(mt)
