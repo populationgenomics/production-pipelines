@@ -378,6 +378,18 @@ class DownloadCramFromIca(SequencingGroupStage):
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
+
+            # Check the md5sum of the downloaded CRAM file
+            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}.cram | grep 'md5_hash' | awk '{{print $2}}')
+            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/{sequencing_group.name}.cram.md5sum)
+            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
+                echo "Error: MD5 checksums do not match!"
+                echo "GCS MD5: $gcloud_md5_hash"
+                echo "ICA MD5: $ica_md5_hash"
+                exit 1
+            else
+                echo "MD5 checksums match."
+            fi
         """,
         )
 
