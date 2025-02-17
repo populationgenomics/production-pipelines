@@ -166,7 +166,7 @@ class ManageDragenPipeline(SequencingGroupStage):
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
             'output': sg_bucket / GCP_FOLDER_FOR_RUNNING_PIPELINE / f'{sequencing_group.name}_pipeline_success.json',
-            'pipeline_id': sequencing_group.dataset.prefix(test=True)
+            'pipeline_id': sequencing_group.dataset.prefix()
             / GCP_FOLDER_FOR_RUNNING_PIPELINE
             / f'{sequencing_group.name}_pipeline_id.json',
         }
