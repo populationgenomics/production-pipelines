@@ -1,4 +1,5 @@
 import logging
+from hmac import new
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
@@ -79,6 +80,10 @@ class Combiner(CohortStage):
         sg_ids_in_vds: list[str] = []
         new_sg_gvcfs: list[str] = []
 
+        logging.info(f'cohort: {cohort}')
+        logging.info(f'cohort.get_sequencing_groups(): {cohort.get_sequencing_groups()}')
+        logging.info(f'dataset: {cohort.analysis_dataset} and cohort.get_datasets(): {cohort.get_datasets()}')
+
         if combiner_config.get('vds_analysis_ids', None) is not None:
             for vds_id in combiner_config['vds_analysis_ids']:
                 tmp_query_res, tmp_sg_ids_in_vds = self.get_vds_ids_output(vds_id)
@@ -89,9 +94,12 @@ class Combiner(CohortStage):
             # Get SG IDs from the cohort object itself, rather than call Metamist.
             # Get VDS IDs first and filter out from this list
             cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
+            logging.info(f'cohort_sgs: {cohort_sgs}')
             new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
 
         if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
+            logging.info('No new gvcfs to process, skipping combiner')
+            logging.info(f'vds_paths: {vds_paths}, new_sg_gvcfs: {new_sg_gvcfs}')
             return self.make_outputs(cohort, output_paths)
 
         j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
