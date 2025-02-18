@@ -238,6 +238,10 @@ class ManageDragenPipeline(SequencingGroupStage):
             reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
             user_reference: str = sequencing_group.name
 
+            qc_cross_cont_vcf_id = config_retrieve(['ica', 'qc', 'cross_cont_vcf'])
+            qc_cov_region_1_id = config_retrieve(['ica', 'qc', 'coverage_region_1'])
+            qc_cov_region_2_id = config_retrieve(['ica', 'qc', 'coverage_region_2'])
+
             align_genotype_job: PythonJob = get_batch().new_python_job(
                 name='AlignGenotypeWithDragen',
                 attributes=(self.get_job_attrs(sequencing_group) or {}) | {'tool': 'Dragen'},
@@ -250,6 +254,9 @@ class ManageDragenPipeline(SequencingGroupStage):
                 analysis_output_fid_path=inputs.as_path(target=sequencing_group, stage=PrepareIcaForDragenAnalysis),
                 dragen_ht_id=dragen_ht_id,
                 cram_reference_id=cram_reference_id,
+                qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
+                qc_cov_region_1_id=qc_cov_region_1_id,
+                qc_cov_region_2_id=qc_cov_region_2_id,
                 dragen_pipeline_id=dragen_pipeline_id,
                 user_tags=user_tags,
                 technical_tags=technical_tags,
