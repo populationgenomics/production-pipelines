@@ -1,6 +1,3 @@
 [workflow]
 sequencing_type = 'genome'
 site_blacklist = ["victorian clinical genetics services, murdoch childrens research institute"]
-
-[images]
-bcftools = "australia-southeast1-docker.pkg.dev/cpg-common/images/bcftools_120:1.20"
