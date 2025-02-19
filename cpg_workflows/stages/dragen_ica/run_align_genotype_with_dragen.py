@@ -65,6 +65,7 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='vc_enable_vcf_output', value='False'),
                 AnalysisParameterInput(code='qc_coverage_report', value='cov_report'),
                 AnalysisParameterInput(code='enable_cnv', value='True'),
+                AnalysisParameterInput(code='cnv_enable_self_normalization', value='True'),
                 AnalysisParameterInput(code='enable_sv', value='True'),
                 AnalysisParameterInput(
                     code='additional_args',
