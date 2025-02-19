@@ -49,7 +49,10 @@ def submit_dragen_run(
                 AnalysisDataInput(parameterCode='ref_tar', dataIds=[dragen_ht_id]),
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
                 AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
-                AnalysisDataInput(parameterCode='qc_coverage_region_1', dataIds=[qc_cov_region_1_id]), # In the XML it calls this qc-coverage-bed-N?
+                AnalysisDataInput(
+                    parameterCode='qc_coverage_region_1',
+                    dataIds=[qc_cov_region_1_id],
+                ),  # In the XML it calls this qc-coverage-bed-N?
                 AnalysisDataInput(parameterCode='qc_coverage_region_2', dataIds=[qc_cov_region_2_id]),
             ],
             parameters=[
@@ -66,7 +69,7 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='enable_sv', value='True'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --enable-cyp2d6 true --cnv-enable-self-normalization true',
+                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --enable-cyp2d6 true',
                 ),
             ],
         ),
