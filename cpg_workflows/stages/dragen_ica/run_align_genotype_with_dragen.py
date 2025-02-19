@@ -50,10 +50,9 @@ def submit_dragen_run(
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
                 AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
                 AnalysisDataInput(
-                    parameterCode='qc_coverage_region_1',
-                    dataIds=[qc_cov_region_1_id],
-                ),  # In the XML it calls this qc-coverage-bed-N?
-                AnalysisDataInput(parameterCode='qc_coverage_region_2', dataIds=[qc_cov_region_2_id]),
+                    parameterCode='qc_coverage_region_beds',
+                    dataIds=[qc_cov_region_1_id, qc_cov_region_2_id],
+                ),
             ],
             parameters=[
                 AnalysisParameterInput(code='enable_map_align', value='True'),
