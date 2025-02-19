@@ -63,8 +63,7 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='enable_variant_caller', value='True'),
                 AnalysisParameterInput(code='vc_emit_reference_confidence', value='GVCF'),
                 AnalysisParameterInput(code='vc_enable_vcf_output', value='False'),
-                AnalysisParameterInput(code='qc_coverage_report_1', value='cov_report'),
-                AnalysisParameterInput(code='qc_coverage_report_2', value='cov_report'),
+                AnalysisParameterInput(code='qc_coverage_report', value='cov_report'),
                 AnalysisParameterInput(code='enable_cnv', value='True'),
                 AnalysisParameterInput(code='enable_sv', value='True'),
                 AnalysisParameterInput(
