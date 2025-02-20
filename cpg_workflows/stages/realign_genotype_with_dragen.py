@@ -180,7 +180,7 @@ class ManageDragenPipeline(SequencingGroupStage):
         stage_jobs: list[BashJob | PythonJob] = []
 
         if (
-            config_retrieve(['ica', 'pipelines', 'cancel_cohort_run'], False)
+            config_retrieve(['ica', 'management', 'cancel_cohort_run'], False)
             and cpg_utils.to_path(outputs['pipeline_id']).exists()
         ):
             # Can only cancel a pipeline if the pipeline ID JSON exists
@@ -215,7 +215,7 @@ class ManageDragenPipeline(SequencingGroupStage):
             )
 
         # Test if a previous pipeline should be re-monitored. Used for when monitor stage on batch crashes and we want to resume
-        if (resume := config_retrieve(['ica', 'pipelines', 'monitor_previous'], False)) and cpg_utils.to_path(
+        if (resume := config_retrieve(['ica', 'management', 'monitor_previous'], False)) and cpg_utils.to_path(
             outputs['pipeline_id'],
         ).exists():
             logging.info(f'Previous pipeline found for {sequencing_group.name}, not setting off a new one')
