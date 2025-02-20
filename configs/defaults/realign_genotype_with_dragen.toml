@@ -18,9 +18,6 @@ technical_tags = ['test_technical_tag']
 user_tags = ['test_user_tags']
 reference_tags = ['test_reference_tags']
 
-# This gets added to the pipeline name with the pipeline ID in the format <ref>-<id> automatically by ICA
-user_reference = 'test_user_reference'
-
 # The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'
