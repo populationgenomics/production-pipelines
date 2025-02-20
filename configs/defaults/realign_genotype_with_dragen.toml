@@ -24,7 +24,7 @@ user_reference = 'test_user_reference'
 # The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'
-dragen_3_7_8 = 'a59c10af-b44a-46f9-b4ba-47e5191c358d'
+dragen_3_7_8 = 'fc58f4e2-d7e7-4f27-9f8a-34277150c28b'
 # Dragen hash table for 3.7.8
 dragen_ht_id = 'fil.854d49a151a24edae5d708da2935b1b0'
 
