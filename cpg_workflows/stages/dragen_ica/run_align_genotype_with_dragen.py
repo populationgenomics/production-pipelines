@@ -68,7 +68,7 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='enable_sv', value='True'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --enable-cyp2d6 true',
+                    value='--read-trimmers "polyg" --soft-read-trimmers "none" --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection "true" --qc-coverage-ignore-overlaps "true" --qc-coverage-count-soft-clipped-bases "true" --enable-cyp2d6 "true"',
                 ),
             ],
         ),
