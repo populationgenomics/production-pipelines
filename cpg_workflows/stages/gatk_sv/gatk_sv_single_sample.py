@@ -32,12 +32,9 @@ from cpg_workflows.workflow import (
 
 def get_sv_callers():
     if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs']):
-        callers = []
-        for job in only_jobs:
-            for caller in SV_CALLERS:
-                if caller in job:
-                    callers.append(caller)
-        return callers
+        callers = [caller for caller in SV_CALLERS if caller in only_jobs]
+        if not callers:
+            raise ValueError('No SV callers enabled')
     return SV_CALLERS
 
 
