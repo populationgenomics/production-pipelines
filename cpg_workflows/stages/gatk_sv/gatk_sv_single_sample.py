@@ -129,14 +129,8 @@ class GatherSampleEvidence(SequencingGroupStage):
             # if only_jobs is set, only run the specified jobs
             # this is useful for samples which need to re-run specific jobs
             # e.g. if manta failed and needs to be re-run with more memory
-            #
-            # do this by removing expected outputs from the expected_d,
-            # and changing the input_dict values to None / False
-            #
-            # scramble, wham, melt, and manta can be turned off by setting
-            # their {caller}_docker key to None in the input_dict
-            # coverage_counts and pesr can be turned off by setting the keys
-            # collect_coverage and collect_pesr to False in the input_dict
+
+            # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
                 for key, path in expected_d.items():
@@ -144,14 +138,17 @@ class GatherSampleEvidence(SequencingGroupStage):
                         new_expected[key] = path
             expected_d = new_expected
 
-            for key in input_dict:
-                if (key == 'collect_coverage' and 'coverage_counts' not in only_jobs) or (
-                    key == 'collect_pesr' and 'pesr' not in only_jobs
-                ):
-                    input_dict[key] = False
-                elif key in [f'{caller}_docker' for caller in SV_CALLERS]:
+            # disable the evidence collection jobs if they're not in only_jobs
+            if 'coverage_counts' not in only_jobs:
+                input_dict['collect_coverage'] = False
+            if 'pesr' not in only_jobs:
+                input_dict['collect_pesr'] = False
+
+            # disable the caller jobs that are not in only_jobs by nulling their docker image
+            for key, val in input_dict.items():
+                if key in [f'{caller}_docker' for caller in SV_CALLERS]:
                     caller = key.removesuffix('_docker')
-                    input_dict[key] = key if caller in only_jobs else None
+                    input_dict[key] = val if caller in only_jobs else None
 
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
