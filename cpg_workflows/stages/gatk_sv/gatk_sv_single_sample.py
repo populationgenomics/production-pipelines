@@ -35,6 +35,7 @@ def get_sv_callers():
         callers = [caller for caller in SV_CALLERS if caller in only_jobs]
         if not callers:
             raise ValueError('No SV callers enabled')
+        return callers
     return SV_CALLERS
 
 
