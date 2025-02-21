@@ -33,10 +33,10 @@ old_cram_reference = 'dragmap'
 
 # CRAM reference used to align the CRAM file that you want to realign with Dragen
 # Dragmap reference FASTA
-dragmap = 'fil.159e94790e5c4bdfcbef08dd148ff548'
+dragmap = 'fil.589de3adaa7a4615929208dd508b26bf'
 
 # GATK reference FASTA
-gatk = 'fil.7e16c32f65e9468d31b908dcefab1cbc'
+gatk = ''
 
 [ica.qc]
 cross_cont_vcf = 'fil.1a7a2d0442854127e5d608da2935b1b0'
