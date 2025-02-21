@@ -320,7 +320,7 @@ class MonitorGvcfMlrWithDragen(SequencingGroupStage):
 
 @stage(
     analysis_type='cram',
-    analysis_keys=['cram', 'crai'],
+    analysis_keys=['cram'],
     required_stages=[PrepareIcaForDragenAnalysis, ManageDragenPipeline],
 )
 class DownloadCramFromIca(SequencingGroupStage):
@@ -403,7 +403,7 @@ class DownloadCramFromIca(SequencingGroupStage):
 
 @stage(
     analysis_type='gvcf',
-    analysis_keys=['gvcf', 'gvcf_tbi'],
+    analysis_keys=['gvcf'],
     required_stages=[ManageDragenPipeline],
 )
 class DownloadGvcfFromIca(SequencingGroupStage):
