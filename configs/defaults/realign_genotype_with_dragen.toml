@@ -45,4 +45,4 @@ coverage_region_2 = 'fil.c4ade57f5ffe4baff28d08da33ba0a20'
 
 [images]
 # This image contains the ICA CLI used for transferring data from ICA -> GCP at the end of the pipeline.
-ica = "australia-southeast1-docker.pkg.dev/cpg-common/images/ica:2.31.0"
+ica = "australia-southeast1-docker.pkg.dev/cpg-common/images/ica:2.31.2"
