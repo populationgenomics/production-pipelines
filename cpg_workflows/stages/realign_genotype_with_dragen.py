@@ -329,8 +329,8 @@ class DownloadCramFromIca(SequencingGroupStage):
     ) -> cpg_utils.Path:
         bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
         return {
-            'cram': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'ica_crams' / f'{sequencing_group.name}.cram',
-            'crai': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'ica_crams' / f'{sequencing_group.name}.cram.crai',
+            'cram': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'cram' / f'{sequencing_group.name}.cram',
+            'crai': bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'cram' / f'{sequencing_group.name}.cram.crai',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
@@ -369,13 +369,13 @@ class DownloadCramFromIca(SequencingGroupStage):
             icav2 projectdata download $cram_id {sequencing_group.name}/{sequencing_group.name}.cram --exclude-source-path
             icav2 projectdata download $crai_id {sequencing_group.name}/{sequencing_group.name}.cram.crai --exclude-source-path
             icav2 projectdata download $cram_md5 {sequencing_group.name}/{sequencing_group.name}.cram.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_crams/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_crams/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_crams/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
 
             # Check the md5sum of the downloaded CRAM file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_crams/{sequencing_group.name}.cram | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_crams/{sequencing_group.name}.cram.md5sum)
+            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram | grep 'md5_hash' | awk '{{print $2}}')
+            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram.md5sum)
             if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
                 echo "Error: MD5 checksums do not match!"
                 echo "GCS MD5: $gcloud_md5_hash"
@@ -408,11 +408,11 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         return {
             'gvcf': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / 'ica_gvcfs'
+            / 'base_gvcf'
             / f'{sequencing_group.name}.hard-filtered.gvcf.gz',
             'gvcf_tbi': bucket_name
             / GCP_FOLDER_FOR_ICA_DOWNLOAD
-            / 'ica_gvcfs'
+            / 'base_gvcf'
             / f'{sequencing_group.name}.hard-filtered.gvcf.gz.tbi',
         }
 
@@ -457,13 +457,13 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             icav2 projectdata download $gvcf_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
             icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
             icav2 projectdata download $gvcf_md5_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcfs/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcfs/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcfs/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
 
             # Check the md5sum of the downloaded gVCF file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcfs/{sequencing_group.name}.hard-filtered.gvcf.gz | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/ica_gvcfs/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
+            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz | grep 'md5_hash' | awk '{{print $2}}')
+            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
             if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
                 echo "Error: MD5 checksums do not match!"
                 echo "GCS MD5: $gcloud_md5_hash"
@@ -498,7 +498,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         sequencing_group: SequencingGroup,
     ) -> cpg_utils.Path:
         bucket_name: cpg_utils.Path = sequencing_group.dataset.prefix()
-        return bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / f'{sequencing_group.name}'
+        return bucket_name / GCP_FOLDER_FOR_ICA_DOWNLOAD / 'dragen_metrics' / f'{sequencing_group.name}'
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         bucket_name: str = get_path_components_from_gcp_path(path=str(object=sequencing_group.cram))['bucket']
@@ -537,7 +537,7 @@ class DownloadDataFromIca(SequencingGroupStage):
                 echo "Downloading $name with ID $id"
                 icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
             done <<< "$files_and_ids"
-            gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/{sequencing_group.name}/
+            gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/dragen_metrics/{sequencing_group.name}/
         """,
         )
 
