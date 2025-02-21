@@ -4,6 +4,7 @@ single-sample components of the GATK SV workflow
 
 import json
 import logging
+from functools import cache
 from typing import Any
 
 from cpg_utils import Path, to_path
@@ -30,6 +31,7 @@ from cpg_workflows.workflow import (
 )
 
 
+@cache
 def get_sv_callers():
     if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs']):
         callers = [caller for caller in SV_CALLERS if caller in only_jobs]
@@ -77,6 +79,15 @@ class GatherSampleEvidence(SequencingGroupStage):
         for caller in get_sv_callers():
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
+
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs']):
+            # remove the expected outputs for the jobs that are not in only_jobs
+            new_expected = {}
+            for job in only_jobs:
+                for key, path in d.items():
+                    if job in key:
+                        new_expected[key] = path
+            d = new_expected
 
         return d
 
@@ -141,14 +152,6 @@ class GatherSampleEvidence(SequencingGroupStage):
                 if key in [f'{caller}_docker' for caller in SV_CALLERS]:
                     caller = key.removesuffix('_docker')
                     input_dict[key] = val if caller in only_jobs else None
-
-            # remove the expected outputs for the jobs that are not in only_jobs
-            new_expected = {}
-            for job in only_jobs:
-                for key, path in expected_d.items():
-                    if job in key:
-                        new_expected[key] = path
-            expected_d = new_expected
 
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
