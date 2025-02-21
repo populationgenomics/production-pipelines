@@ -73,7 +73,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in SV_CALLERS:
+        for caller in get_sv_callers():
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
