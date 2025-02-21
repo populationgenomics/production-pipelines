@@ -1,0 +1,9 @@
+[workflow]
+
+# The name of the workflow
+name = "echtvar"
+
+sequencing_type = 'genome'
+
+[images]
+echtvar = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/echtvar:v0.2.1'
