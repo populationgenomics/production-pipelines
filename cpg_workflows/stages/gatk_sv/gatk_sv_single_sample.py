@@ -30,7 +30,18 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
+def get_sv_callers():
+    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs']):
+        callers = []
+        for job in only_jobs:
+            for caller in SV_CALLERS:
+                if caller in job:
+                    callers.append(caller)
+        return callers
+    return SV_CALLERS
+
+
+@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()], analysis_type='sv')
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
