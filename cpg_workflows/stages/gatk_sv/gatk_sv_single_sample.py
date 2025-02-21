@@ -130,14 +130,6 @@ class GatherSampleEvidence(SequencingGroupStage):
             # this is useful for samples which need to re-run specific jobs
             # e.g. if manta failed and needs to be re-run with more memory
 
-            # remove the expected outputs for the jobs that are not in only_jobs
-            new_expected = {}
-            for job in only_jobs:
-                for key, path in expected_d.items():
-                    if job in key:
-                        new_expected[key] = path
-            expected_d = new_expected
-
             # disable the evidence collection jobs if they're not in only_jobs
             if 'coverage_counts' not in only_jobs:
                 input_dict['collect_coverage'] = False
@@ -149,6 +141,14 @@ class GatherSampleEvidence(SequencingGroupStage):
                 if key in [f'{caller}_docker' for caller in SV_CALLERS]:
                     caller = key.removesuffix('_docker')
                     input_dict[key] = val if caller in only_jobs else None
+
+            # remove the expected outputs for the jobs that are not in only_jobs
+            new_expected = {}
+            for job in only_jobs:
+                for key, path in expected_d.items():
+                    if job in key:
+                        new_expected[key] = path
+            expected_d = new_expected
 
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
