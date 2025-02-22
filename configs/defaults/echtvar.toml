@@ -10,7 +10,6 @@ sequencing_type = 'genome'
 [images]
 echtvar = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/echtvar:v0.2.1'
 
-
 [references."gnomad_4.1_vcfs"]
 chr1 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr1.vcf.bgz"
 chr2 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr2.vcf.bgz"
