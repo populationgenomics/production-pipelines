@@ -33,7 +33,7 @@ from cpg_workflows.workflow import (
 
 @cache
 def get_sv_callers():
-    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs']):
+    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
         callers = [caller for caller in SV_CALLERS if caller in only_jobs]
         if not callers:
             raise ValueError('No SV callers enabled')
@@ -80,7 +80,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
-        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs']):
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
             for job in only_jobs:
@@ -136,7 +136,7 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         expected_d = self.expected_outputs(sequencing_group)
 
-        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs']):
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
             # if only_jobs is set, only run the specified jobs
             # this is useful for samples which need to re-run specific jobs
             # e.g. if manta failed and needs to be re-run with more memory
