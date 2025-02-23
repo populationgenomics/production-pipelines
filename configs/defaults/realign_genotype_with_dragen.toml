@@ -18,13 +18,10 @@ technical_tags = ['test_technical_tag']
 user_tags = ['test_user_tags']
 reference_tags = ['test_reference_tags']
 
-# This gets added to the pipeline name with the pipeline ID in the format <ref>-<id> automatically by ICA
-user_reference = 'test_user_reference'
-
 # The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'
-dragen_3_7_8 = 'a59c10af-b44a-46f9-b4ba-47e5191c358d'
+dragen_3_7_8 = 'fc58f4e2-d7e7-4f27-9f8a-34277150c28b'
 # Dragen hash table for 3.7.8
 dragen_ht_id = 'fil.854d49a151a24edae5d708da2935b1b0'
 
@@ -36,11 +33,16 @@ old_cram_reference = 'dragmap'
 
 # CRAM reference used to align the CRAM file that you want to realign with Dragen
 # Dragmap reference FASTA
-dragmap = 'fil.159e94790e5c4bdfcbef08dd148ff548'
+dragmap = 'fil.589de3adaa7a4615929208dd508b26bf'
 
 # GATK reference FASTA
-gatk = 'fil.7e16c32f65e9468d31b908dcefab1cbc'
+gatk = ''
+
+[ica.qc]
+cross_cont_vcf = 'fil.1a7a2d0442854127e5d608da2935b1b0'
+coverage_region_1 = 'fil.ad60897bc97e4646f28c08da33ba0a20'
+coverage_region_2 = 'fil.c4ade57f5ffe4baff28d08da33ba0a20'
 
 [images]
 # This image contains the ICA CLI used for transferring data from ICA -> GCP at the end of the pipeline.
-ica = "australia-southeast1-docker.pkg.dev/cpg-common/images/ica:2.31.0"
+ica = "australia-southeast1-docker.pkg.dev/cpg-common/images/ica:2.31.2"
