@@ -37,7 +37,7 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
             ),
             hl.sum(mt.AD),
         ),
-        'ad': mt.AD,
+        'ad': hl.if_else(is_called, hl.delimit(mt.AD, ','), hl.missing(hl.tstr)),
         'dp': hl.if_else(is_called, hl.int(hl.min(mt.DP, 32000)), hl.missing(hl.tfloat)),
         'sample_id': mt.s,
     }
