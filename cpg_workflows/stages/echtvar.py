@@ -1,5 +1,5 @@
 """
-all processes related to echtvar - generating a VCF annotation resource from raw inputs, or appylying those annotations
+all processes related to echtvar - generating a VCF annotation resource from raw inputs, or applying those annotations
 this is not confined to a specific cohort/project
 """
 
