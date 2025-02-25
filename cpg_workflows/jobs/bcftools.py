@@ -182,9 +182,11 @@ def merge_ss_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     # -R: region to extract (optional depending on the region file being passed as an argument)
     job.command(
-        f'bcftools merge {" ".join(batch_vcfs)} {region_string} -Oz -o '
-        f'{job.output["vcf.bgz"]} --threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi',
+        f'bcftools merge {" ".join(batch_vcfs)} {region_string} -Oz -o temp.vcf.gz '
+        f'--threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi ',
     )
+    # use the fill-tags plugin to correct the combined callset AC/AN
+    job.command(f'bcftools +fill-tags temp.vcf.gz -Oz -o {job.output["vcf.bgz"]} --write-index=tbi -- -t AF ')
 
     # write the result out
     get_batch().write_output(job.output, output_file.removesuffix('.vcf.bgz'))
