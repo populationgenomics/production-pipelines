@@ -120,7 +120,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         gff3_file = get_batch().read_input(config_retrieve(['annotations', 'gff3']))
 
         # get the fasta
-        fasta = get_batch().read_input(config_retrieve(['workflow', 'ref_fasta']))
+        fasta = get_batch().read_input(config_retrieve(['references', 'broad', 'ref_fasta']))
 
         job = get_batch().new_job('bcftools csq')
         job.image(image_path('bcftools_120'))
