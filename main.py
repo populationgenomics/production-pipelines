@@ -14,7 +14,7 @@ from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
 from cpg_workflows.stages.cram_qc import CramMultiQC
-from cpg_workflows.stages.echtvar import RunEchtvarOnGnomad, ReformatAlphaMissenseTsv
+from cpg_workflows.stages.echtvar import RunEchtvarOnGnomad
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -24,7 +24,7 @@ from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, Mt
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf
 from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
-from cpg_workflows.stages.mini_annotation import StripSingleSampleGvcf, MergeSingleSampleVcfs, AnnotateGnomadFrequenciesWithEchtvar
+from cpg_workflows.stages.mini_annotation import StripSingleSampleGvcf, MergeSingleSampleVcfs, AnnotateGnomadFrequenciesWithEchtvar, ReformatAlphaMissenseTsv
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
