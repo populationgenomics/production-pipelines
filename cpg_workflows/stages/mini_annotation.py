@@ -180,6 +180,8 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         job.command(f'convert_alpha_missense --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
         job.command(f'tar -czf {job.output} AlphaMissense38.ht')
         job.storage('10Gi')
+        job.cpu(4)
+        job.memory('highmem')
         get_batch().write_output(job.output, str(outputs))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
@@ -208,6 +210,8 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
         job = get_batch().new_job('Combine annotated VCF and AlphaMissense data')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'tar -xf {alpha_missense_tar}')
+        job.cpu(4)
+        job.memory('36Gi')
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '

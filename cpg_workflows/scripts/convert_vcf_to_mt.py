@@ -217,7 +217,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
         alpha_m ():
     """
 
-    hl.default_reference('GRCh38')
+    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
 
     # pull and split the CSQ header line
     csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)

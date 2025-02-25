@@ -149,7 +149,7 @@ def main(alpha_m_file: str, ht_path: str):
     # generate a new tsv of just pathogenic entries
     filter_for_pathogenic_am(alpha_m_file, random_intermediate_file)
 
-    hl.default_reference('GRCh38')
+    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
 
     # now ingest as HT and re-jig some fields
     hail_table_from_tsv(random_intermediate_file, ht_path, types={'am_pathogenicity': hl.tfloat64, 'pos': hl.tint32})
