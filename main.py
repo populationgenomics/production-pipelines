@@ -50,8 +50,8 @@ from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
-    'echtvar': [RunEchtvarOnGnomad, ReformatAlphaMissenseTsv],
-    'mini_annotation': [StripSingleSampleGvcf, MergeSingleSampleVcfs, AnnotateGnomadFrequenciesWithEchtvar],
+    'echtvar': [RunEchtvarOnGnomad],
+    'mini_annotation': [StripSingleSampleGvcf, MergeSingleSampleVcfs, AnnotateGnomadFrequenciesWithEchtvar, ReformatAlphaMissenseTsv],
     'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
     'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
