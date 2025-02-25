@@ -71,3 +71,36 @@ class MergeSingleSampleVcfs(CohortStage):
 
         return self.make_outputs(cohort, data=outputs, jobs=job)
 
+
+@stage(required_stages=StripSingleSampleGvcf)
+class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
+    """
+    Annotate this cohort with gnomad frequencies
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        Expected to generate a matrix table
+        """
+        return self.tmp_prefix / 'gnomad_frequency_annotated.vcf.bgz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        apply pre-encoded gnomad frequencies to the merged vcf
+        """
+        outputs = self.expected_outputs(cohort)
+
+        merged_vcf = get_batch().read_input(str(inputs.as_path(cohort, MergeSingleSampleVcfs)))
+
+        gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar', 'gnomad']))
+
+        job = get_batch().new_job('Annotate gnomad frequencies with echtvar')
+        job.image(image_path('echtvar'))
+        job.command(f'echtvar anno -e {gnomad_annotations} {merged_vcf} {str(outputs)}')
+        job.storage('30Gi')
+        job.memory('highmem')
+        job.cpu(4)
+
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(cohort, data=outputs, jobs=job)
