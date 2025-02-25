@@ -1,0 +1,3 @@
+[workflow]
+name = 'mini_annotation'
+sequencing_type = 'exome'

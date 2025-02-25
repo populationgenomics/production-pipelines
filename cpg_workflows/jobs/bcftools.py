@@ -8,6 +8,8 @@ from hailtop.batch.job import BashJob
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch
 
+from cpg_workflows.filetypes import GvcfPath
+
 # mypy: ignore_errors
 
 
@@ -125,3 +127,37 @@ def naive_merge_vcfs(
     get_batch().write_output(merge_job.output, output_file.removesuffix('.vcf.bgz'))
 
     return merge_job.output["vcf.bgz"], merge_job
+
+
+def strip_gvcf_to_vcf(
+    gvcf: GvcfPath,
+    output: str,
+    job_attrs: dict | None = None,
+) -> BashJob:
+    """
+    Takes a GVCF and writes out a VCF
+    Args:
+        gvcf (GvcfPath): the GVCF to strip
+        output (str): path to write the VCF
+        job_attrs (dict): job attributes
+    """
+
+    # read in the gVCF (no need for an index)
+    localised_gvcf = get_batch().read_input(str(gvcf.path))
+
+    job = get_batch().new_job('Strip GVCF to VCF', job_attrs)
+
+    # declare a resource group for the output
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+
+    # use a bcftools which can write an inline index
+    job.image(image_path('bcftools_120'))
+
+    job.command(
+        f'bcftools view -m3 {localised_gvcf} | '
+        f'bcftools norm -m -any | '
+        f'grep -v NON_REF | '
+        f'bcftools view -Oz -o {job.output["vcf.bgz"]} --write-index=tbi',
+    )
+    get_batch().write_output(job.output, output.removesuffix('.vcf.bgz'))
+    return job
