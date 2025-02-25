@@ -182,7 +182,7 @@ def merge_ss_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     # -R: region to extract (optional depending on the region file being passed as an argument)
     job.command(
-        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {region_string} '
+        f'bcftools merge {" ".join(batch_vcfs)} {region_string} -Oz -o '
         f'{job.output["vcf.bgz"]} --threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi',
     )
 
