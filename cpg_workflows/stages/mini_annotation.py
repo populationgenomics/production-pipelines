@@ -215,7 +215,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
-            f'--am alpha_missense.ht '
+            f'--am AlphaMissense38.ht '
             f'--gene_bed {region_file} '
             f'--output tmp.mt'
         )
