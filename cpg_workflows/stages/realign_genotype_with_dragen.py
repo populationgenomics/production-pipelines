@@ -116,6 +116,8 @@ class UploadDataToIca(SequencingGroupStage):
         # Check if the CRAM already exists in ICA before uploading. If it exists, just return the ID for the CRAM and CRAI
         upload_job.command(
             f"""
+            pwd
+            df --si
             {ICA_CLI_SETUP}
             cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
             if [[ $cram_status != "AVAILABLE" ]]
@@ -126,7 +128,7 @@ class UploadDataToIca(SequencingGroupStage):
                 icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
                 icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
             fi
-
+            df --si
             icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
             icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
 
