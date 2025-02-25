@@ -86,6 +86,8 @@ setup(
             'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_gene_tsvs:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
+            # script to convert the AlphaMissense tsv into a Hail Table
+            'convert_alpha_missense = cpg_workflows.scripts.parse_amissense_tsv_into_ht:cli_main',
         ],
     },
 )

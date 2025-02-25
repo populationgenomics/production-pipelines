@@ -13,6 +13,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.targets import SequencingGroup, MultiCohort, Cohort
+from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, CohortStage, SequencingGroupStage
 from cpg_workflows.jobs.bcftools import strip_gvcf_to_vcf, merge_ss_vcfs
 
@@ -104,3 +105,41 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
         get_batch().write_output(job.output, str(outputs))
 
         return self.make_outputs(cohort, data=outputs, jobs=job)
+
+
+@stage
+class WgetAlphaMissenseTsv(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
+        return to_path(config_retrieve(['storage', 'common'])) / 'reannotation' / 'AlphaMissense38.tsv.gz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+
+        job = get_batch().new_job('wget Alpha missense tsv')
+        job.image(image_path('wget'))
+        job.command(f'wget -O {job.output} https://zenodo.org/records/8208688/files/AlphaMissense_hg38.tsv.gz')
+        job.storage('10Gi')
+
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=WgetAlphaMissenseTsv)
+class ReformatAlphaMissenseTsv(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return to_path(config_retrieve(['storage', 'common'])) / 'reannotation' / 'AlphaMissense38.ht.tar.gz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+
+        am_tsv = get_batch().read_input(str(inputs.as_path(multicohort, WgetAlphaMissenseTsv)))
+
+        job = get_batch().new_job('Reformat AlphaMissense TSV')
+        job.image(image_path('hail'))
+        job.command(f'convert_alpha_missense --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
+        job.command(f'tar -czf {job.output} AlphaMissense38.ht')
+        job.storage('10Gi')
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
