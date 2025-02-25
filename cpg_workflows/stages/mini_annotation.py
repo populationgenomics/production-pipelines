@@ -116,7 +116,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         job = get_batch().new_job('wget Alpha missense tsv')
-        job.image(image_path('wget'))
+        job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'wget -O {job.output} https://zenodo.org/records/8208688/files/AlphaMissense_hg38.tsv.gz')
         job.storage('10Gi')
 
@@ -136,7 +136,7 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         am_tsv = get_batch().read_input(str(inputs.as_path(multicohort, WgetAlphaMissenseTsv)))
 
         job = get_batch().new_job('Reformat AlphaMissense TSV')
-        job.image(image_path('hail'))
+        job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'convert_alpha_missense --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
         job.command(f'tar -czf {job.output} AlphaMissense38.ht')
         job.storage('10Gi')
