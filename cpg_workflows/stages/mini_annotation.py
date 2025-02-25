@@ -97,7 +97,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
 
         job = get_batch().new_job('Annotate gnomad frequencies with echtvar')
         job.image(image_path('echtvar'))
-        job.command(f'echtvar anno -e {gnomad_annotations} {merged_vcf} {str(outputs)}')
+        job.command(f'echtvar anno -e {gnomad_annotations} {merged_vcf} {job.output}')
         job.storage('30Gi')
         job.memory('highmem')
         job.cpu(4)
