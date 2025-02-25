@@ -211,7 +211,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'tar -xf {alpha_missense_tar}')
         job.cpu(4)
-        job.memory('36Gi')
+        job.memory('highmem')
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
