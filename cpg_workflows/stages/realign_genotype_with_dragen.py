@@ -120,11 +120,11 @@ class UploadDataToIca(SequencingGroupStage):
             cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
             if [[ $cram_status != "AVAILABLE" ]]
             then
-                mkdir {sequencing_group.name}
-                gcloud storage cp {sequencing_group.cram} .
-                gcloud storage cp {sequencing_group.cram}.crai .
-                icav2 projectdata upload {sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
-                icav2 projectdata upload {sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
+                mkdir /io/{sequencing_group.name}
+                gcloud storage cp {sequencing_group.cram} /io/{sequencing_group.name}/
+                gcloud storage cp {sequencing_group.cram}.crai /io/{sequencing_group.name}/
+                icav2 projectdata upload /io/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
+                icav2 projectdata upload /io/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
             fi
 
             icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
@@ -376,21 +376,23 @@ class DownloadCramFromIca(SequencingGroupStage):
             icav2 projectdata download $cram_id {sequencing_group.name}/{sequencing_group.name}.cram --exclude-source-path
             icav2 projectdata download $crai_id {sequencing_group.name}/{sequencing_group.name}.cram.crai --exclude-source-path
             icav2 projectdata download $cram_md5 {sequencing_group.name}/{sequencing_group.name}.cram.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
 
-            # Check the md5sum of the downloaded CRAM file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram.md5sum)
-            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
+            # Get md5sum of the downloaded CRAM file and compare it with the ICA md5sum
+            # Checking here because using icav2 package to download which doesn't automatically perform checksum matching
+            ica_md5_hash=$(cat {sequencing_group.name}/{sequencing_group.name}.cram.md5sum)
+            cram_md5=$(cat {sequencing_group.name}/{sequencing_group.name}.cram | md5sum | cut -d " " -f1)
+            if [ "$cram_md5" != "$ica_md5_hash" ]; then
                 echo "Error: MD5 checksums do not match!"
-                echo "GCS MD5: $gcloud_md5_hash"
                 echo "ICA MD5: $ica_md5_hash"
+                echo "Cram MD5: $cram_md5"
                 exit 1
             else
                 echo "MD5 checksums match."
-            fi
+
+            # Checksums are already checked by `gcloud storage cp`
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
         """,
         )
 
@@ -464,21 +466,23 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             icav2 projectdata download $gvcf_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
             icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
             icav2 projectdata download $gvcf_md5_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
 
-            # Check the md5sum of the downloaded gVCF file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
-            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
+            # Get md5sum of the downloaded gVCF file and compare it with the ICA md5sum
+            # Checking here because using icav2 package to download which doesn't automatically perform checksum matching
+            ica_md5_hash=$(cat {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
+            gvcf_md5=$(cat {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz | md5sum | cut -d " " -f1)
+            if [ "$gvcf_md5" != "$ica_md5_hash" ]; then
                 echo "Error: MD5 checksums do not match!"
-                echo "GCS MD5: $gcloud_md5_hash"
                 echo "ICA MD5: $ica_md5_hash"
+                echo "Gvcf MD5: $gvcf_md5"
                 exit 1
             else
                 echo "MD5 checksums match."
-            fi
+
+            # Checksums are already checked by `gcloud storage cp`
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
         """,
         )
 
