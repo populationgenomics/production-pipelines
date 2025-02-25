@@ -66,7 +66,7 @@ class MergeSingleSampleVcfs(CohortStage):
             input_list=vcfs_to_merge,
             output_file=str(outputs),
             missing_to_ref=True,  # heck, why not
-            region_file=config_retrieve(['workflow', 'region']),
+            region_file=config_retrieve(['annotations', 'region']),
         )
 
         return self.make_outputs(cohort, data=outputs, jobs=job)
