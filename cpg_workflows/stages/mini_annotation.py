@@ -142,7 +142,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
             """
         )
 
-        get_batch().write_output(job.output, output.removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(cohort, data=output, jobs=job)
 
