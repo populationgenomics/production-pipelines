@@ -110,7 +110,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
 @stage
 class WgetAlphaMissenseTsv(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
-        return to_path(config_retrieve(['storage', 'common'])) / 'reannotation' / 'AlphaMissense38.tsv.gz'
+        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense38.tsv.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -128,7 +128,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
 @stage(required_stages=WgetAlphaMissenseTsv)
 class ReformatAlphaMissenseTsv(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return to_path(config_retrieve(['storage', 'common'])) / 'reannotation' / 'AlphaMissense38.ht.tar.gz'
+        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense38.ht.tar.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
