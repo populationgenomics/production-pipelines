@@ -120,13 +120,76 @@ def naive_merge_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     merge_job.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""} --write-index=tbi',
+        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi',
     )
 
     # write the result out
     get_batch().write_output(merge_job.output, output_file.removesuffix('.vcf.bgz'))
 
     return merge_job.output["vcf.bgz"], merge_job
+
+
+def merge_ss_vcfs(
+    input_list: list[str],
+    output_file: str,
+    cpu: int = 4,
+    memory: str = '16Gi',
+    storage: str = '50Gi',
+    missing_to_ref: bool = False,
+    region_file: str | None = None,
+) -> BashJob:
+    """
+    A generic method to merge multiple VCFs with non-overlapping sample sets to create one multi-sample VCF.
+    Sample names should be unique across all files.
+
+    Args:
+        input_list (list[str]): all VCFs to merge, can be pre-localised (see vcfs_localised[bool)
+        output_file (str): path to a vcf.bgz file to write to
+        cpu (int): number of cores (threads when merging)
+        memory (str): RAM requirement
+        storage (str): storage requirement for the task
+        missing_to_ref (bool): if specified, replace missing calls with unphased WT 0/0
+        region_file (str): path to a BED file with the region to extract
+
+    Returns:
+        the ResourceFile in-batch for the merged VCF
+    """
+
+    batch_vcfs = [
+        get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
+        for each_vcf in input_list
+    ]
+
+    job = get_batch().new_job('Merge SS VCFs', attributes={'tool': 'bcftools'})
+    job.image(image=image_path('bcftools_120'))
+
+    # guessing at resource requirements
+    job.cpu(cpu)
+    job.memory(memory)
+    job.storage(storage)
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+
+    region_string = ''
+    if region_file:
+        localised_region_file = get_batch().read_input(region_file)
+        region_string = f' -R {localised_region_file}'
+
+    # option breakdown:
+    # -Oz: bgzip output
+    # -o: output file
+    # --threads: number of threads to use
+    # -m: merge strategy (don't create multiallelic variants)
+    # -0: missing-calls-to-ref (not used by default)
+    # -R: region to extract (optional depending on the region file being passed as an argument)
+    job.command(
+        f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {region_string}'
+        f'{job.output["vcf.bgz"]} --threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi',
+    )
+
+    # write the result out
+    get_batch().write_output(job.output, output_file.removesuffix('.vcf.bgz'))
+
+    return job
 
 
 def strip_gvcf_to_vcf(

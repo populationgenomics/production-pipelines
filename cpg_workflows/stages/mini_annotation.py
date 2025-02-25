@@ -12,9 +12,9 @@ Starting from first principles -
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
-from cpg_workflows.targets import SequencingGroup, MultiCohort
-from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, DatasetStage, SequencingGroupStage
-from cpg_workflows.jobs.bcftools import strip_gvcf_to_vcf
+from cpg_workflows.targets import SequencingGroup, MultiCohort, Cohort
+from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, CohortStage, SequencingGroupStage
+from cpg_workflows.jobs.bcftools import strip_gvcf_to_vcf, merge_ss_vcfs
 
 
 @stage
@@ -42,4 +42,32 @@ class StripSingleSampleGvcf(SequencingGroupStage):
         )
         return self.make_outputs(sg, data=outputs, jobs=job)
 
+
+@stage(required_stages=StripSingleSampleGvcf)
+class MergeSingleSampleVcfs(CohortStage):
+    """
+    Merge all the single-sample VCFs into a single VCF
+    use a specific region
+    """
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return self.tmp_prefix / 'merged_ss_vcfs.vcf.bgz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        Merge all the single-sample VCFs into a single VCF
+        """
+        outputs = self.expected_outputs(cohort)
+        stripped_vcfs = inputs.as_path_by_target(StripSingleSampleGvcf)
+
+        # get all of those relevant to this cohort
+        vcfs_to_merge = [str(stripped_vcfs[sg.id]) for sg in cohort.get_sequencing_groups()]
+
+        job = merge_ss_vcfs(
+            input_list=vcfs_to_merge,
+            output_file=str(outputs),
+            missing_to_ref=True,  # heck, why not
+            region_file=config_retrieve(['workflow', 'region']),
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=job)
 
