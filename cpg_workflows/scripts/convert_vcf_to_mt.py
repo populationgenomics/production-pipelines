@@ -240,9 +240,8 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
     # add AlphaMissense scores
     mt = insert_am_annotations(mt, am_table=alpha_m)
 
-    # migrate the BCSQ field to a top-level attribute, then drop it
-    mt = mt.transmute_rows(bcsq=mt.info.BCSQ)
-    mt = mt.drop('bcsq')
+    # drop the BCSQ info attribute
+    mt = mt.annotate_rows(info=mt.info.drop('BCSQ'))
 
     mt.describe()
 
