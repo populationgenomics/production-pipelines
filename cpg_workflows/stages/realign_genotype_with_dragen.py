@@ -120,11 +120,11 @@ class UploadDataToIca(SequencingGroupStage):
             cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
             if [[ $cram_status != "AVAILABLE" ]]
             then
-                mkdir /io/{sequencing_group.name}
-                gcloud storage cp {sequencing_group.cram} /io/{sequencing_group.name}/
-                gcloud storage cp {sequencing_group.cram}.crai /io/{sequencing_group.name}/
-                icav2 projectdata upload /io/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
-                icav2 projectdata upload /io/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
+                mkdir $BATCH_TMPDIR/{sequencing_group.name}
+                gcloud storage cp {sequencing_group.cram} $BATCH_TMPDIR/{sequencing_group.name}/
+                gcloud storage cp {sequencing_group.cram}.crai $BATCH_TMPDIR/{sequencing_group.name}/
+                icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
+                icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
             fi
 
             icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
