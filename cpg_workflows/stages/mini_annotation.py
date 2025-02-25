@@ -14,7 +14,7 @@ from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.targets import SequencingGroup, MultiCohort, Cohort
 from cpg_workflows.utils import ExpectedResultT
-from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, CohortStage, SequencingGroupStage
+from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, CohortStage, SequencingGroupStage, get_multicohort
 from cpg_workflows.jobs.bcftools import strip_gvcf_to_vcf, merge_ss_vcfs
 
 
@@ -107,6 +107,46 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job)
 
 
+@stage(required_stages=[AnnotateGnomadFrequenciesWithEchtvar])
+class AnnotateConsequenceWithBcftools(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(cohort)
+        gnomad_annotated_vcf = get_batch().read_input(str(inputs.as_path(cohort, AnnotateGnomadFrequenciesWithEchtvar)))
+
+        # get the GFF3 file required to generate consequences
+        gff3_file = get_batch().read_input(config_retrieve(['annotations', 'gff3']))
+
+        # get the fasta
+        fasta = get_batch().read_input(config_retrieve(['workflow', 'ref_fasta']))
+
+        job = get_batch().new_job('bcftools csq')
+        job.image(image_path('bcftools_120'))
+        job.cpu(4)
+        job.memory('highmem')
+        job.storage('10G')
+
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+
+        job.command(
+            f"""
+            bcftools index -t {gnomad_annotated_vcf}
+            bcftools csq --force -f {fasta} \
+                --local-csq \
+                -g {gff3_file} \
+                -Oz -o {job.output["vcf.bgz"]} \
+                {gnomad_annotated_vcf}
+            bcftools index -t {job.output["vcf.bgz"]}
+            """
+        )
+
+        get_batch().write_output(job.output, output.removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(cohort, data=output, jobs=job)
+
+
 @stage
 class WgetAlphaMissenseTsv(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
@@ -143,3 +183,42 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         get_batch().write_output(job.output, str(outputs))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=[ReformatAlphaMissenseTsv, AnnotateConsequenceWithBcftools])
+class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.prefix / 'annotated_for_reanalysis.ht.tar.gz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+
+        # convert_vcf_to_mt
+        output = self.expected_outputs(cohort)
+
+        # pull the alphamissense TarBall
+        alpha_missense_tar = get_batch().read_input(str(inputs.as_path(get_multicohort(), ReformatAlphaMissenseTsv)))
+
+        # get the annotated VCF & index
+        vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))
+        vcf_in = get_batch().read_input_group(**{'vcf.bgz': vcf, 'vcf.bgz.tbi': f'{vcf}.tbi'})['vcf.bgz']
+
+        # bed with region and gene mapping
+        region_file = get_batch().read_input(config_retrieve(['annotations', 'region']))
+
+        job = get_batch().new_job('Combine annotated VCF and AlphaMissense data')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(f'tar -xf {alpha_missense_tar}')
+        job.command(
+            f'convert_vcf_to_mt '
+            f'--input {vcf_in} '
+            f'--am alpha_missense.ht '
+            f'--gene_bed {region_file} '
+            f'--output tmp.mt'
+        )
+        job.command(f'tar -czf {job.output} tmp.mt')
+
+        # write the output
+        get_batch().write_output(job.output, str(output))
+
+        return self.make_outputs(cohort, data=output, jobs=job)
+

@@ -88,6 +88,8 @@ setup(
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
             # script to convert the AlphaMissense tsv into a Hail Table
             'convert_alpha_missense = cpg_workflows.scripts.parse_amissense_tsv_into_ht:cli_main',
+            # script to take a VCF and AM data, generating a MatrixTable
+            'convert_vcf_to_mt = cpg_workflows.scripts.convert_vcf_to_mt:cli_main'
         ],
     },
 )
