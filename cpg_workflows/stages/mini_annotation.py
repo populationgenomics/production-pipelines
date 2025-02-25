@@ -92,7 +92,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
 
         merged_vcf = get_batch().read_input(str(inputs.as_path(cohort, MergeSingleSampleVcfs)))
 
-        gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar', 'gnomad']))
+        gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar']))
 
         job = get_batch().new_job('Annotate gnomad frequencies with echtvar')
         job.image(image_path('echtvar'))
