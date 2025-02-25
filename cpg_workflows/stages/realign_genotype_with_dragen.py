@@ -390,7 +390,9 @@ class DownloadCramFromIca(SequencingGroupStage):
                 exit 1
             else
                 echo "MD5 checksums match."
+            fi
 
+            # Copy the CRAM and CRAI files to the bucket
             # Checksums are already checked by `gcloud storage cp`
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
@@ -480,7 +482,9 @@ class DownloadGvcfFromIca(SequencingGroupStage):
                 exit 1
             else
                 echo "MD5 checksums match."
+            fi
 
+            # Copy the gVCF and gVCF TBI files to the bucket
             # Checksums are already checked by `gcloud storage cp`
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
             gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
