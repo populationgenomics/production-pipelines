@@ -72,7 +72,7 @@ class MergeSingleSampleVcfs(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=StripSingleSampleGvcf)
+@stage(required_stages=MergeSingleSampleVcfs)
 class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
     """
     Annotate this cohort with gnomad frequencies
