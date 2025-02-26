@@ -74,7 +74,8 @@ def mane_to_ht(input_path: str, output_path: str):
     ht.show()
 
 
-if __name__ == '__main__':
+def cli_main():
+
     parser = ArgumentParser()
     parser.add_argument('--input', help='Path to the MANE summary file')
     parser.add_argument('--output', help='Path to write the resulting HT')
@@ -87,3 +88,7 @@ if __name__ == '__main__':
         mane_to_ht(input_path=args.input, output_path=args.output)
     else:
         raise ValueError(f'Unrecognised format {args.format}')
+
+
+if __name__ == '__main__':
+    cli_main()
