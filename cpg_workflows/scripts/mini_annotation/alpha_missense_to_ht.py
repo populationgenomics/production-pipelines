@@ -24,7 +24,7 @@ Process:
 """
 
 import gzip
-import os
+import json
 from argparse import ArgumentParser
 
 import hail as hl
@@ -37,7 +37,7 @@ def process_header(final_header_line: str) -> dict[str, int]:
     we could determine preset columns by filename/flag, but... that's more burden on operator
 
     Args:
-        final_header_line ():
+        final_header_line (str): the header line from the TSV file
     """
     # remove newline and hash, lowercase, split into a list
     broken_line = final_header_line.rstrip().replace('#', '').lower().split()
@@ -66,8 +66,7 @@ def filter_for_pathogenic_am(input_file: str, intermediate_file: str):
 
     # empty dictionary to contain the target indexes
     header_indexes: dict[str, int] = {}
-    with gzip.open(input_file, 'rt') as read_handle, gzip.open(intermediate_file, 'wt') as write_handle:
-        write_handle.write('\t'.join(headers) + '\n')
+    with gzip.open(input_file, 'rt') as read_handle, open(intermediate_file, 'wt') as write_handle:
         for line in read_handle:
             # skip over the headers
             if line.startswith('#'):
@@ -84,36 +83,46 @@ def filter_for_pathogenic_am(input_file: str, intermediate_file: str):
                 continue
 
             content = line.rstrip().split()
-            new_content = [
-                content[header_indexes['chrom']],  # chrom
-                content[header_indexes['pos']],  # pos
-                content[header_indexes['ref']],  # ref
-                content[header_indexes['alt']],  # alt
-                content[header_indexes['transcript']].split('.')[0],  # transcript, with version decimal removed
-                content[header_indexes['am_pathogenicity']],  # float, score
-                content[header_indexes['am_class']],  # string, classification
-            ]
 
-            write_handle.write('\t'.join(new_content) + '\n')
+            # grab all the content
+            content_dict: dict[str, str | float] = {key: content[header_indexes[key]] for key in headers}
+
+            # trim transcripts
+            content_dict['transcript'] = content_dict['transcript'].split('.')[0]
+
+            # convert the AM score to a float, and pos to an int
+            content_dict['pos'] = int(content_dict['pos'])
+            content_dict['am_pathogenicity'] = float(content_dict['am_pathogenicity'])
+            write_handle.write(f'{json.dumps(content_dict)}\n')
 
 
-def hail_table_from_tsv(tsv_file: str, new_ht: str, types: dict[str, hl.tstr] | None = None):
+def json_to_hail_table(json_file: str, new_ht: str):
     """
-    take a previously created TSV file and ingest it as a Hail Table
+    take a previously created JSON file and ingest it as a Hail Table
     requires an initiated Hail context
 
     Args:
-        tsv_file ():
+        json_file ():
         new_ht ():
-        types (dict[str, hl.tstr]): optional, a dictionary of column names and their types
     """
 
-    if types is None:
-        types = {}
+    # define the schema for each written line
+    schema = hl.dtype(
+        'struct{'
+        'chrom:str,'
+        'pos:int32,'
+        'ref:str,'
+        'alt:str,'
+        'transcript:str,'
+        'am_pathogenicity:float64,'
+        'am_class:str'
+        '}',
+    )
 
     # import as a hail table, force=True as this isn't Block-Zipped so all read on one core
-    # We also provide some data types for non-string columns
-    ht = hl.import_table(tsv_file, types=types, force=True)
+    # We also provide a full attribute schema
+    ht = hl.import_table(json_file, types={'f0': schema}, force=True, no_header=True)
+    ht = ht.transmute(**ht.f0)
 
     # combine the two alleles into a single list
     ht = ht.transmute(locus=hl.locus(contig=ht.chrom, pos=ht.pos), alleles=[ht.ref, ht.alt])
@@ -123,7 +132,6 @@ def hail_table_from_tsv(tsv_file: str, new_ht: str, types: dict[str, hl.tstr] | 
 
 
 def cli_main():
-    # two positional
     parser = ArgumentParser()
     parser.add_argument('--am_tsv', help='path to the AM tsv.gz file')
     parser.add_argument('--ht_out', help='path to write a new Hail Table')
@@ -144,18 +152,15 @@ def main(alpha_m_file: str, ht_path: str):
     """
 
     # generate a random file name so that we don't overwrite anything consistently
-    random_intermediate_file: str = f'temptemp.tsv.gz'
+    random_intermediate_file: str = 'temp.json'
 
     # generate a new tsv of just pathogenic entries
     filter_for_pathogenic_am(alpha_m_file, random_intermediate_file)
 
-    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
+    hl.default_reference('GRCh38')
 
     # now ingest as HT and re-jig some fields
-    hail_table_from_tsv(random_intermediate_file, ht_path, types={'am_pathogenicity': hl.tfloat64, 'pos': hl.tint32})
-
-    # if that succeeded, delete the intermediate file
-    os.remove(random_intermediate_file)
+    json_to_hail_table(random_intermediate_file, ht_path)
 
 
 if __name__ == '__main__':

@@ -87,11 +87,13 @@ setup(
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
             # script to convert the AlphaMissense tsv into a Hail Table
-            'convert_alpha_missense = cpg_workflows.scripts.parse_amissense_tsv_into_ht:cli_main',
+            'alpha_missense_to_ht = cpg_workflows.scripts.mini_annotation.alpha_missense_to_ht:cli_main',
             # script to take a VCF and AM data, generating a MatrixTable
-            'convert_vcf_to_mt = cpg_workflows.scripts.convert_vcf_to_mt:cli_main'
+            'convert_vcf_to_mt = cpg_workflows.scripts.mini_annotation.convert_vcf_to_mt:cli_main',
             # generate a JSON representation of MANE data
-            'reformat_mane_summary = cpg_workflows.scripts.reformat_mane_summary:cli_main'
+            'reformat_mane_summary = cpg_workflows.scripts.mini_annotation.reformat_mane_summary:cli_main',
+            # take a GFF3 file, and generate a BED file of gene regions, plus padding
+            'generate_gene_roi = cpg_workflows.scripts.mini_annotation.generate_gene_roi:cli_main'
         ],
     },
 )

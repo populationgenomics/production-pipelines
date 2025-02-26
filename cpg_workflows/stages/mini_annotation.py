@@ -18,6 +18,9 @@ from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, st
 from cpg_workflows.jobs.bcftools import strip_gvcf_to_vcf, merge_ss_vcfs
 
 
+REANNOTATION_DIR = to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation'
+
+
 @stage
 class StripSingleSampleGvcf(SequencingGroupStage):
     """
@@ -154,10 +157,9 @@ class MakeManeJson(MultiCohortStage):
     """
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         version = config_retrieve(['workflow', 'mane_version'])
-        base_dir = config_retrieve(['storage', 'common', 'analysis']) / 'reannotation'
         return {
-            'mane_summary': base_dir / f'mane_{version}.summary.txt.gz',
-            'mane_json': base_dir / f'mane_{version}.json',
+            'mane_summary': REANNOTATION_DIR / f'mane_{version}.summary.txt.gz',
+            'mane_json': REANNOTATION_DIR / f'mane_{version}.json',
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -179,12 +181,57 @@ class MakeManeJson(MultiCohortStage):
 
 
 @stage
+class WgetEnsemblGffFile(MultiCohortStage):
+    """
+    This data is stored in a common location, so we only need to download it once
+    """
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        return REANNOTATION_DIR / f'ensembl_{version}.gff3.gz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(version)
+
+        job = get_batch().new_job('wget Ensembl GFF3 file')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+
+        job.command(f'wget {ensembl_url} -O {job.output}')
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=[WgetEnsemblGffFile])
+class GenerateGeneRoi(MultiCohortStage):
+    """
+    This data is stored in a common location, so we only need to download it once
+    """
+    def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        return REANNOTATION_DIR / f'ensembl_{version}.bed'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        gff3_file = get_batch().read_input(str(inputs.as_path(multicohort, WgetEnsemblGffFile)))
+
+        job = get_batch().new_job('Generate Gene ROI')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(f'generate_gene_roi --gff3 {gff3_file} --output {job.output}')
+
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage
 class WgetAlphaMissenseTsv(MultiCohortStage):
     """
     This data is stored in a common location, so we only need to download it once
     """
     def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
-        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense.tsv.gz'
+        return REANNOTATION_DIR / 'AlphaMissense.tsv.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -202,7 +249,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
 @stage(required_stages=WgetAlphaMissenseTsv)
 class ReformatAlphaMissenseTsv(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense.ht.tar.gz'
+        return REANNOTATION_DIR / 'AlphaMissense.ht.tar.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -211,7 +258,7 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
 
         job = get_batch().new_job('Reformat AlphaMissense TSV')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'convert_alpha_missense --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
+        job.command(f'alpha_missense_to_ht --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
         job.command(f'tar -czf {job.output} AlphaMissense.ht')
         job.storage('10Gi')
         job.cpu(4)
@@ -221,8 +268,8 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[ReformatAlphaMissenseTsv, AnnotateConsequenceWithBcftools])
-class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
+@stage(required_stages=[ReformatAlphaMissenseTsv, AnnotateConsequenceWithBcftools, GenerateGeneRoi, MakeManeJson])
+class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         return self.prefix / 'annotated_for_reanalysis.ht.tar.gz'
 
@@ -234,12 +281,13 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
         # pull the alphamissense TarBall
         alpha_missense_tar = get_batch().read_input(str(inputs.as_path(get_multicohort(), ReformatAlphaMissenseTsv)))
 
+        mane_json = get_batch().read_input(str(inputs.as_path(get_multicohort(), MakeManeJson)))
+
+        gene_roi = get_batch().read_input(str(inputs.as_path(get_multicohort(), GenerateGeneRoi)))
+
         # get the annotated VCF & index
         vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))
         vcf_in = get_batch().read_input_group(**{'vcf.bgz': vcf, 'vcf.bgz.tbi': f'{vcf}.tbi'})['vcf.bgz']
-
-        # bed with region and gene mapping
-        region_file = get_batch().read_input(config_retrieve(['annotations', 'region']))
 
         job = get_batch().new_job('Combine annotated VCF and AlphaMissense data')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -250,7 +298,8 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
             f'--am AlphaMissense.ht '
-            f'--gene_bed {region_file} '
+            f'--gene_bed {gene_roi} '
+            f'--mane {mane_json} '
             f'--output tmp.mt'
         )
         job.command(f'tar -czf {job.output} tmp.mt')
