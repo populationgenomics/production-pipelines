@@ -14,7 +14,6 @@ from collections import defaultdict
 
 import hail as hl
 
-
 MISSING_STRING = hl.str('')
 
 
@@ -73,8 +72,8 @@ def csq_strings_into_hail_structs(csq_strings: list[str], mt: hl.MatrixTable) ->
                     x.extend([MISSING_STRING]),
                     x,
                 ),
-            )
-        )
+            ),
+        ),
     )
 
     # transform the CSQ string arrays into structs using the header names
@@ -102,7 +101,7 @@ def csq_strings_into_hail_structs(csq_strings: list[str], mt: hl.MatrixTable) ->
                         x.amino_acid_change.matches('^([0-9]+).*$'),
                         hl.int32(x.amino_acid_change.replace("^([0-9]+).+", "$1")),
                         hl.missing(hl.tint32),
-                    )
+                    ),
                 ),
             ),
             mt.transcript_consequences,
@@ -142,7 +141,7 @@ def annotate_gene_ids(mt: hl.MatrixTable, bed_file: str | None = None) -> hl.Mat
             lambda x: x.annotate(
                 gene_id=id_hl_dict[mt.locus.contig].get(
                     x.gene,
-                    x.gene
+                    x.gene,
                 ),
             ),
             mt.transcript_consequences,
@@ -217,7 +216,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
         alpha_m ():
     """
 
-    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
+    hl.context.init_spark(master='local[4]', default_reference='GRCh38', quiet=True)
 
     # pull and split the CSQ header line
     csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)

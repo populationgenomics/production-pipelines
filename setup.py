@@ -93,7 +93,7 @@ setup(
             # generate a JSON representation of MANE data
             'reformat_mane_summary = cpg_workflows.scripts.mini_annotation.reformat_mane_summary:cli_main',
             # take a GFF3 file, and generate a BED file of gene regions, plus padding
-            'generate_gene_roi = cpg_workflows.scripts.mini_annotation.generate_gene_roi:cli_main'
+            'generate_gene_roi = cpg_workflows.scripts.mini_annotation.generate_gene_roi:cli_main',
         ],
     },
 )
