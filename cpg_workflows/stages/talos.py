@@ -498,7 +498,7 @@ class RunHailFiltering(DatasetStage):
 
         # find the clinvar tables zip, and localise
         clinvar_zip = get_batch().read_input(get_clinvar_bundle())
-        job.command(f'tar -xzf {clinvar_zip} -C $BATCH_TMPDIR')
+        job.command(f'tar -xzf -C $BATCH_TMPDIR {clinvar_zip}')
 
         # see if we can find any exomiser results to integrate
         try:
@@ -556,10 +556,12 @@ class RunHailFilteringSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {
-            filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
-            for _path, filename in query_for_sv_mt(dataset.name)
-        }
+        # todo remove this
+        return {}
+        # return {
+        #     filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
+        #     for _path, filename in query_for_sv_mt(dataset.name)
+        # }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
