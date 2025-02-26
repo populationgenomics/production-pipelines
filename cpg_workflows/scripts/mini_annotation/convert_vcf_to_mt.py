@@ -279,7 +279,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
         mane (str | None): path to a MANE Hail Table for enhanced annotation
     """
 
-    hl.default_reference('GRCh38')
+    hl.context.init_spark(master='local[4]', default_reference='GRCh38', quiet=True)
 
     # pull and split the CSQ header line
     csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)
@@ -305,14 +305,11 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
     # drop the BCSQ field
     mt = mt.annotate_rows(info=mt.info.drop('BCSQ'))
 
-    # checkpoint again before rummaging around in MANE table
-    mt = mt.checkpoint('checkpoint_pre_mane.mt', overwrite=True, _read_if_exists=True)
-
     mt = apply_mane_annotations(mt, mane_path=mane)
 
-    mt.describe()
-
     mt.write(output_path, overwrite=True)
+
+    mt.describe()
 
 
 if __name__ == '__main__':
