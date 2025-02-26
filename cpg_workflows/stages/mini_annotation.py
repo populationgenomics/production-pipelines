@@ -156,7 +156,7 @@ class MakeManeJson(MultiCohortStage):
     This data is stored in a common location, so we only need to download it once
     """
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        version = config_retrieve(['workflow', 'mane_version'])
+        version = config_retrieve(['annotations', 'mane_version'])
         return {
             'mane_summary': REANNOTATION_DIR / f'mane_{version}.summary.txt.gz',
             'mane_json': REANNOTATION_DIR / f'mane_{version}.json',
@@ -165,8 +165,8 @@ class MakeManeJson(MultiCohortStage):
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
 
-        mane_version = config_retrieve(['workflow', 'mane_version'])
-        mane_url = config_retrieve(['workflow', 'mane_url']).format(v=mane_version)
+        mane_version = config_retrieve(['annotations', 'mane_version'])
+        mane_url = config_retrieve(['annotations', 'mane_url']).format(v=mane_version)
 
         job = get_batch().new_job('Get and Reformat MANE summary data')
         job.image(config_retrieve(['workflow', 'driver_image']))
