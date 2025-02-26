@@ -64,10 +64,15 @@ def main(gff3_file: str, output: str, flanking: int = 2000):
             write_handle.write('\t'.join(output_list) + '\n')
 
 
-if __name__ == '__main__':
+def cli_main():
+
     parser = ArgumentParser()
     parser.add_argument('--gff3', help='Path to the compressed GFF3 file')
     parser.add_argument('--output', help='Path to output file')
     parser.add_argument('--flanking', help='Regions to add to each gene', default=2000)
     args = parser.parse_args()
     main(gff3_file=args.gff3, output=args.output, flanking=args.flanking)
+
+
+if __name__ == '__main__':
+    cli_main()
