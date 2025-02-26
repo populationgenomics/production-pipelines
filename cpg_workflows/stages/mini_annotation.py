@@ -281,7 +281,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
         # pull the alphamissense TarBall
         alpha_missense_tar = get_batch().read_input(str(inputs.as_path(get_multicohort(), ReformatAlphaMissenseTsv)))
 
-        mane_json = get_batch().read_input(str(inputs.as_path(get_multicohort(), MakeManeJson)))
+        mane_json = get_batch().read_input(str(inputs.as_path(get_multicohort(), MakeManeJson, 'mane_json')))
 
         gene_roi = get_batch().read_input(str(inputs.as_path(get_multicohort(), GenerateGeneRoi)))
 
