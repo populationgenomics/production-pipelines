@@ -540,14 +540,13 @@ class RunHailFiltering(DatasetStage):
         job.command('echo "ClinvArbitration PM5 copied"')
 
         # finally, localise the whole MT (this takes the longest
-        mt_name = input_mt.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
-        job.command('echo "Cohort MT copied"')
+        mt_zip = get_batch().read_input(input_mt)
+        job.command(f'tar -xzf -C $BATCH_TMPDIR {mt_zip}')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'RunHailFiltering '
-            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--input "${{BATCH_TMPDIR}}/annotated.mt" '
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
