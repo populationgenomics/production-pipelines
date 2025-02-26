@@ -59,6 +59,7 @@ class MergeSingleSampleVcfs(CohortStage):
     Merge all the single-sample VCFs into a single VCF
     use a specific region
     """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         return self.tmp_prefix / 'merged_ss_vcfs.vcf.bgz'
 
@@ -116,6 +117,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
     """
     Take the VCF with gnomad frequencies, and annotate with consequences using BCFtools
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
 
@@ -190,6 +192,7 @@ class WgetEnsemblGffFile(MultiCohortStage):
     """
     Reformat the MANE data into a dictionary format
     """
+
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         version = config_retrieve(['annotations', 'ensembl_version'])
         return REANNOTATION_DIR / f'ensembl_{version}.gff3.gz'
@@ -213,6 +216,7 @@ class GenerateGeneRoi(MultiCohortStage):
     """
     parse the Ensembl GFF3 file, and generate a BED file of gene regions
     """
+
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         version = config_retrieve(['annotations', 'ensembl_version'])
         return REANNOTATION_DIR / f'ensembl_{version}.bed'
@@ -235,6 +239,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
     """
     Pull the AlphaMissense TSV file from Zenodo
     """
+
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         return REANNOTATION_DIR / 'AlphaMissense.tsv.gz'
 
@@ -256,6 +261,7 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
     """
     Reformat the AlphaMissense TSV file into a Hail Table
     """
+
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         return REANNOTATION_DIR / 'AlphaMissense.ht.tar.gz'
 
@@ -281,6 +287,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
     Join the annotated VCF, with AlphaMissense, and with gene/transcript information
     exporting as a Hail MatrixTable
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         return self.prefix / 'annotated_for_reanalysis.ht.tar.gz'
 

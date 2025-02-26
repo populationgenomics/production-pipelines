@@ -25,12 +25,12 @@ def mane_to_json(input_path: str, output_path: str):
         reader = DictReader(handle, delimiter='\t')
         for line in reader:
 
-            enst = line['Ensembl_nuc'].split('.')[0]    # ENST
-            ensg = line['Ensembl_Gene'].split('.')[0]   # ENSG
-            ensp = line['Ensembl_prot'].split('.')[0]   # ENSP
-            symbol = line['symbol'].split('.')[0]       # symbol
-            nm_id = line['RefSeq_nuc'].split('.')[0]    # NMID
-            mane = line['MANE_status']                  # "MANE Select" or "MANE Plus Clinical"
+            enst = line['Ensembl_nuc'].split('.')[0]
+            ensg = line['Ensembl_Gene'].split('.')[0]
+            ensp = line['Ensembl_prot'].split('.')[0]
+            symbol = line['symbol'].split('.')[0]
+            nm_id = line['RefSeq_nuc'].split('.')[0]
+            mane = line['MANE_status']
 
             transcript_dict[enst] = {
                 'mane': mane,
@@ -56,12 +56,12 @@ def mane_to_ht(input_path: str, output_path: str):
         reader = DictReader(handle, delimiter='\t')
         for line in reader:
             line_elements = [
-                line['Ensembl_nuc'].split('.')[0],   # ENST
+                line['Ensembl_nuc'].split('.')[0],  # ENST
                 line['Ensembl_Gene'].split('.')[0],  # ENSG
                 line['Ensembl_prot'].split('.')[0],  # ENSP
-                line['symbol'].split('.')[0],        # symbol
-                line['RefSeq_nuc'].split('.')[0],    # NMID
-                line['MANE_status'],                 # "MANE Select" or "MANE Plus Clinical"
+                line['symbol'].split('.')[0],  # symbol
+                line['RefSeq_nuc'].split('.')[0],  # NMID
+                line['MANE_status'],  # "MANE Select" or "MANE Plus Clinical"
             ]
             write_handle.write('\t'.join(line_elements) + '\n')
 

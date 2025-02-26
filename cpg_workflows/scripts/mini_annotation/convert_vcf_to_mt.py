@@ -81,10 +81,7 @@ def csq_strings_into_hail_structs(csq_strings: list[str], mt: hl.MatrixTable) ->
     mt = mt.annotate_rows(
         transcript_consequences=split_csqs.map(
             lambda x: hl.struct(
-                **{
-                    csq_strings[n]: x[n]
-                    for n in range(len(csq_strings))
-                },
+                **{csq_strings[n]: x[n] for n in range(len(csq_strings))},
             ),
         ),
     )
