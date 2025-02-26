@@ -221,17 +221,16 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
     get_logger().info(f'No forced {key} table available, trying default')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
-    for default_name in ['clinvarbitration', 'aip_clinvar']:
-        clinvar_table = join(
-            config_retrieve(['storage', 'common', 'analysis']),
-            default_name,
-            datetime.now().strftime('%y-%m'),
-            f'{key}.ht',
-        )
+    clinvar_table = join(
+        config_retrieve(['storage', 'common', 'analysis']),
+        'clinvarbitration',
+        datetime.now().strftime('%y-%m'),
+        f'{key}.ht',
+    ).replace('test', 'main')
 
-        if to_path(clinvar_table).exists():
-            get_logger().info(f'Using clinvar table {clinvar_table}')
-            return clinvar_table
+    if to_path(clinvar_table).exists():
+        get_logger().info(f'Using clinvar table {clinvar_table}')
+        return clinvar_table
 
     raise ValueError('no Clinvar Tables were identified')
 
