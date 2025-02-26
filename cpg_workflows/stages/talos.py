@@ -198,9 +198,9 @@ def query_for_latest_hail_object(
 
 
 @lru_cache(2)
-def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
+def get_clinvar_bundle() -> str:
     """
-    this is used to retrieve two types of object - clinvar_decisions & clinvar_pm5
+    this is used to retrieve two zipped objects - clinvar_decisions & clinvar_pm5
 
     try and identify the clinvar table to use
     - try the config specified path
@@ -214,25 +214,25 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
         a path to a clinvar table, or None
     """
 
-    if (clinvar_table := config_retrieve(['workflow', key], None)) is not None:
-        get_logger().info(f'Using clinvar table {clinvar_table} from config')
-        return clinvar_table
+    if (clinvar_zip := config_retrieve(['workflow', 'clinvarbitration'], None)) is not None:
+        get_logger().info(f'Using clinvar table {clinvar_zip} from config')
+        return clinvar_zip
 
-    get_logger().info(f'No forced {key} table available, trying default')
+    get_logger().info(f'No forced clinvar table available, trying default location')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
     clinvar_table = join(
         config_retrieve(['storage', 'common', 'analysis']),
         'clinvarbitration',
         datetime.now().strftime('%y-%m'),
-        f'{key}.ht',
-    ).replace('test', 'main')
+        'clinvarbitration.tar.gz',
+    )
 
-    if to_path(clinvar_table).exists():
-        get_logger().info(f'Using clinvar table {clinvar_table}')
-        return clinvar_table
+    if to_path(clinvar_zip).exists():
+        get_logger().info(f'Using clinvar table {clinvar_zip}')
+        return clinvar_zip
 
-    raise ValueError('no Clinvar Tables were identified')
+    raise ValueError('no Clinvar ZIP identified')
 
 
 @stage
@@ -496,13 +496,9 @@ class RunHailFiltering(DatasetStage):
         # peds can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
-        # find the clinvar tables, and localise
-        clinvar_decisions = get_clinvar_table()
-        clinvar_name = clinvar_decisions.split('/')[-1]
-
-        # localise the clinvar decisions table
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration decisions copied"')
+        # find the clinvar tables zip, and localise
+        clinvar_zip = get_batch().read_input(get_clinvar_bundle())
+        job.command(f'tar -xzf {clinvar_zip} -C $BATCH_TMPDIR')
 
         # see if we can find any exomiser results to integrate
         try:
@@ -531,11 +527,6 @@ class RunHailFiltering(DatasetStage):
         else:
             svdb_argument = ' '
 
-        pm5 = get_clinvar_table('clinvar_pm5')
-        pm5_name = pm5.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration PM5 copied"')
-
         # finally, localise the whole MT (this takes the longest
         mt_zip = get_batch().read_input(input_mt)
         job.command(f'tar -xzf -C $BATCH_TMPDIR {mt_zip}')
@@ -547,8 +538,8 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
-            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
-            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
+            f'--clinvar "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.ht" '
+            f'--pm5 "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_pm5.ht" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
             f'{svdb_argument} '
             f'{exomiser_argument} ',
