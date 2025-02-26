@@ -501,7 +501,7 @@ class RunHailFiltering(DatasetStage):
 
         # find the clinvar tables zip, and localise
         clinvar_zip = get_batch().read_input(get_clinvar_bundle())
-        job.command(f'tar -xzf -C $BATCH_TMPDIR {clinvar_zip}')
+        job.command(f'tar -xzf {clinvar_zip} -C $BATCH_TMPDIR')
 
         # see if we can find any exomiser results to integrate
         try:
@@ -532,7 +532,7 @@ class RunHailFiltering(DatasetStage):
 
         # finally, localise the whole MT (this takes the longest
         mt_zip = get_batch().read_input(input_mt)
-        job.command(f'tar -xzf -C $BATCH_TMPDIR {mt_zip}')
+        job.command(f'tar -xzf {mt_zip} -C $BATCH_TMPDIR')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
