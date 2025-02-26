@@ -28,6 +28,53 @@ REANNOTATION_DIR = to_path(config_retrieve(['storage', 'common', 'analysis'])) /
 
 
 @stage
+class WgetEnsemblGffFile(MultiCohortStage):
+    """
+    Reformat the MANE data into a dictionary format
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        return REANNOTATION_DIR / f'ensembl_{version}.gff3.gz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(v=version)
+
+        job = get_batch().new_job('wget Ensembl GFF3 file')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+
+        job.command(f'wget {ensembl_url} -O {job.output}')
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage(required_stages=[WgetEnsemblGffFile])
+class GenerateGeneRoi(MultiCohortStage):
+    """
+    parse the Ensembl GFF3 file, and generate a BED file of gene regions
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        version = config_retrieve(['annotations', 'ensembl_version'])
+        return REANNOTATION_DIR / f'ensembl_{version}.bed'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+        gff3_file = get_batch().read_input(str(inputs.as_path(multicohort, WgetEnsemblGffFile)))
+
+        job = get_batch().new_job('Generate Gene ROI')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+        job.command(f'generate_gene_roi --gff3 {gff3_file} --output {job.output}')
+
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
+@stage
 class StripSingleSampleGvcf(SequencingGroupStage):
     """
     Merge all the single-sample VCFs into a single VCF
@@ -46,14 +93,11 @@ class StripSingleSampleGvcf(SequencingGroupStage):
 
         outputs = self.expected_outputs(sg)
 
-        job = strip_gvcf_to_vcf(
-            gvcf=sg.gvcf,
-            output=str(outputs),
-        )
+        job = strip_gvcf_to_vcf(gvcf=sg.gvcf, output=str(outputs))
         return self.make_outputs(sg, data=outputs, jobs=job)
 
 
-@stage(required_stages=StripSingleSampleGvcf)
+@stage(required_stages=[StripSingleSampleGvcf, GenerateGeneRoi])
 class MergeSingleSampleVcfs(CohortStage):
     """
     Merge all the single-sample VCFs into a single VCF
@@ -77,7 +121,7 @@ class MergeSingleSampleVcfs(CohortStage):
             input_list=vcfs_to_merge,
             output_file=str(outputs),
             missing_to_ref=True,
-            region_file=config_retrieve(['annotations', 'region']),
+            region_file=str(inputs.as_path(get_multicohort(), GenerateGeneRoi)),
         )
 
         return self.make_outputs(cohort, data=outputs, jobs=job)
@@ -184,53 +228,6 @@ class MakeManeJson(MultiCohortStage):
         job.command(f'wget {mane_url} -O {job.output["summary.txt.gz"]}')
         job.command(f'reformat_mane_summary --input {job.output["summary.txt.gz"]} --output {job.output["json"]}')
         get_batch().write_output(job.output, str(outputs['mane_json']).removesuffix('.json'))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
-@stage
-class WgetEnsemblGffFile(MultiCohortStage):
-    """
-    Reformat the MANE data into a dictionary format
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        return REANNOTATION_DIR / f'ensembl_{version}.gff3.gz'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(v=version)
-
-        job = get_batch().new_job('wget Ensembl GFF3 file')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-
-        job.command(f'wget {ensembl_url} -O {job.output}')
-        get_batch().write_output(job.output, str(outputs))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
-@stage(required_stages=[WgetEnsemblGffFile])
-class GenerateGeneRoi(MultiCohortStage):
-    """
-    parse the Ensembl GFF3 file, and generate a BED file of gene regions
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        return REANNOTATION_DIR / f'ensembl_{version}.bed'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-        gff3_file = get_batch().read_input(str(inputs.as_path(multicohort, WgetEnsemblGffFile)))
-
-        job = get_batch().new_job('Generate Gene ROI')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'generate_gene_roi --gff3 {gff3_file} --output {job.output}')
-
-        get_batch().write_output(job.output, str(outputs))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
