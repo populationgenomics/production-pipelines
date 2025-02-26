@@ -156,7 +156,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AnnotateGnomadFrequenciesWithEchtvar])
+@stage(required_stages=[AnnotateGnomadFrequenciesWithEchtvar, WgetEnsemblGffFile])
 class AnnotateConsequenceWithBcftools(CohortStage):
     """
     Take the VCF with gnomad frequencies, and annotate with consequences using BCFtools
@@ -170,7 +170,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         gnomad_annotated_vcf = get_batch().read_input(str(inputs.as_path(cohort, AnnotateGnomadFrequenciesWithEchtvar)))
 
         # get the GFF3 file required to generate consequences
-        gff3_file = get_batch().read_input(config_retrieve(['annotations', 'gff3']))
+        gff3_file = get_batch().read_input(str(inputs.as_path(get_multicohort(), WgetEnsemblGffFile)))
 
         # get the fasta
         fasta = get_batch().read_input(config_retrieve(['references', 'broad', 'ref_fasta']))
