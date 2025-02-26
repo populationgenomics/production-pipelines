@@ -9,7 +9,8 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.targets import MultiCohort
-from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, stage, exists
+from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, exists, stage
+from cpg_workflows.utils import get_logger
 
 CANONICAL_CHROMOSOMES = [f'chr{x}' for x in list(range(1, 23)) + ['X', 'Y', 'whole_genome']]
 common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'gnomad', 'echtvar')
@@ -42,8 +43,12 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             contig_localised = get_batch().read_input(config_retrieve(['references', 'gnomad_4.1_vcfs', contig]))
             # add to the list of inputs for the whole genome job
             contig_files.append(contig_localised)
+
+            if exists(output[contig]):
+                get_logger().info(f'Skipping echtvar on {contig}, output already exists')
+                continue
             # create and resource a job
-            contig_job = get_batch().new_job(f'Run echtvar on gnomad v4.1 {contig}')
+            contig_job = get_batch().new_job(f'Run echtvar on gnomad v4.1, {contig}')
             contig_job.image(image_path('echtvar'))
             contig_job.storage('10Gi')
             contig_job.cpu(4)
