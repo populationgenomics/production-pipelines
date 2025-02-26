@@ -1,6 +1,5 @@
 [workflow]
 name = 'mini_annotation'
-sequencing_type = 'exome'
 
 [annotations]
 echtvar = "gs://cpg-common-test-analysis/gnomad/echtvar/gnomad_4.1_echtvar.zip"
