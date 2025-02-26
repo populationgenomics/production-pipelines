@@ -221,7 +221,7 @@ def get_clinvar_bundle() -> str:
     get_logger().info(f'No forced clinvar table available, trying default location')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
-    clinvar_table = join(
+    clinvar_zip = join(
         config_retrieve(['storage', 'common', 'analysis']),
         'clinvarbitration',
         datetime.now().strftime('%y-%m'),
