@@ -177,10 +177,10 @@ class MakeManeJson(MultiCohortStage):
         job = get_batch().new_job('Get and Reformat MANE summary data')
         job.image(config_retrieve(['workflow', 'driver_image']))
 
-        job.declare_resource_group(output={'.summary.txt.gz': '{root}.summary.txt.gz', 'json': '{root}.json'})
+        job.declare_resource_group(output={'summary.txt.gz': '{root}.summary.txt.gz', 'json': '{root}.json'})
 
-        job.command(f'wget {mane_url} -O {job.output["mane_summary"]}')
-        job.command(f'reformat_mane_summary --input {job.output[".summary.txt.gz"]} --output {job.output["json"]}')
+        job.command(f'wget {mane_url} -O {job.output["summary.txt.gz"]}')
+        job.command(f'reformat_mane_summary --input {job.output["summary.txt.gz"]} --output {job.output["json"]}')
         get_batch().write_output(job.output, str(outputs['json']).removesuffix('.json'))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
@@ -234,7 +234,7 @@ class GenerateGeneRoi(MultiCohortStage):
 @stage
 class WgetAlphaMissenseTsv(MultiCohortStage):
     """
-    This data is stored in a common location, so we only need to download it once
+    Pull the AlphaMissense TSV file from Zenodo
     """
     def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
         return REANNOTATION_DIR / 'AlphaMissense.tsv.gz'
@@ -254,6 +254,9 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
 
 @stage(required_stages=WgetAlphaMissenseTsv)
 class ReformatAlphaMissenseTsv(MultiCohortStage):
+    """
+    Reformat the AlphaMissense TSV file into a Hail Table
+    """
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         return REANNOTATION_DIR / 'AlphaMissense.ht.tar.gz'
 
@@ -275,6 +278,10 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
 
 @stage(required_stages=[ReformatAlphaMissenseTsv, AnnotateConsequenceWithBcftools, GenerateGeneRoi, MakeManeJson])
 class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
+    """
+    Join the annotated VCF, with AlphaMissense, and with gene/transcript information
+    exporting as a Hail MatrixTable
+    """
     def expected_outputs(self, cohort: Cohort) -> Path:
         return self.prefix / 'annotated_for_reanalysis.ht.tar.gz'
 
