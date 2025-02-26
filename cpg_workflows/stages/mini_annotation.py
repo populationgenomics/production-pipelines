@@ -166,7 +166,7 @@ class MakeManeJson(MultiCohortStage):
         outputs = self.expected_outputs(multicohort)
 
         mane_version = config_retrieve(['workflow', 'mane_version'])
-        mane_url = config_retrieve(['workflow', 'mane_url']).format(mane_version)
+        mane_url = config_retrieve(['workflow', 'mane_url']).format(v=mane_version)
 
         job = get_batch().new_job('Get and Reformat MANE summary data')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -192,7 +192,7 @@ class WgetEnsemblGffFile(MultiCohortStage):
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
         version = config_retrieve(['annotations', 'ensembl_version'])
-        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(version)
+        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(v=version)
 
         job = get_batch().new_job('wget Ensembl GFF3 file')
         job.image(config_retrieve(['workflow', 'driver_image']))
