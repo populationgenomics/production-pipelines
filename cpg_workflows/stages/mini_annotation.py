@@ -258,11 +258,10 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
 
         job = get_batch().new_job('Reformat AlphaMissense TSV')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'alpha_missense_to_ht --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
+        job.command(f'alpha_missense_to_ht --am_tsv {am_tsv} --ht_out AlphaMissense.ht')
         job.command(f'tar -czf {job.output} AlphaMissense.ht')
         job.storage('10Gi')
         job.cpu(4)
-        job.memory('highmem')
         get_batch().write_output(job.output, str(outputs))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
