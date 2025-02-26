@@ -14,7 +14,6 @@ from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.bcftools import merge_ss_vcfs, strip_gvcf_to_vcf
 from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
-from cpg_workflows.utils import ExpectedResultT
 from cpg_workflows.workflow import (
     CohortStage,
     MultiCohortStage,
@@ -189,7 +188,7 @@ class MakeManeJson(MultiCohortStage):
 @stage
 class WgetEnsemblGffFile(MultiCohortStage):
     """
-    Reformat the MANE data into a ditionary format
+    Reformat the MANE data into a dictionary format
     """
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
         version = config_retrieve(['annotations', 'ensembl_version'])
@@ -212,9 +211,9 @@ class WgetEnsemblGffFile(MultiCohortStage):
 @stage(required_stages=[WgetEnsemblGffFile])
 class GenerateGeneRoi(MultiCohortStage):
     """
-    This data is stored in a common location, so we only need to download it once
+    parse the Ensembl GFF3 file, and generate a BED file of gene regions
     """
-    def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
         version = config_retrieve(['annotations', 'ensembl_version'])
         return REANNOTATION_DIR / f'ensembl_{version}.bed'
 
@@ -236,7 +235,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
     """
     Pull the AlphaMissense TSV file from Zenodo
     """
-    def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
         return REANNOTATION_DIR / 'AlphaMissense.tsv.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -320,4 +319,3 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
         get_batch().write_output(job.output, str(output))
 
         return self.make_outputs(cohort, data=output, jobs=job)
-
