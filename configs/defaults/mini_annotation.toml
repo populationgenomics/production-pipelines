@@ -6,3 +6,5 @@ sequencing_type = 'exome'
 echtvar = "gs://cpg-common-test-analysis/gnomad/echtvar/gnomad_4.1_echtvar.zip"
 gff3 = "gs://cpg-common-test-analysis/talos/GRCh38.gff3.gz"
 region = "gs://cpg-common-test-analysis/talos/38.bed"
+mane_release = "1.4"
+mane_url = "https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/release_{}/MANE.GRCh38.v{}.summary.txt.gz"

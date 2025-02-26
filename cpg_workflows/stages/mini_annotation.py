@@ -152,9 +152,30 @@ class MakeManeJson(MultiCohortStage):
     """
     This data is stored in a common location, so we only need to download it once
     """
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        mane_version = config_retrieve(['workflow', 'mane_version'], '14')
-        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'mane.json'
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        version = config_retrieve(['workflow', 'mane_version'])
+        base_dir = config_retrieve(['storage', 'common', 'analysis']) / 'reannotation'
+        return {
+            'mane_summary': base_dir / f'mane_{version}.summary.txt.gz',
+            'mane_json': base_dir / f'mane_{version}.json',
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+
+        mane_version = config_retrieve(['workflow', 'mane_version'])
+        mane_url = config_retrieve(['workflow', 'mane_url']).format(mane_version)
+
+        job = get_batch().new_job('Get and Reformat MANE summary data')
+        job.image(config_retrieve(['workflow', 'driver_image']))
+
+        job.declare_resource_group(output={'mane_summary': '{root}.summary.txt.gz', 'mane_json': '{root}.json'})
+
+        job.command(f'wget {mane_url} -O {job.output["mane_summary"]}')
+        job.command(f'reformat_mane_summary --input {job.output["mane_summary"]} --output {job.output["mane_json"]}')
+        get_batch().write_output(job.output, str(outputs['mane_json']).removesuffix('.json'))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
 @stage

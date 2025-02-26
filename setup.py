@@ -90,6 +90,8 @@ setup(
             'convert_alpha_missense = cpg_workflows.scripts.parse_amissense_tsv_into_ht:cli_main',
             # script to take a VCF and AM data, generating a MatrixTable
             'convert_vcf_to_mt = cpg_workflows.scripts.convert_vcf_to_mt:cli_main'
+            # generate a JSON representation of MANE data
+            'reformat_mane_summary = cpg_workflows.scripts.reformat_mane_summary:cli_main'
         ],
     },
 )
