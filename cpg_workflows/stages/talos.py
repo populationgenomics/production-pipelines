@@ -453,17 +453,15 @@ class RunHailFiltering(DatasetStage):
         return dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        input_mt = config_retrieve(
-            ['workflow', 'matrix_table'],
-            default=query_for_latest_hail_object(
+        if (input_mt := config_retrieve(['workflow', 'matrix_table'], None)) is None:
+            input_mt = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type=config_retrieve(
                     ['workflow', 'mt_entry_type'],
                     default='matrixtable',
                 ),
                 object_suffix='.mt',
-            ),
-        )
+            )
 
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
