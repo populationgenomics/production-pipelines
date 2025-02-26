@@ -154,10 +154,10 @@ def main(alpha_m_file: str, ht_path: str):
     # generate a random file name so that we don't overwrite anything consistently
     random_intermediate_file: str = 'temp.json'
 
+    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
+
     # generate a new tsv of just pathogenic entries
     filter_for_pathogenic_am(alpha_m_file, random_intermediate_file)
-
-    hl.default_reference('GRCh38')
 
     # now ingest as HT and re-jig some fields
     json_to_hail_table(random_intermediate_file, ht_path)

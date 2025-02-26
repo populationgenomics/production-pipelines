@@ -82,6 +82,8 @@ def cli_main():
     parser.add_argument('--format', choices=['json', 'ht'], default='json')
     args = parser.parse_args()
 
+    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
+
     if args.format == 'json':
         mane_to_json(input_path=args.input, output_path=args.output)
     elif args.format == 'ht':
