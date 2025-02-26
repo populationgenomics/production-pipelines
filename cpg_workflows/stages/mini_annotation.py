@@ -145,6 +145,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
             bcftools csq --force -f {fasta} \
                 --local-csq \
                 -g {gff3_file} \
+                -B 10 \
                 -Oz -o {job.output["vcf.bgz"]} \
                 {gnomad_annotated_vcf}
             bcftools index -t {job.output["vcf.bgz"]}
@@ -318,9 +319,9 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
             f'--am AlphaMissense.ht '
             f'--gene_bed {gene_roi} '
             f'--mane {mane_json} '
-            f'--output tmp.mt',
+            f'--output annotated.mt',
         )
-        job.command(f'tar -czf {job.output} tmp.mt')
+        job.command(f'tar -czf {job.output} annotated.mt')
 
         # write the output
         get_batch().write_output(job.output, str(output))
