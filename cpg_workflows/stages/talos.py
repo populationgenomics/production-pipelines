@@ -557,7 +557,7 @@ class RunHailFilteringSV(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         # todo remove this
-        return {}
+        return {'a': 'b'}
         # return {
         #     filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
         #     for _path, filename in query_for_sv_mt(dataset.name)
