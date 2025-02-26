@@ -1,0 +1,9 @@
+[workflow]
+name = 'talos_prep'
+
+[annotations]
+echtvar = "gs://cpg-common-test-analysis/gnomad/echtvar/gnomad_4.1_echtvar.zip"
+mane_version = "1.4"
+mane_url = "https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/release_{v}/MANE.GRCh38.v{v}.summary.txt.gz"
+ensembl_version = "113"
+ensembl_url = "https://ftp.ensembl.org/pub/release-{v}/gff3/homo_sapiens/Homo_sapiens.GRCh38.{v}.gff3.gz"
