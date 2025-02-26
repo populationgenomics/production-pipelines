@@ -148,9 +148,22 @@ class AnnotateConsequenceWithBcftools(CohortStage):
 
 
 @stage
+class MakeManeJson(MultiCohortStage):
+    """
+    This data is stored in a common location, so we only need to download it once
+    """
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        mane_version = config_retrieve(['workflow', 'mane_version'], '14')
+        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'mane.json'
+
+
+@stage
 class WgetAlphaMissenseTsv(MultiCohortStage):
+    """
+    This data is stored in a common location, so we only need to download it once
+    """
     def expected_outputs(self, multicohort: MultiCohort) -> ExpectedResultT:
-        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense38.tsv.gz'
+        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense.tsv.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -168,7 +181,7 @@ class WgetAlphaMissenseTsv(MultiCohortStage):
 @stage(required_stages=WgetAlphaMissenseTsv)
 class ReformatAlphaMissenseTsv(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense38.ht.tar.gz'
+        return to_path(config_retrieve(['storage', 'common', 'analysis'])) / 'reannotation' / 'AlphaMissense.ht.tar.gz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(multicohort)
@@ -178,7 +191,7 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         job = get_batch().new_job('Reformat AlphaMissense TSV')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'convert_alpha_missense --am_tsv {am_tsv} --ht_out AlphaMissense38.ht')
-        job.command(f'tar -czf {job.output} AlphaMissense38.ht')
+        job.command(f'tar -czf {job.output} AlphaMissense.ht')
         job.storage('10Gi')
         job.cpu(4)
         job.memory('highmem')
@@ -215,7 +228,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoHT(CohortStage):
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
-            f'--am AlphaMissense38.ht '
+            f'--am AlphaMissense.ht '
             f'--gene_bed {region_file} '
             f'--output tmp.mt'
         )
