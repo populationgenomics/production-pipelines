@@ -1,0 +1,35 @@
+[workflow]
+
+# The name of the workflow
+name = "echtvar"
+
+# the cohort isn't important, so this is a dummy value
+input_cohorts = ['COH2142']
+sequencing_type = 'genome'
+
+[references."gnomad_4.1_vcfs"]
+chr1 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr1.vcf.bgz"
+chr2 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr2.vcf.bgz"
+chr3 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr3.vcf.bgz"
+chr4 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr4.vcf.bgz"
+chr5 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr5.vcf.bgz"
+chr6 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr6.vcf.bgz"
+chr7 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr7.vcf.bgz"
+chr8 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr8.vcf.bgz"
+chr9 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr9.vcf.bgz"
+chr10 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr10.vcf.bgz"
+chr11 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr11.vcf.bgz"
+chr12 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr12.vcf.bgz"
+chr13 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr13.vcf.bgz"
+chr14 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr14.vcf.bgz"
+chr15 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr15.vcf.bgz"
+chr16 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr16.vcf.bgz"
+chr17 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr17.vcf.bgz"
+chr18 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr18.vcf.bgz"
+chr19 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr19.vcf.bgz"
+chr20 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr20.vcf.bgz"
+chr21 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr21.vcf.bgz"
+chr22 = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chr22.vcf.bgz"
+chrX = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chrX.vcf.bgz"
+chrY = "gs://cpg-common-main/references/gnomad/v4.1/vcfs/gnomad.genomes.v4.1.sites.chrY.vcf.bgz"
+chrM = "gs://cpg-common-main/references/gnomad/v3.1/vcf/gnomad.genomes.r3.1.sites.chrM.vcf.bgz"
