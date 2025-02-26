@@ -181,7 +181,7 @@ class MakeManeJson(MultiCohortStage):
 
         job.command(f'wget {mane_url} -O {job.output["summary.txt.gz"]}')
         job.command(f'reformat_mane_summary --input {job.output["summary.txt.gz"]} --output {job.output["json"]}')
-        get_batch().write_output(job.output, str(outputs['json']).removesuffix('.json'))
+        get_batch().write_output(job.output, str(outputs['mane_json']).removesuffix('.json'))
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
