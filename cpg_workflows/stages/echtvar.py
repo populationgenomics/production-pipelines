@@ -9,8 +9,8 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, image_path
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.targets import MultiCohort
-from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, exists, stage
 from cpg_workflows.utils import get_logger
+from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, exists, stage
 
 CANONICAL_CHROMOSOMES = [f'chr{x}' for x in list(range(1, 23)) + ['X', 'Y', 'whole_genome']]
 common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'gnomad', 'echtvar')
