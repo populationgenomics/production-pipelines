@@ -119,7 +119,7 @@ def naive_merge_vcfs(
     # -0: missing-calls-to-ref (not used by default)
     merge_job.command(
         f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi',
+        f'{merge_job.output["vcf.bgz"]} --threads {cpu} -m all {" -0" if missing_to_ref else ""} --write-index=tbi',
     )
 
     # write the result out
