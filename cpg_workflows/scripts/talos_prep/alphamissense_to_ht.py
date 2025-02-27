@@ -30,6 +30,9 @@ from argparse import ArgumentParser
 import hail as hl
 
 
+AM_ZENODO = 'https://zenodo.org/records/8208688/files/AlphaMissense_hg38.tsv.gz'
+
+
 def process_header(final_header_line: str) -> dict[str, int]:
     """
     the TSV format is a little different in the all-isoforms vs. main transcript only
