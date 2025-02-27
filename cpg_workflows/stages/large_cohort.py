@@ -1,4 +1,5 @@
 import logging
+from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
@@ -463,6 +464,34 @@ class Frequencies(CohortStage):
                 str(get_workflow().tmp_prefix / 'MakeSiteOnlyVcf' / 'siteonly.ht'),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[Frequencies, MakeSiteOnlyVcf])
+class BrowserPrepare(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return cohort.analysis_dataset.prefix() / 'browser' / 'browser.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import browser_prepare
+
+        j = get_batch().new_job(
+            'BrowserPrepare',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                browser_prepare.prepare_gnomad_v4_variants_helper,
+                browser_prepare.prepare_gnomad_v4_variants_helper.__name__,
+                str(inputs.as_path(cohort, Frequencies)),
+                str(config_retrieve(['workflow', 'sequencing_type'])),
+                str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
         )
