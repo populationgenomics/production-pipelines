@@ -51,7 +51,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             # create and resource a job
             contig_job = get_batch().new_job(f'Run echtvar on gnomad v4.1, {contig}')
             contig_job.image(image_path('echtvar'))
-            contig_job.storage('10Gi')
+            contig_job.storage('50Gi')
             contig_job.cpu(4)
             contig_job.memory('highmem')
             # run the echtvar encode command
@@ -62,7 +62,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
         if not exists(output['whole_genome']):
             job = get_batch().new_job('Run echtvar on gnomad v4.1, whole genome')
             job.image(image_path('echtvar'))
-            job.storage('700G')
+            job.storage('600G')
             job.cpu(4)
             job.memory('highmem')
             job.command(f'echtvar encode {job.output} $ECHTVAR_CONFIG {" ".join(contig_files)}')
