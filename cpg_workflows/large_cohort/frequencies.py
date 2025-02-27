@@ -71,6 +71,31 @@ def frequency_annotations(
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
     """
+
+    # Exome parsing
+    if config_retrieve(['workflow', ['sequencing_type']]) == 'exome':
+        # clear sample qc filters as this data has not been qc'd yet
+        sample_qc_ht = sample_qc_ht.annotate(filters=hl.empty_set(hl.tstr))
+        # sample_qc_ht has no females in it. This is causing errors in freq_meta_dict where we have no 'XY_adj'. Forcing
+        # the one 'ambiguous' sex individual to be XY..
+        sample_qc_ht = sample_qc_ht.annotate(
+            X_karyotype=hl.if_else(
+                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
+                "X",
+                sample_qc_ht.X_karyotype,
+            ),
+            Y_karyotype=hl.if_else(
+                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
+                "Y",
+                sample_qc_ht.Y_karyotype,
+            ),
+            sex_karyotype=hl.if_else(
+                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
+                "XY",
+                sample_qc_ht.sex_karyotype,
+            ),
+        )
+
     logging.info('Reading full sparse MT and metadata table...')
 
     logging.info('Splitting multiallelics')
@@ -197,7 +222,11 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         faf=faf,
         popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX),
     )
-    mt = mt.annotate_globals(faf_meta=faf_meta, faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth']))
+    mt = mt.annotate_globals(
+        faf_meta=faf_meta,
+        # exome data has 'Other' while genome data has 'oth'
+        faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth', 'Other']),
+    )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
             faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
