@@ -84,7 +84,7 @@ class StripSingleSampleGvcf(SequencingGroupStage):
     """
 
     def expected_outputs(self, sg: SequencingGroup) -> Path:
-        return self.tmp_prefix / f'{sg.id}_stripped.vcf.bgz'
+        return sg.dataset.prefix(category='temp') / self.name / f'{sg.id}_stripped.vcf.bgz'
 
     def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
         """
@@ -104,10 +104,11 @@ class MergeSingleSampleVcfs(CohortStage):
     """
     Merge all the single-sample VCFs into a single VCF
     use a specific region
+    Writes to a cohort-specific temp folder
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return self.tmp_prefix / 'merged_ss_vcfs.vcf.bgz'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort, category='temp') / 'merged_ss_vcfs.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -133,10 +134,11 @@ class MergeSingleSampleVcfs(CohortStage):
 class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
     """
     Annotate this cohort joint-call VCF with gnomad frequencies
+    Temp storage, open to reconsideration on this
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return self.tmp_prefix / 'gnomad_frequency_annotated.vcf.bgz'
+        return self.get_stage_cohort_prefix(cohort=cohort, category='temp') / 'gnomad_frequency_annotated.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
@@ -162,10 +164,11 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
 class AnnotateConsequenceWithBcftools(CohortStage):
     """
     Take the VCF with gnomad frequencies, and annotate with consequences using BCFtools
+    Writes into a cohort-specific permanent folder
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
+        return self.get_stage_cohort_prefix(cohort=cohort) / 'consequence_annotated.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(cohort)
@@ -281,15 +284,24 @@ class ReformatAlphaMissenseTsv(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[ReformatAlphaMissenseTsv, AnnotateConsequenceWithBcftools, GenerateGeneRoi, MakeManeJson])
+@stage(
+    required_stages=[
+        ReformatAlphaMissenseTsv,
+        AnnotateConsequenceWithBcftools,
+        GenerateGeneRoi,
+        MakeManeJson,
+    ],
+    analysis_type='talos_prep',
+)
 class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
     """
     Join the annotated VCF, with AlphaMissense, and with gene/transcript information
     exporting as a Hail MatrixTable
+    definitely permanent storage for this one
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.prefix / 'annotated_for_reanalysis.ht.tar.gz'
+        return self.get_stage_cohort_prefix(cohort=cohort) / 'annotated_for_reanalysis.ht.tar.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
