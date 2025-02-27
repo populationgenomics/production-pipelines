@@ -33,6 +33,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
 
         output = self.expected_outputs(multicohort)
 
+        jobs = []
         contig_files = []
         for contig in CANONICAL_CHROMOSOMES:
             # don't do this for the whole genome output
@@ -56,14 +57,16 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             # run the echtvar encode command
             contig_job.command(f'echtvar encode {contig_job.output} $ECHTVAR_CONFIG {contig_localised}')
             get_batch().write_output(contig_job.output, str(output[contig]))
+            jobs.append(contig_job)
 
-        job = get_batch().new_job('Run echtvar on gnomad v4.1, whole genome')
-        job.image(image_path('echtvar'))
-        job.storage('700G')
-        job.cpu(4)
-        job.memory('highmem')
+        if not exists(output['whole_genome']):
+            job = get_batch().new_job('Run echtvar on gnomad v4.1, whole genome')
+            job.image(image_path('echtvar'))
+            job.storage('700G')
+            job.cpu(4)
+            job.memory('highmem')
+            job.command(f'echtvar encode {job.output} $ECHTVAR_CONFIG {" ".join(contig_files)}')
+            get_batch().write_output(job.output, str(output['whole_genome']))
+            jobs.append(job)
 
-        job.command(f'echtvar encode {job.output} $ECHTVAR_CONFIG {" ".join(contig_files)}')
-        get_batch().write_output(job.output, str(output['whole_genome']))
-
-        return self.make_outputs(target=multicohort, jobs=job, data=output)
+        return self.make_outputs(target=multicohort, jobs=jobs, data=output)
