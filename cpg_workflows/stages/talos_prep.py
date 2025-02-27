@@ -84,7 +84,7 @@ class StripSingleSampleGvcf(SequencingGroupStage):
     """
 
     def expected_outputs(self, sg: SequencingGroup) -> Path:
-        return sg.dataset.prefix(category='temp') / self.name / f'{sg.id}_stripped.vcf.bgz'
+        return sg.dataset.prefix(category='tmp') / self.name / f'{sg.id}_stripped.vcf.bgz'
 
     def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
         """
@@ -108,7 +108,7 @@ class MergeSingleSampleVcfs(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort, category='temp') / 'merged_ss_vcfs.vcf.bgz'
+        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / 'merged_ss_vcfs.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -138,7 +138,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return self.get_stage_cohort_prefix(cohort=cohort, category='temp') / 'gnomad_frequency_annotated.vcf.bgz'
+        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / 'gnomad_frequency_annotated.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
