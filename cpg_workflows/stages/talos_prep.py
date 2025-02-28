@@ -236,57 +236,8 @@ class MakeManeJson(MultiCohortStage):
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
-
-@stage
-class WgetAlphaMissenseTsv(MultiCohortStage):
-    """
-    Pull the AlphaMissense TSV file from Zenodo
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return REANNOTATION_DIR / 'AlphaMissense.tsv.gz'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-
-        job = get_batch().new_job('wget Alpha missense tsv')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'wget -O {job.output} https://zenodo.org/records/8208688/files/AlphaMissense_hg38.tsv.gz')
-        job.storage('10Gi')
-
-        get_batch().write_output(job.output, str(outputs))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
-@stage(required_stages=WgetAlphaMissenseTsv)
-class ReformatAlphaMissenseTsv(MultiCohortStage):
-    """
-    Reformat the AlphaMissense TSV file into a Hail Table
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        return REANNOTATION_DIR / 'AlphaMissense.ht.tar.gz'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-
-        am_tsv = get_batch().read_input(str(inputs.as_path(multicohort, WgetAlphaMissenseTsv)))
-
-        job = get_batch().new_job('Reformat AlphaMissense TSV')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'alphamissense_to_ht --am_tsv {am_tsv} --ht_out AlphaMissense.ht')
-        job.command(f'tar -czf {job.output} AlphaMissense.ht')
-        job.storage('10Gi')
-        job.cpu(4)
-        get_batch().write_output(job.output, str(outputs))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
 @stage(
     required_stages=[
-        ReformatAlphaMissenseTsv,
         AnnotateConsequenceWithBcftools,
         GenerateGeneRoi,
         MakeManeJson,
@@ -308,8 +259,9 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
         # convert_vcf_to_mt
         output = self.expected_outputs(cohort)
 
-        # pull the alphamissense TarBall
-        alphamissense_tar = get_batch().read_input(str(inputs.as_path(get_multicohort(), ReformatAlphaMissenseTsv)))
+        # pull the alphamissense TarBall location from config, and localise it
+        alphamissense_tar_location = config_retrieve(['annotations', 'alphamissense_tar'])
+        alphamissense_tar = get_batch().read_input(alphamissense_tar_location)
 
         mane_json = get_batch().read_input(str(inputs.as_path(get_multicohort(), MakeManeJson, 'mane_json')))
 
@@ -327,7 +279,7 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
-            f'--am AlphaMissense.ht '
+            f'--am alphamissense_38.ht '
             f'--gene_bed {gene_roi} '
             f'--mane {mane_json} '
             f'--output annotated.mt',
