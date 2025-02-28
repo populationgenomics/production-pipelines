@@ -222,11 +222,15 @@ def apply_mane_annotations(mt: hl.MatrixTable, mane_path: str | None = None) -> 
         transcript_consequences=hl.map(
             lambda x: x.annotate(
                 mane_status=hl.if_else(
-                    key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_status'], MISSING_STRING,
+                    key_set.contains(x.transcript),
+                    hl_mane_dict[x.transcript]['mane_status'],
+                    MISSING_STRING,
                 ),
                 ensp=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['ensp'], MISSING_STRING),
                 mane_id=hl.if_else(
-                    key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_id'], MISSING_STRING,
+                    key_set.contains(x.transcript),
+                    hl_mane_dict[x.transcript]['mane_id'],
+                    MISSING_STRING,
                 ),
             ),
             mt.transcript_consequences,
