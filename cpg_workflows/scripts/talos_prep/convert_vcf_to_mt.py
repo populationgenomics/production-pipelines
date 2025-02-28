@@ -15,7 +15,10 @@ from collections import defaultdict
 
 import hail as hl
 
+
+MISSING_INT = hl.int32(0)
 MISSING_STRING = hl.str('')
+MISSING_FLOAT_LO = hl.float64(0.0)
 
 
 def extract_and_split_csq_string(vcf_path: str) -> list[str]:
@@ -228,6 +231,25 @@ def apply_mane_annotations(mt: hl.MatrixTable, mane_path: str | None = None) -> 
     )
 
 
+def update_missing_gnomad_values(mt):
+    """
+    Missing gnomAD AC is a hl.Missing value at this point, replace it with 0
+    Args:
+        mt ():
+
+    Returns:
+        Same same, but different
+    """
+
+    return mt.annotate_rows(
+        info=mt.info.annotate(
+            gnomad_AF=hl.or_else(mt.gnomad_exomes.AF, MISSING_FLOAT_LO),
+            gnomad_AC=hl.or_else(mt.info.gnomad_AC, MISSING_INT),
+            gnomad_AN=hl.or_else(mt.info.gnomad_AC, MISSING_INT),
+        )
+    )
+
+
 def cli_main():
     """
     take an input VCF and an output MT path
@@ -270,6 +292,8 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
 
     # checkpoint it locally to make everything faster
     mt = mt.checkpoint('checkpoint.mt', overwrite=True, _read_if_exists=True)
+
+    # update missing gnomAD fields
 
     # re-shuffle the BCSQ elements
     mt = csq_strings_into_hail_structs(csq_fields, mt)
