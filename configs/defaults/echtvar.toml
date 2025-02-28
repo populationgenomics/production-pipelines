@@ -8,4 +8,5 @@ input_cohorts = ['COH2142']
 sequencing_type = 'genome'
 
 [ensembl]
-bed_file = "gs://cpg-common-test-analysis/reannotation/ensembl_113.bed"
+#bed_file = "gs://cpg-common-test-analysis/reannotation/ensembl_113.bed"
+bed_file = "gs://cpg-common-test-analysis/reannotation/ensembl_113_merged.bed"
