@@ -63,13 +63,13 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             # localise this one file
             contig_path = config_retrieve(['references', 'gnomad_4.1_vcfs', contig])
             job_storage = storage_with_buffer(contig_path)
-            contig_localised = get_batch().read_input_group(vcf=contig_path, index=f'{contig_path}.tbi')['vcf']
+            contig_localised = get_batch().read_input_group(vcf=contig_path, index=f'{contig_path}.tbi')
 
             trim_job = get_batch().new_bash_job(f'Trim {contig} to Ensembl regions')
             trim_job.image(bcftools_image)
             trim_job.storage(f'{job_storage}Gi')
             trim_job.cpu(4)
-            trim_job.command(f'bcftools view -R {bed_file} --regions-overlap 2 {contig_localised} -O z -o {trim_job.output}')
+            trim_job.command(f'bcftools view -R {bed_file} --regions-overlap 2 {contig_localised["vcf"]} -O z -o {trim_job.output}')
 
             # use the trimmed version for the whole genome
             contig_files.append(trim_job.output)
