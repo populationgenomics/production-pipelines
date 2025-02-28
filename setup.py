@@ -86,8 +86,6 @@ setup(
             'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_gene_tsvs:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
-            # script to convert the AlphaMissense tsv into a Hail Table
-            'alphamissense_to_ht = cpg_workflows.scripts.talos_prep.alphamissense_to_ht:cli_main',
             # script to take a VCF and AM data, generating a MatrixTable
             'convert_vcf_to_mt = cpg_workflows.scripts.talos_prep.convert_vcf_to_mt:cli_main',
             # generate a JSON representation of MANE data

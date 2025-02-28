@@ -81,6 +81,7 @@ class StripSingleSampleGvcf(SequencingGroupStage):
     do this by finding the gVCFs and stripping them to VCF
     This isn't perfect, it's just to stress test this type of workflow
     We get the same results internally by condensing the combiner output to joint-VCF
+    TODO should these be in main storage or tmp? TMP for now as this is more a proof of concept workflow than anything
     """
 
     def expected_outputs(self, sg: SequencingGroup) -> Path:
