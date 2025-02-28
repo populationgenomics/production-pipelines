@@ -233,7 +233,7 @@ def apply_mane_annotations(mt: hl.MatrixTable, mane_path: str | None = None) -> 
 
 def update_missing_gnomad_values(mt):
     """
-    Missing gnomAD AC is a hl.Missing value at this point, replace it with 0
+    Missing gnomad_AC is a hl.Missing value at this point, replace it with 0
     Args:
         mt ():
 
@@ -294,6 +294,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
     mt = mt.checkpoint('checkpoint.mt', overwrite=True, _read_if_exists=True)
 
     # update missing gnomAD fields
+    mt =  update_missing_gnomad_values(mt)
 
     # re-shuffle the BCSQ elements
     mt = csq_strings_into_hail_structs(csq_fields, mt)
