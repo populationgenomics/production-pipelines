@@ -66,6 +66,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             contig_localised = get_batch().read_input(contig_path)
 
             trim_job = get_batch().new_bash_job(f'Trim {contig} to Ensembl regions')
+            job.image(bcftools_image)
             trim_job.storage(f'{job_storage}Gi')
             trim_job.cpu(4)
             trim_job.command(f'bcftools view -R {bed_file} --regions-overlap 2 {contig_localised} -O z -o {trim_job.output}')
@@ -75,7 +76,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
 
             # encode that
             contig_job = get_batch().new_job(f'Run echtvar on gnomad v4.1, {contig}')
-            contig_job.image(image_path('echtvar'))
+            contig_job.image(echtvar_image)
             contig_job.storage(f'{job_storage}Gi')
             contig_job.cpu(4)
             contig_job.memory('highmem')
@@ -87,7 +88,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
 
         if not exists(output['whole_genome']):
             job = get_batch().new_job('Run echtvar on gnomad v4.1, whole genome')
-            job.image(image_path('echtvar'))
+            job.image(echtvar_image)
             job.storage('100G')
             job.cpu(4)
             job.memory('highmem')
