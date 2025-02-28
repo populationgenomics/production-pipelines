@@ -236,13 +236,14 @@ class MakeManeJson(MultiCohortStage):
 
         return self.make_outputs(multicohort, data=outputs, jobs=job)
 
+
 @stage(
     required_stages=[
         AnnotateConsequenceWithBcftools,
         GenerateGeneRoi,
         MakeManeJson,
     ],
-    analysis_type='talos_prep',
+    analysis_type='talos_prep',  # TODO(MattWellie) this type doesn't exist yet
 )
 class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
     """
@@ -252,7 +253,8 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / 'annotated_for_reanalysis.ht.tar.gz'
+        # this output will be a tarball, containing the {cohort.id}.mt directory, compressed with the same outer name
+        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.ht.tar.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
@@ -273,18 +275,18 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
 
         job = get_batch().new_job('Combine annotated VCF and AlphaMissense data')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'tar -xf {alphamissense_tar}')
+        job.command(f'tar -xf {alphamissense_tar} -C $BATCH_TMPDIR')
         job.cpu(4)
         job.memory('highmem')
         job.command(
             f'convert_vcf_to_mt '
             f'--input {vcf_in} '
-            f'--am alphamissense_38.ht '
+            f'--am ${{BATCH_TMPDIR}}/alphamissense_38.ht '
             f'--gene_bed {gene_roi} '
             f'--mane {mane_json} '
-            f'--output annotated.mt',
+            f'--output {cohort.id}.mt',
         )
-        job.command(f'tar -czf {job.output} annotated.mt')
+        job.command(f'tar -czf {job.output} {cohort.id}.mt')
 
         # write the output
         get_batch().write_output(job.output, str(output))

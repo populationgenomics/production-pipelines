@@ -29,7 +29,6 @@ from argparse import ArgumentParser
 
 import hail as hl
 
-
 AM_ZENODO = 'https://zenodo.org/records/8208688/files/AlphaMissense_hg38.tsv.gz'
 
 

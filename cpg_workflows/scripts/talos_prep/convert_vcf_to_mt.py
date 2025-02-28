@@ -15,7 +15,6 @@ from collections import defaultdict
 
 import hail as hl
 
-
 MISSING_INT = hl.int32(0)
 MISSING_STRING = hl.str('')
 MISSING_FLOAT_LO = hl.float64(0.0)
@@ -222,9 +221,13 @@ def apply_mane_annotations(mt: hl.MatrixTable, mane_path: str | None = None) -> 
     return mt.annotate_rows(
         transcript_consequences=hl.map(
             lambda x: x.annotate(
-                mane_status=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_status'], MISSING_STRING),
+                mane_status=hl.if_else(
+                    key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_status'], MISSING_STRING,
+                ),
                 ensp=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['ensp'], MISSING_STRING),
-                mane_id=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_id'], MISSING_STRING),
+                mane_id=hl.if_else(
+                    key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_id'], MISSING_STRING,
+                ),
             ),
             mt.transcript_consequences,
         ),
@@ -246,7 +249,7 @@ def update_missing_gnomad_values(mt):
             gnomad_AF=hl.or_else(mt.gnomad_exomes.AF, MISSING_FLOAT_LO),
             gnomad_AC=hl.or_else(mt.info.gnomad_AC, MISSING_INT),
             gnomad_AN=hl.or_else(mt.info.gnomad_AC, MISSING_INT),
-        )
+        ),
     )
 
 
@@ -294,7 +297,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str | None = N
     mt = mt.checkpoint('checkpoint.mt', overwrite=True, _read_if_exists=True)
 
     # update missing gnomAD fields
-    mt =  update_missing_gnomad_values(mt)
+    mt = update_missing_gnomad_values(mt)
 
     # re-shuffle the BCSQ elements
     mt = csq_strings_into_hail_structs(csq_fields, mt)
