@@ -63,7 +63,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             # localise this one file
             contig_path = config_retrieve(['references', 'gnomad_4.1_vcfs', contig])
             job_storage = storage_with_buffer(contig_path)
-            contig_localised = get_batch().read_input(contig_path)
+            contig_localised = get_batch().read_input_group(vcf=contig_path, index=f'{contig_path}.tbi')['vcf']
 
             trim_job = get_batch().new_bash_job(f'Trim {contig} to Ensembl regions')
             trim_job.image(bcftools_image)
