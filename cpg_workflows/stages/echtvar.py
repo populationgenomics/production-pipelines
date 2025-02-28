@@ -66,7 +66,7 @@ class RunEchtvarOnGnomad(MultiCohortStage):
             contig_localised = get_batch().read_input(contig_path)
 
             trim_job = get_batch().new_bash_job(f'Trim {contig} to Ensembl regions')
-            job.image(bcftools_image)
+            trim_job.image(bcftools_image)
             trim_job.storage(f'{job_storage}Gi')
             trim_job.cpu(4)
             trim_job.command(f'bcftools view -R {bed_file} --regions-overlap 2 {contig_localised} -O z -o {trim_job.output}')
