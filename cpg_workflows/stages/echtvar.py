@@ -12,13 +12,13 @@ from cpg_workflows.targets import MultiCohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import MultiCohortStage, StageInput, StageOutput, exists, stage
 
-CANONICAL_CHROMOSOMES = [f'chr{x}' for x in list(range(1, 23)) + ['X', 'Y', 'whole_genome']]
+CANONICAL_CHROMOSOMES = [f'chr{x}' for x in list(range(1, 23)) + ['X', 'Y']] + ['whole_genome']
 common_folder = join(config_retrieve(['storage', 'common', 'analysis']), 'gnomad', 'echtvar')
 bcftools_image = image_path('bcftools_120')
 echtvar_image = image_path('echtvar')
 
 
-def storage_with_buffer(file_path: str, buffer: int = 10) -> int:
+def storage_with_buffer(file_path: str, buffer: int = 50) -> int:
     """
     determine the storage requirement for a file, adding a buffer
     Args:
