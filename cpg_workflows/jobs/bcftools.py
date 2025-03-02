@@ -177,12 +177,12 @@ def merge_ss_vcfs(
     # -Oz: bgzip output
     # -o: output file
     # --threads: number of threads to use
-    # -m: merge strategy (don't create multiallelic variants)
+    # -m: merge strategy (don't create multiallelic variants), and remove NON_REF
     # -0: missing-calls-to-ref (not used by default)
     # -R: region to extract (optional depending on the region file being passed as an argument)
     job.command(
-        f'bcftools merge {" ".join(batch_vcfs)} {region_string} -Oz -o temp.vcf.gz '
-        f'--threads {cpu} -m none {" -0" if missing_to_ref else ""} --write-index=tbi ',
+        f'bcftools merge -m "none,**" {" ".join(batch_vcfs)} {region_string} -Oz -o temp.vcf.gz '
+        f'--threads {cpu} {" -0" if missing_to_ref else ""} --write-index=tbi ',
     )
     # use the fill-tags plugin to correct the combined callset AC/AN
     job.command(f'bcftools +fill-tags temp.vcf.gz -Oz -o {job.output["vcf.bgz"]} --write-index=tbi -- -t AF ')
@@ -217,11 +217,13 @@ def strip_gvcf_to_vcf(
     # use a bcftools which can write an inline index
     job.image(image_path('bcftools_120'))
 
+    # -m3: min 3 alleles (REF/ALT/"NON_REF")
+    # norm splits each alt allele onto a separate row
+    # -c1 requires at least one alt (remove refs). Could keep them, but it would make the resulting file smaller
     job.command(
         f'bcftools view -m3 {localised_gvcf} | '
         f'bcftools norm -m -any | '
-        f'grep -v NON_REF | '
-        f'bcftools view -Oz -o {job.output["vcf.bgz"]} --write-index=tbi',
+        f'bcftools view -c1 -Oz -o {job.output["vcf.bgz"]} --write-index=tbi',
     )
     get_batch().write_output(job.output, output.removesuffix('.vcf.bgz'))
     return job
