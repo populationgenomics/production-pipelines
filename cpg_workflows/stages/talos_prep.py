@@ -28,53 +28,6 @@ REANNOTATION_DIR = to_path(config_retrieve(['storage', 'common', 'analysis'])) /
 
 
 @stage
-class WgetEnsemblGffFile(MultiCohortStage):
-    """
-    Reformat the MANE data into a dictionary format
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        return REANNOTATION_DIR / f'ensembl_{version}.gff3.gz'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        ensembl_url = config_retrieve(['annotations', 'ensembl_url']).format(v=version)
-
-        job = get_batch().new_job('wget Ensembl GFF3 file')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-
-        job.command(f'wget {ensembl_url} -O {job.output}')
-        get_batch().write_output(job.output, str(outputs))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
-@stage(required_stages=[WgetEnsemblGffFile])
-class GenerateGeneRoi(MultiCohortStage):
-    """
-    parse the Ensembl GFF3 file, and generate a BED file of gene regions
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> Path:
-        version = config_retrieve(['annotations', 'ensembl_version'])
-        return REANNOTATION_DIR / f'ensembl_{version}.bed'
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-        gff3_file = get_batch().read_input(str(inputs.as_path(multicohort, WgetEnsemblGffFile)))
-
-        job = get_batch().new_job('Generate Gene ROI')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'generate_gene_roi --gff3 {gff3_file} --output {job.output}')
-
-        get_batch().write_output(job.output, str(outputs))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
-@stage
 class StripSingleSampleGvcf(SequencingGroupStage):
     """
     Merge all the single-sample VCFs into a single VCF
@@ -100,7 +53,7 @@ class StripSingleSampleGvcf(SequencingGroupStage):
         return self.make_outputs(sg, data=outputs, jobs=job)
 
 
-@stage(required_stages=[StripSingleSampleGvcf, GenerateGeneRoi])
+@stage(required_stages=StripSingleSampleGvcf)
 class MergeSingleSampleVcfs(CohortStage):
     """
     Merge all the single-sample VCFs into a single VCF
@@ -121,11 +74,15 @@ class MergeSingleSampleVcfs(CohortStage):
         # get all of those relevant to this cohort
         vcfs_to_merge = [str(stripped_vcfs[sg.id]) for sg in cohort.get_sequencing_groups()]
 
+        # ensembl version used to generate region of interest
+        ensembl_version = config_retrieve(['workflow', 'ensembl_version'])
+        merged_bed_file = config_retrieve(['references', f'ensembl_{ensembl_version}', 'merged_bed`'])
+
         job = merge_ss_vcfs(
             input_list=vcfs_to_merge,
             output_file=str(outputs),
             missing_to_ref=True,
-            region_file=str(inputs.as_path(get_multicohort(), GenerateGeneRoi)),
+            region_file=merged_bed_file,
         )
 
         return self.make_outputs(cohort, data=outputs, jobs=job)
@@ -161,7 +118,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=job)
 
 
-@stage(required_stages=[AnnotateGnomadFrequenciesWithEchtvar, WgetEnsemblGffFile])
+@stage(required_stages=AnnotateGnomadFrequenciesWithEchtvar)
 class AnnotateConsequenceWithBcftools(CohortStage):
     """
     Take the VCF with gnomad frequencies, and annotate with consequences using BCFtools
@@ -176,7 +133,9 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         gnomad_annotated_vcf = get_batch().read_input(str(inputs.as_path(cohort, AnnotateGnomadFrequenciesWithEchtvar)))
 
         # get the GFF3 file required to generate consequences
-        gff3_file = get_batch().read_input(str(inputs.as_path(get_multicohort(), WgetEnsemblGffFile)))
+        ensembl_version = config_retrieve(['workflow', 'ensembl_version'])
+        gff3_file_path = config_retrieve(['references', f'ensembl_{ensembl_version}', 'gff3`'])
+        gff3_file = get_batch().read_input(gff3_file_path)
 
         # get the fasta
         fasta = get_batch().read_input(config_retrieve(['references', 'broad', 'ref_fasta']))
@@ -207,43 +166,8 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         return self.make_outputs(cohort, data=output, jobs=job)
 
 
-@stage
-class MakeManeJson(MultiCohortStage):
-    """
-    Download MANE data from Ensembl
-    """
-
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        version = config_retrieve(['annotations', 'mane_version'])
-        return {
-            'mane_summary': REANNOTATION_DIR / f'mane_{version}.summary.txt.gz',
-            'mane_json': REANNOTATION_DIR / f'mane_{version}.json',
-        }
-
-    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(multicohort)
-
-        mane_version = config_retrieve(['annotations', 'mane_version'])
-        mane_url = config_retrieve(['annotations', 'mane_url']).format(v=mane_version)
-
-        job = get_batch().new_job('Get and Reformat MANE summary data')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-
-        job.declare_resource_group(output={'summary.txt.gz': '{root}.summary.txt.gz', 'json': '{root}.json'})
-
-        job.command(f'wget {mane_url} -O {job.output["summary.txt.gz"]}')
-        job.command(f'reformat_mane_summary --input {job.output["summary.txt.gz"]} --output {job.output["json"]}')
-        get_batch().write_output(job.output, str(outputs['mane_json']).removesuffix('.json'))
-
-        return self.make_outputs(multicohort, data=outputs, jobs=job)
-
-
 @stage(
-    required_stages=[
-        AnnotateConsequenceWithBcftools,
-        GenerateGeneRoi,
-        MakeManeJson,
-    ],
+    required_stages=AnnotateConsequenceWithBcftools,
     analysis_type='talos_prep',  # TODO(MattWellie) this type doesn't exist yet
 )
 class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
@@ -266,9 +190,15 @@ class CombineAnnotatedVcfAndAlphaMissenseIntoMt(CohortStage):
         alphamissense_tar_location = config_retrieve(['annotations', 'alphamissense_tar'])
         alphamissense_tar = get_batch().read_input(alphamissense_tar_location)
 
-        mane_json = get_batch().read_input(str(inputs.as_path(get_multicohort(), MakeManeJson, 'mane_json')))
+        # mane version for gene details
+        mane_version = config_retrieve(['workflow', 'mane_version'])
+        mane_json_path = config_retrieve(['references', f'mane_{mane_version}', 'json`'])
+        mane_json = get_batch().read_input(mane_json_path)
 
-        gene_roi = get_batch().read_input(str(inputs.as_path(get_multicohort(), GenerateGeneRoi)))
+        # ensembl version used to generate region of interest
+        ensembl_version = config_retrieve(['workflow', 'ensembl_version'])
+        merged_bed_file = config_retrieve(['references', f'ensembl_{ensembl_version}', 'merged_bed`'])
+        gene_roi = get_batch().read_input(merged_bed_file)
 
         # get the annotated VCF & index
         vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))

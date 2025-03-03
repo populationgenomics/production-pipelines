@@ -1,10 +1,9 @@
 [workflow]
 name = 'talos_prep'
 
+mane_version = "1.4"
+ensembl_version = "113"
+
 [annotations]
 echtvar = "gs://cpg-common-main-analysis/gnomad/echtvar/gnomad_4.1_whole_genome.zip"
-mane_version = "1.4"
-mane_url = "https://ftp.ncbi.nlm.nih.gov/refseq/MANE/MANE_human/release_{v}/MANE.GRCh38.v{v}.summary.txt.gz"
-ensembl_version = "113"
-ensembl_url = "https://ftp.ensembl.org/pub/release-{v}/gff3/homo_sapiens/Homo_sapiens.GRCh38.{v}.gff3.gz"
 alphamissense_tar = "gs://cpg-common-main/references/alphamissense/alphamissense_38.ht.tar.gz"
