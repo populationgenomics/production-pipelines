@@ -4,6 +4,10 @@ ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapie
 status_reporter = 'metamist'
 time_limit_seconds = 86400  # 24 hrs max runtime
 
+# Use this option to run only a subset of jobs in the GatherSampleEvidence workflow
+# [workflow.GatherSampleEvidence]
+# only_jobs = ['coverage_counts', 'pesr', 'scramble', 'wham', 'manta']
+
 # these workflows take a VCF result from a GatherSampleEvidence stage, and optionally a baseline VCF
 # from the same caller, and runs a VCFMetrics comparison of the two
 # we don't have like-for-like baselines for any of our samples (AFAIK), and the workflows don't allow

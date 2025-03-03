@@ -34,7 +34,7 @@ def run(ica_pipeline_id_path: str, api_root: str) -> dict[str, str]:
     configuration.api_key['ApiKeyAuth'] = api_key
 
     with open(cpg_utils.to_path(ica_pipeline_id_path), 'rt') as pipeline_fid_handle:
-        ica_pipeline_id: str = json.load(pipeline_fid_handle)['pipeline_id']
+        ica_pipeline_id: str = pipeline_fid_handle.read().rstrip()
     path_parameters: dict[str, str] = {'projectId': project_id} | {'analysisId': ica_pipeline_id}
 
     with icasdk.ApiClient(configuration=configuration) as api_client:
