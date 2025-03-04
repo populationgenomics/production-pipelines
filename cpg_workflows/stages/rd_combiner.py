@@ -626,6 +626,14 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
         if not config_retrieve(['workflow', 'dry_run'], False):
             with outputs['id_file'].open('w') as f:
                 for sg in dataset.get_sequencing_groups():
+
+                    # skip over SGs without gVCFs, they can't have been combined into the MT, so cannot be extracted
+                    if not sg.gvcf:
+                        get_logger().error(f'SG {sg.id} has no gVCF, will not attempt to extract from the MT')
+                        get_logger().error(f'Note! {sg.id} will still appear in the metamist analysis entry for the MT')
+                        get_logger().error(f'If {sg.id} is not in this callset, it should be removed from the cohort')
+                        continue
+
                     f.write(f'{sg.id}\n')
 
         job = get_batch().new_job(self.name, self.get_job_attrs(dataset))
