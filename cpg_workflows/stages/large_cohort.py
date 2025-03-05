@@ -335,9 +335,15 @@ class AncestryPlots(CohortStage):
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if site_only_version := config_retrieve(['large_cohort', 'output_versions', 'makesiteonly'], default=None):
+            site_only_version = slugify(site_only_version)
+
+        site_only_version = site_only_version or get_workflow().output_version
+
         return {
-            'vcf': self.tmp_prefix / 'siteonly.vcf.bgz',
-            'tbi': self.tmp_prefix / 'siteonly.vcf.bgz.tbi',
+            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
+            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -369,6 +375,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
+                str(self.expected_outputs(cohort)['ht']),
                 str(self.tmp_prefix),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,

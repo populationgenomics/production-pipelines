@@ -20,6 +20,7 @@ def run(
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
+    out_ht_path: str,
     tmp_prefix: str,
 ):
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
@@ -39,6 +40,8 @@ def run(
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
+    logging.info(f'Writing site-only HT to {out_ht_path}')
+    site_only_ht.write(str(out_ht_path), overwrite=True)
 
 
 def vds_to_site_only_ht(
