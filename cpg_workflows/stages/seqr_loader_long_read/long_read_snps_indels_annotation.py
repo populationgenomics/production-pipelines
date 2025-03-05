@@ -38,6 +38,7 @@ VCF_QUERY = gql(
     sequencingGroups {
       id
       analyses(type: {eq: "pacbio_vcf"}) {
+        meta
         output
         outputs
       }
@@ -46,9 +47,30 @@ VCF_QUERY = gql(
 }""",
 )
 
+FAMILY_LRS_IDS_QUERY = gql(
+    """
+    query MyQuery($dataset: String!, $family_id: String!) {
+  project(name: $dataset) {
+    families(externalId: {eq: $family_id}) {
+        externalId
+        participants {
+          externalId
+          samples {
+            externalId
+            meta
+            sequencingGroups(technology: {eq_: "long-read"}, type: {eq: "genome"}) {
+              id
+            }
+          }
+        }
+      }
+    }
+}
+    """,
+)
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
+def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -60,14 +82,42 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
     """
-    return_dict: dict[str, str] = {}
+    return_dict: dict[str, dict] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
             if analysis['output'].endswith('snp_indel.phased.vcf.gz'):
-                return_dict[sg['id']] = analysis['output']
+                joint_called = analysis['meta'].get('joint_called', False)
+                family_id = analysis['meta'].get('family_id', None)
+                return_dict[sg['id']] = {
+                    'output': analysis['output'],
+                    'joint_called': joint_called,
+                    'family_id': family_id,
+                }
 
     return return_dict
+
+
+def query_for_family_id_mapping(dataset: str, family_id: str):
+    """
+    Query metamist for the family ID mapping, to get the SG IDs for each family member
+    and the LRS IDs that correspond to each of these family members / SG IDs
+    """
+    lrs_sgid_family_mapping = {}
+    family_results = query(FAMILY_LRS_IDS_QUERY, variables={'dataset': dataset, 'family_id': family_id})
+    for family in family_results['project']['families']:
+        for participant in family['participants']:
+            for sample in participant['samples']:
+                if not sample['sequencingGroups']:
+                    continue
+                lrs_id = sample['meta'].get('lrs_id', None)
+                if not lrs_id:
+                    get_logger().warning(f'No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
+                    continue
+                lrs_individual_number = lrs_id.split('-')[1]
+                for sg in sample['sequencingGroups']:
+                    lrs_sgid_family_mapping[lrs_individual_number] = sg['id']
+    return lrs_sgid_family_mapping
 
 
 @stage
@@ -102,10 +152,15 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         if sg.id not in query_result:
             raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {sg.dataset.name}')
 
-        lr_snps_indels_vcf: str = query_result[sg.id]
+        lr_snps_indels_vcf: str = query_result[sg.id]['output']
+        if query_result[sg.id]['joint_called']:
+            get_logger().info(f'{sg.id} is joint called, getting the family SG IDs')
+            family_id_mapping = query_for_family_id_mapping(sg.dataset.name, query_result[sg.id]['family_id'])
+        else:
+            family_id_mapping = None
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
 
-        mod_job = get_batch().new_bash_job(f'Convert {lr_snps_indels_vcf} prior to annotation')
+        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if query_result[sg.id]["joint_called"] else ""}{lr_snps_indels_vcf} prior to annotation')
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
@@ -121,7 +176,9 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             f'--vcf_out {mod_job.output} '
             f'--new_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sex} ',
+            f'--sex {sex} '
+            f'--new_id_01 {family_id_mapping["01"]} ' if family_id_mapping else ''
+            f'--new_id_02 {family_id_mapping["02"]} ' if family_id_mapping else '',
         )
 
         # normalise, then block-gzip and index that result

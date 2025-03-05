@@ -62,8 +62,9 @@ def cli_main():
         help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels',
         action='store_true',
     )
+    parser.add_argument('--new_id_01', help='The Sample ID we want in the output VCF for individual 01 (joint called VCFs)', default=None)
+    parser.add_argument('--new_id_02', help='The Sample ID we want in the output VCF for individual 02 (joint called VCFs)', default=None)
     args = parser.parse_args()
-
     modify_sniffles_vcf(
         file_in=args.vcf_in,
         file_out=args.vcf_out,
@@ -71,10 +72,12 @@ def cli_main():
         new_id=args.new_id,
         sex=args.sex,
         sv=args.sv,
+        new_id_01=args.new_id_01,
+        new_id_02=args.new_id_02,
     )
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True, new_id_01: str | None = None, new_id_02: str | None = None):
     """
     Scrolls through the VCF and performs a few updates:
 
@@ -93,6 +96,8 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
         new_id (str): CPG ID, required inside the reformatted VCF
         sex (int): 0=Unknown, 1=Male, 2=Female
         sv (bool): True=SV, False=SNPs_Indels
+        new_id_01 (str): CPG ID for individual 01 (joint called VCFs)
+        new_id_02 (str): CPG ID for individual 02 (joint called VCFs)
     """
 
     # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
@@ -114,6 +119,9 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
                 if line.startswith('#CHR') and new_id:
                     l_split = line.rstrip().split('\t')
                     l_split[9] = new_id
+                    if len(l_split) > 10 and new_id_01 and new_id_02:
+                        l_split[10] = new_id_01
+                        l_split[11] = new_id_02
                     f_out.write('\t'.join(l_split) + '\n')
                     continue
 
