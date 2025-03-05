@@ -1,5 +1,10 @@
 [workflow]
-input_datasets = ['validation']
 name = 'hap.py_validation'
-dataset = 'validation'
 status_reporter = 'metamist'
+
+# if this is populated, the validation workflow will start from this specific MatrixTable
+#matrixtable = "placeholder"
+
+# by default validation runs on output from the rd_combiner AnnotateDataset Stage
+# to choose output from a different Stage, use this String
+#mt_stage = "AnnotateDatasetSmallVariantsWithHailQuery"

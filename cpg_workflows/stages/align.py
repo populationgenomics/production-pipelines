@@ -55,6 +55,9 @@ class Align(SequencingGroupStage):
             / 'markduplicates_metrics'
             / f'{sequencing_group.id}.markduplicates-metrics'
         )
+        sorted_bam_path = (
+            sequencing_group.dataset.prefix(category='tmp') / 'align' / f'{sequencing_group.id}.sorted.bam'
+        )
 
         try:
             jobs = align.align(
@@ -63,6 +66,7 @@ class Align(SequencingGroupStage):
                 output_path=sequencing_group.make_cram_path(),
                 job_attrs=self.get_job_attrs(sequencing_group),
                 overwrite=sequencing_group.forced,
+                sorted_bam_path=sorted_bam_path,
                 out_markdup_metrics_path=markdup_metrics_path,
             )
             return self.make_outputs(

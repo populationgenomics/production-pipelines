@@ -65,7 +65,7 @@ def _common(mocker, tmp_path):
 
     def mock_create_cohort() -> MultiCohort:
         m = MultiCohort()
-        c = m.create_cohort('fewgenomes')
+        c = m.create_cohort(id='COH123', name='fewgenomes')
         ds = c.create_dataset('my_dataset')
         m_ds = m.add_dataset(ds)
 

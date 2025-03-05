@@ -2,7 +2,6 @@
 Targets for workflow stages: SequencingGroup, Dataset, Cohort.
 """
 
-import copy
 import hashlib
 import logging
 from dataclasses import dataclass
@@ -18,6 +17,25 @@ from .filetypes import AlignmentInput, BamPath, CramPath, FastqPairs, GvcfPath
 from .metamist import Assay
 
 
+def hash_from_list_of_strings(string_list: list[str], hash_length: int = 10, suffix: str | None = None) -> str:
+    """
+    Create a hash from a list of strings
+    Args:
+        string_list ():
+        hash_length (int): how many characters to use from the hash
+        suffix (str): optional, clarify the type of value which was hashed
+
+    Returns:
+
+    """
+    hash_portion = hashlib.sha256(' '.join(string_list).encode()).hexdigest()[:hash_length]
+    full_hash = f'{hash_portion}_{len(string_list)}'
+
+    if suffix:
+        full_hash += f'_{suffix}'
+    return full_hash
+
+
 class Target:
     """
     Defines a target that a stage can act upon.
@@ -28,6 +46,10 @@ class Target:
         self.forced: bool = False
         # If not set, exclude from the workflow:
         self.active: bool = True
+
+        # create a self.alignment_inputs_hash variable to store the hash of the alignment inputs
+        # this begins as None, and is set upon first calling
+        self.alignment_inputs_hash: str | None = None
 
     def get_sequencing_groups(self, only_active: bool = True) -> list['SequencingGroup']:
         """
@@ -41,7 +63,23 @@ class Target:
         """
         return [s.id for s in self.get_sequencing_groups(only_active=only_active)]
 
-    def alignment_inputs_hash(self) -> str:
+    def get_alignment_inputs_hash(self) -> str:
+        """
+        If this hash has been set, return it, otherwise set it, then return it
+        This should be safe as it matches the current usage:
+        - we set up the Targets in this workflow (populating SGs, Datasets, Cohorts)
+            - at this point the targets are malleable (e.g. addition of an additional Cohort may add SGs to Datasets)
+        - we then set up the Stages, where alignment input hashes are generated
+            - at this point, the alignment inputs are fixed
+            - all calls to get_alignment_inputs_hash() need to return the same value
+        """
+        if self.alignment_inputs_hash is None:
+            self.set_alignment_inputs_hash()
+        if self.alignment_inputs_hash is None:
+            raise TypeError('Alignment_inputs_hash was not populated by the setter method')
+        return self.alignment_inputs_hash
+
+    def set_alignment_inputs_hash(self):
         """
         Unique hash string of sample alignment inputs. Useful to decide
         whether the analysis on the target needs to be rerun.
@@ -50,7 +88,7 @@ class Target:
             sorted(' '.join(str(s.alignment_input)) for s in self.get_sequencing_groups() if s.alignment_input),
         )
         h = hashlib.sha256(s.encode()).hexdigest()[:38]
-        return f'{h}_{len(self.get_sequencing_group_ids())}'
+        self.alignment_inputs_hash = f'{h}_{len(self.get_sequencing_group_ids())}'
 
     @property
     def target_id(self) -> str:
@@ -100,16 +138,19 @@ class MultiCohort(Target):
     def __init__(self) -> None:
         super().__init__()
 
-        # NOTE: For a cohort, we simply pull the dataset name from the config.
+        # previously MultiCohort.name was an underscore-delimited string of all the input cohorts
+        # this was expanding to the point where filenames including this String were too long for *nix
+        # instead we can create a hash of the input cohorts, and use that as the name
+        # the exact cohorts can be obtained from the config associated with the ar-guid
         input_cohorts = get_config()['workflow'].get('input_cohorts', [])
         if input_cohorts:
-            self.name = '_'.join(sorted(input_cohorts))
+            self.name = hash_from_list_of_strings(sorted(input_cohorts), suffix='cohorts')
         else:
             self.name = get_config()['workflow']['dataset']
 
         assert self.name, 'Ensure cohorts or dataset is defined in the config file.'
 
-        self._cohorts_by_name: dict[str, Cohort] = {}
+        self._cohorts_by_id: dict[str, Cohort] = {}
         self._datasets_by_name: dict[str, Dataset] = {}
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'])
 
@@ -126,19 +167,19 @@ class MultiCohort(Target):
         Gets list of all cohorts.
         Include only "active" cohorts (unless only_active is False)
         """
-        cohorts = list(self._cohorts_by_name.values())
+        cohorts = list(self._cohorts_by_id.values())
         if only_active:
             cohorts = [c for c in cohorts if c.active and c.get_datasets()]
         return cohorts
 
-    def get_cohort_by_name(self, name: str, only_active: bool = True) -> Optional['Cohort']:
+    def get_cohort_by_id(self, id: str, only_active: bool = True) -> Optional['Cohort']:
         """
-        Get cohort by name.
+        Get cohort by id.
         Include only "active" cohorts (unless only_active is False)
         """
-        cohort = self._cohorts_by_name.get(name)
+        cohort = self._cohorts_by_id.get(id)
         if not cohort:
-            logging.warning(f'Cohort {name} not found in the multi-cohort')
+            logging.warning(f'Cohort {id} not found in the multi-cohort')
             return None
         if not only_active:  # Return cohort even if it's inactive
             return cohort
@@ -168,16 +209,16 @@ class MultiCohort(Target):
                 all_sequencing_groups[sg.id] = sg
         return list(all_sequencing_groups.values())
 
-    def create_cohort(self, name: str):
+    def create_cohort(self, id: str, name: str) -> 'Cohort':
         """
         Create a cohort and add it to the multi-cohort.
         """
-        if name in self._cohorts_by_name:
-            logging.debug(f'Cohort {name} already exists in the multi-cohort')
-            return self._cohorts_by_name[name]
+        if id in self._cohorts_by_id:
+            logging.debug(f'Cohort {id} already exists in the multi-cohort')
+            return self._cohorts_by_id[id]
 
-        c = Cohort(name=name, multicohort=self)
-        self._cohorts_by_name[c.name] = c
+        c = Cohort(id=id, name=name, multicohort=self)
+        self._cohorts_by_id[c.id] = c
         return c
 
     def add_dataset(self, d: 'Dataset') -> 'Dataset':
@@ -208,7 +249,7 @@ class MultiCohort(Target):
         return {
             # 'sequencing_groups': self.get_sequencing_group_ids(),
             'datasets': [d.name for d in self.get_datasets()],
-            'cohorts': [c.name for c in self.get_cohorts()],
+            'cohorts': [c.id for c in self.get_cohorts()],
         }
 
     def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
@@ -225,7 +266,7 @@ class MultiCohort(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -240,20 +281,21 @@ class Cohort(Target):
     cohort.
     """
 
-    def __init__(self, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
+    def __init__(self, id: str | None = None, name: str | None = None, multicohort: MultiCohort | None = None) -> None:
         super().__init__()
+        self.id = id or get_config()['workflow']['dataset']
         self.name = name or get_config()['workflow']['dataset']
         self.analysis_dataset = Dataset(name=get_config()['workflow']['dataset'], cohort=self)
         self._datasets_by_name: dict[str, Dataset] = {}
         self.multicohort = multicohort
 
     def __repr__(self):
-        return f'Cohort("{self.name}", {len(self.get_datasets())} datasets)'
+        return f'Cohort("{self.id}", {len(self.get_datasets())} datasets)'
 
     @property
     def target_id(self) -> str:
         """Unique target ID"""
-        return self.name
+        return self.id
 
     def write_ped_file(self, out_path: Path | None = None, use_participant_id: bool = False) -> Path:
         """
@@ -264,11 +306,11 @@ class Cohort(Target):
         for sequencing_group in self.get_sequencing_groups():
             datas.append(sequencing_group.pedigree.get_ped_dict(use_participant_id=use_participant_id))
         if not datas:
-            raise ValueError(f'No pedigree data found for {self.name}')
+            raise ValueError(f'No pedigree data found for {self.id}')
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.analysis_dataset.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:
@@ -411,7 +453,7 @@ class Dataset(Target):
         prefix at all.
         """
         seq_type = get_config()['workflow'].get('sequencing_type')
-        return '' if not self.cohort or not seq_type or seq_type == 'genome' else seq_type
+        return '' if not seq_type or seq_type == 'genome' else seq_type
 
     def prefix(self, **kwargs) -> Path:
         """
@@ -560,7 +602,7 @@ class Dataset(Target):
         df = pd.DataFrame(datas)
 
         if out_path is None:
-            out_path = self.tmp_prefix() / 'ped' / f'{self.alignment_inputs_hash()}.ped'
+            out_path = self.tmp_prefix() / 'ped' / f'{self.get_alignment_inputs_hash()}.ped'
 
         if not get_config()['workflow'].get('dry_run', False):
             with out_path.open('w') as fp:

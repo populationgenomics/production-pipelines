@@ -38,7 +38,7 @@ backend = 'local'
 
 def mock_deprecated_create_cohort() -> MultiCohort:
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='COH123', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
     m_ds = m.add_dataset(ds)
 
@@ -80,7 +80,14 @@ def test_workflow(tmp_path):
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_multicohort().get_sequencing_groups()) == 2
+    multi_cohort = get_multicohort()
+
+    assert len(multi_cohort.get_sequencing_groups()) == 2
+
+    assert multi_cohort.alignment_inputs_hash is None
+    mc_hash = multi_cohort.get_alignment_inputs_hash()
+    assert multi_cohort.alignment_inputs_hash == mc_hash
+    assert mc_hash == 'e3b0c44298fc1c149afbf4c8996fb92427ae41_2'
 
     @stage
     class MySequencingGroupStage(SequencingGroupStage):

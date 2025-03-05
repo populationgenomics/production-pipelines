@@ -20,6 +20,7 @@ from cpg_workflows.workflow import (
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_multicohort,
     get_workflow,
     stage,
 )
@@ -33,6 +34,7 @@ VCF_QUERY = gql(
       id
       analyses(type: {eq: "pacbio_vcf"}) {
         output
+        meta
       }
     }
   }
@@ -54,11 +56,12 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
         a dictionary of the SG IDs and their phased SV VCF
     """
     return_dict: dict[str, str] = {}
+    get_logger().info(f'Querying for SV VCFs for {dataset_name}')
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
-    for sg_id_section in analysis_results['project']['sequencingGroups']:
-        for analysis in sg_id_section['analyses']:
-            if analysis['output'].endswith('.SVs.phased.vcf.gz'):
-                return_dict[sg_id_section['id']] = analysis['output']
+    for sg in analysis_results['project']['sequencingGroups']:
+        for analysis in sg['analyses']:
+            if analysis['meta'].get('variant_type') == 'SV':
+                return_dict[sg['id']] = analysis['output']
 
     return return_dict
 
@@ -203,8 +206,8 @@ class AnnotateLongReadSVs(MultiCohortStage):
         billing_labels = {'stage': self.name.lower(), AR_GUID_NAME: try_get_ar_guid()}
 
         job_or_none = queue_annotate_sv_jobs(
-            cohort=multicohort,
-            cohort_prefix=self.prefix,
+            multicohort=multicohort,
+            prefix=self.prefix,
             input_vcf=inputs.as_dict(multicohort, MergeLongReadSVs)['vcf'],
             outputs=expected_out,
             labels=billing_labels,
@@ -291,9 +294,7 @@ class AnnotateDatasetLRSv(DatasetStage):
             dataset (Dataset): SGIDs specific to this dataset/project
             inputs ():
         """
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohortLRSv, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortLRSv, key='mt')
 
         outputs = self.expected_outputs(dataset)
 

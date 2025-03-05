@@ -12,12 +12,12 @@ Inputs:
 from typing import TYPE_CHECKING
 
 from hail.vds import new_combiner
+from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse, to_path
-
-if TYPE_CHECKING:  # TCH002 https://docs.astral.sh/ruff/rules/typing-only-third-party-import/
-    from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 
 
 def run(
@@ -25,11 +25,28 @@ def run(
     sequencing_type: str,
     tmp_prefix: str,
     genome_build: str,
+    save_path: str | None,
+    force_new_combiner: bool = False,
+    sequencing_group_names: list[str] | None = None,
+    gvcf_external_header: str | None = None,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
 ) -> None:
+    """
+    Runs the combiner
 
+    Args:
+        output_vds_path (str): eventual output path for the VDS
+        sequencing_type (str): genome/exome, relevant in selecting defaults
+        tmp_prefix (str): where to store temporary combiner intermediates
+        genome_build (str): GRCh38
+        save_path (str | None): where to store the combiner plan, or where to resume from
+        force_new_combiner (bool): whether to force a new combiner run, or permit resume from a previous one
+        gvcf_paths (list[str] | None): list of paths to GVCFs
+        vds_paths (list[str] | None): list of paths to VDSs
+        specific_intervals (list[str] | None): list of intervals to use for the combiner, if using non-standard
+    """
     import logging
 
     import hail as hl
@@ -38,7 +55,17 @@ def run(
     logging.basicConfig(level=logging.INFO)
 
     if not can_reuse(to_path(output_vds_path)):
-        init_batch()
+        init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+
+        if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+            override_jar_spec(jar_spec)
+
+        # Load from save, if supplied
+        if save_path:
+            if force_new_combiner:
+                logging.info(f'Combiner plan {save_path} will be ignored/written new')
+            else:
+                logging.info(f'Resuming combiner plan from {save_path}')
 
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
@@ -52,14 +79,28 @@ def run(
 
         combiner: VariantDatasetCombiner = new_combiner(
             output_path=output_vds_path,
+            save_path=save_path,
             gvcf_paths=gvcf_paths,
+            gvcf_sample_names=sequencing_group_names,
+            # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
+            # will be ignored. The first gvcf path works fine as a header because it will
+            # be only read until the last line that begins with "#":
+            gvcf_external_header=gvcf_external_header,
             vds_paths=vds_paths,
             reference_genome=genome_build,
             temp_path=tmp_prefix,
             use_exome_default_intervals=sequencing_type == 'exome',
             use_genome_default_intervals=sequencing_type == 'genome',
             intervals=intervals,
-            force=True,
+            force=force_new_combiner,
+            branch_factor=config_retrieve(
+                ['combiner', 'branch_factor'],
+                VariantDatasetCombiner._default_branch_factor,
+            ),
+            gvcf_batch_size=config_retrieve(
+                ['combiner', 'gvcf_batch_size'],
+                None,
+            ),
         )
 
         combiner.run()

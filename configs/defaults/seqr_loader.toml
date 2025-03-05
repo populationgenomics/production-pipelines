@@ -16,6 +16,12 @@ vep_version = '110'
 # (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
+# Write the sorted BAM file to the temp bucket after alignment and before MarkDuplicates
+checkpoint_sorted_bam = false
+
+# Shard exome BAMs and CRAMs with bazam to align them in chunks
+exome_realignment_shards = 1
+
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
@@ -38,6 +44,10 @@ write_vcf = ["udn-aus"]
 # send_to_slack = true
 # [workflow.gvcf_multiqc.extra_config]
 # plots_force_interactive = true
+
+# By default, run the es-index generating jobs on spot (preemptible) instances
+[workflow.es_index]
+spot_instance = true
 
 [resource_overrides]
 # Override default resource requirements for unusually large seq data without

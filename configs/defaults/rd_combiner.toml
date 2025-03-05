@@ -1,0 +1,100 @@
+[workflow]
+name = 'rd_combiner'
+status_reporter = 'metamist'
+
+## If set, stop at generation of the joint-callset using the Combiner
+#last_stages = ['CreateDenseMtFromVdsWithHail']
+
+## if this is False, we will not check for existing VDS - always create fresh VDS from gVCFs
+# as of 11-02-2025 we have a base VDS for all exome and genome datasets, so by default, do check
+check_for_existing_vds = true
+
+# during development and the transition to input_cohorts over input_datasets, there are some instances
+# where we have VDS entries in Metamist, but the analysis entry contains SG IDs which weren't combined into the VDS
+# this is not expected to be a long term problem, but is a way of confirming explicitly which SGs still need combining
+manually_check_vds_sg_ids = true
+
+## If this is populated with an integer, we will use the VDS with this ID in Metamist as the starting point
+#use_specific_vds = 1234
+
+## Subsetting and AnnotateDataset will only run for these datasets
+#write_mt_for_datasets = ['test_dataset', ]
+
+## Writing an es-index will only run for these datasets
+#create_es_index_for_datasets = ['test_dataset', ]
+
+## number of partitions to coalesce the data into
+densify_partitions = 2500
+
+## strategy to use for partitioning the data [none, naive, shuffle]
+## not currently in use (see #1078)
+partition_strategy = 'naive'
+
+# these are used when calculating how many fragments to send to each job
+vqsr_training_fragments_per_job = 100
+vqsr_apply_fragments_per_job = 60
+indel_recal_disc_size = 20
+snps_gather_disc_size = 10
+snps_recal_disc_size = 20
+
+# without this setting we use the native Hail version in the container
+# not currently in use as the cpg-utils default contains these patches by default, plus extra logging
+# most recently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
+#default_jar_spec_revision = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+
+[workflow.es_index]
+# if false, use a non-preemptible instance to run the ES export
+spot_instance = false
+
+[combiner]
+# used to decide if we should resume from a previous combiner plan
+force_new_combiner = false
+# highem, standard, or a string, e.g. "4Gi"
+driver_memory = "highmem"
+# string, e.g. "4Gi"
+driver_storage = "10Gi"
+# integer
+driver_cores = 2
+# highem, standard, or a string, e.g. "4Gi"
+worker_memory = "highmem"
+# if false, use non-preemptible VMs
+preemptible_vms = false
+
+# these settings alter the behaviour of the combiner, and don't all align with the documentation
+
+# In config: "The number of Variant Datasets to combine at once."
+# In practice: "The number of gVCFs to combine into each VDS?"
+# https://github.com/hail-is/hail/issues/14781
+branch_factor = 50
+
+# when merging multiple VDS, we find the largest VDS, repartition to target_records variants per partition
+# then repartition all VDSs to match those intervals prior to merging
+target_records = 30000
+
+# this is supposed to be the number of gVCFs to combine into a VDS
+# but that is not curretly working. See issue above
+gvcf_batch_size = 5
+
+[vqsr]
+# VQSR, when applying model, targets indel_filter_level and snp_filter_level
+# sensitivities. The tool matches them internally to a VQSLOD score cutoff
+# based on the model's estimated sensitivity to a set of true variants.
+snp_filter_level = 99.7
+indel_filter_level = 99.0
+
+[gcloud_condense]
+chunk_size = 32
+storage = "10Gi"
+
+[references]
+# this might be a holdover until the references file is corrected. Working in Main.
+vep_110_mount = "gs://cpg-common-main/references/vep/110/mount"
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'

@@ -6,8 +6,9 @@ import logging
 
 import hail as hl
 
-from cpg_utils.config import get_config, reference_path
+from cpg_utils.config import config_retrieve, get_config, reference_path
 from cpg_utils.hail_batch import genome_build
+from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.large_cohort.load_vqsr import load_vqsr
 from cpg_workflows.utils import checkpoint_hail
 from hail_scripts.computed_fields import variant_id, vep
@@ -17,14 +18,21 @@ def annotate_cohort(
     vcf_path: str,
     out_mt_path: str,
     vep_ht_path: str,
-    site_only_vqsr_vcf_path=None,
-    checkpoint_prefix=None,
-    long_read=False,
+    site_only_vqsr_vcf_path: str | None = None,
+    checkpoint_prefix: str | None = None,
+    long_read: bool = False,
+    remove_invalid_contigs: bool = False,
 ):
     """
     Convert VCF to matrix table, annotate for Seqr Loader, add VEP and VQSR
     annotations.
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     # tune the logger correctly
     logging.getLogger().setLevel(logging.INFO)
@@ -50,6 +58,36 @@ def annotate_cohort(
     )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
+    # in our long-read VCFs, AF is present as an Entry field, so we need to drop it from entries,
+    # and then recompute AC/AF/AN correctly from the variant QC table
+    # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
+    # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
+    if long_read:
+        mt = mt.drop('AF')
+        mt = hl.variant_qc(mt)
+        mt = mt.annotate_rows(
+            info=mt.info.annotate(
+                AF=mt.variant_qc.AF,
+                AN=mt.variant_qc.AN,
+                AC=mt.variant_qc.AC,
+            ),
+        )
+        mt = mt.drop('variant_qc')
+
+    # Remove any contigs not in the 22 autosomes, X, Y, M
+    if remove_invalid_contigs:
+        logging.info('Removing invalid contigs')
+        # fmt: off
+        chromosomes = [
+            '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13',
+            '14', '15', '16', '17', '18', '19', '20', '21', '22', 'X', 'Y', 'M',
+        ]
+        # fmt: on
+        standard_contigs = hl.literal(
+            hl.literal([f'chr{chrom}' for chrom in chromosomes]),
+        )
+        mt = mt.filter_rows(standard_contigs.contains(mt.locus.contig))
+
     # Splitting multi-allelics. We do not handle AS info fields here - we handle
     # them when loading VQSR instead, and populate entire "info" from VQSR.
     mt = hl.split_multi_hts(mt.annotate_rows(locus_old=mt.locus, alleles_old=mt.alleles))
@@ -73,28 +111,23 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
-    if long_read:
-        # For long read data, drop the pre-computed AF entry field
-        mt = mt.drop('AF')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(info=mt.info.annotate(AF=mt.variant_qc.AF, AN=mt.variant_qc.AN, AC=mt.variant_qc.AC))
-        mt = mt.drop('variant_qc')
-
-    # don't fail if the AC/AF attributes are an inappropriate type
-    # don't fail if completely absent either
-    for attr in ['AC', 'AF']:
-        if attr not in mt.info:
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [1]}))
-        elif not isinstance(mt.info[attr], hl.ArrayExpression):
-            mt = mt.annotate_rows(info=mt.info.annotate(**{attr: [mt.info[attr]]}))
-
-    if 'AN' not in mt.info:
-        mt = mt.annotate_rows(info=mt.info.annotate(AN=1))
+    # split the AC/AF attributes into separate entries, overwriting the array in INFO
+    # these elements become a 1-element array
+    # the index_correction is required to align the AC/AF with the correct allele
+    # in the split multi-allelics
+    index_correction = 0 if long_read else 1
+    mt = mt.annotate_rows(
+        info=mt.info.annotate(
+            AF=[mt.info.AF[mt.a_index - index_correction]],
+            AC=[mt.info.AC[mt.a_index - index_correction]],
+        ),
+    )
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
-        AC=mt.info.AC[mt.a_index - 1],
-        AF=mt.info.AF[mt.a_index - 1],
+        # still taking just a single value here for downstream compatibility in Seqr
+        AC=mt.info.AC[0],
+        AF=mt.info.AF[0],
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
@@ -195,6 +228,13 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
         exclusion_file (str, optional): path to a file containing samples to remove from the
                                         subset prior to extracting
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     logging.basicConfig(level=logging.INFO)
 
     mt = hl.read_matrix_table(mt_path)
@@ -212,39 +252,18 @@ def subset_mt_to_samples(mt_path: str, sample_ids: list[str], out_mt_path: str, 
     mt_sample_ids = set(mt.s.collect())
 
     if sample_ids_not_in_mt := unique_sids - mt_sample_ids:
-        raise Exception(
+        raise ValueError(
             f'Found {len(sample_ids_not_in_mt)}/{len(unique_sids)} IDs in the requested subset not in the callset.\n'
             f'IDs that aren\'t in the callset: {sample_ids_not_in_mt}\n'
             f'All callset sample IDs: {mt_sample_ids}',
         )
 
-    # work out the proportion of the original sample count that we'll keep
-    downsample = len(mt_sample_ids) // len(unique_sids)
-    # calculate the proportional number of partitions to generate
-    downsample_partitions = mt.n_partitions() // downsample
-
     logging.info(f'Found {len(mt_sample_ids)} samples in mt, subsetting to {len(unique_sids)} samples.')
-    logging.info(f'Re-reading the MT with {downsample_partitions} partitions, reduced from {mt.n_partitions()}')
-    # re-read instead of a repartition/naive_coalesce
-    # naive coalesce could produce really unbalanced partitions, and repartitioning might be more expensive
-    # "it's basically free to read with different partitioning than you wrote with"
-    # https://hail.zulipchat.com/#narrow/stream/123010-Hail-Query-0.2E2-support/topic/Reading.20many.20HTs/near/438846215
-    mt = hl.read_matrix_table(mt_path, _n_partitions=downsample_partitions)
-
-    n_rows_before = mt.count_rows()
 
     mt = mt.filter_cols(hl.literal(unique_sids).contains(mt.s))
     mt = mt.filter_rows(hl.agg.any(mt.GT.is_non_ref()))
     mt.write(out_mt_path, overwrite=True)
-
-    # read again to get the metadata
-    mt = hl.read_matrix_table(out_mt_path)
-    # log with row/col counts as a no-op as we read the fresh metadata
-    logging.info(
-        f'Finished subsetting to {len(unique_sids)} samples, written to {out_mt_path}. '
-        f'Kept {mt.count_cols()}/{len(mt_sample_ids)} samples, '
-        f'{mt.count_rows()}/{n_rows_before} rows',
-    )
+    logging.info(f'Finished subsetting to {len(unique_sids)} samples, written to {out_mt_path}.')
 
 
 def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
@@ -258,6 +277,12 @@ def vcf_from_mt_subset(mt_path: str, out_vcf_path: str):
         out_vcf_path (str): path of the vcf.bgz to generate
     """
 
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     mt = hl.read_matrix_table(mt_path)
     logging.info(f'Dataset MT dimensions: {mt.count()}')
     hl.export_vcf(mt, out_vcf_path, tabix=True)
@@ -268,6 +293,13 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
     """
     Add dataset-level annotations.
     """
+
+    # this overrides the jar spec for the current session
+    # and requires `init_batch()` to be called before any other hail methods
+    # we satisfy this requirement by calling `init_batch()` in the query_command wrapper
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
+
     mt = hl.read_matrix_table(mt_path)
 
     # Convert the mt genotype entries into num_alt, gq, ab, dp, and sample_id.

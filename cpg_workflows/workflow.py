@@ -639,7 +639,7 @@ class Stage(Generic[TargetT], ABC):
 
         if self.skipped:
             if reusable and not first_missing_path:
-                logging.info(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
+                logging.debug(f'{self.name}: {target} [REUSE] (stage skipped, and outputs exist)')
                 return Action.REUSE
             if get_config()['workflow'].get('skip_sgs_with_missing_input'):
                 logging.warning(
@@ -697,13 +697,13 @@ class Stage(Generic[TargetT], ABC):
                 Path | None: first missing path, if any
         """
         if self.assume_outputs_exist:
-            logging.info(f'Assuming outputs exist. Expected output is {expected_out}')
+            logging.debug(f'Assuming outputs exist. Expected output is {expected_out}')
             return True, None
 
         if not expected_out:
             # Marking is reusable. If the stage does not naturally produce any outputs,
             # it would still need to create some flag file.
-            logging.info('No expected outputs, assuming outputs exist')
+            logging.debug('No expected outputs, assuming outputs exist')
             return True, None
 
         if get_config()['workflow'].get('check_expected_outputs'):
@@ -914,7 +914,7 @@ class Workflow:
 
     @property
     def output_version(self) -> str:
-        return self._output_version or get_multicohort().alignment_inputs_hash()
+        return self._output_version or get_multicohort().get_alignment_inputs_hash()
 
     @property
     def analysis_prefix(self) -> Path:
@@ -945,13 +945,13 @@ class Workflow:
         e.g. "gs://cpg-project-main/seqr_loader/COH123", or "gs://cpg-project-main-analysis/seqr_loader/COH123"
 
         Args:
-            cohort (Cohort): we pull the analysis dataset and name from this Cohort
+            cohort (Cohort): we pull the analysis dataset and id from this Cohort
             category (str | None): sub-bucket for this project
 
         Returns:
             Path
         """
-        return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.name
+        return cohort.analysis_dataset.prefix(category=category) / self.name / cohort.id
 
     def run(
         self,
@@ -1344,9 +1344,8 @@ class DatasetStage(Stage, ABC):
         """
         output_by_target: dict[str, StageOutput | None] = dict()
         # iterate directly over the datasets in this multicohort
-        for dataset_i, dataset in enumerate(multicohort.get_datasets()):
+        for dataset in multicohort.get_datasets():
             action = self._get_action(dataset)
-            logging.info(f'{self.name}: #{dataset_i + 1}/{dataset} [{action.name}]')
             output_by_target[dataset.target_id] = self._queue_jobs_with_checks(dataset, action)
         return output_by_target
 
@@ -1383,7 +1382,6 @@ class CohortStage(Stage, ABC):
         output_by_target: dict[str, StageOutput | None] = dict()
         for cohort in multicohort.get_cohorts():
             action = self._get_action(cohort)
-            logging.info(f'{self.name}: {cohort} [{action.name}]')
             output_by_target[cohort.target_id] = self._queue_jobs_with_checks(cohort, action)
         return output_by_target
 
@@ -1413,6 +1411,5 @@ class MultiCohortStage(Stage, ABC):
         """
         output_by_target: dict[str, StageOutput | None] = dict()
         action = self._get_action(multicohort)
-        logging.info(f'{self.name}: {multicohort} [{action.name}]')
         output_by_target[multicohort.target_id] = self._queue_jobs_with_checks(multicohort, action)
         return output_by_target

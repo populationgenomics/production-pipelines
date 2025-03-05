@@ -47,7 +47,7 @@ def test_check_for_cohort_overlaps(tmp_path):
     """
     set_config(TOML, tmp_path / 'config.toml')
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='fewgenomes', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
 
     add_sg(ds, 'CPGAAA', external_id='SAMPLE1')
@@ -62,9 +62,9 @@ def test_check_for_cohort_overlaps_fails(tmp_path):
     """
     set_config(TOML, tmp_path / 'config.toml')
     m = MultiCohort()
-    c = m.create_cohort('fewgenomes')
+    c = m.create_cohort(id='fewgenomes', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
-    c2 = m.create_cohort('fewgenomes2')
+    c2 = m.create_cohort(id='fewgenomes2', name='fewgenomes2')
     ds2 = c2.create_dataset('my_dataset')
 
     add_sg(ds, 'CPGAAA', external_id='SAMPLE1')

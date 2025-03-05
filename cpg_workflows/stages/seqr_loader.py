@@ -7,7 +7,7 @@ from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
-from cpg_utils import Path, to_path
+from cpg_utils import Path
 from cpg_utils.cloud import read_secret
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -15,7 +15,15 @@ from cpg_workflows.jobs.seqr_loader import annotate_dataset_jobs, cohort_to_vcf_
 from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, MultiCohortStage, StageInput, StageOutput, get_workflow, stage
+from cpg_workflows.workflow import (
+    DatasetStage,
+    MultiCohortStage,
+    StageInput,
+    StageOutput,
+    get_multicohort,
+    get_workflow,
+    stage,
+)
 
 from .joint_genotyping import JointGenotyping
 from .vep import Vep
@@ -96,9 +104,7 @@ class AnnotateDataset(DatasetStage):
             get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return None
 
-        assert dataset.cohort
-        assert dataset.cohort.multicohort
-        mt_path = inputs.as_path(target=dataset.cohort.multicohort, stage=AnnotateCohort, key='mt')
+        mt_path = inputs.as_path(target=get_multicohort(), stage=AnnotateCohort, key='mt')
 
         jobs = annotate_dataset_jobs(
             mt_path=mt_path,
@@ -219,6 +225,9 @@ class MtToEs(DatasetStage):
         flag_name = str(outputs['done_flag'])
 
         job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
+        if config_retrieve(['workflow', 'es_index', 'spot_instance'], default=True) is False:
+            # Use a non-preemptible instance if spot_instance is False in the config
+            job = job.spot(is_spot=False)
 
         req_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
