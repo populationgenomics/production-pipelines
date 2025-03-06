@@ -484,7 +484,7 @@ class Frequencies(CohortStage):
 
 
 @stage(required_stages=[Frequencies, MakeSiteOnlyVcf])
-class BrowserPrepare(CohortStage):
+class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         return cohort.analysis_dataset.prefix() / 'browser' / 'browser.ht'
 
@@ -492,7 +492,7 @@ class BrowserPrepare(CohortStage):
         from cpg_workflows.large_cohort import browser_prepare
 
         j = get_batch().new_job(
-            'BrowserPrepare',
+            'PrepareBrowserTable',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
