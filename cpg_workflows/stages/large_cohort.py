@@ -483,7 +483,7 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Frequencies, MakeSiteOnlyVcf])
+@stage(required_stages=[Frequencies])
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         return cohort.analysis_dataset.prefix() / 'browser' / 'browser.ht'
