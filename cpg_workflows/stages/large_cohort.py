@@ -499,7 +499,7 @@ class PrepareBrowserTable(CohortStage):
 
         j.command(
             query_command(
-                browser_prepare.prepare_gnomad_v4_variants_helper,
+                browser_prepare,
                 browser_prepare.prepare_gnomad_v4_variants_helper.__name__,
                 str(inputs.as_path(cohort, Frequencies)),
                 str(config_retrieve(['workflow', 'sequencing_type'])),
