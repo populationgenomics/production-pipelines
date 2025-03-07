@@ -339,6 +339,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
     # ds = ds.drop("allele_info", "a_index", "info", "was_split", "grpmax", "vqsr_results")
 
     # Elevate variant_id and rsids to top level
+    ds.describe()
     ds = ds.annotate(
         variant_id=ds.gnomad.variant_id,
         rsids=ds.gnomad.rsids,
