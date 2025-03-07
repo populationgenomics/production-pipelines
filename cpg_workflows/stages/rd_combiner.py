@@ -3,6 +3,8 @@ All Stages relating to the seqr_loader pipeline, reimplemented from scratch to
 use the gVCF combiner instead of joint-calling.
 """
 
+from functools import cache
+
 from google.api_core.exceptions import PermissionDenied
 
 from hail.vds import read_vds
@@ -51,6 +53,27 @@ LATEST_ANALYSIS_QUERY = gql(
     }
 """,
 )
+
+FAMILY_SGS_QUERY = gql(
+    """
+    projectFamilySequencingGroups($dataset: String!, $sequencing_type: String!) {
+        project(name: $dataset) {
+            families {
+                id
+                externalId
+                participants {
+                    samples {
+                        sequencingGroups(type: {eq: $sequencing_type}) {
+                            id
+                        }
+                    }
+                }
+            }
+        }
+    }
+    """,
+)
+
 SPECIFIC_VDS_QUERY = gql(
     """
     query getVDSByAnalysisId($vds_id: Int!) {
@@ -145,6 +168,34 @@ def manually_find_ids_from_vds(vds_path: str) -> set[str]:
 
     # find the samples in the Variant Data MT
     return set(vds.variant_data.s.collect())
+
+
+@cache
+def query_for_family_sequencing_groups(dataset: str, sequencing_type: str, only_families: list) -> dict:
+    """
+    Query for the sequencing groups in certain families for a dataset
+    """
+    # get the SG IDs for all families in the dataset
+    family_sgs = query(FAMILY_SGS_QUERY, variables={'dataset': dataset, 'sequencing_type': sequencing_type})
+    # keep only the SG IDs for the families in the only_families list
+    family_sg_ids = [
+        sg['id']
+        for family in family_sgs['project']['families']
+        for participant in family['participants']
+        for sample in participant['samples']
+        for sg in sample['sequencingGroups']
+        if (family['externalId'] in only_families) or (family['id'] in only_families)
+    ]
+    only_family_ids = [
+        (family['id'], family['externalId'])
+        for family in family_sgs['project']['families']
+        if family['id'] in only_families or family['externalId'] in only_families
+    ]
+    get_logger().info(f'Keeping only {len(family_sg_ids)} SGs from families {len(only_family_ids)} in {dataset}:')
+    get_logger().info(only_family_ids)
+    get_logger().info(family_sg_ids)
+
+    return {'family_sg_ids': family_sg_ids, 'only_family_ids': only_family_ids}
 
 
 @stage(analysis_type='combiner', analysis_keys=['vds'])
@@ -591,22 +642,41 @@ class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
 @stage(required_stages=[AnnotateCohortSmallVariantsWithHailQuery])
 class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
     """
-    Subset the MT to a single dataset
+    Subset the MT to a single dataset - or a subset of families within a dataset
     Skips this stage if the MultiCohort has only one dataset
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path] | None:
         """
         Expected to generate a MatrixTable
-        This is kinda transient, so shove it in tmp
+        This is kinda transient, so shove it in tmp.
+
+        If subsetting to certain families, the output will be named accordingly
         """
         if len(get_multicohort().get_datasets()) == 1:
             get_logger().info(f'Skipping SubsetMatrixTableToDataset for single Dataset {dataset}')
             return None
-        return {
-            'mt': dataset.tmp_prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt',
-            'id_file': dataset.tmp_prefix() / f'{get_workflow().output_version}-{dataset.name}-SG-ids.txt',
-        }
+        if only_families := config_retrieve(['workflow', dataset.name, 'only_families'], []):
+            family_sg_data = query_for_family_sequencing_groups(
+                dataset.name,
+                config_retrieve(['workflow', 'sequencing_type']),
+                only_families,
+            )
+            n_sgs = len(family_sg_data['family_sg_ids'])
+            n_families = len(family_sg_data['only_family_ids'])
+            return {
+                'mt': dataset.tmp_prefix()
+                / 'mt'
+                / self.name
+                / f'{get_workflow().output_version}-{dataset.name}-{n_sgs}_sgs-{n_families}_families.mt',
+                'id_file': dataset.tmp_prefix()
+                / f'{get_workflow().output_version}-{dataset.name}-{n_sgs}_sgs-{n_families}_families-SG-ids.txt',
+            }
+        else:
+            return {
+                'mt': dataset.tmp_prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt',
+                'id_file': dataset.tmp_prefix() / f'{get_workflow().output_version}-{dataset.name}-SG-ids.txt',
+            }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -622,11 +692,21 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
 
         variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
 
+        if only_families := config_retrieve(['workflow', dataset.name, 'only_families'], []):
+            family_sg_ids = query_for_family_sequencing_groups(
+                dataset.name,
+                config_retrieve(['workflow', 'sequencing_type']),
+                only_families,
+            )['family_sg_ids']
+        else:
+            family_sg_ids = None
+
         # write a list of all the SG IDs to retain
         if not config_retrieve(['workflow', 'dry_run'], False):
             with outputs['id_file'].open('w') as f:
                 for sg in dataset.get_sequencing_groups():
-                    f.write(f'{sg.id}\n')
+                    if not family_sg_ids or sg.id in family_sg_ids:
+                        f.write(f'{sg.id}\n')
 
         job = get_batch().new_job(self.name, self.get_job_attrs(dataset))
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -652,7 +732,22 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        return dataset.prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt'
+        if only_families := config_retrieve(['workflow', dataset.name, 'only_families'], []):
+            family_sg_data = query_for_family_sequencing_groups(
+                dataset.name,
+                config_retrieve(['workflow', 'sequencing_type']),
+                only_families,
+            )
+            n_sgs = len(family_sg_data['family_sg_ids'])
+            n_families = len(family_sg_data['only_family_ids'])
+            return (
+                dataset.prefix()
+                / 'mt'
+                / self.name
+                / f'{get_workflow().output_version}-{dataset.name}-{n_sgs}_sgs-{n_families}_families.mt'
+            )
+        else:
+            return dataset.prefix() / 'mt' / self.name / f'{get_workflow().output_version}-{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -704,7 +799,17 @@ class ExportMtAsEsIndex(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
-        index_name = f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
+        if only_families := config_retrieve(['workflow', dataset.name, 'only_families'], []):
+            family_sg_data = query_for_family_sequencing_groups(
+                dataset.name,
+                config_retrieve(['workflow', 'sequencing_type']),
+                only_families,
+            )
+            n_sgs = len(family_sg_data['family_sg_ids'])
+            n_families = len(family_sg_data['only_family_ids'])
+            index_name = f'{dataset.name}-{sequencing_type}-{n_sgs}_sgs-{n_families}_families-{get_workflow().run_timestamp}'.lower()
+        else:
+            index_name = f'{dataset.name}-{sequencing_type}-{get_workflow().run_timestamp}'.lower()
         return {
             'index_name': index_name,
             'done_flag': dataset.prefix() / 'es' / f'{index_name}.done',
