@@ -486,7 +486,11 @@ class Frequencies(CohortStage):
 @stage(required_stages=[Frequencies])
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return cohort.analysis_dataset.prefix() / 'browser' / 'browser.ht'
+        if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
+            browser_version = slugify(browser_version)
+
+        browser_version = browser_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / browser_version / 'browser.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import browser_prepare
