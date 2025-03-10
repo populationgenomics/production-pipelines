@@ -7,7 +7,7 @@ from gnomad.utils import reference_genome, sparse_mt
 
 def get_reference_genome(ref_genome: str) -> hl.ReferenceGenome:
     rg = hl.get_reference(ref_genome)
-    reference_ht = reference_genome.get_reference(rg)
+    reference_ht = reference_genome.get_reference_ht(rg)
     return reference_ht
 
 
