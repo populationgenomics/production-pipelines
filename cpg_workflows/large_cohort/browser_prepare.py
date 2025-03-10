@@ -341,8 +341,12 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
     # Elevate variant_id and rsids to top level
     ds.describe()
     ds = ds.transmute(**ds.gnomad)
-    ds = ds.select("variant_id", "rsids", **{exomes_or_genomes: ds.drop("variant_id", "rsids").row_value})
-    # ds = ds.select(**{exomes_or_genomes: ds.row_value})
+    ds = ds.select(**{exomes_or_genomes: ds.row_value})
+    ds = ds.annotate(
+        variant_id=ds[exomes_or_genomes].variant_id,
+        rsids=ds[exomes_or_genomes].rsids,
+        **{exomes_or_genomes: ds[exomes_or_genomes].drop("variant_id", "rsids")},
+    )
     # ds = ds.rename({"gnomad": exomes_or_genomes})
     ds.describe()
 
