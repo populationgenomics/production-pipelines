@@ -22,6 +22,7 @@ def calculate_coverage_ht(vds: hl.vds.VariantDataset, out_path: str) -> hl.Table
     logging.info('Calculating coverage stats...')
     reference_ht: hl.Table = get_reference_genome('GRCh38')
     if can_reuse(output_path('reference.ht', 'tmp')):
+        logging.info(f'Reading reference_ht from {output_path("reference.ht", "tmp")}...')
         reference_ht = hl.read_table(output_path('reference.ht', 'tmp'))
     else:
         logging.info(f'Checkpointing reference_ht to {output_path("reference.ht", "tmp")}...')
