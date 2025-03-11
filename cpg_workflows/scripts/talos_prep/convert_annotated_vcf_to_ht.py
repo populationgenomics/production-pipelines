@@ -220,7 +220,6 @@ def apply_mane_annotations(ht: hl.Table, mane_path: str | None = None) -> hl.Tab
                 mane_status=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_status'], MISSING_STRING),
                 mane_id=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['mane_id'], MISSING_STRING),
                 ensp=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['ensp'], MISSING_STRING),
-                gene_id=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['ensg'], x.gene_id),
                 nm_id=hl.if_else(key_set.contains(x.transcript), hl_mane_dict[x.transcript]['nm_id'], MISSING_STRING),
             ),
             ht.transcript_consequences,
