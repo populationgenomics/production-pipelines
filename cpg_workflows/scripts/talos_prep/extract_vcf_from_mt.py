@@ -9,7 +9,10 @@ The output contains only the variants that overlap with the BED file
 All existing info fields are dropped, and replaced with the callset
 AC / AN / AF
 
-unsure if the BED needs to be localised, or needs to be remote
+This removes any Filtered variants, due to an issue between the header and content
+ - when we apply VQSR annotations we pull in Filters, but we don't pull the corresponding header lines
+ - this means that the MT contains rows which aren't explained in the header, causing some tools to fail
+ - for now it's easier to just remove these rows - reconsider if we use this properly
 """
 
 from argparse import ArgumentParser
@@ -40,10 +43,15 @@ def extract_vcf_from_mt(
 
     init_batch()
 
+    # remote-read of the BED file, skipping any contigs not in the reference genome
+    # the Ensembl data wasn't filtered to remove non-standard contigs
     limited_region = hl.import_bed(bed, reference_genome=genome_build(), skip_invalid_intervals=True)
 
     # read full MT
     mt = hl.read_matrix_table(mt_path)
+
+    # filter to PASS only (this is a temporary measure until we insert VQSR headers)
+    mt = mt.filter_rows(hl.is_missing(mt.filters) | (mt.filters.length() == 0))
 
     # filter to overlaps with the BED file
     mt = mt.filter_rows(hl.is_defined(limited_region[mt.locus]))

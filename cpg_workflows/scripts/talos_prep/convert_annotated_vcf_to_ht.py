@@ -271,7 +271,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str
         alpha_m (str): path to the AlphaMissense Hail Table, required
         mane (str | None): path to a MANE Hail Table for enhanced annotation
     """
-    hl.context.init_spark(master=f'local[4]', default_reference='GRCh38', quiet=True)
+    hl.context.init_spark(master='local[4]', default_reference='GRCh38')
 
     # pull and split the CSQ header line
     csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)
