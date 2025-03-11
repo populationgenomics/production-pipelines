@@ -49,10 +49,13 @@ def submit_dragen_run(
                 AnalysisDataInput(parameterCode='ref_tar', dataIds=[dragen_ht_id]),
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
                 AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
-                AnalysisDataInput(
-                    parameterCode='qc_coverage_region_beds',
-                    dataIds=[qc_cov_region_1_id, qc_cov_region_2_id],
-                ),
+                # QC coverage regions changed in new pipeline XML configuration
+                # AnalysisDataInput(
+                #     parameterCode='qc_coverage_region_beds',
+                #     dataIds=[qc_cov_region_1_id, qc_cov_region_2_id],
+                # ),
+                AnalysisDataInput(parameterCode='qc_coverage_region_1', data=qc_cov_region_1_id),
+                AnalysisDataInput(parameterCode='qc_coverage_region_2', data=qc_cov_region_2_id),
             ],
             parameters=[
                 AnalysisParameterInput(code='enable_map_align', value='True'),
