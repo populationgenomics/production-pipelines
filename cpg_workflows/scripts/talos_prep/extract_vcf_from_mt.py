@@ -22,7 +22,7 @@ from cpg_workflows.utils import get_logger
 
 
 def extract_vcf_from_mt(
-    mt: str,
+    mt_path: str,
     out: str,
     sites_only: str,
     bed: str,
@@ -32,16 +32,18 @@ def extract_vcf_from_mt(
     Limits the MT to the regions specified in the BED file
 
     Args:
-        mt (str): input MT
+        mt_path (str): input MT
         out (str): Full VCF destination
         sites_only (str): Sites-only VCF destination
         bed (str): BED file containing regions to keep
     """
 
+    init_batch()
+
     limited_region = hl.import_bed(bed, reference_genome=genome_build(), skip_invalid_intervals=True)
 
     # read full MT
-    mt = hl.read_matrix_table(mt)
+    mt = hl.read_matrix_table(mt_path)
 
     # filter to overlaps with the BED file
     mt = mt.filter_rows(hl.is_defined(limited_region[mt.locus]))
@@ -63,7 +65,7 @@ def extract_vcf_from_mt(
     hl.export_vcf(mt.rows(), sites_only, tabix=True)
 
 
-if __name__ == '__main__':
+def cli_main():
     parser = ArgumentParser(description=__doc__)
     parser.add_argument('--mt', help='Input MatrixTable', required=True)
     parser.add_argument('--out', help='Path to full output VCF', required=True)
@@ -75,11 +77,13 @@ if __name__ == '__main__':
     get_logger(__file__).info(f'Writing full VCF to {args.out}')
     get_logger(__file__).info(f'Writing sites-only VCF to {args.sites_only}')
 
-    init_batch()
-
     extract_vcf_from_mt(
-        mt=args.mt,
+        mt_path=args.mt,
         out=args.out,
         sites_only=args.sites_only,
         bed=args.bed,
     )
+
+
+if __name__ == '__main__':
+    cli_main()

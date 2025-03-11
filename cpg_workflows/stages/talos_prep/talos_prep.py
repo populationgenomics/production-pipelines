@@ -5,11 +5,10 @@ this workflow is designed to be something which could be executed easily off-sit
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
-from cpg_workflows.workflow import get_workflow, get_batch, stage, CohortStage, StageInput, StageOutput
+from cpg_workflows.stages.talos import query_for_latest_hail_object
 from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import get_logger
-
-from cpg_workflows.stages.talos import query_for_latest_hail_object
+from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_batch, get_workflow, stage
 
 
 @stage
@@ -54,7 +53,7 @@ class ExtractVcfFromCohortMt(CohortStage):
             f'--mt {input_mt} '
             f'--out {outputs["vcf"]} '
             f'--sites_only {outputs["sites_only"]} '
-            f'--bed {bed}'
+            f'--bed {bed}',
         )
 
         return self.make_outputs(cohort, outputs, jobs=job)

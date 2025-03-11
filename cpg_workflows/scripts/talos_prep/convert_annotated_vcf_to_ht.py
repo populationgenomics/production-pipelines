@@ -15,7 +15,6 @@ from pathlib import Path
 
 import hail as hl
 
-
 MISSING_STRING = hl.str('')
 
 
