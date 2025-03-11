@@ -2,7 +2,7 @@ import logging
 
 import hail as hl
 
-from cpg_utils.hail_batch import output_path
+from cpg_utils.config import output_path
 from cpg_workflows.utils import can_reuse
 from gnomad.utils import reference_genome, sparse_mt
 
