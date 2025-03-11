@@ -7,6 +7,7 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_workflows.workflow import get_workflow, get_batch, stage, CohortStage, StageInput, StageOutput
 from cpg_workflows.targets import Cohort
+from cpg_workflows.utils import get_logger
 
 from cpg_workflows.stages.talos import query_for_latest_hail_object
 
@@ -32,6 +33,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         """
 
         if (input_mt := config_retrieve(['workflow', cohort.name, 'mt'], None)) is None:
+            get_logger().info(f'No config entry retrieved at workflow/{cohort.name}/mt')
             input_mt = query_for_latest_hail_object(
                 dataset=cohort.analysis_dataset.name,
                 analysis_type='matrixtable',
