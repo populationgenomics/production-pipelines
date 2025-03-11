@@ -2,6 +2,7 @@ import logging
 
 import hail as hl
 
+from cpg_utils import Path, to_path
 from cpg_utils.config import output_path
 from cpg_workflows.utils import can_reuse
 from gnomad.utils import reference_genome, sparse_mt
@@ -13,7 +14,7 @@ def get_reference_genome(ref_genome: str) -> hl.ReferenceGenome:
     return reference_ht
 
 
-def calculate_coverage_ht(vds_path: str, out_path: str) -> hl.Table:
+def calculate_coverage_ht(vds_path: str, out_path: str, tmp_prefix: str) -> hl.Table:
     """
     Calculate coverage for each sample.
     """
@@ -23,12 +24,12 @@ def calculate_coverage_ht(vds_path: str, out_path: str) -> hl.Table:
 
     logging.info('Calculating coverage stats...')
     reference_ht: hl.Table = get_reference_genome('GRCh38')
-    if can_reuse(output_path('reference.ht', 'tmp')):
-        logging.info(f'Reading reference_ht from {output_path("reference.ht", "tmp")}...')
+    if can_reuse(str(to_path(tmp_prefix) / 'reference.ht')):
+        logging.info(f'Reading reference_ht from {str(to_path(tmp_prefix) / "reference.ht")}...')
         reference_ht = hl.read_table(output_path('reference.ht', 'tmp'))
     else:
-        logging.info(f'Checkpointing reference_ht to {output_path("reference.ht", "tmp")}...')
-        reference_ht = reference_ht.checkpoint(output_path('reference.ht', 'tmp'), overwrite=True)
+        logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / "reference.ht")}...')
+        reference_ht = reference_ht.checkpoint(str(to_path(tmp_prefix) / 'reference.ht'), overwrite=True)
     logging.info(f'reference_ht: {reference_ht.describe()}')
     coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, reference_ht)
     logging.info(f'coverage_ht: {coverage_ht.describe()}')

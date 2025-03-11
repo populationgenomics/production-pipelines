@@ -509,6 +509,7 @@ class GenerateCoverageTable(CohortStage):
                 generate_coverage_table.calculate_coverage_ht.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix),
                 setup_gcp=True,
             ),
         )
