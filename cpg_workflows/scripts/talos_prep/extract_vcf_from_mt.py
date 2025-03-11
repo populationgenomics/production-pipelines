@@ -38,7 +38,7 @@ def extract_vcf_from_mt(
         bed (str): BED file containing regions to keep
     """
 
-    limited_region = hl.import_bed(bed, reference_genome=genome_build())
+    limited_region = hl.import_bed(bed, reference_genome=genome_build(), skip_invalid_intervals=True)
 
     # read full MT
     mt = hl.read_matrix_table(mt)
@@ -47,11 +47,12 @@ def extract_vcf_from_mt(
     mt = mt.filter_rows(hl.is_defined(limited_region[mt.locus]))
 
     # replace the existing INFO block to just have AC/AN/AF - no other carry-over
+    # this is based on the structure we already achieved in annotate_cohort
     mt = mt.annotate_rows(
         info=hl.struct(
-            AF=mt.info.AF,
-            AN=mt.info.AN,
-            AC=mt.info.AC,
+            AF=mt.AF,
+            AN=mt.AN,
+            AC=mt.AC,
         ),
     )
 
