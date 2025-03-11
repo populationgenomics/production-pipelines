@@ -90,13 +90,13 @@ class FilterVcfsForPassVariants(CohortStage):
         full_job.image(image_path('bcftools_120'))
         full_job.storage('50Gi')
         full_job.command(f"bcftools view -f 'PASS' --write-index -Oz -o {full_job.output['vcf.bgz']} {full_vcf}")
-
+        full_job.command("ls")
         get_batch().write_output(full_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))
 
         sites_job = get_batch().new_job(f'Filter sites-only VCFs for PASS variants for {cohort.id}')
         sites_job.image(image_path('bcftools_120'))
         sites_job.storage('10Gi')
-        sites_job.command(f"bcftools view -f 'PASS' --write-index -Oz -o {sites_job.output} {sites_only}")
+        sites_job.command(f"bcftools view -f 'PASS' -Oz -o {sites_job.output} {sites_only}")
 
         get_batch().write_output(sites_job.output, str(outputs['sites_only']))
 
