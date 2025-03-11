@@ -89,8 +89,7 @@ class FilterVcfsForPassVariants(CohortStage):
         full_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         full_job.image(image_path('bcftools_120'))
         full_job.storage('50Gi')
-        full_job.command(f"bcftools view -f 'PASS' -Oz -o {full_job.output['vcf.bgz']} {full_vcf}")
-        full_job.command(f"tabix {full_job.output['vcf.bgz']}")
+        full_job.command(f"bcftools view -f 'PASS' --write-index=tbi -Oz -o {full_job.output['vcf.bgz']} {full_vcf}")
         get_batch().write_output(full_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))
 
         sites_job = get_batch().new_job(f'Filter sites-only VCFs for PASS variants for {cohort.id}')
