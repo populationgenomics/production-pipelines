@@ -13,12 +13,14 @@ def get_reference_genome(ref_genome: str) -> hl.ReferenceGenome:
     return reference_ht
 
 
-def calculate_coverage_ht(vds: hl.vds.VariantDataset, out_path: str) -> hl.Table:
+def calculate_coverage_ht(vds_path: str, out_path: str) -> hl.Table:
     """
     Calculate coverage for each sample.
     """
     # The `reference_ht` is a Table that contains a row for each locus coverage that should be
     # computed on. It needs to be keyed by `locus`.
+    vds = hl.vds.read_vds(vds_path)
+
     logging.info('Calculating coverage stats...')
     reference_ht: hl.Table = get_reference_genome('GRCh38')
     if can_reuse(output_path('reference.ht', 'tmp')):
