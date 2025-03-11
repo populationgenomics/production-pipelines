@@ -31,7 +31,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         script is called extract_vcf_from_mt
         """
 
-        if (input_mt := config_retrieve(['workflow', cohort.name, 'mt'], None)) is None:
+        if (input_mt := config_retrieve(['workflow', cohort.id, 'mt'], None)) is None:
             get_logger().info(f'No config entry retrieved at workflow/{cohort.name}/mt')
             input_mt = query_for_latest_hail_object(
                 dataset=cohort.analysis_dataset.name,
@@ -45,7 +45,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
         bed = reference_path(f'ensembl_{ensembl_version}/merged_bed')
 
-        job = get_batch().new_job(f'Extract VCF representations from {input_mt} for {cohort.name}')
+        job = get_batch().new_job(f'Extract VCF representations from {input_mt} for {cohort.id}')
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(
