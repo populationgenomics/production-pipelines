@@ -88,7 +88,7 @@ class FilterVcfsForPassVariants(CohortStage):
         # we need the index for this one
         full_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         full_job.image(image_path('bcftools_120'))
-        full_job.storage('50Gi')
+        full_job.storage('20Gi')
         full_job.command(f"bcftools view -f 'PASS' --write-index=tbi -Oz -o {full_job.output['vcf.bgz']} {full_vcf}")
         get_batch().write_output(full_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))
 
@@ -122,7 +122,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
         job = get_batch().new_job('Annotate gnomad frequencies with echtvar')
         job.image(image_path('echtvar'))
         job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
-        job.storage('50Gi')
+        job.storage('20Gi')
         job.memory('highmem')
         job.cpu(4)
 
@@ -217,6 +217,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'tar -xf {alphamissense_tar} -C $BATCH_TMPDIR')
         job.cpu(4)
+        job.storage('10Gi')
         job.memory('highmem')
         job.command(
             f'convert_annotated_vcf_to_ht '
@@ -260,6 +261,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         job.command(f'tar -xf {annotations} -C $BATCH_TMPDIR')
         job.cpu(4)
         job.memory('highmem')
+        job.storage('10Gi')
         job.command(
             f'transfer_annotations_to_vcf '
             f'--input {vcf_in} '
