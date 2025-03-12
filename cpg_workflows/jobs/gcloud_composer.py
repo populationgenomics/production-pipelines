@@ -131,6 +131,8 @@ def gcloud_compose_vcf_from_manifest(
     # one final job - read the final vcf in, index it, move the index, and write it out
     input_vcf = get_batch().read_input(fragment_files[0])
     final_job = get_batch().new_bash_job(name='index_final_vcf')
+    final_job.image(image_path('bcftools'))
+    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
 
     # if there were no jobs, there's no composing...
     if condense_jobs:
@@ -154,11 +156,8 @@ def gcloud_compose_vcf_from_manifest(
         else:
             threads = ''
 
-        final_job.image(image_path('bcftools'))
-        final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
-
-        # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
-        # will still be a block-gzipped result. We generate both index types as futureproofing
+        # As each separate VCF is block-gzipped, concatenating will be a block-gzipped result.
+        # We generate both index types as future-proofing
         final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
         final_job.command(f'tabix {threads} {final_job.output["vcf.bgz"]}')
         final_job.command(f'tabix {threads} -C {final_job.output["vcf.bgz"]}')
