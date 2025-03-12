@@ -45,7 +45,6 @@ def submit_dragen_run(
         analysisInput=NextflowAnalysisInput(
             inputs=[
                 AnalysisDataInput(parameterCode='crams', dataIds=[cram_id]),
-                AnalysisDataInput(parameterCode='crais', dataIds=[cram_index_id]),
                 AnalysisDataInput(parameterCode='ref_tar', dataIds=[dragen_ht_id]),
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
                 AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
