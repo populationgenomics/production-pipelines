@@ -269,7 +269,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         return self.make_outputs(cohort, data=output, jobs=job)
 
 
-@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ExtractVcfFromCohortMt])
+@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ConcatenateVcfFragments])
 class JumpAnnotationsFromHtToFinalMt(CohortStage):
     """
     Join the annotated sites-only VCF, with AlphaMissense, and with gene/transcript information
