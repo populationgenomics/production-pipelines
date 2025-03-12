@@ -71,6 +71,7 @@ def submit_dragen_run(
             ],
         ),
     )
+    logging.info(body)
     try:
         api_response = api_instance.create_nextflow_analysis(
             path_params=project_id,
