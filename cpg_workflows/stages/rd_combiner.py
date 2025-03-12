@@ -169,7 +169,7 @@ def get_family_sequencing_groups(dataset: Dataset) -> dict:
     import hashlib
 
     h = hashlib.sha256(''.join(sorted(family_sg_ids)).encode()).hexdigest()[:4]
-    name_suffix = f'{len(family_sg_ids)}_sgs-{len(only_family_ids)}_families_{h}'
+    name_suffix = f'{len(family_sg_ids)}_sgs-{len(only_family_ids)}_families-{h}'
 
     return {'family_sg_ids': family_sg_ids, 'name_suffix': name_suffix}
 
