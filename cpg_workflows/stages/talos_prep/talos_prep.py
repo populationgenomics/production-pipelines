@@ -171,7 +171,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         job.image(image_path('bcftools_120'))
         job.cpu(4)
         job.memory('highmem')
-        job.storage('10G')
+        job.storage('20G')
 
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
@@ -232,7 +232,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'tar -xf {alphamissense_tar} -C $BATCH_TMPDIR')
         job.cpu(4)
-        job.storage('10Gi')
+        job.storage('20Gi')
         job.memory('highmem')
         job.command(
             f'convert_annotated_vcf_to_ht '
@@ -276,7 +276,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         job.command(f'tar -xf {annotations} -C $BATCH_TMPDIR')
         job.cpu(4)
         job.memory('highmem')
-        job.storage('10Gi')
+        job.storage('100Gi')
         job.command(
             f'transfer_annotations_to_vcf '
             f'--input {vcf_in} '
