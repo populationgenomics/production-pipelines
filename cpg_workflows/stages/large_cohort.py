@@ -343,9 +343,12 @@ class MakeSiteOnlyVcf(CohortStage):
         site_only_version = site_only_version or get_workflow().output_version
 
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
-            'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            # 'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
+            # 'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'ht': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'siteonly.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
