@@ -36,7 +36,7 @@ from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.stages.talos import query_for_latest_hail_object
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import get_logger, ExpectedResultT
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_batch, get_workflow, stage
 
 
@@ -88,71 +88,100 @@ class ExtractVcfFromCohortMt(CohortStage):
         job = get_batch().new_job(f'Extract VCF representations from {input_mt} for {cohort.id}')
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'extract_vcf_from_mt --input {input_mt} --output {str(outputs["vcf_dir"])} --output_sites_only {str(outputs["sites_only_vcf_dir"])} --bed {bed}')
+        job.command(
+            f"""
+            extract_vcf_from_mt \
+            --input {input_mt} \
+            --output {str(outputs['vcf_dir'])} \
+            --output_sites_only {str(outputs['sites_only_vcf_dir'])} \
+            --bed {bed}
+            """,
+        )
 
         return self.make_outputs(cohort, outputs, jobs=job)
 
 
 @stage(required_stages=ExtractVcfFromCohortMt)
-class ConcatenateVcfFragments(CohortStage):
+class ConcatenateSitesOnlyVcfFragments(CohortStage):
     """
     glue all the mini-VCFs together
     """
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
 
         cohort_prefix = get_workflow().cohort_prefix(cohort)
-        return {
-            'vcf': cohort_prefix / f'{cohort.id}_reassembled.vcf.bgz',
-            'sites_only': cohort_prefix / f'{cohort.id}_sites_only_reassembled.vcf.bgz',
-        }
+        return cohort_prefix / f'{cohort.id}_sites_only_reassembled.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         trigger a rolling merge using gcloud compose, gluing all the individual files together
         """
 
-        outputs = self.expected_outputs(cohort)
-        prior_outputs = inputs.as_dict(cohort, ExtractVcfFromCohortMt)
+        output = self.expected_outputs(cohort)
+        sites_manifest = inputs.as_dict(cohort, ExtractVcfFromCohortMt)['sites_only_vcf_manifest']
 
-        full_manifest = prior_outputs['vcf_manifest']
-        sites_manifest = prior_outputs['sites_only_vcf_manifest']
-
-        all_jobs = []
-
-        for name, in_path, out_path, final_size in [
-            ('full', full_manifest, outputs['vcf'], '100Gi'),
-            ('sites', sites_manifest, outputs['sites_only'], '100Gi'),
-        ]:
-            if not in_path.exists():
-                raise ValueError(
-                    f'Manifest file {str(in_path)} does not exist, '
-                    f'run the rd_combiner workflow with workflows.last_stages=[ExtractVcfFromCohortMt]',
-                )
-            jobs = gcloud_compose_vcf_from_manifest(
-                manifest_path=in_path,
-                intermediates_path=str(self.tmp_prefix / f'{name}_temporary_compose_intermediates'),
-                output_path=str(out_path),
-                job_attrs={'stage': self.name},
-                final_size=final_size,
+        if not sites_manifest.exists():
+            raise ValueError(
+                f'Manifest file {str(sites_manifest)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[ExtractVcfFromCohortMt]',
             )
 
-            all_jobs.extend(jobs)
-        return self.make_outputs(cohort, data=outputs, jobs=all_jobs)
+        jobs = gcloud_compose_vcf_from_manifest(
+            manifest_path=sites_manifest,
+            intermediates_path=str(self.tmp_prefix / 'sites_temporary_compose_intermediates'),
+            output_path=str(output),
+            job_attrs={'stage': self.name},
+            final_size='10Gi',
+        )
+        return self.make_outputs(cohort, data=output, jobs=jobs)
 
 
-@stage(required_stages=ConcatenateVcfFragments)
+@stage(required_stages=ExtractVcfFromCohortMt)
+class ConcatenateFullVcfFragments(CohortStage):
+    """
+    glue all the mini-VCFs together
+    """
+    def expected_outputs(self, cohort: Cohort) -> Path:
+
+        cohort_prefix = get_workflow().cohort_prefix(cohort)
+        return cohort_prefix / f'{cohort.id}_reassembled.vcf.bgz'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        """
+        trigger a rolling merge using gcloud compose, gluing all the individual files together
+        """
+
+        output = self.expected_outputs(cohort)
+
+        full_manifest = inputs.as_dict(cohort, ExtractVcfFromCohortMt)['vcf_manifest']
+        if not full_manifest.exists():
+            raise ValueError(
+                f'Manifest file {str(full_manifest)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[ExtractVcfFromCohortMt]',
+            )
+
+        jobs = gcloud_compose_vcf_from_manifest(
+            manifest_path=full_manifest,
+            intermediates_path=str(self.tmp_prefix / 'full_temporary_compose_intermediates'),
+            output_path=str(output),
+            job_attrs={'stage': self.name},
+            final_size='100Gi',
+        )
+        return self.make_outputs(cohort, data=output, jobs=jobs)
+
+
+@stage(required_stages=ConcatenateSitesOnlyVcfFragments)
 class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
     """
     Annotate this cohort joint-call VCF with gnomad frequencies, write to tmp storage
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / 'gnomad_frequency_annotated.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
 
-        sites_vcf = get_batch().read_input(str(inputs.as_dict(cohort, ConcatenateVcfFragments)['sites_only']))
+        sites_vcf = get_batch().read_input(str(inputs.as_path(cohort, ConcatenateSitesOnlyVcfFragments)))
 
         # this is a single whole-genome file, generated by the echtvar workflow
         gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar']))
@@ -273,7 +302,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         return self.make_outputs(cohort, data=output, jobs=job)
 
 
-@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ConcatenateVcfFragments])
+@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ConcatenateFullVcfFragments])
 class JumpAnnotationsFromHtToFinalMt(CohortStage):
     """
     Join the annotated sites-only VCF, with AlphaMissense, and with gene/transcript information
@@ -288,7 +317,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         output = self.expected_outputs(cohort)
 
         # get the full VCF & index
-        vcf = str(inputs.as_dict(cohort, ConcatenateVcfFragments)['vcf'])
+        vcf = str(inputs.as_dict(cohort, ConcatenateFullVcfFragments))
         vcf_in = get_batch().read_input_group(**{'vcf.bgz': vcf, 'vcf.bgz.tbi': f'{vcf}.tbi'})['vcf.bgz']
 
         # get the table of compressed annotations
