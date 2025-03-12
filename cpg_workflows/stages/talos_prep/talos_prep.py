@@ -289,11 +289,11 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         job.command(
             f'convert_annotated_vcf_to_ht '
             f'--input {vcf} '
-            f'--am {alphamissense} '
+            f'--output {str(output)} '
             f'--gene_bed {gene_roi} '
+            f'--am {alphamissense} '
             f'--mane {mane_json} '
-            f'--output {str(output)}'
-            f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")}',
+            f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")} ',
         )
 
         return self.make_outputs(cohort, data=output, jobs=job)
