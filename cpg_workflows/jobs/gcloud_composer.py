@@ -81,7 +81,8 @@ def gcloud_compose_vcf_from_manifest(
     intermediates_path: str,
     output_path: str,
     job_attrs: dict,
-    final_size: str | None = None,
+    final_size: str = '10Gi',
+    high_resource_index: bool = False,
 ) -> list[hb.batch.job.Job]:
     """
     compose a series gcloud commands to condense a list of VCF fragments into a single VCF
@@ -95,6 +96,8 @@ def gcloud_compose_vcf_from_manifest(
         intermediates_path (str): path to a bucket, where intermediate files will be written
         output_path (str): path to write the final file to. Must be in the same bucket as the manifest
         job_attrs (dict): job attributes
+        final_size (str): estimated size of the final output (defaults to 10Gi)
+        high_resource_index (bool): whether to use a high resource indexing job (e.g. large full VCF)
 
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
@@ -139,14 +142,23 @@ def gcloud_compose_vcf_from_manifest(
             'vcf.bgz.csi': '{root}.vcf.bgz.csi',
         },
     )
+
+    # apply large resources if the output is massive
+    if high_resource_index:
+        final_job.cpu(8)
+        final_job.memory(32)
+        threads = '--threads 8'
+    else:
+        threads = ''
+
     final_job.image(image_path('bcftools'))
-    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size or '10Gi'))
+    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
 
     # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
     # will still be a block-gzipped result. We generate both index types as futureproofing
     final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
-    final_job.command(f'tabix {final_job.output["vcf.bgz"]}')
-    final_job.command(f'tabix -C {final_job.output["vcf.bgz"]}')
+    final_job.command(f'tabix {threads} {final_job.output["vcf.bgz"]}')
+    final_job.command(f'tabix {threads} -C {final_job.output["vcf.bgz"]}')
 
     get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
 
