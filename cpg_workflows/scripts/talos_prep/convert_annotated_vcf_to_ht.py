@@ -282,7 +282,7 @@ def main(
         gene_bed (str): path to a BED file containing gene IDs, derived from the Ensembl GFF3 file
         alpha_m (str): path to the AlphaMissense Hail Table, required
         mane (str | None): path to a MANE Hail Table for enhanced annotation
-        checkpoint (str | None): path to checkpoint to, if desired
+        checkpoint_dir (str | None): path to checkpoint to, if desired
     """
 
     init_batch()

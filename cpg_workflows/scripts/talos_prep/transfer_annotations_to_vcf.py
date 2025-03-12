@@ -8,11 +8,10 @@ Integrates the two, writing a MatrixTable representation of the fully annotated 
 
 import logging
 from argparse import ArgumentParser
-from pathlib import Path
 
 import hail as hl
 
-from cpg_utils.hail_batch import get_batch
+from cpg_utils.hail_batch import init_batch
 
 
 def cli_main():
@@ -28,10 +27,6 @@ def cli_main():
     args = parser.parse_args()
 
     assert args.output.endswith('.mt'), 'Output path must end in .mt'
-
-    # check specifically for a SUCCESS file, marking a completed hail write
-    # will fail if we accidentally pass the compressed Tarball path
-    assert (Path(args.annotations) / '_SUCCESS').exists(), 'Annotations Table does not exist'
 
     main(
         vcf_path=args.input,
