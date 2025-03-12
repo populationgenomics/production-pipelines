@@ -82,7 +82,7 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
 
 def make_vqsr_jobs(
     b: hb.Batch,
-    # input_siteonly_vcf_path: Path,
+    input_siteonly_vcf_path: Path,
     tmp_prefix: Path,
     gvcf_count: int,
     scatter_count: int | None = None,
@@ -95,7 +95,7 @@ def make_vqsr_jobs(
     Add jobs that perform the allele-specific VQSR variant QC
 
     @param b: Batch object to add jobs to
-    # @param input_siteonly_vcf_path: path to a site-only VCF
+    @param input_siteonly_vcf_path: path to a site-only VCF
     @param tmp_prefix: bucket for intermediate files
     @param gvcf_count: number of input samples. Can't read from combined_mt_path as it
            might not be yet generated the point of Batch job submission
@@ -143,8 +143,8 @@ def make_vqsr_jobs(
 
     siteonly_vcf = b.read_input_group(
         **{
-            # 'vcf.gz': str(input_siteonly_vcf_path),
-            # 'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
+            'vcf.gz': str(input_siteonly_vcf_path),
+            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
         },
     )
 

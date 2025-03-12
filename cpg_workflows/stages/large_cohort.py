@@ -405,10 +405,10 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import vqsr
 
-        # vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
+        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
-            # input_siteonly_vcf_path=vcf_path,
+            input_siteonly_vcf_path=vcf_path,
             gvcf_count=len(cohort.get_sequencing_groups()),
             out_path=self.expected_outputs(cohort)['vcf'],
             tmp_prefix=self.tmp_prefix,
@@ -437,7 +437,7 @@ class LoadVqsr(CohortStage):
             query_command(
                 load_vqsr,
                 load_vqsr.run.__name__,
-                # str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(inputs.as_path(cohort, Vqsr, key='vcf')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
