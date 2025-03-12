@@ -158,6 +158,9 @@ def get_family_sequencing_groups(dataset: Dataset) -> dict:
     """
     only_family_ids = set(config_retrieve(['workflow', dataset.name, 'only_families'], []))
     # keep only the SG IDs for the families in the only_families list
+    get_logger.info(f'Finding sequencing groups for families {only_family_ids} in dataset {dataset.name}')
+    for sg in dataset.get_sequencing_groups():
+        print(sg.id, sg.pedigree.fam_id)
     family_sg_ids = [sg.id for sg in dataset.get_sequencing_groups() if sg.pedigree.fam_id in only_family_ids]
     if not family_sg_ids:
         raise ValueError(f'No sequencing groups found for families {only_family_ids} in dataset {dataset.name}. Available sequencing groups: {[sg.id for sg in dataset.get_sequencing_groups()]}')
