@@ -75,10 +75,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(
-            f'extract_vcf_from_mt '
-            f'--mt {input_mt} '
-            f'--out {str(outputs)} '
-            f'--bed {bed}',
+            f'extract_vcf_from_mt ' f'--mt {input_mt} ' f'--out {str(outputs)} ' f'--bed {bed}',
         )
 
         return self.make_outputs(cohort, outputs, jobs=job)
