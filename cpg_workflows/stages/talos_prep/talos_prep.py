@@ -276,7 +276,8 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
 
         # ensembl version used to generate region of interest
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
-        gene_roi = reference_path(f'ensembl_{ensembl_version}/bed')
+        # local file parsed into a dict
+        gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
 
         # get the annotated VCF & index
         vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))
