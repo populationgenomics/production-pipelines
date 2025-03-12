@@ -156,7 +156,6 @@ def get_family_sequencing_groups(dataset: Dataset) -> dict:
     Get the subset of sequencing groups that are in the specified families for a dataset
     Returns a dict containing the sequencing groups and a name suffix for the outputs
     """
-    dataset_name = dataset.name (+ '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else '')
     only_family_ids = set(config_retrieve(['workflow', dataset.name, 'only_families'], []))
     # keep only the SG IDs for the families in the only_families list
     family_sg_ids = [sg.id for sg in dataset.get_sequencing_groups() if sg.pedigree.fam_id in only_family_ids]
