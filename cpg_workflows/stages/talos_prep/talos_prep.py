@@ -108,7 +108,8 @@ class GenerateSitesOnlyVcfWithBcftools(CohortStage):
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         job.image(image_path('bcftools_120'))
         job.storage('100Gi')
-        job.command(f"bcftools view -G --write-index=tbi -Oz -o {job.output['vcf.bgz']} {vcf_inputs}")
+        job.cpu(4)
+        job.command(f"bcftools view --threads 4 -G --write-index=tbi -Oz -o {job.output['vcf.bgz']} {vcf_inputs}")
         get_batch().write_output(job.output, str(outputs).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(cohort, outputs, jobs=job)
