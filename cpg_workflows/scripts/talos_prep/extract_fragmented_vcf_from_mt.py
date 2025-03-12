@@ -99,12 +99,7 @@ def cli_main():
         help='Region BED file',
     )
     args = parser.parse_args()
-    main(
-        mt_path=args.input,
-        output=args.output,
-        output_sites_only=args.output_sites_only,
-        bed=args.bed
-    )
+    main(mt_path=args.input, output=args.output, output_sites_only=args.output_sites_only, bed=args.bed)
 
 
 if __name__ == '__main__':

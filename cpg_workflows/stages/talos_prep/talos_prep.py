@@ -39,7 +39,6 @@ from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_batch, get_workflow, stage
 
-
 SHARD_MANIFEST = 'shard-manifest.txt'
 
 
@@ -106,6 +105,7 @@ class ConcatenateSitesOnlyVcfFragments(CohortStage):
     """
     glue all the mini-VCFs together
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
 
         cohort_prefix = get_workflow().cohort_prefix(cohort)
@@ -140,6 +140,7 @@ class ConcatenateFullVcfFragments(CohortStage):
     """
     glue all the mini-VCFs together
     """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
 
         cohort_prefix = get_workflow().cohort_prefix(cohort)
