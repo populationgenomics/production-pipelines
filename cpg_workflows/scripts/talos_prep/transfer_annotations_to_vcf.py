@@ -54,7 +54,7 @@ def main(
         annotations (str): path to a Hail Table containing annotations
     """
 
-    hl.context.init_spark(master='local[4]', default_reference='GRCh38')
+    hl.context.init_spark(master='local[8]', default_reference='GRCh38')
 
     # read the VCF into a MatrixTable
     mt = hl.import_vcf(

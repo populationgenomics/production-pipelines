@@ -327,9 +327,9 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         job = get_batch().new_job('Combine annotations and full VCF')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(f'tar -xf {annotations} -C $BATCH_TMPDIR')
-        job.cpu(4)
+        job.cpu(16)
         job.memory('highmem')
-        job.storage('100Gi')
+        job.storage('250Gi')
         job.command(
             f'transfer_annotations_to_vcf '
             f'--input {vcf_in} '
@@ -338,6 +338,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         )
         # make some more room on the VM?
         job.command(f'rm -r ${{BATCH_TMPDIR}}/{cohort.id}_annotations.ht')
+        job.command(f'rm vcf_in')
 
         # create a compressed tarball
         job.command(f'tar -czf {job.output} {cohort.id}_talos_ready.mt')
