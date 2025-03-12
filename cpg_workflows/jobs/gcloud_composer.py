@@ -83,6 +83,7 @@ def gcloud_compose_vcf_from_manifest(
     job_attrs: dict,
     final_size: str = '10Gi',
     high_resource_index: bool = False,
+    create_index: bool = True,
 ) -> list[hb.batch.job.Job]:
     """
     compose a series gcloud commands to condense a list of VCF fragments into a single VCF
@@ -98,6 +99,7 @@ def gcloud_compose_vcf_from_manifest(
         job_attrs (dict): job attributes
         final_size (str): estimated size of the final output (defaults to 10Gi)
         high_resource_index (bool): whether to use a high resource indexing job (e.g. large full VCF)
+        create_index (bool): whether to create a tabix index
 
     Returns:
         a list of the jobs which will generate a single output from the manifest of fragment paths
@@ -135,32 +137,36 @@ def gcloud_compose_vcf_from_manifest(
         final_job.depends_on(condense_jobs[-1])
     condense_jobs.append(final_job)
 
-    final_job.declare_resource_group(
-        output={
-            'vcf.bgz': '{root}.vcf.bgz',
-            'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
-            'vcf.bgz.csi': '{root}.vcf.bgz.csi',
-        },
-    )
+    if create_index:
+        final_job.declare_resource_group(
+            output={
+                'vcf.bgz': '{root}.vcf.bgz',
+                'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+                'vcf.bgz.csi': '{root}.vcf.bgz.csi',
+            },
+        )
 
-    # apply large resources if the output is massive
-    if high_resource_index:
-        final_job.cpu(8)
-        final_job.memory(32)
-        threads = '--threads 8'
+        # apply large resources if the output is massive
+        if high_resource_index:
+            final_job.cpu(8)
+            final_job.memory(32)
+            threads = '--threads 8'
+        else:
+            threads = ''
+
+        final_job.image(image_path('bcftools'))
+        final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
+
+        # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
+        # will still be a block-gzipped result. We generate both index types as futureproofing
+        final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
+        final_job.command(f'tabix {threads} {final_job.output["vcf.bgz"]}')
+        final_job.command(f'tabix {threads} -C {final_job.output["vcf.bgz"]}')
+        get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
+
     else:
-        threads = ''
-
-    final_job.image(image_path('bcftools'))
-    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
-
-    # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
-    # will still be a block-gzipped result. We generate both index types as futureproofing
-    final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
-    final_job.command(f'tabix {threads} {final_job.output["vcf.bgz"]}')
-    final_job.command(f'tabix {threads} -C {final_job.output["vcf.bgz"]}')
-
-    get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
+        final_job.command(f'mv {input_vcf} {final_job.output}')
+        get_batch().write_output(final_job.output, output_path)
 
     # don't start the batch straight away
     return condense_jobs

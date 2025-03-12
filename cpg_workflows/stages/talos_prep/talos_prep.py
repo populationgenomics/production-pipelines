@@ -166,7 +166,7 @@ class ConcatenateFullVcfFragments(CohortStage):
             output_path=str(output),
             job_attrs={'stage': self.name},
             final_size='100Gi',
-            high_resource_index=True,
+            create_index=False
         )
         return self.make_outputs(cohort, data=output, jobs=jobs)
 
@@ -319,8 +319,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         output = self.expected_outputs(cohort)
 
         # get the full VCF & index
-        vcf = str(inputs.as_dict(cohort, ConcatenateFullVcfFragments))
-        vcf_in = get_batch().read_input_group(**{'vcf.bgz': vcf, 'vcf.bgz.tbi': f'{vcf}.tbi'})['vcf.bgz']
+        vcf_in = get_batch().read_input(str(inputs.as_path(cohort, ConcatenateFullVcfFragments)))
 
         # get the table of compressed annotations
         annotations = get_batch().read_input(str(inputs.as_path(cohort, ProcessAnnotatedSitesOnlyVcfIntoHt)))
