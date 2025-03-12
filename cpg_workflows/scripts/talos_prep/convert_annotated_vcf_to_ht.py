@@ -11,9 +11,10 @@ import json
 import logging
 from argparse import ArgumentParser
 from collections import defaultdict
-from pathlib import Path
 
 import hail as hl
+
+from cpg_utils.hail_batch import init_batch
 
 MISSING_STRING = hl.str('')
 
@@ -252,11 +253,7 @@ def cli_main():
 
     assert args.output.endswith('.ht'), 'Output path must end in .ht'
 
-    # check specifically for a SUCCESS file, marking a completed hail write
-    # will fail if we accidentally pass the compressed Tarball path
-    assert (Path(args.am) / '_SUCCESS').exists(), 'AlphaMissense Table does not exist'
-
-    main(vcf_path=args.input, output_path=args.output, gene_bed=args.gene_bed, alpha_m=args.am, mane=args.mane)
+    main(vcf_path=args.input, output_path=args.output, gene_bed=args.gene_bed, alpha_m=args.am, mane=args.mane,)
 
 
 def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str | None = None):
@@ -271,7 +268,9 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str
         alpha_m (str): path to the AlphaMissense Hail Table, required
         mane (str | None): path to a MANE Hail Table for enhanced annotation
     """
-    hl.context.init_spark(master='local[4]', default_reference='GRCh38')
+
+    init_batch()
+    # hl.context.init_spark(master='local[4]', default_reference='GRCh38')
 
     # pull and split the CSQ header line
     csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)

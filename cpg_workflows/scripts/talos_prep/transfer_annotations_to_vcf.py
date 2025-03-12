@@ -53,8 +53,8 @@ def main(
         output_path (str): path to write the resulting MatrixTable to
         annotations (str): path to a Hail Table containing annotations
     """
-
-    hl.context.init_spark(master='local[8]', default_reference='GRCh38')
+    init_batch()
+    # hl.context.init_spark(master='local[8]', default_reference='GRCh38')
 
     # read the VCF into a MatrixTable
     mt = hl.import_vcf(

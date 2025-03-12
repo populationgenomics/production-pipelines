@@ -261,14 +261,14 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> Path:
         # output will be a tarball, containing the {cohort.id}_annotations.ht directory
-        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / f'{cohort.id}_annotations.ht.tar.gz'
+        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / f'{cohort.id}_annotations.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         output = self.expected_outputs(cohort)
 
         # pull the alphamissense TarBall location from config, and localise it
-        alphamissense_tar = get_batch().read_input(reference_path('alphamissense/ht_tar'))
+        alphamissense = get_batch().read_input(reference_path('alphamissense/ht'))
 
         # mane version for gene details
         mane_version = config_retrieve(['workflow', 'mane_version'], '1.4')
@@ -276,30 +276,24 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
 
         # ensembl version used to generate region of interest
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
-        gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
+        gene_roi = reference_path(f'ensembl_{ensembl_version}/bed')
 
         # get the annotated VCF & index
         vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))
-        vcf_in = get_batch().read_input_group(**{'vcf.bgz': vcf, 'vcf.bgz.tbi': f'{vcf}.tbi'})['vcf.bgz']
 
         job = get_batch().new_job('Combine annotated VCF, AlphaMissense, and MANE annotations')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'tar -xf {alphamissense_tar} -C $BATCH_TMPDIR')
         job.cpu(4)
         job.storage('20Gi')
         job.memory('highmem')
         job.command(
             f'convert_annotated_vcf_to_ht '
-            f'--input {vcf_in} '
-            f'--am ${{BATCH_TMPDIR}}/alphamissense_38.ht '
+            f'--input {vcf} '
+            f'--am {alphamissense} '
             f'--gene_bed {gene_roi} '
             f'--mane {mane_json} '
-            f'--output {cohort.id}_annotations.ht',
+            f'--output {str(output)}',
         )
-        job.command(f'tar -czf {job.output} {cohort.id}_annotations.ht')
-
-        # write the output
-        get_batch().write_output(job.output, str(output))
 
         return self.make_outputs(cohort, data=output, jobs=job)
 
@@ -312,38 +306,28 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}_talos_ready.mt.tar.gz'
+        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}_talos_ready.mt'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         output = self.expected_outputs(cohort)
 
         # get the full VCF & index
-        vcf_in = get_batch().read_input(str(inputs.as_path(cohort, ConcatenateFullVcfFragments)))
+        vcf = str(inputs.as_path(cohort, ConcatenateFullVcfFragments))
 
         # get the table of compressed annotations
-        annotations = get_batch().read_input(str(inputs.as_path(cohort, ProcessAnnotatedSitesOnlyVcfIntoHt)))
+        annotations = str(inputs.as_path(cohort, ProcessAnnotatedSitesOnlyVcfIntoHt))
 
         job = get_batch().new_job('Combine annotations and full VCF')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'tar -xf {annotations} -C $BATCH_TMPDIR')
         job.cpu(16)
         job.memory('highmem')
         job.storage('250Gi')
         job.command(
             f'transfer_annotations_to_vcf '
-            f'--input {vcf_in} '
-            f'--annotations ${{BATCH_TMPDIR}}/{cohort.id}_annotations.ht '
-            f'--output {cohort.id}_talos_ready.mt',
+            f'--input {vcf} '
+            f'--annotations {annotations} '
+            f'--output {str(output)}',
         )
-        # make some more room on the VM?
-        job.command(f'rm -r ${{BATCH_TMPDIR}}/{cohort.id}_annotations.ht')
-        job.command(f'rm vcf_in')
-
-        # create a compressed tarball
-        job.command(f'tar -czf {job.output} {cohort.id}_talos_ready.mt')
-
-        # write the output
-        get_batch().write_output(job.output, str(output))
 
         return self.make_outputs(cohort, data=output, jobs=job)
