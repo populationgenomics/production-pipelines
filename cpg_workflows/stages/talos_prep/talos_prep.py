@@ -292,7 +292,8 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
             f'--am {alphamissense} '
             f'--gene_bed {gene_roi} '
             f'--mane {mane_json} '
-            f'--output {str(output)}',
+            f'--output {str(output)}'
+            f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")}',
         )
 
         return self.make_outputs(cohort, data=output, jobs=job)

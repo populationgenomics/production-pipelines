@@ -249,14 +249,29 @@ def cli_main():
     parser.add_argument('--gene_bed', help='BED file containing gene mapping')
     parser.add_argument('--am', help='Hail Table containing AlphaMissense annotations', required=True)
     parser.add_argument('--mane', help='Hail Table containing MANE annotations', default=None)
+    parser.add_argument('--checkpoint_dir', help='directory to checkpoint to', default=None)
     args = parser.parse_args()
 
     assert args.output.endswith('.ht'), 'Output path must end in .ht'
 
-    main(vcf_path=args.input, output_path=args.output, gene_bed=args.gene_bed, alpha_m=args.am, mane=args.mane,)
+    main(
+        vcf_path=args.input,
+        output_path=args.output,
+        gene_bed=args.gene_bed,
+        alpha_m=args.am,
+        mane=args.mane,
+        checkpoint_dir=args.checkpoint_dir,
+    )
 
 
-def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str | None = None):
+def main(
+    vcf_path: str,
+    output_path: str,
+    gene_bed: str,
+    alpha_m: str,
+    mane: str | None = None,
+    checkpoint_dir: str | None = None,
+):
     """
     Takes a VEP-annotated VCF, reorganises into a Talos-compatible MatrixTable
     Will annotate at runtime with AlphaMissense annotations
@@ -267,6 +282,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str
         gene_bed (str): path to a BED file containing gene IDs, derived from the Ensembl GFF3 file
         alpha_m (str): path to the AlphaMissense Hail Table, required
         mane (str | None): path to a MANE Hail Table for enhanced annotation
+        checkpoint (str | None): path to checkpoint to, if desired
     """
 
     init_batch()
@@ -279,7 +295,7 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str
     mt = hl.import_vcf(vcf_path, array_elements_required=False, force_bgz=True)
 
     # checkpoint the rows as a Table locally to make everything downstream faster
-    ht = mt.rows().checkpoint('checkpoint.mt', overwrite=True, _read_if_exists=True)
+    ht = mt.rows().checkpoint(f'{checkpoint_dir}/checkpoint.mt', overwrite=True, _read_if_exists=True)
 
     # re-shuffle the BCSQ elements
     ht = csq_strings_into_hail_structs(csq_fields, ht)
@@ -295,10 +311,6 @@ def main(vcf_path: str, output_path: str, gene_bed: str, alpha_m: str, mane: str
 
     # drop the BCSQ field
     ht = ht.annotate(info=ht.info.drop('BCSQ'))
-
-    ## commented this out for now, may become important at higher sample counts
-    # # checkpoint before rummaging around in MANE table
-    # mt = mt.checkpoint('checkpoint_pre_mane.mt', overwrite=True, _read_if_exists=True)
 
     ht = apply_mane_annotations(ht, mane_path=mane)
 

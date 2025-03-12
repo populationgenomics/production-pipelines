@@ -12,6 +12,8 @@ from pathlib import Path
 
 import hail as hl
 
+from cpg_utils.hail_batch import get_batch
+
 
 def cli_main():
     """
