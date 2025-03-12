@@ -81,6 +81,7 @@ def gcloud_compose_vcf_from_manifest(
     intermediates_path: str,
     output_path: str,
     job_attrs: dict,
+    final_size: str | None = None,
 ) -> list[hb.batch.job.Job]:
     """
     compose a series gcloud commands to condense a list of VCF fragments into a single VCF
@@ -139,7 +140,7 @@ def gcloud_compose_vcf_from_manifest(
         },
     )
     final_job.image(image_path('bcftools'))
-    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], '10Gi'))
+    final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size or '10Gi'))
 
     # hypothesis here is that as each separate VCF is block-gzipped, concatenating the results
     # will still be a block-gzipped result. We generate both index types as futureproofing

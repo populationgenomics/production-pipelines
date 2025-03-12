@@ -119,7 +119,10 @@ class ConcatenateVcfFragments(CohortStage):
 
         all_jobs = []
 
-        for in_path, out_path in [(full_manifest, outputs['vcf']), (sites_manifest, outputs['sites_only'])]:
+        for in_path, out_path, final_size in [
+            (full_manifest, outputs['vcf'], '100Gi'),
+            (sites_manifest, outputs['sites_only'], '100Gi'),
+        ]:
             if not in_path.exists():
                 raise ValueError(
                     f'Manifest file {str(in_path)} does not exist, '
@@ -130,6 +133,7 @@ class ConcatenateVcfFragments(CohortStage):
                 intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
                 output_path=str(out_path),
                 job_attrs={'stage': self.name},
+                final_size=final_size,
             )
 
             all_jobs.extend(jobs)
