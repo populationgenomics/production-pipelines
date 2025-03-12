@@ -379,7 +379,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(self.expected_outputs(cohort)['vcf']),
+                # str(self.expected_outputs(cohort)['vcf']),
                 str(self.expected_outputs(cohort)['ht']),
                 str(self.tmp_prefix),
                 init_batch_args=init_batch_args,
