@@ -268,7 +268,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         output = self.expected_outputs(cohort)
 
         # pull the alphamissense TarBall location from config, and localise it
-        alphamissense = get_batch().read_input(reference_path('alphamissense/ht'))
+        alphamissense = reference_path('alphamissense/ht')
 
         # mane version for gene details
         mane_version = config_retrieve(['workflow', 'mane_version'], '1.4')
