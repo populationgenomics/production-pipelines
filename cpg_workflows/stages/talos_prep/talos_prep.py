@@ -88,7 +88,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         job = get_batch().new_job(f'Extract VCF representations from {input_mt} for {cohort.id}')
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
-        job.command(f'extract_vcf_from_mt --mt {input_mt} --out {str(outputs)} --bed {bed}')
+        job.command(f'extract_vcf_from_mt --input {input_mt} --output {str(outputs["vcf_dir"])} --output_sites_only {str(outputs["sites_only_vcf_dir"])} --bed {bed}')
 
         return self.make_outputs(cohort, outputs, jobs=job)
 
