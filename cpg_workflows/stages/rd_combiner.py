@@ -151,11 +151,13 @@ def manually_find_ids_from_vds(vds_path: str) -> set[str]:
 
 
 @cache
-def get_family_sequencing_groups(dataset: Dataset) -> dict:
+def get_family_sequencing_groups(dataset: Dataset) -> dict | None:
     """
     Get the subset of sequencing groups that are in the specified families for a dataset
     Returns a dict containing the sequencing groups and a name suffix for the outputs
     """
+    if not config_retrieve(['workflow', dataset.name, 'only_families'], []):
+        return None
     only_family_ids = set(config_retrieve(['workflow', dataset.name, 'only_families'], []))
     # keep only the SG IDs for the families in the only_families list
     get_logger().info(f'Finding sequencing groups for families {only_family_ids} in dataset {dataset.name}')
@@ -629,8 +631,7 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
 
         If subsetting to certain families, the output will be named accordingly
         """
-        if config_retrieve(['workflow', dataset.name, 'only_families'], []):
-            family_sgs = get_family_sequencing_groups(dataset)
+        if family_sgs := get_family_sequencing_groups(dataset):
             return {
                 'mt': dataset.tmp_prefix()
                 / 'mt'
@@ -662,8 +663,8 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
 
         variant_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
 
-        if config_retrieve(['workflow', dataset.name, 'only_families'], []):
-            family_sg_ids = get_family_sequencing_groups(dataset)['family_sg_ids']
+        if family_sgs := get_family_sequencing_groups(dataset):
+            family_sg_ids = family_sgs['family_sg_ids']
         else:
             family_sg_ids = None
 
@@ -698,8 +699,7 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         """
         Expected to generate a matrix table
         """
-        if config_retrieve(['workflow', dataset.name, 'only_families'], []):
-            family_sgs = get_family_sequencing_groups(dataset)
+        if family_sgs := get_family_sequencing_groups(dataset):
             return (
                 dataset.prefix()
                 / 'mt'
@@ -716,8 +716,9 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
             get_logger().info(f'Skipping AnnotateDataset mt subsetting for {dataset}')
             return self.make_outputs(dataset)
 
-        # choose the input MT based on the number of datasets in the MultiCohort
-        if len(get_multicohort().get_datasets()) == 1:
+        family_sgs = get_family_sequencing_groups(dataset)
+        # choose the input MT based on the number of datasets in the MultiCohort and the presence of family SGs
+        if len(get_multicohort().get_datasets()) == 1 and family_sgs is None:
             input_mt = inputs.as_path(target=get_multicohort(), stage=AnnotateCohortSmallVariantsWithHailQuery)
         else:
             input_mt = inputs.as_path(target=dataset, stage=SubsetMatrixTableToDatasetUsingHailQuery, key='mt')
@@ -759,8 +760,7 @@ class ExportMtAsEsIndex(DatasetStage):
         Expected to generate a Seqr index, which is not a file
         """
         sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
-        if config_retrieve(['workflow', dataset.name, 'only_families'], []):
-            family_sgs = get_family_sequencing_groups(dataset)
+        if family_sgs := get_family_sequencing_groups(dataset):
             index_name = (
                 f'{dataset.name}-{sequencing_type}-{family_sgs["name_suffix"]}-{get_workflow().run_timestamp}'.lower()
             )
