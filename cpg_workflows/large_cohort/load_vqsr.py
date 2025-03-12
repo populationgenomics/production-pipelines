@@ -7,10 +7,11 @@ from cpg_workflows.utils import can_reuse
 
 
 def run(
-    site_only_vcf_path: str,
+    # site_only_vcf_path: str,
     out_ht_path: str,
 ):
-    load_vqsr(site_only_vcf_path, out_ht_path)
+    # load_vqsr(site_only_vcf_path, out_ht_path)
+    pass
 
 
 def load_vqsr(

@@ -394,56 +394,56 @@ class MakeSiteOnlyVcf(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
-# @stage(required_stages=MakeSiteOnlyVcf)
-# class Vqsr(CohortStage):
-#     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-#         return {
-#             'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
-#             'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
-#         }
+@stage(required_stages=MakeSiteOnlyVcf)
+class Vqsr(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
+            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
+        }
 
-#     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-#         from cpg_workflows.jobs import vqsr
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.jobs import vqsr
 
-#         vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
-#         jobs = vqsr.make_vqsr_jobs(
-#             b=get_batch(),
-#             input_siteonly_vcf_path=vcf_path,
-#             gvcf_count=len(cohort.get_sequencing_groups()),
-#             out_path=self.expected_outputs(cohort)['vcf'],
-#             tmp_prefix=self.tmp_prefix,
-#             use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
-#             intervals_path=get_config()['workflow'].get('intervals_path'),
-#             job_attrs=self.get_job_attrs(),
-#         )
-#         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+        # vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
+        jobs = vqsr.make_vqsr_jobs(
+            b=get_batch(),
+            # input_siteonly_vcf_path=vcf_path,
+            gvcf_count=len(cohort.get_sequencing_groups()),
+            out_path=self.expected_outputs(cohort)['vcf'],
+            tmp_prefix=self.tmp_prefix,
+            use_as_annotations=get_config()['workflow'].get('use_as_vqsr', True),
+            intervals_path=get_config()['workflow'].get('intervals_path'),
+            job_attrs=self.get_job_attrs(),
+        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-# @stage(required_stages=Vqsr)
-# class LoadVqsr(CohortStage):
-#     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-#         return get_workflow().prefix / 'vqsr.ht'
+@stage(required_stages=Vqsr)
+class LoadVqsr(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return get_workflow().prefix / 'vqsr.ht'
 
-#     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-#         from cpg_workflows.large_cohort import load_vqsr
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import load_vqsr
 
-#         j = get_batch().new_job(
-#             'LoadVqsr',
-#             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-#         )
-#         j.image(image_path('cpg_workflows'))
+        j = get_batch().new_job(
+            'LoadVqsr',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
 
-#         j.command(
-#             query_command(
-#                 load_vqsr,
-#                 load_vqsr.run.__name__,
-#                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
-#                 str(self.expected_outputs(cohort)),
-#                 setup_gcp=True,
-#             ),
-#         )
+        j.command(
+            query_command(
+                load_vqsr,
+                load_vqsr.run.__name__,
+                # str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
 
-#         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
 @stage(required_stages=[Combiner, SampleQC, Relatedness, Ancestry, MakeSiteOnlyVcf])
