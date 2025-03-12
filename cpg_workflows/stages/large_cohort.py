@@ -115,6 +115,10 @@ class Combiner(CohortStage):
             genome_build=genome_build(),
             save_path=output_paths['combiner_plan'],
             force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
+            sequencing_group_names=[
+                str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
+            ],
+            gvcf_external_header=new_sg_gvcfs[0],
             gvcf_paths=new_sg_gvcfs,
             vds_paths=vds_paths,
         )
