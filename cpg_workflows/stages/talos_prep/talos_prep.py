@@ -119,9 +119,9 @@ class ConcatenateVcfFragments(CohortStage):
 
         all_jobs = []
 
-        for in_path, out_path, final_size in [
-            (full_manifest, outputs['vcf'], '100Gi'),
-            (sites_manifest, outputs['sites_only'], '100Gi'),
+        for name, in_path, out_path, final_size in [
+            ('full', full_manifest, outputs['vcf'], '100Gi'),
+            ('sites', sites_manifest, outputs['sites_only'], '100Gi'),
         ]:
             if not in_path.exists():
                 raise ValueError(
@@ -130,7 +130,7 @@ class ConcatenateVcfFragments(CohortStage):
                 )
             jobs = gcloud_compose_vcf_from_manifest(
                 manifest_path=in_path,
-                intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
+                intermediates_path=str(self.tmp_prefix / f'{name}_temporary_compose_intermediates'),
                 output_path=str(out_path),
                 job_attrs={'stage': self.name},
                 final_size=final_size,
