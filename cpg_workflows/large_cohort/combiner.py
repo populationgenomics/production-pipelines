@@ -27,6 +27,8 @@ def run(
     genome_build: str,
     save_path: str | None,
     force_new_combiner: bool = False,
+    sequencing_group_names: list[str] | None = None,
+    gvcf_external_header: str | None = None,
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
@@ -79,6 +81,11 @@ def run(
             output_path=output_vds_path,
             save_path=save_path,
             gvcf_paths=gvcf_paths,
+            gvcf_sample_names=sequencing_group_names,
+            # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
+            # will be ignored. The first gvcf path works fine as a header because it will
+            # be only read until the last line that begins with "#":
+            gvcf_external_header=gvcf_external_header,
             vds_paths=vds_paths,
             reference_genome=genome_build,
             temp_path=tmp_prefix,
