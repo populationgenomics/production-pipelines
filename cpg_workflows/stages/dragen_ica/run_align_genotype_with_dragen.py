@@ -65,9 +65,11 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='enable_cnv', value='True'),
                 AnalysisParameterInput(code='cnv_enable_self_normalization', value='True'),
                 AnalysisParameterInput(code='enable_sv', value='True'),
+                AnalysisParameterInput(code='enably_cpy2d6', value='True'),
+                AnalysisParameterInput(code='repeat_genotype_enable', value='False'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --enable-cyp2d6 true',
+                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true',
                 ),
             ],
         ),
