@@ -569,7 +569,7 @@ class RunHailFilteringSV(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         # TODO(MattWellie) reinstate this before merging anything
-        return {'test': 'dummy'}
+        return None
         paths_or_none = query_for_sv_mt(dataset.name)
         if paths_or_none:
             _sv_path, sv_file = paths_or_none
@@ -650,16 +650,16 @@ class ValidateMOI(DatasetStage):
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
-        # either find a SV vcf, or None
-        if sv_paths_or_empty := query_for_sv_mt(dataset.name):
-            hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
-            sv_path, sv_file = sv_paths_or_empty
-            labelled_sv_vcf = get_batch().read_input_group(
-                **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
-            )['vcf.bgz']
-            sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
-        else:
-            sv_vcf_arg = ''
+        sv_vcf_arg = ''
+        # # either find a SV vcf, or None
+        # if sv_paths_or_empty := query_for_sv_mt(dataset.name):
+        #     hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
+        #     sv_path, sv_file = sv_paths_or_empty
+        #     labelled_sv_vcf = get_batch().read_input_group(
+        #         **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
+        #     )['vcf.bgz']
+        #     sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
+        # else:''
 
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
