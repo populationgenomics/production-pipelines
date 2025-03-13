@@ -74,7 +74,6 @@ def frequency_annotations(
 
     # Exome parsing
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
-        print('making it here')
         # clear sample qc filters as this data has not been qc'd yet
         sample_qc_ht = sample_qc_ht.annotate(filters=hl.empty_set(hl.tstr))
         # sample_qc_ht has no females in it. This is causing errors in freq_meta_dict where we have no 'XY_adj'. Forcing
@@ -108,59 +107,40 @@ def frequency_annotations(
     # That's why we need to convert it to a "dense" representation, effectively
     # dropping reference blocks.
     mt = hl.vds.to_dense_mt(vds)
-    print(f'Matrix table sg indices: {mt.s.collect()}')
 
     mt = mt.filter_rows(hl.len(mt.alleles) > 1)
-    print(f'Matrix table sg indices: {mt.s.collect()}')
 
     # Filter samples
-    print(f'Matrix table sg indices before filtering: {mt.s.collect()}')
-    print(f'sample qc table sg indices before filtering: {sample_qc_ht.s.collect()}')
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
-    print(f'Matrix table sg indices after filtering: {mt.s.collect()}')
-    print(f'sample qc table sg indices after filtering: {sample_qc_ht.s.collect()}')
-
-    print(f'Matrix table sg indices before filtering relateds: {mt.s.collect()}')
-    print(f'relateds_to_drop_ht table sg indices before filtering: {relateds_to_drop_ht.s.collect()}')
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
-    print(f'Matrix table sg indices after filtering relateds: {mt.s.collect()}')
-    print(f'relateds_to_drop_ht table sg indices after filtering: {relateds_to_drop_ht.s.collect()}')
 
     logging.info('Computing adj and sex adjusted genotypes...')
     mt = mt.annotate_entries(
         GT=adjusted_sex_ploidy_expr(mt.locus, mt.GT, sample_qc_ht[mt.col_key].sex_karyotype),
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
-    print(f'Matrix table sg indices: {mt.s.collect()}')
     logging.info('Computing adj call rates...')
     mt_adj = mt.filter_entries(mt.adj)
     info_ht = mt_adj.annotate_rows(adj_gt_stats=hl.agg.call_stats(mt_adj.GT, mt_adj.alleles)).rows()
-    print(f'Matrix table sg indices after computing adj call rates: {mt.s.collect()}')
 
     logging.info('Generating frequency data...')
     mt = hl.variant_qc(mt)
-    print(f'Matrix table sg indices after generating frequency data: {mt.s.collect()}')
 
     logging.info('Calculating InbreedingCoeff...')
     # NOTE: This is not the ideal location to calculate this, but added here
     # to avoid another densify.
     # The algorithm assumes all samples are unrelated:
     mt = mt.annotate_rows(InbreedingCoeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
-    print(f'Matrix table sg indices after calculating InbreedingCoeff: {mt.s.collect()}')
 
     mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
-    print(f'Matrix table sg indices after annotating labels: {mt.s.collect()}')
 
     mt = _compute_filtering_af_and_popmax(mt)
-    print(f'Matrix table sg indices after computing filtering AF and popmax: {mt.s.collect()}')
 
     mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'), overwrite=True)
-    print(f'Matrix table sg indices after checkpointing: {mt.s.collect()}')
 
     # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
     # mt = _compute_age_hists(mt, sample_qc_ht)
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
-    print(f'Matrix table sg indices after annotating globals: {mt.s.collect()}')
 
     # Annotate quality metrics histograms
     qual_hist_ht = _annotate_quality_metrics_hist(mt)
@@ -170,18 +150,14 @@ def frequency_annotations(
             raw_qual_hists=qual_hist_ht[mt.row_key].raw_qual_hists,
         ),
     )
-    print(f'Matrix table sg indices after annotating quality metrics histograms: {mt.s.collect()}')
 
     freq_ht = mt.rows()
-    print(f'Frequency table sg indices after converting to rows: {freq_ht.s.collect()}')
 
     freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
-    print(f'Frequency table sg indices after annotating info: {freq_ht.s.collect()}')
 
     freq_ht = freq_ht.annotate(
         info=freq_ht.info.annotate(InbreedingCoeff=freq_ht.InbreedingCoeff),
     )
-    print(f'Frequency table sg indices after annotating InbreedingCoeff: {freq_ht.s.collect()}')
 
     freq_ht = freq_ht.annotate(
         region_flags=region_flag_expr(
@@ -189,29 +165,19 @@ def frequency_annotations(
             prob_regions={'lcr': lcr_intervals.ht(), 'segdup': seg_dup_intervals.ht()},
         ),
     )
-    print(f'Frequency table sg indices after annotating region flags: {freq_ht.s.collect()}')
 
     mono_allelic_flag_expr = (freq_ht.freq[0].AC > 0) & (freq_ht.freq[1].AF == 1)
     freq_ht = freq_ht.annotate(info=freq_ht.info.annotate(monoallelic=mono_allelic_flag_expr))
-    print(f'Frequency table sg indices after annotating monoallelic flag: {freq_ht.s.collect()}')
 
     freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
-    print(f'Frequency table sg indices after annotating variant QC: {freq_ht.s.collect()}')
 
     freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
-    print(f'Frequency table sg indices after annotating adj GT stats: {freq_ht.s.collect()}')
 
     return freq_ht
 
 
 def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht: hl.Table) -> hl.MatrixTable:
     # prepare_gnomad_v4_variants_helper requires ancestry to be annotated
-    print(f'Matrix table sg indices: {mt.s.collect()}')
-    print(f'Inferred pop table indices: {inferred_pop_ht.s.collect()}')
-    print(f'Sample qc table indices: {sample_qc_ht.s.collect()}')
-    print(f'Matrix table show(): {mt.show()}')
-    print(f'Inferred pop show(): {inferred_pop_ht.show()}')
-    print(f'Sample qc show(): {sample_qc_ht.show()}')
     mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
     # prepare_gnomad_v4_variants_helper requires sex to be annotated
     mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
