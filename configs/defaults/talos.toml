@@ -17,7 +17,7 @@ mt_entry_type = 'matrixtable'
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
 panelapp = 'https://panelapp-aus.org/api/v1/panels'
-require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
+require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5', 'HFE']
 
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
