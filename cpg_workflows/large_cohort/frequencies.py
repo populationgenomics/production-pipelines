@@ -170,6 +170,9 @@ def frequency_annotations(
 
 def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht: hl.Table) -> hl.MatrixTable:
     # prepare_gnomad_v4_variants_helper requires ancestry to be annotated
+    logging.info(f'{mt.s.collect()}')
+    logging.info(f'{inferred_pop_ht.s.collect()}')
+    logging.info(f'{sample_qc_ht.s.collect()}')
     mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
     # prepare_gnomad_v4_variants_helper requires sex to be annotated
     mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
