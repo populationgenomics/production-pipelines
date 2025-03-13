@@ -198,9 +198,10 @@ def query_for_latest_hail_object(
 
 
 @lru_cache(2)
-def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
+def get_clinvar_table(key: str = 'clinvarbitration') -> str:
     """
     this is used to retrieve two types of object - clinvar_decisions & clinvar_pm5
+    these are packaged into one tarball
 
     try and identify the clinvar table to use
     - try the config specified path
@@ -225,7 +226,7 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
         config_retrieve(['storage', 'common', 'analysis']),
         'clinvarbitration',
         datetime.now().strftime('%y-%m'),
-        f'{key}.ht.tar.gz',
+        f'clinvar_decisions.release.tar.gz',
     )
 
     if to_path(clinvar_table).exists():
@@ -525,14 +526,9 @@ class RunHailFiltering(DatasetStage):
             svdb_argument = ' '
 
         # find the clinvar table, localise, and expand
-        clinvar = get_clinvar_table('clinvar_decisions')
-        localised_clinvar = get_batch().read_input(clinvar)
+        clinvar_tar = get_clinvar_table()
+        localised_clinvar = get_batch().read_input(clinvar_tar)
         job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
-
-        # find the clinvar PM5 table, localise, and expand
-        pm5 = get_clinvar_table('clinvar_pm5')
-        localised_pm5 = get_batch().read_input(pm5)
-        job.command(f'tar -xzf {localised_pm5} -C $BATCH_TMPDIR')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
@@ -546,8 +542,8 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
-            f'--clinvar "${{BATCH_TMPDIR}}/clinvar_decisions.ht" '
-            f'--pm5 "${{BATCH_TMPDIR}}/clinvar_pm5.ht" '
+            f'--clinvar "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.ht" '
+            f'--pm5 "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.pm5.ht" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
             f'{svdb_argument} '
             f'{exomiser_argument} ',
