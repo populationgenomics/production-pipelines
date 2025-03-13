@@ -568,6 +568,8 @@ class RunHailFilteringSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        # TODO(MattWellie) reinstate this before merging anything
+        return {}
         paths_or_none = query_for_sv_mt(dataset.name)
         if paths_or_none:
             _sv_path, sv_file = paths_or_none
