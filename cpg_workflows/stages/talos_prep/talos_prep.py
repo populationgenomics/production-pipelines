@@ -58,7 +58,7 @@ class ExtractDataFromCohortMt(CohortStage):
 
         return {
             # write path for the full (region-limited) MatrixTable, stripped of info fields
-            'mt': str(cohort_prefix / f'{cohort.id}.mt'),
+            'mt': cohort_prefix / f'{cohort.id}.mt',
             # this will be the write path for fragments of sites-only VCF
             'sites_only_vcf_dir': str(cohort_prefix / f'{cohort.id}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments
