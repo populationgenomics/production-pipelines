@@ -569,8 +569,8 @@ class RunHailFilteringSV(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         return {
-            filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
-            for _path, filename in query_for_sv_mt(dataset.name)
+            # filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
+            # for _path, filename in query_for_sv_mt(dataset.name)
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
