@@ -578,6 +578,7 @@ class RunHailFilteringSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
+        return self.make_outputs(dataset, data=expected_out)
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
         panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
