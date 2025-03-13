@@ -586,32 +586,36 @@ class RunHailFilteringSV(DatasetStage):
 
         required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
-        sv_jobs: list = []
-        for sv_path, sv_file in query_for_sv_mt(dataset.name):
-            job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
-            # manually extract the VCF and index
-            job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-            job.image(image_path('talos'))
-            # generally runtime under 10 minutes
-            job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
-            # use the new config file
-            STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
+        paths_or_none = query_for_sv_mt(dataset.name)
+        if not paths_or_none:
+            get_logger().info(f'No SV MT found for {dataset.name}, skipping')
+            return self.make_outputs(dataset, data=expected_out)
 
-            # copy the mt in
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
-            job.command(f'export TALOS_CONFIG={conf_in_batch}')
-            job.command(
-                'RunHailFilteringSV '
-                f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
-                f'--panelapp {panelapp_json} '
-                f'--pedigree {local_ped} '
-                f'--output {job.output["vcf.bgz"]} ',  # type: ignore
-            )
-            get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
-            sv_jobs.append(job)
+        sv_path, sv_file = paths_or_none
+        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
+        # manually extract the VCF and index
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.image(image_path('talos'))
+        # generally runtime under 10 minutes
+        job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
+        # use the new config file
+        STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
+
+        # copy the mt in
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        job.command(
+            'RunHailFilteringSV '
+            f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
+            f'--panelapp {panelapp_json} '
+            f'--pedigree {local_ped} '
+            f'--output {job.output["vcf.bgz"]} ',  # type: ignore
+        )
+        get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
 @stage(
