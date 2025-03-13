@@ -72,30 +72,6 @@ def frequency_annotations(
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
     """
 
-    # Exome parsing
-    if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
-        # clear sample qc filters as this data has not been qc'd yet
-        sample_qc_ht = sample_qc_ht.annotate(filters=hl.empty_set(hl.tstr))
-        # sample_qc_ht has no females in it. This is causing errors in freq_meta_dict where we have no 'XY_adj'. Forcing
-        # the one 'ambiguous' sex individual to be XY..
-        sample_qc_ht = sample_qc_ht.annotate(
-            X_karyotype=hl.if_else(
-                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
-                "X",
-                sample_qc_ht.X_karyotype,
-            ),
-            Y_karyotype=hl.if_else(
-                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
-                "Y",
-                sample_qc_ht.Y_karyotype,
-            ),
-            sex_karyotype=hl.if_else(
-                (sample_qc_ht.X_karyotype == "ambiguous") & (sample_qc_ht.sex_karyotype == "ambiguous"),
-                "XY",
-                sample_qc_ht.sex_karyotype,
-            ),
-        )
-
     logging.info('Reading full sparse MT and metadata table...')
 
     logging.info('Splitting multiallelics')
@@ -139,7 +115,7 @@ def frequency_annotations(
     mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'), overwrite=True)
 
     # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
-    # mt = _compute_age_hists(mt, sample_qc_ht)
+    # mt = _compute_age_hists(mt, sample_qc_ht) # <-- Discuss
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
 
     # Annotate quality metrics histograms
@@ -177,11 +153,10 @@ def frequency_annotations(
 
 
 def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht: hl.Table) -> hl.MatrixTable:
-    # prepare_gnomad_v4_variants_helper requires ancestry to be annotated
     mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
-    # prepare_gnomad_v4_variants_helper requires sex to be annotated
+
     mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
-    # mt = mt.annotate_cols(subset='tenk10k')
+
     mt = annotate_freq(
         mt,
         sex_expr=mt.sex,
@@ -232,8 +207,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_globals(
         faf_meta=faf_meta,
-        # exome data has 'Other' while genome data has 'oth'
-        faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth', 'Other']),
+        faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth', 'Other']),  # <--- Discuss
     )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
@@ -243,7 +217,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
 
     # Populating 'filters' field with empty set for now
-    mt = mt.annotate_rows(filters=hl.empty_set(hl.tstr))
+    mt = mt.annotate_rows(filters=hl.empty_set(hl.tstr))  # <-- Discuss
     return mt
 
 
