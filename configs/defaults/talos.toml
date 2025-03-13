@@ -16,8 +16,9 @@ mt_entry_type = 'matrixtable'
 [GeneratePanelData]
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
-panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
+panelapp = 'https://panelapp-aus.org/api/v1/panels'
 require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
+
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
 within_x_months = 6
@@ -49,13 +50,13 @@ exomiser_rank_threshold = 2
 # variables for the hail operations, including CSQ sets and filter thresholds
 ac_threshold = 0.01
 # for de novo testing, use HIGH consequence terms + these terms
-additional_csq = ['missense_variant']
+additional_csq = ['missense']
 # maximum allowed population frequency - dominant variants will have a stricter threshold applied later
 af_semi_rare = 0.01
 # maximum presence in a SV callset to be considered potentially pathogenic
 callset_af_sv_recessive = 0.03
 # all VEP consequences considered HIGH impact
-critical_csq = ['frameshift_variant', 'splice_acceptor_variant', 'splice_donor_variant', 'start_lost', 'stop_gained', 'stop_lost', 'transcript_ablation']
+critical_csq = ['frameshift', 'splice_acceptor', 'splice_donor', 'start_lost', 'stop_gained', 'stop_lost']
 # used in de novo calculation - highest %Alt reads for a parent to be considered WT
 max_parent_ab = 0.05
 # min read depth required for variant calls
@@ -64,7 +65,7 @@ minimum_depth = 10
 spliceai = 0.5
 
 # for generating the VCF output - these are the fields pulled from the MT, in this order
-csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotype', 'exon', 'hgvsc', 'hgvsp', 'cdna_position', 'cds_position', 'protein_position', 'variant_class', 'ensp', 'lof', 'sift', 'polyphen', 'am_class', 'am_pathogenicity']
+csq_string = [ "consequence", "gene_id", "gene", "transcript", "mane_id", "mane", "biotype", "dna_change", "amino_acid_change", "codon", "ensp", "am_class", "am_pathogenicity",]
 
 # config entries relating to size of VM provisioned for Hail
 [RunHailFiltering.cores]
