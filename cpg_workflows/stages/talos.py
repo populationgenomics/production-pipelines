@@ -525,7 +525,7 @@ class RunHailFiltering(DatasetStage):
             svdb_argument = ' '
 
         # find the clinvar table, localise, and expand
-        clinvar = get_clinvar_table('clinvar_pm5')
+        clinvar = get_clinvar_table('clinvar_decisions')
         localised_clinvar = get_batch().read_input(clinvar)
         job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
 
