@@ -93,7 +93,7 @@ class ExtractDataFromCohortMt(CohortStage):
             extract_vcf_from_mt \
             --input {input_mt} \
             --output_mt {str(outputs['mt'])} \
-            --output_vcf {str(outputs['sites_only_vcf_dir'])} \
+            --output_sites_only {str(outputs['sites_only_vcf_dir'])} \
             --bed {bed}
             """,
         )
