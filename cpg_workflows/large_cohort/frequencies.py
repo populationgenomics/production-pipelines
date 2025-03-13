@@ -73,7 +73,7 @@ def frequency_annotations(
     """
 
     # Exome parsing
-    if config_retrieve(['workflow'], ['sequencing_type']) == 'exome':
+    if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
         print('making it here')
         # clear sample qc filters as this data has not been qc'd yet
         sample_qc_ht = sample_qc_ht.annotate(filters=hl.empty_set(hl.tstr))
