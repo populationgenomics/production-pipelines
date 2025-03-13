@@ -17,7 +17,6 @@ from cpg_workflows.stages.dragen_ica import ica_utils
 
 def submit_dragen_run(
     cram_id: str,
-    cram_index_id: str,
     dragen_ht_id: str,
     cram_reference_id: str,
     qc_cross_cont_vcf_id: str,
@@ -133,7 +132,6 @@ def run(
         path_params: dict[str, str] = {'projectId': project_id}
         analysis_run_id: str = submit_dragen_run(
             cram_id=ica_fids['cram_fid'],
-            cram_index_id=ica_fids['crai_fid'],
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
