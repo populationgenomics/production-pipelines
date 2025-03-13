@@ -221,17 +221,16 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
     get_logger().info(f'No forced {key} table available, trying default')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
-    for default_name in ['clinvarbitration', 'aip_clinvar']:
-        clinvar_table = join(
-            config_retrieve(['storage', 'common', 'analysis']),
-            default_name,
-            datetime.now().strftime('%y-%m'),
-            f'{key}.ht',
-        )
+    clinvar_table = join(
+        config_retrieve(['storage', 'common', 'analysis']),
+        'clinvarbitration',
+        datetime.now().strftime('%y-%m'),
+        f'{key}.ht.tar.gz',
+    )
 
-        if to_path(clinvar_table).exists():
-            get_logger().info(f'Using clinvar table {clinvar_table}')
-            return clinvar_table
+    if to_path(clinvar_table).exists():
+        get_logger().info(f'Using clinvar table {clinvar_table}')
+        return clinvar_table
 
     raise ValueError('no Clinvar Tables were identified')
 
@@ -498,14 +497,6 @@ class RunHailFiltering(DatasetStage):
         # peds can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
-        # find the clinvar tables, and localise
-        clinvar_decisions = get_clinvar_table()
-        clinvar_name = clinvar_decisions.split('/')[-1]
-
-        # localise the clinvar decisions table
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration decisions copied"')
-
         # see if we can find any exomiser results to integrate
         try:
             exomiser_ht = query_for_latest_hail_object(
@@ -533,10 +524,15 @@ class RunHailFiltering(DatasetStage):
         else:
             svdb_argument = ' '
 
+        # find the clinvar table, localise, and expand
+        clinvar = get_clinvar_table('clinvar_pm5')
+        localised_clinvar = get_batch().read_input(clinvar)
+        job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
+
+        # find the clinvar PM5 table, localise, and expand
         pm5 = get_clinvar_table('clinvar_pm5')
-        pm5_name = pm5.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration PM5 copied"')
+        localised_pm5 = get_batch().read_input(pm5)
+        job.command(f'tar -xzf {localised_pm5} -C $BATCH_TMPDIR')
 
         # finally, localise the whole MT (this takes the longest
         mt_name = input_mt.split('/')[-1]
@@ -550,8 +546,8 @@ class RunHailFiltering(DatasetStage):
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
-            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
-            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
+            f'--clinvar "${{BATCH_TMPDIR}}/clinvar_decisions.ht" '
+            f'--pm5 "${{BATCH_TMPDIR}}/clinvar_pm5.ht" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
             f'{svdb_argument} '
             f'{exomiser_argument} ',
@@ -651,6 +647,7 @@ class ValidateMOI(DatasetStage):
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
         sv_vcf_arg = ''
+        # TODO replace this section
         # # either find a SV vcf, or None
         # if sv_paths_or_empty := query_for_sv_mt(dataset.name):
         #     hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
