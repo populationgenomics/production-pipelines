@@ -2,8 +2,8 @@
 
 """
 Takes a MatrixTable and two output paths
-Writes two representations - full VCF and a sites-only version
-both output types are exported per-interval, with a separate header file, to be concatenated later
+Writes two representations - region filtered MatrixTable, and a sites-only VCF representation
+VCF is exported per-interval, with a separate header file, to be concatenated later
 
 This script also takes a BED file as input; output contains only the variants that overlap with the BED file
 
@@ -26,7 +26,7 @@ from cpg_workflows.utils import get_logger
 
 def main(
     mt_path: str,
-    output: str,
+    output_mt: str,
     output_sites_only: str,
     bed: str | None,
 ) -> None:
@@ -34,7 +34,7 @@ def main(
 
     Args:
         mt_path (str):
-        output (str): write a per-partition VCF directory to this location
+        output_mt (str): write region-filtered MatrixTable, stripped of INFO fields
         output_sites_only (str): write a per-partition sites-only VCF directory to this location
         bed (str): Region BED file
     """
@@ -69,10 +69,11 @@ def main(
 
     mt.describe()
 
-    get_logger().info('Writing full VCF in fragments, header-per-shard')
-    hl.export_vcf(mt, output, tabix=True, parallel='separate_header')
+    mt.write(output_mt, overwrite=True)
 
-    sites_only_ht = mt.rows()
+    # now read that location for speed, and write the sites-only VCF
+    # keep partitions consistent
+    sites_only_ht = hl.read_matrix_table(output_mt).rows()
 
     get_logger().info('Writing sites-only VCF in fragments, header-per-shard')
     hl.export_vcf(sites_only_ht, output_sites_only, tabix=True, parallel='separate_header')
@@ -86,8 +87,8 @@ def cli_main():
         required=True,
     )
     parser.add_argument(
-        '--output',
-        help='Path to write the result',
+        '--output_mt',
+        help='Path to write the resulting MatrixTable',
         required=True,
     )
     parser.add_argument(
@@ -99,7 +100,7 @@ def cli_main():
         help='Region BED file',
     )
     args = parser.parse_args()
-    main(mt_path=args.input, output=args.output, output_sites_only=args.output_sites_only, bed=args.bed)
+    main(mt_path=args.input, output_mt=args.output_mt, output_sites_only=args.output_sites_only, bed=args.bed)
 
 
 if __name__ == '__main__':

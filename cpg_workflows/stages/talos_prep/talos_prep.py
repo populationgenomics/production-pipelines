@@ -11,12 +11,15 @@ this workflow is designed to be something which could be executed easily off-sit
 
 - During this extraction from the MT all INFO fields are dropped, to make sure we have a blank slate
 
-- We generate a sites-only version of the same VCF to annotate (less data to pass around)
-
 - We remove any non-PASS sites from the MT prior to export
     - This is necessary because we don't pull the VQSR headers when applying QC annotations, just the filters
     - >> "FILTER 'VQSRTrancheSNP99.90to100.00' is not defined in the header"
     - There's a longer-term fix for this, but it's not important to this workflow
+
+- The export of the MT to VCF is done in a per-interval way, writing a directory of fragments which can be reassembled
+    through a gcloud compose operation, copied in from the rd_combiner workflow
+
+- We export a sites-only and a full VCF representation
 
 - We annotate the sites-only VCF with gnomad frequencies
     - uses the gnomAD 4.1 joint exomes + genomes dataset
@@ -43,7 +46,7 @@ SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 @stage
-class ExtractVcfFromCohortMt(CohortStage):
+class ExtractDataFromCohortMt(CohortStage):
     """
     extract some plain calls from a joint-callset
     these calls are a region-filtered subset, limited to genic regions
@@ -54,10 +57,8 @@ class ExtractVcfFromCohortMt(CohortStage):
         cohort_prefix = get_workflow().cohort_prefix(cohort, category='tmp')
 
         return {
-            # this will be the write path for fragments of sites-only VCF
-            'vcf_dir': str(cohort_prefix / f'{cohort.id}.vcf.bgz'),
-            # this will be the file which contains the name of all fragments
-            'vcf_manifest': cohort_prefix / f'{cohort.id}.vcf.bgz' / SHARD_MANIFEST,
+            # write path for the full (region-limited) MatrixTable, stripped of info fields
+            'mt': str(cohort_prefix / f'{cohort.id}.mt'),
             # this will be the write path for fragments of sites-only VCF
             'sites_only_vcf_dir': str(cohort_prefix / f'{cohort.id}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments
@@ -91,8 +92,8 @@ class ExtractVcfFromCohortMt(CohortStage):
             f"""
             extract_vcf_from_mt \
             --input {input_mt} \
-            --output {str(outputs['vcf_dir'])} \
-            --output_sites_only {str(outputs['sites_only_vcf_dir'])} \
+            --output_mt {str(outputs['mt'])} \
+            --output_vcf {str(outputs['sites_only_vcf_dir'])} \
             --bed {bed}
             """,
         )
@@ -100,7 +101,7 @@ class ExtractVcfFromCohortMt(CohortStage):
         return self.make_outputs(cohort, outputs, jobs=job)
 
 
-@stage(required_stages=ExtractVcfFromCohortMt)
+@stage(required_stages=ExtractDataFromCohortMt)
 class ConcatenateSitesOnlyVcfFragments(CohortStage):
     """
     glue all the mini-VCFs together
@@ -117,7 +118,7 @@ class ConcatenateSitesOnlyVcfFragments(CohortStage):
         """
 
         output = self.expected_outputs(cohort)
-        sites_manifest = inputs.as_dict(cohort, ExtractVcfFromCohortMt)['sites_only_vcf_manifest']
+        sites_manifest = inputs.as_dict(cohort, ExtractDataFromCohortMt)['sites_only_vcf_manifest']
 
         if not sites_manifest.exists():
             raise ValueError(
@@ -131,42 +132,6 @@ class ConcatenateSitesOnlyVcfFragments(CohortStage):
             output_path=str(output),
             job_attrs={'stage': self.name},
             final_size='10Gi',
-        )
-        return self.make_outputs(cohort, data=output, jobs=jobs)
-
-
-@stage(required_stages=ExtractVcfFromCohortMt)
-class ConcatenateFullVcfFragments(CohortStage):
-    """
-    glue all the mini-VCFs together
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> Path:
-
-        cohort_prefix = get_workflow().cohort_prefix(cohort)
-        return cohort_prefix / f'{cohort.id}_reassembled.vcf.bgz'
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        """
-        trigger a rolling merge using gcloud compose, gluing all the individual files together
-        """
-
-        output = self.expected_outputs(cohort)
-
-        full_manifest = inputs.as_dict(cohort, ExtractVcfFromCohortMt)['vcf_manifest']
-        if not full_manifest.exists():
-            raise ValueError(
-                f'Manifest file {str(full_manifest)} does not exist, '
-                f'run the rd_combiner workflow with workflows.last_stages=[ExtractVcfFromCohortMt]',
-            )
-
-        jobs = gcloud_compose_vcf_from_manifest(
-            manifest_path=full_manifest,
-            intermediates_path=str(self.tmp_prefix / 'full_temporary_compose_intermediates'),
-            output_path=str(output),
-            job_attrs={'stage': self.name},
-            final_size='100Gi',
-            create_index=False,
         )
         return self.make_outputs(cohort, data=output, jobs=jobs)
 
@@ -300,7 +265,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         return self.make_outputs(cohort, data=output, jobs=job)
 
 
-@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ConcatenateFullVcfFragments])
+@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ExtractDataFromCohortMt])
 class JumpAnnotationsFromHtToFinalMt(CohortStage):
     """
     Join the annotated sites-only VCF, with AlphaMissense, and with gene/transcript information
@@ -314,8 +279,8 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
 
         output = self.expected_outputs(cohort)
 
-        # get the full VCF & index
-        vcf = str(inputs.as_path(cohort, ConcatenateFullVcfFragments))
+        # get the region-limited MT
+        mt = str(inputs.as_path(cohort, ExtractDataFromCohortMt, 'mt'))
 
         # get the table of compressed annotations
         annotations = str(inputs.as_path(cohort, ProcessAnnotatedSitesOnlyVcfIntoHt))
@@ -327,7 +292,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
         job.storage('250Gi')
         job.command(
             f'transfer_annotations_to_vcf '
-            f'--input {vcf} '
+            f'--input_path {mt} '
             f'--annotations {annotations} '
             f'--output {str(output)}',
         )

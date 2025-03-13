@@ -21,7 +21,7 @@ def cli_main():
     """
 
     parser = ArgumentParser(description='Takes a HT of annotations, and a callset VCF, and combines into a MT')
-    parser.add_argument('--input', help='Path to the full VCF', required=True)
+    parser.add_argument('--input_path', help='Path to the input, MatrixTable or VCF', required=True)
     parser.add_argument('--annotations', help='Path to the annotation HT', required=True)
     parser.add_argument('--output', help='output Table path, must have a ".mt" extension', required=True)
     args = parser.parse_args()
@@ -29,36 +29,40 @@ def cli_main():
     assert args.output.endswith('.mt'), 'Output path must end in .mt'
 
     main(
-        vcf_path=args.input,
+        input_path=args.input_path,
         output_path=args.output,
         annotations=args.annotations,
     )
 
 
 def main(
-    vcf_path: str,
+    input_path: str,
     output_path: str,
     annotations: str,
 ):
     """
     Takes a Hail-Table of annotations, a joint-called VCF, reads the VCF as a MatrixTable and hops the annotations over
 
-    I'm initially trying this without a checkpoint, though I expect that not to scale well
-
     Args:
-        vcf_path (str): path to the full callset VCF
+        input_path (str): path to the full callset VCF or MatrixTable
         output_path (str): path to write the resulting MatrixTable to
         annotations (str): path to a Hail Table containing annotations
     """
     init_batch()
     # hl.context.init_spark(master='local[8]', default_reference='GRCh38')
 
-    # read the VCF into a MatrixTable
-    mt = hl.import_vcf(
-        vcf_path,
-        array_elements_required=False,
-        force_bgz=True,
-    )
+    if input_path.endswith('.mt'):
+        # read the MatrixTable directly
+        mt = hl.read_matrix_table(input_path)
+    elif input_path.endswith(('.vcf.gz', '.vcf.bgz')):
+        # read the VCF into a MatrixTable
+        mt = hl.import_vcf(
+            input_path,
+            array_elements_required=False,
+            force_bgz=True,
+        )
+    else:
+        raise ValueError('Input path must end in .mt, .vcf.gz, or .vcf.bgz')
 
     # read the annotations into a Table
     ht = hl.read_table(annotations)
