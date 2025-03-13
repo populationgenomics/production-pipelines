@@ -101,7 +101,7 @@ def get_date_folder() -> str:
 
 
 @lru_cache(maxsize=None)
-def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
+def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
     """
     query for the latest SV MT for a dataset
     bonus - is we're searching for CNVs, we search for multiple
@@ -138,13 +138,13 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
     # perfectly acceptable to not have an input SV MT
     if not mt_by_date:
-        return []
+        return None
 
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
     sv_file = mt_by_date[sorted(mt_by_date)[-1]]
     filename = sv_file.split('/')[-1]
-    return [(sv_file, filename)]
+    return sv_file, filename
 
 
 @lru_cache(maxsize=None)
@@ -568,10 +568,11 @@ class RunHailFilteringSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {
-            # filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
-            # for _path, filename in query_for_sv_mt(dataset.name)
-        }
+        paths_or_none = query_for_sv_mt(dataset.name)
+        if paths_or_none:
+            _sv_path, sv_file = paths_or_none
+            return {sv_file: dataset.prefix() / get_date_folder() / f'label_{sv_file}.vcf.bgz'}
+        return {}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
@@ -642,20 +643,16 @@ class ValidateMOI(DatasetStage):
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
-        # If there are SV VCFs, read each one in and add to the arguments
-        sv_paths_or_empty = query_for_sv_mt(dataset.name)
-        sv_vcf_arg = ''
-        if sv_paths_or_empty:
-            # only go looking for inputs from prior stage where we expect to find them
+        # either find a SV vcf, or None
+        if sv_paths_or_empty := query_for_sv_mt(dataset.name):
             hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
-            for sv_path, sv_file in query_for_sv_mt(dataset.name):
-                labelled_sv_vcf = get_batch().read_input_group(
-                    **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
-                )['vcf.bgz']
-                sv_vcf_arg += f' {labelled_sv_vcf} '
-
-        if sv_vcf_arg:
-            sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
+            sv_path, sv_file = sv_paths_or_empty
+            labelled_sv_vcf = get_batch().read_input_group(
+                **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
+            )['vcf.bgz']
+            sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
+        else:
+            sv_vcf_arg = ''
 
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
