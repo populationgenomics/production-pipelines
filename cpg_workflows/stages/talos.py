@@ -226,7 +226,7 @@ def get_clinvar_table(key: str = 'clinvarbitration') -> str:
         config_retrieve(['storage', 'common', 'analysis']),
         'clinvarbitration',
         datetime.now().strftime('%y-%m'),
-        f'clinvar_decisions.release.tar.gz',
+        'clinvar_decisions.release.tar.gz',
     )
 
     if to_path(clinvar_table).exists():
