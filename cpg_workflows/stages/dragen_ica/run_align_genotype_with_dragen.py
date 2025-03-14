@@ -17,7 +17,6 @@ from cpg_workflows.stages.dragen_ica import ica_utils
 
 def submit_dragen_run(
     cram_id: str,
-    cram_index_id: str,
     dragen_ht_id: str,
     cram_reference_id: str,
     qc_cross_cont_vcf_id: str,
@@ -45,31 +44,28 @@ def submit_dragen_run(
         analysisInput=NextflowAnalysisInput(
             inputs=[
                 AnalysisDataInput(parameterCode='crams', dataIds=[cram_id]),
-                AnalysisDataInput(parameterCode='crais', dataIds=[cram_index_id]),
                 AnalysisDataInput(parameterCode='ref_tar', dataIds=[dragen_ht_id]),
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
                 AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
-                AnalysisDataInput(
-                    parameterCode='qc_coverage_region_beds',
-                    dataIds=[qc_cov_region_1_id, qc_cov_region_2_id],
-                ),
+                AnalysisDataInput(parameterCode='qc_coverage_region_1', dataIds=[qc_cov_region_1_id]),
+                AnalysisDataInput(parameterCode='qc_coverage_region_2', dataIds=[qc_cov_region_2_id]),
             ],
             parameters=[
-                AnalysisParameterInput(code='enable_map_align', value='True'),
-                AnalysisParameterInput(code='enable_map_align_output', value='True'),
+                AnalysisParameterInput(code='enable_map_align', value='true'),
+                AnalysisParameterInput(code='enable_map_align_output', value='true'),
                 AnalysisParameterInput(code='output_format', value='CRAM'),
-                AnalysisParameterInput(code='enable_duplicate_marking', value='True'),
-                AnalysisParameterInput(code='enable_variant_caller', value='True'),
-                AnalysisParameterInput(code='vc_emit_reference_confidence', value='GVCF'),
-                AnalysisParameterInput(code='vc_enable_vcf_output', value='False'),
-                AnalysisParameterInput(code='qc_coverage_report', value='cov_report,cov_report'),
-                AnalysisParameterInput(code='qc_coverage_filters', value='mapq<1,bq<0,mapq<1,bq<0'),
-                AnalysisParameterInput(code='enable_cnv', value='True'),
-                AnalysisParameterInput(code='cnv_enable_self_normalization', value='True'),
-                AnalysisParameterInput(code='enable_sv', value='True'),
+                AnalysisParameterInput(code='enable_duplicate_marking', value='true'),
+                AnalysisParameterInput(code='enable_variant_caller', value='true'),
+                AnalysisParameterInput(code='vc_emit_ref_confidence', value='GVCF'),
+                AnalysisParameterInput(code='vc_enable_vcf_output', value='false'),
+                AnalysisParameterInput(code='enable_cnv', value='true'),
+                AnalysisParameterInput(code='cnv_segmentation_mode', value='SLM'),
+                AnalysisParameterInput(code='enable_sv', value='true'),
+                AnalysisParameterInput(code='enable_cyp2d6', value='true'),
+                AnalysisParameterInput(code='repeat_genotype_enable', value='false'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value='--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --enable-cyp2d6 true',
+                    value="--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter 'DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1' --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --qc-coverage-reports-1 cov_report,cov_report --qc-coverage-filters-1 'mapq<1,bq<0,mapq<1,bq<0'",
                 ),
             ],
         ),
@@ -136,7 +132,6 @@ def run(
         path_params: dict[str, str] = {'projectId': project_id}
         analysis_run_id: str = submit_dragen_run(
             cram_id=ica_fids['cram_fid'],
-            cram_index_id=ica_fids['crai_fid'],
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
             qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
