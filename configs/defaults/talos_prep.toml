@@ -9,4 +9,4 @@ ensembl_version = "113"
 #echtvar = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_whole_genome.zip"
 
 # this contains the gnomad exomes & genomes data
-echtvar = "gs://cpg-common-test/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"
+echtvar = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"
