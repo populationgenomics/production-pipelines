@@ -18,8 +18,6 @@ technical_tags = ['dragen_378']
 user_tags = ['default_user_tag']
 reference_tags = ['GRCh38']
 
-user_reference = "default_user_reference"
-
 # The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'
