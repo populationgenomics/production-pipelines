@@ -8,7 +8,8 @@ Note that there is no example settings config for WGS AS-VQSR, so we construct i
 from WGS VQSR and Exome AS-VQSR settings.
 """
 
-from typing import List, Sequence
+from collections.abc import Sequence
+from typing import List
 
 import hailtop.batch as hb
 from hailtop.batch.job import Job
