@@ -560,8 +560,6 @@ class RunHailFilteringSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        # TODO(MattWellie) reinstate this before merging anything
-        return None
         paths_or_none = query_for_sv_mt(dataset.name)
         if paths_or_none:
             _sv_path, sv_file = paths_or_none
@@ -570,7 +568,6 @@ class RunHailFilteringSV(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
-        return self.make_outputs(dataset, data=expected_out)
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
         panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
@@ -642,17 +639,16 @@ class ValidateMOI(DatasetStage):
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
-        sv_vcf_arg = ''
-        # TODO replace this section
-        # # either find a SV vcf, or None
-        # if sv_paths_or_empty := query_for_sv_mt(dataset.name):
-        #     hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
-        #     sv_path, sv_file = sv_paths_or_empty
-        #     labelled_sv_vcf = get_batch().read_input_group(
-        #         **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
-        #     )['vcf.bgz']
-        #     sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
-        # else:''
+        # either find a SV vcf, or None
+        if sv_paths_or_empty := query_for_sv_mt(dataset.name):
+            hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
+            sv_path, sv_file = sv_paths_or_empty
+            labelled_sv_vcf = get_batch().read_input_group(
+                **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
+            )['vcf.bgz']
+            sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
+        else:
+            sv_vcf_arg = ''
 
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
