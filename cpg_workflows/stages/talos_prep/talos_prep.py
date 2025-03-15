@@ -320,6 +320,7 @@ class CompressMtIntoTarball(CohortStage):
         job = get_batch().new_job(f'CompressMtIntoTarball: {cohort.id}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.memory('highmem')
+        job.cpu(4)
         job.storage('250Gi')
 
         # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
