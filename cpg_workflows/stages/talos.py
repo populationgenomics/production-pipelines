@@ -101,7 +101,7 @@ def get_date_folder() -> str:
 
 
 @lru_cache(maxsize=None)
-def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
+def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
     """
     query for the latest SV MT for a dataset
     bonus - is we're searching for CNVs, we search for multiple
@@ -113,6 +113,12 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
     Returns:
         str, the path to the latest MT for the given type
     """
+
+    # TODO remove once we're good to go
+    return (
+        'gs://cpg-acute-test-main/mt/SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
+        'SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
+    )
 
     sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
 
@@ -138,13 +144,13 @@ def query_for_sv_mt(dataset: str) -> list[tuple[str, str]]:
 
     # perfectly acceptable to not have an input SV MT
     if not mt_by_date:
-        return []
+        return None
 
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
     sv_file = mt_by_date[sorted(mt_by_date)[-1]]
     filename = sv_file.split('/')[-1]
-    return [(sv_file, filename)]
+    return sv_file, filename
 
 
 @lru_cache(maxsize=None)
@@ -198,9 +204,10 @@ def query_for_latest_hail_object(
 
 
 @lru_cache(2)
-def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
+def get_clinvar_table(key: str = 'clinvarbitration') -> str:
     """
     this is used to retrieve two types of object - clinvar_decisions & clinvar_pm5
+    these are packaged into one tarball
 
     try and identify the clinvar table to use
     - try the config specified path
@@ -221,17 +228,16 @@ def get_clinvar_table(key: str = 'clinvar_decisions') -> str:
     get_logger().info(f'No forced {key} table available, trying default')
 
     # try multiple path variations - legacy dir name is 'aip_clinvar', but this may also change
-    for default_name in ['clinvarbitration', 'aip_clinvar']:
-        clinvar_table = join(
-            config_retrieve(['storage', 'common', 'analysis']),
-            default_name,
-            datetime.now().strftime('%y-%m'),
-            f'{key}.ht',
-        )
+    clinvar_table = join(
+        config_retrieve(['storage', 'common', 'analysis']),
+        'clinvarbitration',
+        datetime.now().strftime('%y-%m'),
+        'clinvar_decisions.release.tar.gz',
+    )
 
-        if to_path(clinvar_table).exists():
-            get_logger().info(f'Using clinvar table {clinvar_table}')
-            return clinvar_table
+    if to_path(clinvar_table).exists():
+        get_logger().info(f'Using clinvar table {clinvar_table}')
+        return clinvar_table
 
     raise ValueError('no Clinvar Tables were identified')
 
@@ -453,17 +459,16 @@ class RunHailFiltering(DatasetStage):
         return dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        input_mt = config_retrieve(
-            ['workflow', 'matrix_table'],
-            default=query_for_latest_hail_object(
+
+        # if it's not set in config, try and get it through metamist
+        if not (input_mt := config_retrieve(['workflow', 'matrix_table'], None)):
+            mt_type = config_retrieve(['workflow', 'mt_entry_type'], default='matrixtable')
+
+            input_mt = query_for_latest_hail_object(
                 dataset=dataset.name,
-                analysis_type=config_retrieve(
-                    ['workflow', 'mt_entry_type'],
-                    default='matrixtable',
-                ),
-                object_suffix='.mt',
-            ),
-        )
+                analysis_type=mt_type,
+                object_suffix='.mt.tar.gz',
+            )
 
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
         job.image(image_path('talos'))
@@ -499,16 +504,11 @@ class RunHailFiltering(DatasetStage):
         # peds can't read cloud paths
         local_ped = get_batch().read_input(str(pedigree))
 
-        # find the clinvar tables, and localise
-        clinvar_decisions = get_clinvar_table()
-        clinvar_name = clinvar_decisions.split('/')[-1]
-
-        # localise the clinvar decisions table
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {clinvar_decisions} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration decisions copied"')
-
         # see if we can find any exomiser results to integrate
         try:
+            if 'exomiser' in config_retrieve(['ValidateMOI']):
+                raise ValueError('Exomiser is not required in this workflow')
+
             exomiser_ht = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type='exomiser',
@@ -534,25 +534,25 @@ class RunHailFiltering(DatasetStage):
         else:
             svdb_argument = ' '
 
-        pm5 = get_clinvar_table('clinvar_pm5')
-        pm5_name = pm5.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {pm5} $BATCH_TMPDIR')
-        job.command('echo "ClinvArbitration PM5 copied"')
+        # find the clinvar table, localise, and expand
+        clinvar_tar = get_clinvar_table()
+        localised_clinvar = get_batch().read_input(clinvar_tar)
+        job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
 
-        # finally, localise the whole MT (this takes the longest
-        mt_name = input_mt.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
-        job.command('echo "Cohort MT copied"')
+        # read in the massive MT, and unpack it
+        localised_mt = get_batch().read_input(input_mt)
+        mt_name = localised_mt.split('/')[-1].removesuffix('.tar.gz')
+        job.command(f'tar -xzf {localised_mt} -C $BATCH_TMPDIR')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'RunHailFiltering '
-            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
-            f'--clinvar "${{BATCH_TMPDIR}}/{clinvar_name}" '
-            f'--pm5 "${{BATCH_TMPDIR}}/{pm5_name}" '
+            f'--clinvar "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.ht" '
+            f'--pm5 "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.pm5.ht" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
             f'{svdb_argument} '
             f'{exomiser_argument} ',
@@ -569,10 +569,11 @@ class RunHailFilteringSV(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        return {
-            filename: dataset.prefix() / get_date_folder() / f'label_{filename}.vcf.bgz'
-            for _path, filename in query_for_sv_mt(dataset.name)
-        }
+        paths_or_none = query_for_sv_mt(dataset.name)
+        if paths_or_none:
+            _sv_path, sv_file = paths_or_none
+            return {sv_file: dataset.prefix() / get_date_folder() / f'label_{sv_file}.vcf.bgz'}
+        return {}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(dataset)
@@ -584,32 +585,36 @@ class RunHailFilteringSV(DatasetStage):
 
         required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
-        sv_jobs: list = []
-        for sv_path, sv_file in query_for_sv_mt(dataset.name):
-            job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
-            # manually extract the VCF and index
-            job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-            job.image(image_path('talos'))
-            # generally runtime under 10 minutes
-            job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
-            # use the new config file
-            STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
+        paths_or_none = query_for_sv_mt(dataset.name)
+        if not paths_or_none:
+            get_logger().info(f'No SV MT found for {dataset.name}, skipping')
+            return self.make_outputs(dataset, data=expected_out)
 
-            # copy the mt in
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
-            job.command(f'export TALOS_CONFIG={conf_in_batch}')
-            job.command(
-                'RunHailFilteringSV '
-                f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
-                f'--panelapp {panelapp_json} '
-                f'--pedigree {local_ped} '
-                f'--output {job.output["vcf.bgz"]} ',  # type: ignore
-            )
-            get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
-            sv_jobs.append(job)
+        sv_path, sv_file = paths_or_none
+        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
+        # manually extract the VCF and index
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.image(image_path('talos'))
+        # generally runtime under 10 minutes
+        job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=sv_jobs)
+        # use the new config file
+        STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
+
+        # copy the mt in
+        job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
+        job.command(f'export TALOS_CONFIG={conf_in_batch}')
+        job.command(
+            'RunHailFilteringSV '
+            f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
+            f'--panelapp {panelapp_json} '
+            f'--pedigree {local_ped} '
+            f'--output {job.output["vcf.bgz"]} ',  # type: ignore
+        )
+        get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
 
 
 @stage(
@@ -643,20 +648,16 @@ class ValidateMOI(DatasetStage):
         pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
-        # If there are SV VCFs, read each one in and add to the arguments
-        sv_paths_or_empty = query_for_sv_mt(dataset.name)
-        sv_vcf_arg = ''
-        if sv_paths_or_empty:
-            # only go looking for inputs from prior stage where we expect to find them
+        # either find a SV vcf, or None
+        if sv_paths_or_empty := query_for_sv_mt(dataset.name):
             hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
-            for sv_path, sv_file in query_for_sv_mt(dataset.name):
-                labelled_sv_vcf = get_batch().read_input_group(
-                    **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
-                )['vcf.bgz']
-                sv_vcf_arg += f' {labelled_sv_vcf} '
-
-        if sv_vcf_arg:
-            sv_vcf_arg = f'--labelled_sv {sv_vcf_arg}'
+            sv_path, sv_file = sv_paths_or_empty
+            labelled_sv_vcf = get_batch().read_input_group(
+                **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
+            )['vcf.bgz']
+            sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
+        else:
+            sv_vcf_arg = ''
 
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
