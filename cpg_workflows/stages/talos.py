@@ -500,6 +500,9 @@ class RunHailFiltering(DatasetStage):
 
         # see if we can find any exomiser results to integrate
         try:
+            if 'exomiser' in config_retrieve(['ValidateMOI']):
+                raise ValueError('Exomiser is not required in this workflow')
+
             exomiser_ht = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type='exomiser',
