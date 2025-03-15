@@ -547,7 +547,7 @@ class RunHailFiltering(DatasetStage):
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'RunHailFiltering '
-            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '  # type: ignore
+            f'--input "${{BATCH_TMPDIR}}/{mt_name}" '
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} '
