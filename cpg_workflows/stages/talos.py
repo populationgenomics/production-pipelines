@@ -114,6 +114,12 @@ def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
         str, the path to the latest MT for the given type
     """
 
+    # TODO remove once we're good to go
+    return (
+        'gs://cpg-acute-test-main/mt/SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
+        'SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
+    )
+
     sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
 
     # hot swapping to a string we can freely modify
