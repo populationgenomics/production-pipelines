@@ -332,4 +332,6 @@ class CompressMtIntoTarball(CohortStage):
         job.command(f'mv $BATCH_TMPDIR/{mt_name} {cohort.id}.mt')
         job.command(f'tar -czf {job.output} {cohort.id}.mt')
 
+        get_batch().write_output(job.output, str(output))
+
         return self.make_outputs(cohort, data=output, jobs=job)
