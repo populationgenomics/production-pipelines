@@ -461,7 +461,7 @@ class RunHailFiltering(DatasetStage):
             input_mt = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type=mt_type,
-                object_suffix='.mt',
+                object_suffix='.mt.tar.gz',
             )
 
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
@@ -533,10 +533,10 @@ class RunHailFiltering(DatasetStage):
         localised_clinvar = get_batch().read_input(clinvar_tar)
         job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
 
-        # finally, localise the whole MT (this takes the longest
-        mt_name = input_mt.split('/')[-1]
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {input_mt} $BATCH_TMPDIR')
-        job.command('echo "Cohort MT copied"')
+        # read in the massive MT, and unpack it
+        localised_mt = get_batch().read_input(input_mt)
+        mt_name = localised_mt.split('/')[-1].removesuffix('.tar.gz')
+        job.command(f'tar -xzf {localised_mt} -C $BATCH_TMPDIR')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
