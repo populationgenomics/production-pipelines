@@ -330,7 +330,8 @@ class CompressMtIntoTarball(CohortStage):
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt} $BATCH_TMPDIR')
         job.command(f'mv $BATCH_TMPDIR/{mt_name} {cohort.id}.mt')
-        job.command(f'tar -czf {job.output} {cohort.id}.mt')
+        # tar -c --use-compress-program=zstdmt talos -f fast_zstdmt.tar.gz
+        job.command(f'tar -c --use-compress-program=zstdmt -f {job.output} {cohort.id}.mt')
 
         get_batch().write_output(job.output, str(output))
 

@@ -437,7 +437,7 @@ class CompressExomiserHtIntoTarball(DatasetStage):
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt} $BATCH_TMPDIR')
         job.command(f'mv $BATCH_TMPDIR/{mt_name} {dataset.name}.ht')
-        job.command(f'tar -czf {job.output} {dataset.name}.ht')
+        job.command(f'tar -c --use-compress-program=zstdmt -f {job.output} {dataset.name}.ht')
 
         get_batch().write_output(job.output, str(outputs))
 
