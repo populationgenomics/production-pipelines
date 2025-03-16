@@ -537,12 +537,12 @@ class RunHailFiltering(DatasetStage):
         # find the clinvar table, localise, and expand
         clinvar_tar = get_clinvar_table()
         localised_clinvar = get_batch().read_input(clinvar_tar)
-        job.command(f'tar --zstd -xf {localised_clinvar} -C $BATCH_TMPDIR')
+        job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
 
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
         mt_name = localised_mt.split('/')[-1].removesuffix('.tar.gz')
-        job.command(f'tar -xzf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
+        job.command(f'tar --zstd -xf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
