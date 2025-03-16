@@ -541,7 +541,7 @@ class RunHailFiltering(DatasetStage):
 
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
-        mt_name = localised_mt.split('/')[-1].removesuffix('.tar.gz')
+        mt_name = input_mt.split('/')[-1].removesuffix('.tar.gz')
         job.command(f'tar --zstd -xf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
