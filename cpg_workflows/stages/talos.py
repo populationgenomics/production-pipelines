@@ -537,7 +537,7 @@ class RunHailFiltering(DatasetStage):
         # find the clinvar table, localise, and expand
         clinvar_tar = get_clinvar_table()
         localised_clinvar = get_batch().read_input(clinvar_tar)
-        job.command(f'tar -xzf {localised_clinvar} -C $BATCH_TMPDIR')
+        job.command(f'tar --zstd -xf {localised_clinvar} -C $BATCH_TMPDIR')
 
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
