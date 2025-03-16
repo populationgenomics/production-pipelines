@@ -46,7 +46,7 @@ This will have to be run using Full permissions as we will need to reference dat
 """
 
 from datetime import datetime
-from functools import lru_cache
+from functools import cache, lru_cache
 from os.path import join
 from random import randint
 
@@ -100,7 +100,7 @@ def get_date_folder() -> str:
     return join('reanalysis', get_date_string())
 
 
-@lru_cache(maxsize=None)
+@cache
 def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
     """
     query for the latest SV MT for a dataset
@@ -116,7 +116,7 @@ def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
 
     # TODO remove once we're good to go
     return (
-        'gs://cpg-acute-test-main/mt/SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
+        'gs://cpg-acute-care-test/mt/SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
         'SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
     )
 
@@ -542,7 +542,7 @@ class RunHailFiltering(DatasetStage):
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
         mt_name = localised_mt.split('/')[-1].removesuffix('.tar.gz')
-        job.command(f'tar -xzf {localised_mt} -C $BATCH_TMPDIR')
+        job.command(f'tar -xzf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
