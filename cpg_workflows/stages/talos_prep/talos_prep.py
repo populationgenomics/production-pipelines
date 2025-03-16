@@ -308,6 +308,14 @@ class CompressMtIntoTarball(CohortStage):
     """
     Localise the MatrixTable, and compress it into a tarball
     Means that Talos downstream of this won't need GCloud installed
+
+    I'm generating a tarball with compression...
+    unsure if that's meaningful, given that Hail objects are already compressed
+
+    Tar's default compression: https://batch.hail.populationgenomics.org.au/batches/591717/jobs/1, 60 mins compressing
+    Zstd compression: https://batch.hail.populationgenomics.org.au/batches/591728/jobs/1, 20 mins, 6 mins compressing
+    Even faster would be no compression... but given that this is the permanent artifact for the run, it's best to keep
+    it as small as possible
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
@@ -321,7 +329,7 @@ class CompressMtIntoTarball(CohortStage):
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.memory('highmem')
         job.cpu(4)
-        job.storage('250Gi')
+        job.storage(config_retrieve(['talos_prep', 'mt_storage'], '250Gi'))
 
         # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
         mt = str(inputs.as_path(cohort, JumpAnnotationsFromHtToFinalMt))
@@ -330,8 +338,7 @@ class CompressMtIntoTarball(CohortStage):
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp -r {mt} $BATCH_TMPDIR')
         job.command(f'mv $BATCH_TMPDIR/{mt_name} {cohort.id}.mt')
-        # tar -c --use-compress-program=zstdmt talos -f fast_zstdmt.tar.gz
-        job.command(f'tar -c --use-compress-program=zstdmt -f {job.output} {cohort.id}.mt')
+        job.command(f'tar --remove-files -c --use-compress-program=zstdmt -f {job.output} {cohort.id}.mt')
 
         get_batch().write_output(job.output, str(output))
 
