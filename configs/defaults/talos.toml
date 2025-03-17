@@ -8,11 +8,6 @@ status_reporter = 'metamist'
 #clinvar_decisions = "HailTable path to private ClinVar"
 #clinvar_pm5 = "HailTable path to ClinVar PM5"
 
-# this can be "custom" or "matrixtable"
-# "custom" if the analysis entry type written by seqr_loader
-# "matrixtable" if the analysis entry type written by the rd_combiner
-mt_entry_type = 'matrixtable'
-
 [GeneratePanelData]
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'

@@ -77,6 +77,7 @@ MTA_QUERY = gql(
 )
 # used when building a runtime configuration
 SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
+TALOS_PREP_TYPE = 'talos_prep'
 
 
 @lru_cache(maxsize=1)
@@ -427,11 +428,10 @@ class RunHailFiltering(DatasetStage):
 
         # if it's not set in config, try and get it through metamist
         if not (input_mt := config_retrieve(['workflow', 'matrix_table'], None)):
-            mt_type = config_retrieve(['workflow', 'mt_entry_type'], default='matrixtable')
 
             input_mt = query_for_latest_hail_object(
                 dataset=dataset.name,
-                analysis_type=mt_type,
+                analysis_type=TALOS_PREP_TYPE,
                 object_suffix='.mt.tar.zst',
             )
 
@@ -674,7 +674,6 @@ class HPOFlagging(DatasetStage):
 
         outputs = self.expected_outputs(dataset)
 
-        # TODO IDK, get these from config?
         phenio_db = get_batch().read_input(config_retrieve(['HPOFlagging', 'phenio_db']))
         gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
 
