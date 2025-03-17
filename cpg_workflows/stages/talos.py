@@ -101,24 +101,20 @@ def get_date_folder() -> str:
 
 
 @cache
-def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
+def query_for_sv_vcf(dataset: str) -> str | None:
     """
-    query for the latest SV MT for a dataset
-    bonus - is we're searching for CNVs, we search for multiple
-    return the full paths and filenames only, as 2 lists
+    query for the latest SV VCF for a dataset
+    return a tuple of full path and filename, or None if not found
 
     Args:
         dataset (str): project to query for
 
     Returns:
-        str, the path to the latest MT for the given type
+        str, the path to the latest VCF for the given type
     """
 
     # TODO remove once we're good to go
-    return (
-        'gs://cpg-acute-care-test/mt/SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
-        'SV-09ba6d46403dbba4d5f1ab3df038e907a412b9_4041-acute-care.mt',
-    )
+    return 'gs://cpg-seqr-test/gatk_sv/eb0b368b1a27a04ab9be111c34ae56ab9e8ebf_4531/SpiceUpSVIDs/fresh_ids.vcf.bgz'
 
     sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
 
@@ -128,29 +124,28 @@ def query_for_sv_mt(dataset: str) -> tuple[str, str] | None:
     if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
-    # we only want the final stage MT, subset to the specific dataset
-    final_stage_lookup = {'cnv': 'AnnotateDatasetCNV', 'sv': 'AnnotateDatasetSv'}
+    # we want the last annotated VCF output
+    # at some point later I'll come back and generate a subset Stage
+    final_stage_lookup = {'cnv': 'AnnotateCNVVcfWithStrvctvre', 'sv': 'SpiceUpSVIDs'}
 
     result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': sv_type})
-    mt_by_date: dict[str, str] = {}
+    vcf_by_date: dict[str, str] = {}
     for analysis in result['project']['analyses']:
         if (
             analysis['output']
-            and analysis['output'].endswith('.mt')
+            and analysis['output'].endswith('.vcf.bgz')
             and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
             and (analysis['meta']['stage'] == final_stage_lookup[sv_type])
         ):
-            mt_by_date[analysis['timestampCompleted']] = analysis['output']
+            vcf_by_date[analysis['timestampCompleted']] = analysis['output']
 
     # perfectly acceptable to not have an input SV MT
-    if not mt_by_date:
+    if not vcf_by_date:
         return None
 
     # return the latest, determined by a sort on timestamp
     # 2023-10-10... > 2023-10-09..., so sort on strings
-    sv_file = mt_by_date[sorted(mt_by_date)[-1]]
-    filename = sv_file.split('/')[-1]
-    return sv_file, filename
+    return vcf_by_date[sorted(vcf_by_date)[-1]]
 
 
 @lru_cache(maxsize=None)
@@ -568,11 +563,9 @@ class RunHailFilteringSV(DatasetStage):
     hail job to filter & label the SV MT
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        paths_or_none = query_for_sv_mt(dataset.name)
-        if paths_or_none:
-            _sv_path, sv_file = paths_or_none
-            return {sv_file: dataset.prefix() / get_date_folder() / f'label_{sv_file}.vcf.bgz'}
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        if query_for_sv_vcf(dataset.name):
+            return dataset.prefix() / get_date_folder() / 'labelled_SVs.vcf.bgz'
         return {}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -586,15 +579,18 @@ class RunHailFilteringSV(DatasetStage):
         required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
 
-        paths_or_none = query_for_sv_mt(dataset.name)
-        if not paths_or_none:
+        if not (path_or_none := query_for_sv_vcf(dataset.name)):
             get_logger().info(f'No SV MT found for {dataset.name}, skipping')
             return self.make_outputs(dataset, data=expected_out)
 
-        sv_path, sv_file = paths_or_none
-        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {sv_file}')
+        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {path_or_none}')
         # manually extract the VCF and index
-        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.declare_resource_group(
+            output={
+                'vcf.bgz': '{root}.vcf.bgz',
+                'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
+            },
+        )
         job.image(image_path('talos'))
         # generally runtime under 10 minutes
         job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
@@ -602,17 +598,22 @@ class RunHailFilteringSV(DatasetStage):
         # use the new config file
         STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
-        # copy the mt in
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {sv_path} $BATCH_TMPDIR')
+        # copy the VCF in
+        annotated_vcf = get_batch().read_input_group(
+            **{
+                'vcf.bgz': path_or_none,
+                'vcf.bgz.tbi': f'{path_or_none}.tbi',
+            },
+        )['vcf.bgz']
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'RunHailFilteringSV '
-            f'--input "${{BATCH_TMPDIR}}/{sv_file}" '
+            f'--input {annotated_vcf} '
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
             f'--output {job.output["vcf.bgz"]} ',  # type: ignore
         )
-        get_batch().write_output(job.output, str(expected_out[sv_file]).removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
@@ -649,11 +650,10 @@ class ValidateMOI(DatasetStage):
         hail_inputs = inputs.as_path(dataset, RunHailFiltering)
 
         # either find a SV vcf, or None
-        if sv_paths_or_empty := query_for_sv_mt(dataset.name):
-            hail_sv_inputs = inputs.as_dict(dataset, RunHailFilteringSV)
-            sv_path, sv_file = sv_paths_or_empty
+        if query_for_sv_vcf(dataset.name):
+            hail_sv_inputs = inputs.as_path(dataset, RunHailFilteringSV)
             labelled_sv_vcf = get_batch().read_input_group(
-                **{'vcf.bgz': str(hail_sv_inputs[sv_file]), 'vcf.bgz.tbi': f'{hail_sv_inputs[sv_file]}.tbi'},
+                **{'vcf.bgz': str(hail_sv_inputs), 'vcf.bgz.tbi': f'{hail_sv_inputs}.tbi'},
             )['vcf.bgz']
             sv_vcf_arg = f'--labelled_sv {labelled_sv_vcf} '
         else:
@@ -661,7 +661,10 @@ class ValidateMOI(DatasetStage):
 
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
-            **{'vcf.bgz': str(hail_inputs), 'vcf.bgz.tbi': str(hail_inputs) + '.tbi'},
+            **{
+                'vcf.bgz': str(hail_inputs),
+                'vcf.bgz.tbi': str(hail_inputs) + '.tbi',
+            },
         )['vcf.bgz']
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
