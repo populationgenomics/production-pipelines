@@ -525,7 +525,7 @@ class GenerateCoverageTable(CohortStage):
 
 
 # @stage(required_stages=[Frequencies])
-@stage(required_stages=[Frequencies])
+@stage()
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
