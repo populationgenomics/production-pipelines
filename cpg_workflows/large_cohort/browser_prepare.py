@@ -387,7 +387,7 @@ def prepare_v4_variants(
     variants = variants.annotate(exome=variants.exome.drop(*shared_fields), genome=variants.genome.drop(*shared_fields))
 
     # Colocated variants
-    variants = variants.cache()
+    # variants = variants.cache()
     variants_by_locus = variants.select(
         variants.variant_id,
         exome_ac_raw=hl.struct(**{f: variants.exome.freq[f].ac_raw for f in variants.exome.freq.dtype.fields}),
