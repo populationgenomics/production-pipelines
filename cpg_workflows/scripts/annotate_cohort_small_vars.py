@@ -171,20 +171,11 @@ def annotate_cohort(
     )
     mt = mt.drop('variant_qc')
 
-    # split the AC/AF attributes into separate entries, overwriting the array in INFO
-    # these elements become a 1-element array for [ALT] instead [REF, ALT]
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=[mt.info.AF[1]],
-            AC=[mt.info.AC[1]],
-        ),
-    )
-
     get_logger().info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
         # still taking just a single value here for downstream compatibility in Seqr
-        AC=mt.info.AC[0],
-        AF=mt.info.AF[0],
+        AC=mt.info.AC[1],
+        AF=mt.info.AF[1],
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
