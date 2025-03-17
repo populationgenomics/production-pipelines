@@ -732,7 +732,11 @@ class HPOFlagging(DatasetStage):
 
 
 @stage(
-    required_stages=[HPOFlagging, QueryPanelapp, MakeRuntimeConfig,],
+    required_stages=[
+        HPOFlagging,
+        QueryPanelapp,
+        MakeRuntimeConfig,
+    ],
 )
 class CreateTalosHtml(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> Path:

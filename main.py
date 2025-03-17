@@ -43,7 +43,7 @@ from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import ConvertPacBio
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.talos import UploadTalosHtml, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
+from cpg_workflows.stages.talos import MakePhenopackets, MinimiseOutputForSeqr, UploadTalosHtml, ValidateMOI
 from cpg_workflows.stages.talos_prep.talos_prep import CompressMtIntoTarball
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
