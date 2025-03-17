@@ -27,7 +27,6 @@ from metamist.graphql import gql, query
 
 HPO_KEY: str = 'HPO Terms (present)'
 EXOMISER_ANALYSIS_TYPE: str = 'exomiser'
-EXOMISER_COMPRESSED_TYPE: str = 'exomiser_tar'
 
 
 # GraphQl query for all analysis entries in this Dataset of type: exomiser
@@ -404,41 +403,4 @@ class ExomiserVariantsTSV(DatasetStage):
         # recursive copy of the HT
         job.command(f'gcloud storage cp -r output.ht {str(outputs["ht"])}')
         job.command(f'gcloud storage cp -r output.json {str(outputs["json"])}')
-        return self.make_outputs(dataset, data=outputs, jobs=job)
-
-
-@stage(required_stages=[ExomiserVariantsTSV], analysis_type=EXOMISER_COMPRESSED_TYPE)
-class CompressExomiserHtIntoTarball(DatasetStage):
-    """
-    Read the Exomiser HT into the container, compress it into a tarball, and write it to GCS
-    """
-
-    def expected_outputs(self, dataset: Dataset) -> Path:
-
-        return dataset.analysis_prefix() / get_workflow().output_version / 'exomiser_results.ht.tar.gz'
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-
-        if not find_probands(dataset):
-            get_logger().info('No families found, skipping exomiser')
-            return self.make_outputs(dataset, jobs=None, skipped=True)
-
-        outputs = self.expected_outputs(dataset)
-
-        job = get_batch().new_job(f'CompressExomiserHtIntoTarball: {dataset.name}')
-        job.image(config_retrieve(['workflow', 'driver_image']))
-        job.memory('highmem')
-        job.storage('20Gi')
-
-        # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
-        mt = str(inputs.as_dict(dataset, ExomiserVariantsTSV)['ht'])
-        mt_name = mt.split('/')[-1]
-
-        # copy the MT into the image, bundle it into a Tar-Ball
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt} $BATCH_TMPDIR')
-        job.command(f'mv $BATCH_TMPDIR/{mt_name} {dataset.name}.ht')
-        job.command(f'tar -c --use-compress-program=zstdmt -f {job.output} {dataset.name}.ht')
-
-        get_batch().write_output(job.output, str(outputs))
-
         return self.make_outputs(dataset, data=outputs, jobs=job)
