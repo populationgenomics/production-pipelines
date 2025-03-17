@@ -598,6 +598,9 @@ class RunHailFilteringSV(DatasetStage):
         # use the new config file
         STANDARD.set_resources(job, ncpu=required_cpu, storage_gb=required_storage, mem_gb=16)
 
+        # get the MANE json file - used to map gene Symbols <-> IDs
+        mane_json = get_batch().read_input(config_retrieve(['references', 'mane_1.4', 'json']))
+
         # copy the VCF in
         annotated_vcf = get_batch().read_input_group(
             **{
@@ -611,6 +614,7 @@ class RunHailFilteringSV(DatasetStage):
             f'--input {annotated_vcf} '
             f'--panelapp {panelapp_json} '
             f'--pedigree {local_ped} '
+            f'--mane_json {mane_json} '
             f'--output {job.output["vcf.bgz"]} ',  # type: ignore
         )
         get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
