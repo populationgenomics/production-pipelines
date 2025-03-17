@@ -273,7 +273,7 @@ def main(
     checkpoint_dir: str | None = None,
 ):
     """
-    Takes a VEP-annotated VCF, reorganises into a Talos-compatible MatrixTable
+    Takes a BCFtools CSQ-annotated VCF, reorganises into a Talos-compatible MatrixTable
     Will annotate at runtime with AlphaMissense annotations
 
     Args:
