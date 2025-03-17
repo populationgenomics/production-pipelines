@@ -53,7 +53,7 @@ additional_csq = ['missense']
 af_semi_rare = 0.01
 # maximum presence in a SV callset to be considered potentially pathogenic
 callset_af_sv_recessive = 0.03
-# all VEP consequences considered HIGH impact
+# all consequences considered HIGH impact
 critical_csq = ['frameshift', 'splice_acceptor', 'splice_donor', 'start_lost', 'stop_gained', 'stop_lost']
 # used in de novo calculation - highest %Alt reads for a parent to be considered WT
 max_parent_ab = 0.05
