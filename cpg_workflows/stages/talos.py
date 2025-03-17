@@ -271,7 +271,6 @@ class MakeRuntimeConfig(DatasetStage):
         new_config: dict = {
             'categories': config_retrieve(['categories']),
             'GeneratePanelData': config_retrieve(['GeneratePanelData']),
-            'FindGeneSymbolMap': config_retrieve(['FindGeneSymbolMap']),
             'RunHailFiltering': config_retrieve(['RunHailFiltering']),
             'ValidateMOI': config_retrieve(['ValidateMOI']),
             'HPOFlagging': config_retrieve(['HPOFlagging']),
@@ -413,32 +412,6 @@ class QueryPanelapp(DatasetStage):
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
         job.command(f'QueryPanelapp --input {get_batch().read_input(str(hpo_panel_json))} --output {job.output}')
-        get_batch().write_output(job.output, str(expected_out))
-
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
-
-
-@stage(required_stages=[MakeRuntimeConfig, QueryPanelapp])
-class FindGeneSymbolMap(DatasetStage):
-
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'symbol_to_ensg.json'
-
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
-        job.cpu(1).image(image_path('talos'))
-
-        # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
-        conf_in_batch = get_batch().read_input(runtime_config)
-
-        panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp))
-        expected_out = self.expected_outputs(dataset)
-        job.command(f'export TALOS_CONFIG={conf_in_batch}')
-        # insert a little stagger
-        job.command(f'sleep {randint(0, 30)}')
-        job.command(f'FindGeneSymbolMap --input {panel_json} --output {job.output}')
-
         get_batch().write_output(job.output, str(expected_out))
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
@@ -687,7 +660,7 @@ class ValidateMOI(DatasetStage):
 
 
 @stage(
-    required_stages=[MakeRuntimeConfig, FindGeneSymbolMap, ValidateMOI],
+    required_stages=[MakeRuntimeConfig, ValidateMOI],
     analysis_type='aip-results',
     analysis_keys=['pheno_annotated', 'pheno_filtered'],
 )
@@ -716,13 +689,14 @@ class HPOFlagging(DatasetStage):
         conf_in_batch = get_batch().read_input(runtime_config)
 
         results_json = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
-        gene_map = get_batch().read_input(str(inputs.as_path(dataset, FindGeneSymbolMap)))
+
+        mane_json = get_batch().read_input(config_retrieve(['references', 'mane_1.4', 'json']))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
             'HPOFlagging '
             f'--input {results_json} '
-            f'--gene_map {gene_map} '
+            f'--mane_json {mane_json} '
             f'--gen2phen {gene_to_phenotype} '
             f'--phenio {phenio_db} '
             f'--output {job.output} '

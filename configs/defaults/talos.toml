@@ -70,7 +70,7 @@ csq_string = [ "consequence", "gene_id", "gene", "transcript", "mane_id", "mane"
 
 # config entries relating to size of VM provisioned for Hail
 [RunHailFiltering.cores]
-sv = 2
+sv = 8
 small_variants = 16
 
 # total allocated RAM, String
