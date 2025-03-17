@@ -767,10 +767,7 @@ class CreateTalosHtml(DatasetStage):
         job.command('cd html_outputs')
 
         command_string = (
-            'CreateTalosHTML '
-            f'--input {results_json} '
-            f'--panelapp {panel_input} '
-            '--output summary_output.html '
+            'CreateTalosHTML ' f'--input {results_json} ' f'--panelapp {panel_input} ' '--output summary_output.html '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
