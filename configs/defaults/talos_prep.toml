@@ -5,8 +5,5 @@ mane_version = "1.4"
 ensembl_version = "113"
 
 [annotations]
-## this currently contains the gnomAD v4.1 genomes-only data
-#echtvar = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_whole_genome.zip"
-
 # this contains the gnomad exomes & genomes data
 echtvar = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"

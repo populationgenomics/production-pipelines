@@ -132,6 +132,7 @@ class ConcatenateSitesOnlyVcfFragments(CohortStage):
             output_path=str(output),
             job_attrs={'stage': self.name},
             final_size='10Gi',
+            create_index=False,
         )
         return self.make_outputs(cohort, data=output, jobs=jobs)
 

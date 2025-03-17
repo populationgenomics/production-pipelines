@@ -82,7 +82,6 @@ def gcloud_compose_vcf_from_manifest(
     output_path: str,
     job_attrs: dict,
     final_size: str = '10Gi',
-    high_resource_index: bool = False,
     create_index: bool = True,
 ) -> list[hb.batch.job.Job]:
     """
@@ -98,7 +97,6 @@ def gcloud_compose_vcf_from_manifest(
         output_path (str): path to write the final file to. Must be in the same bucket as the manifest
         job_attrs (dict): job attributes
         final_size (str): estimated size of the final output (defaults to 10Gi)
-        high_resource_index (bool): whether to use a high resource indexing job (e.g. large full VCF)
         create_index (bool): whether to create a tabix index
 
     Returns:
@@ -148,19 +146,11 @@ def gcloud_compose_vcf_from_manifest(
             },
         )
 
-        # apply large resources if the output is massive
-        if high_resource_index:
-            final_job.cpu(8)
-            final_job.memory(32)
-            threads = '--threads 8'
-        else:
-            threads = ''
-
         # As each separate VCF is block-gzipped, concatenating will be a block-gzipped result.
         # We generate both index types as future-proofing
         final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]}')
-        final_job.command(f'tabix {threads} {final_job.output["vcf.bgz"]}')
-        final_job.command(f'tabix {threads} -C {final_job.output["vcf.bgz"]}')
+        final_job.command(f'tabix {final_job.output["vcf.bgz"]}')
+        final_job.command(f'tabix -C {final_job.output["vcf.bgz"]}')
         get_batch().write_output(final_job.output, output_path.removesuffix('.vcf.bgz'))
 
     else:
