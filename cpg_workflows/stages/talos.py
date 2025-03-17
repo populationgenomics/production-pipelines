@@ -43,6 +43,8 @@ Generates:
     - Talos report HTML (metamist `aip-report` analysis)
 
 This will have to be run using Full permissions as we will need to reference data in test and main buckets.
+
+NEW CHANGE - I'm making this a CohortStage pipeline.
 """
 
 from datetime import datetime
@@ -56,9 +58,9 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import ConfigError, config_retrieve, image_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.resources import STANDARD
-from cpg_workflows.targets import Dataset
+from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import exists, get_logger, tshirt_mt_sizing
-from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, stage
+from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, stage
 from metamist.graphql import gql, query
 
 CHUNKY_DATE = datetime.now().strftime('%Y-%m-%d')
@@ -238,34 +240,34 @@ def get_clinvar_table(key: str = 'clinvarbitration') -> str:
 
 
 @stage
-class GeneratePED(DatasetStage):
+class GeneratePED(CohortStage):
     """
     revert to just using the metamist/CPG-flow Pedigree generation
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'pedigree.ped'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'pedigree.ped'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        expected_out = self.expected_outputs(dataset)
-        pedigree = dataset.write_ped_file(out_path=expected_out)
-        get_logger().info(f'PED file for {dataset.name} written to {pedigree}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        expected_out = self.expected_outputs(cohort)
+        pedigree = cohort.write_ped_file(out_path=expected_out)
+        get_logger().info(f'PED file for {cohort.id} written to {pedigree}')
 
-        return self.make_outputs(dataset, data=expected_out)
+        return self.make_outputs(cohort, data=expected_out)
 
 
 @stage
-class MakeRuntimeConfig(DatasetStage):
+class MakeRuntimeConfig(CohortStage):
     """
     create a config file for this run,
     this new config should include all elements specific to this Project and sequencing_type
     this new unambiguous config file should be used in all jobs
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'config.toml'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'config.toml'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         # start off with a fresh config dictionary, including generic content
         new_config: dict = {
@@ -280,7 +282,7 @@ class MakeRuntimeConfig(DatasetStage):
 
         # pull the content relevant to this cohort + sequencing type (mandatory in CPG)
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
-        dataset_conf = config_retrieve(['cohorts', dataset.name])
+        dataset_conf = config_retrieve(['cohorts', cohort.analysis_dataset.name])
         seq_type_conf = dataset_conf.get(seq_type, {})
 
         # forbidden genes and forced panels
@@ -303,25 +305,25 @@ class MakeRuntimeConfig(DatasetStage):
         if 'result_history' in seq_type_conf:
             new_config['result_history'] = seq_type_conf['result_history']
 
-        expected_outputs = self.expected_outputs(dataset)
+        expected_outputs = self.expected_outputs(cohort)
 
         with expected_outputs.open('w') as write_handle:
             toml.dump(new_config, write_handle)
 
-        return self.make_outputs(target=dataset, data=expected_outputs)
+        return self.make_outputs(target=cohort, data=expected_outputs)
 
 
 @stage
-class MakePhenopackets(DatasetStage):
+class MakePhenopackets(CohortStage):
     """
     this calls the script which reads phenotype data from metamist
     and generates a phenopacket file (GA4GH compliant)
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'phenopackets.json'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'phenopackets.json'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
         generate a pedigree from metamist
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
@@ -329,8 +331,8 @@ class MakePhenopackets(DatasetStage):
         job = get_batch().new_job('Generate Phenopackets from Metamist')
         job.cpu(1).image(image_path('talos'))
 
-        expected_out = self.expected_outputs(dataset)
-        query_dataset = dataset.name
+        expected_out = self.expected_outputs(cohort)
+        query_dataset = cohort.analysis_dataset.name
         if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
             query_dataset += '-test'
 
@@ -350,35 +352,35 @@ class MakePhenopackets(DatasetStage):
             f'--hpo {hpo_file}',
         )
         get_batch().write_output(job.output, str(expected_out))
-        get_logger().info(f'Phenopacket file for {dataset.name} going to {expected_out}')
+        get_logger().info(f'Phenopacket file for {cohort.id} going to {expected_out}')
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[MakePhenopackets, MakeRuntimeConfig])
-class GeneratePanelData(DatasetStage):
+class GeneratePanelData(CohortStage):
     """
     PythonJob to find HPO-matched panels
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> Path:
         """
         only one output, the panel data
         """
-        return dataset.prefix() / get_date_folder() / 'hpo_panel_data.json'
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'hpo_panel_data.json'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Find HPO-matched Panels: {cohort.id}')
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        expected_out = self.expected_outputs(dataset)
+        expected_out = self.expected_outputs(cohort)
 
         hpo_file = get_batch().read_input(config_retrieve(['GeneratePanelData', 'obo_file']))
-        local_phenopacket = get_batch().read_input(str(inputs.as_path(target=dataset, stage=MakePhenopackets)))
+        local_phenopacket = get_batch().read_input(str(inputs.as_path(target=cohort, stage=MakePhenopackets)))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
@@ -387,53 +389,53 @@ class GeneratePanelData(DatasetStage):
         job.command(f'GeneratePanelData --input {local_phenopacket} --output {job.output} --hpo {hpo_file}')
         get_batch().write_output(job.output, str(expected_out))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[GeneratePanelData, MakeRuntimeConfig])
-class QueryPanelapp(DatasetStage):
+class QueryPanelapp(CohortStage):
     """
     query PanelApp for up-to-date gene lists
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'panelapp_data.json'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'panelapp_data.json'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Query PanelApp: {cohort.id}')
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        hpo_panel_json = inputs.as_path(target=dataset, stage=GeneratePanelData)
-        expected_out = self.expected_outputs(dataset)
+        hpo_panel_json = inputs.as_path(target=cohort, stage=GeneratePanelData)
+        expected_out = self.expected_outputs(cohort)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(20, 300)}')
         job.command(f'QueryPanelapp --input {get_batch().read_input(str(hpo_panel_json))} --output {job.output}')
         get_batch().write_output(job.output, str(expected_out))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[MakeRuntimeConfig, QueryPanelapp])
-class FindGeneSymbolMap(DatasetStage):
+class FindGeneSymbolMap(CohortStage):
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'symbol_to_ensg.json'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'symbol_to_ensg.json'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Find Symbol-ENSG lookup: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Find Symbol-ENSG lookup: {cohort.id}')
         job.cpu(1).image(image_path('talos'))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        panel_json = str(inputs.as_path(target=dataset, stage=QueryPanelapp))
-        expected_out = self.expected_outputs(dataset)
+        panel_json = str(inputs.as_path(target=cohort, stage=QueryPanelapp))
+        expected_out = self.expected_outputs(cohort)
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         # insert a little stagger
         job.command(f'sleep {randint(0, 30)}')
@@ -441,31 +443,31 @@ class FindGeneSymbolMap(DatasetStage):
 
         get_batch().write_output(job.output, str(expected_out))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[QueryPanelapp, GeneratePED, MakeRuntimeConfig])
-class RunHailFiltering(DatasetStage):
+class RunHailFiltering(CohortStage):
     """
     hail job to filter & label the MT
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'hail_labelled.vcf.bgz'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'hail_labelled.vcf.bgz'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
         # if it's not set in config, try and get it through metamist
         if not (input_mt := config_retrieve(['workflow', 'matrix_table'], None)):
             mt_type = config_retrieve(['workflow', 'mt_entry_type'], default='matrixtable')
 
             input_mt = query_for_latest_hail_object(
-                dataset=dataset.name,
+                dataset=cohort.analysis_dataset.name,
                 analysis_type=mt_type,
-                object_suffix='.mt.tar.gz',
+                object_suffix='.mt.tar.zst',
             )
 
-        job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
+        job = get_batch().new_job(f'Run hail labelling: {cohort.id}')
         job.image(image_path('talos'))
         job.command('set -eux pipefail')
 
@@ -475,13 +477,13 @@ class RunHailFiltering(DatasetStage):
         job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'small_variants'], 15000))
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         # MTs can vary from <10GB for a small exome, to 170GB for a larger one, Genomes ~500GB
         required_storage = tshirt_mt_sizing(
             sequencing_type=config_retrieve(['workflow', 'sequencing_type']),
-            cohort_size=len(dataset.get_sequencing_group_ids()),
+            cohort_size=len(cohort.get_sequencing_group_ids()),
         )
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'small_variants'], 8)
         required_mem: str = config_retrieve(['RunHailFiltering', 'memory', 'small_variants'], 'highmem')
@@ -489,9 +491,9 @@ class RunHailFiltering(DatasetStage):
         # doubling storage due to the repartitioning
         job.cpu(required_cpu).storage(f'{required_storage*2}Gi').memory(required_mem)
 
-        panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
-        expected_out = self.expected_outputs(dataset)
+        panelapp_json = get_batch().read_input(str(inputs.as_path(target=cohort, stage=QueryPanelapp)))
+        pedigree = inputs.as_path(target=cohort, stage=GeneratePED)
+        expected_out = self.expected_outputs(cohort)
 
         # copy vcf & index out manually
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
@@ -501,11 +503,11 @@ class RunHailFiltering(DatasetStage):
 
         # see if we can find any exomiser results to integrate
         try:
-            if 'exomiser' in config_retrieve(['ValidateMOI']):
+            if 'exomiser' not in config_retrieve(['ValidateMOI']):
                 raise ValueError('Exomiser is not required in this workflow')
 
             exomiser_ht = query_for_latest_hail_object(
-                dataset=dataset.name,
+                dataset=cohort.analysis_dataset.name,
                 analysis_type='exomiser',
                 object_suffix='.ht',
             )
@@ -514,7 +516,7 @@ class RunHailFiltering(DatasetStage):
             job.command('echo "Exomiser HT copied"')
             exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/{exomiser_name}" '
         except ValueError:
-            get_logger().info(f'No exomiser results found for {dataset.name}, skipping')
+            get_logger().info(f'No exomiser results found for {cohort.id}, skipping')
             exomiser_argument = ' '
 
         # find, localise, and use the SpliceVarDB table, if available - if not, don't pass the flag
@@ -554,36 +556,36 @@ class RunHailFiltering(DatasetStage):
         )
         get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(required_stages=[QueryPanelapp, GeneratePED, MakeRuntimeConfig])
-class RunHailFilteringSV(DatasetStage):
+class RunHailFilteringSV(CohortStage):
     """
     hail job to filter & label the SV MT
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        if query_for_sv_vcf(dataset.name):
-            return dataset.prefix() / get_date_folder() / 'labelled_SVs.vcf.bgz'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if query_for_sv_vcf(cohort.name):
+            return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'labelled_SVs.vcf.bgz'
         return {}
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        expected_out = self.expected_outputs(dataset)
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        expected_out = self.expected_outputs(cohort)
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
-        panelapp_json = get_batch().read_input(str(inputs.as_path(target=dataset, stage=QueryPanelapp)))
-        pedigree = inputs.as_path(target=dataset, stage=GeneratePED)
+        panelapp_json = get_batch().read_input(str(inputs.as_path(target=cohort, stage=QueryPanelapp)))
+        pedigree = inputs.as_path(target=cohort, stage=GeneratePED)
         local_ped = get_batch().read_input(str(pedigree))
 
         required_storage: int = config_retrieve(['RunHailFiltering', 'storage', 'sv'], 10)
         required_cpu: int = config_retrieve(['RunHailFiltering', 'cores', 'sv'], 2)
 
-        if not (path_or_none := query_for_sv_vcf(dataset.name)):
-            get_logger().info(f'No SV MT found for {dataset.name}, skipping')
-            return self.make_outputs(dataset, data=expected_out)
+        if not (path_or_none := query_for_sv_vcf(cohort.id)):
+            get_logger().info(f'No SV MT found for {cohort.id}, skipping')
+            return self.make_outputs(cohort, data=expected_out)
 
-        job = get_batch().new_job(f'Run hail SV labelling: {dataset.name}, {path_or_none}')
+        job = get_batch().new_job(f'Run hail SV labelling: {cohort.id}, {path_or_none}')
         # manually extract the VCF and index
         job.declare_resource_group(
             output={
@@ -619,7 +621,7 @@ class RunHailFilteringSV(DatasetStage):
         )
         get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(
@@ -632,30 +634,30 @@ class RunHailFilteringSV(DatasetStage):
         MakeRuntimeConfig,
     ],
 )
-class ValidateMOI(DatasetStage):
+class ValidateMOI(CohortStage):
     """
     run the labelled VCF -> results JSON stage
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'summary_output.json'
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'summary_output.json'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Talos summary: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Talos summary: {cohort.id}')
         job.cpu(config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)).memory(
             config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
         ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')).image(image_path('talos'))
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        hpo_panels = get_batch().read_input(str(inputs.as_path(dataset, GeneratePanelData)))
-        pedigree = get_batch().read_input(str(inputs.as_path(target=dataset, stage=GeneratePED)))
-        hail_inputs = inputs.as_path(dataset, RunHailFiltering)
+        hpo_panels = get_batch().read_input(str(inputs.as_path(cohort, GeneratePanelData)))
+        pedigree = get_batch().read_input(str(inputs.as_path(target=cohort, stage=GeneratePED)))
+        hail_inputs = inputs.as_path(cohort, RunHailFiltering)
 
         # either find a SV vcf, or None
-        if query_for_sv_vcf(dataset.name):
-            hail_sv_inputs = inputs.as_path(dataset, RunHailFilteringSV)
+        if query_for_sv_vcf(cohort.analysis_dataset.name):
+            hail_sv_inputs = inputs.as_path(cohort, RunHailFilteringSV)
             labelled_sv_vcf = get_batch().read_input_group(
                 **{'vcf.bgz': str(hail_sv_inputs), 'vcf.bgz.tbi': f'{hail_sv_inputs}.tbi'},
             )['vcf.bgz']
@@ -663,7 +665,7 @@ class ValidateMOI(DatasetStage):
         else:
             sv_vcf_arg = ''
 
-        panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
+        panel_input = get_batch().read_input(str(inputs.as_path(cohort, QueryPanelapp)))
         labelled_vcf = get_batch().read_input_group(
             **{
                 'vcf.bgz': str(hail_inputs),
@@ -681,9 +683,9 @@ class ValidateMOI(DatasetStage):
             f'--participant_panels {hpo_panels} '
             f'{sv_vcf_arg}',
         )
-        expected_out = self.expected_outputs(dataset)
+        expected_out = self.expected_outputs(cohort)
         get_batch().write_output(job.output, str(expected_out))
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(
@@ -691,32 +693,31 @@ class ValidateMOI(DatasetStage):
     analysis_type='aip-results',
     analysis_keys=['pheno_annotated', 'pheno_filtered'],
 )
-class HPOFlagging(DatasetStage):
+class HPOFlagging(CohortStage):
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        date_prefix = dataset.prefix() / get_date_folder()
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        date_prefix = self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder()
         return {
             'pheno_annotated': date_prefix / 'pheno_annotated_report.json',
             'pheno_filtered': date_prefix / 'pheno_filtered_report.json',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
-        outputs = self.expected_outputs(dataset)
+        outputs = self.expected_outputs(cohort)
 
-        # TODO IDK, get these from config?
         phenio_db = get_batch().read_input(config_retrieve(['HPOFlagging', 'phenio_db']))
         gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
 
-        job = get_batch().new_job(f'Label phenotype matches: {dataset.name}')
+        job = get_batch().new_job(f'Label phenotype matches: {cohort.id}')
         job.cpu(2.0).memory('highmem').image(image_path('talos')).storage('20Gi')
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        results_json = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
-        gene_map = get_batch().read_input(str(inputs.as_path(dataset, FindGeneSymbolMap)))
+        results_json = get_batch().read_input(str(inputs.as_path(cohort, ValidateMOI)))
+        gene_map = get_batch().read_input(str(inputs.as_path(cohort, FindGeneSymbolMap)))
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(
@@ -732,7 +733,7 @@ class HPOFlagging(DatasetStage):
         get_batch().write_output(job.output, str(outputs['pheno_annotated']))
         get_batch().write_output(job.phenout, str(outputs['pheno_filtered']))
 
-        return self.make_outputs(target=dataset, jobs=job, data=outputs)
+        return self.make_outputs(target=cohort, jobs=job, data=outputs)
 
 
 @stage(
@@ -742,21 +743,21 @@ class HPOFlagging(DatasetStage):
         MakeRuntimeConfig,
     ],
 )
-class CreateTalosHtml(DatasetStage):
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / get_date_folder() / 'reports.tar.gz'
+class CreateTalosHtml(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'reports.tar.gz'
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'Talos HTML: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'Talos HTML: {cohort.id}')
         job.image(image_path('talos')).memory('standard').cpu(1.0)
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
-        results_json = get_batch().read_input(str(inputs.as_dict(dataset, HPOFlagging)['pheno_annotated']))
-        panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
-        expected_out = self.expected_outputs(dataset)
+        results_json = get_batch().read_input(str(inputs.as_dict(cohort, HPOFlagging)['pheno_annotated']))
+        panel_input = get_batch().read_input(str(inputs.as_path(cohort, QueryPanelapp)))
+        expected_out = self.expected_outputs(cohort)
 
         # this will write output files directly to GCP
         # report splitting is arbitrary, so can't be reliably done in Hail
@@ -766,21 +767,19 @@ class CreateTalosHtml(DatasetStage):
         job.command('mkdir html_outputs')
         job.command('cd html_outputs')
 
-        command_string = (
-            'CreateTalosHTML ' f'--input {results_json} ' f'--panelapp {panel_input} ' '--output summary_output.html '
-        )
+        cmd_string = f'CreateTalosHTML --input {results_json} --panelapp {panel_input} --output summary_output.html '
 
-        if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
-            command_string += f' --split_samples {report_splitting}'
+        if report_splitting := config_retrieve(['workflow', 'report_splitting', cohort.analysis_dataset.name], False,):
+            cmd_string += f' --split_samples {report_splitting}'
 
-        job.command(command_string)
+        job.command(cmd_string)
 
         # Create a tar'chive here, then use an image with GCloud to copy it up in a bit
         job.command(f'tar -czf {job.output} *')
 
         get_batch().write_output(job.output, str(expected_out))
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(
@@ -789,21 +788,21 @@ class CreateTalosHtml(DatasetStage):
     analysis_keys=['results_html'],
     tolerate_missing_output=True,
 )
-class UploadTalosHtml(DatasetStage):
-    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
-        date_folder_prefix = dataset.prefix(category='web') / get_date_folder()
+class UploadTalosHtml(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, str | Path]:
+        date_folder_prefix = self.get_stage_cohort_prefix(cohort=cohort, category='web') / get_date_folder()
         return {
             'results_html': date_folder_prefix / 'summary_output.html',
             'folder': str(date_folder_prefix),
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        job = get_batch().new_job(f'UploadTalosHtml: {dataset.name}')
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'UploadTalosHtml: {cohort.id}')
         job.image(config_retrieve(['workflow', 'driver_image'])).memory('standard').cpu(1.0)
 
-        input_tarchive = get_batch().read_input(str(inputs.as_path(dataset, CreateTalosHtml)))
+        input_tarchive = get_batch().read_input(str(inputs.as_path(cohort, CreateTalosHtml)))
 
-        expected_out = self.expected_outputs(dataset)
+        expected_out = self.expected_outputs(cohort)
 
         authenticate_cloud_credentials_in_job(job)
 
@@ -813,7 +812,7 @@ class UploadTalosHtml(DatasetStage):
         job.command('cd html_outputs')
         job.command(f'gcloud storage cp -r * {expected_out["folder"]}')
 
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
 
 
 @stage(
@@ -822,36 +821,36 @@ class UploadTalosHtml(DatasetStage):
     analysis_type='custom',
     tolerate_missing_output=True,
 )
-class MinimiseOutputForSeqr(DatasetStage):
+class MinimiseOutputForSeqr(CohortStage):
     """
     takes the results file from Seqr and produces a minimised form for Seqr ingestion
     """
 
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        analysis_folder_prefix = dataset.prefix(category='analysis') / 'seqr_files'
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        analysis_folder_prefix = self.get_stage_cohort_prefix(cohort=cohort, category='analysis') / 'seqr_files'
         return {
             'seqr_file': analysis_folder_prefix / f'{get_date_folder()}_seqr.json',
             'seqr_pheno_file': analysis_folder_prefix / f'{get_date_folder()}_seqr_pheno.json',
         }
 
-    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         # pull out the config section relevant to this datatype & cohort
         # if it doesn't exist for this sequencing type, fail gracefully
         seq_type = config_retrieve(['workflow', 'sequencing_type'])
         try:
-            seqr_lookup = config_retrieve(['cohorts', dataset.name, seq_type, 'seqr_lookup'])
+            seqr_lookup = config_retrieve(['cohorts', cohort.analysis_dataset.name, seq_type, 'seqr_lookup'])
         except ConfigError:
-            get_logger().warning(f'No Seqr lookup file for {dataset.name} {seq_type}')
-            return self.make_outputs(dataset, skipped=True)
+            get_logger().warning(f'No Seqr lookup file for {cohort.id} {seq_type}')
+            return self.make_outputs(cohort, skipped=True)
 
-        input_localised = get_batch().read_input(str(inputs.as_path(dataset, ValidateMOI)))
+        input_localised = get_batch().read_input(str(inputs.as_path(cohort, ValidateMOI)))
 
         # create a job to run the minimisation script
-        job = get_batch().new_job(f'Talos Prep for Seqr: {dataset.name}')
+        job = get_batch().new_job(f'Talos Prep for Seqr: {cohort.id}')
         job.image(image_path('talos')).cpu(1.0).memory('lowmem')
 
         # use the new config file
-        runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
+        runtime_config = str(inputs.as_path(cohort, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
 
         lookup_in_batch = get_batch().read_input(seqr_lookup)
@@ -865,7 +864,7 @@ class MinimiseOutputForSeqr(DatasetStage):
         )
 
         # write the results out
-        expected_out = self.expected_outputs(dataset)
+        expected_out = self.expected_outputs(cohort)
         get_batch().write_output(job.out_json, str(expected_out['seqr_file']))
         get_batch().write_output(job.pheno_json, str(expected_out['seqr_pheno_file']))
-        return self.make_outputs(dataset, data=expected_out, jobs=job)
+        return self.make_outputs(cohort, data=expected_out, jobs=job)
