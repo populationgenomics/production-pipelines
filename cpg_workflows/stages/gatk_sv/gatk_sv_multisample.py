@@ -2,6 +2,7 @@
 All post-batching stages of the GATK-SV workflow
 """
 
+from collections import defaultdict
 from functools import cache
 from itertools import combinations
 from typing import Any
@@ -138,6 +139,22 @@ def check_for_cohort_overlaps(multicohort: MultiCohort):
         raise ValueError('\n'.join(errors))
 
 
+def check_paths_exist(input_dict: dict[str, Any]):
+    """
+    Check that all paths in the input_dict exist
+    """
+    invalid_paths = defaultdict(list)
+    for k in ['counts', 'PE_files', 'SD_files', 'SR_files'] + [f'{caller}_vcfs' for caller in SV_CALLERS]:
+        for str_path in input_dict[k]:
+            path = to_path(str_path)
+            if not path.exists():
+                sg_id = path.name.split('/')[-1].split('.')[0]
+                invalid_paths[k].append(sg_id)
+    if invalid_paths:
+        error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
+        raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
+
+
 @stage
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -261,6 +278,8 @@ class GatherBatchEvidence(CohortStage):
                 str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz')
                 for sequencing_group in sequencing_groups
             ]
+
+        check_paths_exist(input_dict)
 
         input_dict |= get_references(
             [
