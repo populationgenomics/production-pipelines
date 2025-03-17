@@ -43,13 +43,13 @@ from cpg_workflows.stages.seqr_loader_long_read.bam_to_cram import ConvertPacBio
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import MtToEsLrSNPsIndels
 from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import MtToEsLrSv
 from cpg_workflows.stages.stripy import Stripy
-from cpg_workflows.stages.talos import CreateTalosHTML, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
+from cpg_workflows.stages.talos import UploadTalosHtml, MakePhenopackets, MinimiseOutputForSeqr, ValidateMOI
 from cpg_workflows.stages.talos_prep.talos_prep import CompressMtIntoTarball
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
-    'talos': [MakePhenopackets, ValidateMOI, CreateTalosHTML, MinimiseOutputForSeqr],
+    'talos': [MakePhenopackets, ValidateMOI, UploadTalosHtml, MinimiseOutputForSeqr],
     'talos_prep': [CompressMtIntoTarball],
     'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],

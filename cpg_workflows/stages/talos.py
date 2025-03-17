@@ -732,19 +732,11 @@ class HPOFlagging(DatasetStage):
 
 
 @stage(
-    required_stages=[HPOFlagging, QueryPanelapp, MakeRuntimeConfig],
-    analysis_type='aip-report',
-    analysis_keys=['results_html', 'latest_html'],
-    tolerate_missing_output=True,
+    required_stages=[HPOFlagging, QueryPanelapp, MakeRuntimeConfig,],
 )
-class CreateTalosHTML(DatasetStage):
-    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
-        date_folder_prefix = dataset.prefix(category='web') / get_date_folder()
-        return {
-            'results_html': date_folder_prefix / 'summary_output.html',
-            'latest_html': date_folder_prefix / f'summary_latest_{get_date_string()}.html',
-            'folder': date_folder_prefix,
-        }
+class CreateTalosHtml(DatasetStage):
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / get_date_folder() / 'reports.tar.gz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos HTML: {dataset.name}')
@@ -757,9 +749,6 @@ class CreateTalosHTML(DatasetStage):
         results_json = get_batch().read_input(str(inputs.as_dict(dataset, HPOFlagging)['pheno_annotated']))
         panel_input = get_batch().read_input(str(inputs.as_path(dataset, QueryPanelapp)))
         expected_out = self.expected_outputs(dataset)
-
-        # this + copy_common_env (called by default) will be enough to do a gcloud copy of the outputs
-        authenticate_cloud_credentials_in_job(job)
 
         # this will write output files directly to GCP
         # report splitting is arbitrary, so can't be reliably done in Hail
@@ -782,8 +771,43 @@ class CreateTalosHTML(DatasetStage):
 
         job.command(command_string)
 
-        # copy the results to the bucket
-        job.command(f'gcloud storage cp -r * {str(expected_out["folder"])}')
+        # Create a tar'chive here, then use an image with GCloud to copy it up in a bit
+        job.command(f'tar -czf {job.output} *')
+
+        get_batch().write_output(job.output, str(expected_out))
+
+        return self.make_outputs(dataset, data=expected_out, jobs=job)
+
+
+@stage(
+    required_stages=[CreateTalosHtml],
+    analysis_type='aip-report',
+    analysis_keys=['results_html'],
+    tolerate_missing_output=True,
+)
+class UploadTalosHtml(DatasetStage):
+    def expected_outputs(self, dataset: Dataset) -> dict[str, str | Path]:
+        date_folder_prefix = dataset.prefix(category='web') / get_date_folder()
+        return {
+            'results_html': date_folder_prefix / 'summary_output.html',
+            'folder': str(date_folder_prefix),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        job = get_batch().new_job(f'UploadTalosHtml: {dataset.name}')
+        job.image(config_retrieve(['workflow', 'driver_image'])).memory('standard').cpu(1.0)
+
+        input_tarchive = get_batch().read_input(str(inputs.as_path(dataset, CreateTalosHtml)))
+
+        expected_out = self.expected_outputs(dataset)
+
+        authenticate_cloud_credentials_in_job(job)
+
+        # create a new directory for the results
+        job.command('mkdir html_outputs')
+        job.command(f'tar -xf {input_tarchive} -C html_outputs')
+        job.command('cd html_outputs')
+        job.command(f'gcloud storage cp -r * {expected_out["folder"]}')
 
         return self.make_outputs(dataset, data=expected_out, jobs=job)
 
