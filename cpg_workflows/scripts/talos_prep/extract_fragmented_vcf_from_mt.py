@@ -63,9 +63,9 @@ def main(
     # these fields are mangled a little in AnnotateCohort - revisit that
     mt = mt.select_rows(
         info=hl.struct(
-            AF=mt.AF,
-            AN=mt.AN,
-            AC=mt.AC,
+            AF=mt.info.AF,
+            AN=mt.info.AN,
+            AC=mt.info.AC,
         ),
         rsid=mt.rsid,
         filters=mt.filters,
