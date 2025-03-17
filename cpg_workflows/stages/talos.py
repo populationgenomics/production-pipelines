@@ -766,8 +766,7 @@ class CreateTalosHtml(DatasetStage):
             'CreateTalosHTML '
             f'--input {results_json} '
             f'--panelapp {panel_input} '
-            f'--output {str(expected_out["results_html"].name)} '
-            f'--latest {str(expected_out["latest_html"].name)} '
+            '--output summary_output.html '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
