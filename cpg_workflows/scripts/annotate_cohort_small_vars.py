@@ -171,20 +171,11 @@ def annotate_cohort(
     )
     mt = mt.drop('variant_qc')
 
-    # split the AC/AF attributes into separate entries, overwriting the array in INFO
-    # these elements become a 1-element array for [ALT] instead [REF, ALT]
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=[mt.info.AF[1]],
-            AC=[mt.info.AC[1]],
-        ),
-    )
-
     get_logger().info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
         # still taking just a single value here for downstream compatibility in Seqr
-        AC=mt.info.AC[0],
-        AF=mt.info.AF[0],
+        AC=mt.info.AC[1],
+        AF=mt.info.AF[1],
         AN=mt.info.AN,
         aIndex=mt.a_index,
         wasSplit=mt.was_split,
@@ -231,10 +222,38 @@ def annotate_cohort(
         cadd=mt.ref_data.cadd,
         dbnsfp=mt.ref_data.dbnsfp,
         geno2mp=mt.ref_data.geno2mp,
-        gnomad_exomes=mt.ref_data.gnomad_exomes,
-        gnomad_exome_coverage=mt.ref_data.gnomad_exome_coverage,
-        gnomad_genomes=mt.ref_data.gnomad_genomes,
-        gnomad_genome_coverage=mt.ref_data.gnomad_genome_coverage,
+        # format expected from seqr-loader resources:
+        # gnomad_genomes: struct {
+        #     AF: float64,
+        #     AN: int32,
+        #     AC: int32,
+        #     Hom: int32,
+        #     AF_POPMAX_OR_GLOBAL: float64,
+        #     FAF_AF: float64,
+        #     Hemi: int32
+        # },
+        # best swing at this using the echtvar annotations currently available
+        # AF/AN/AC is legitimately from exomes and genomes independently
+        # filtering allele freq, hom count, and Hemi are from the exomes & genomes joint dataset
+        # I neglected to extract the pop max allele freq, but it's available in the raw data
+        # this would give the interface something to display, but it's not quite right
+        # seqr doesn't have a place in the back end for the joint data, just exomes and genomes separately
+        gnomad_genomes=hl.struct(
+            AF=mt.info.AF_genomes,
+            AN=mt.info.AN_genomes,
+            AC=mt.info.AC_genomes,
+            Hom=mt.info.nhomalt_joint,
+            FAF_AF=mt.info.fafmax_faf95_max_joint,
+            Hemi=mt.info.AC_joint_XY,
+        ),
+        gnomad_exomes=hl.struct(
+            AF=mt.info.AF_exomes,
+            AN=mt.info.AN_exomes,
+            AC=mt.info.AC_exomes,
+            Hom=mt.info.nhomalt_joint,
+            FAF_AF=mt.info.fafmax_faf95_max_joint,
+            Hemi=mt.info.AC_joint_XY,
+        ),
         eigen=mt.ref_data.eigen,
         exac=mt.ref_data.exac,
         g1k=mt.ref_data.g1k,

@@ -11,7 +11,7 @@ from hail.vds import read_vds
 
 from cpg_utils import Path, to_path
 from cpg_utils.cloud import read_secret
-from cpg_utils.config import config_retrieve, genome_build
+from cpg_utils.config import config_retrieve, genome_build, image_path
 from cpg_utils.hail_batch import get_batch, init_batch
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.jobs.rd_combiner import combiner
@@ -25,7 +25,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snps,
 )
 from cpg_workflows.targets import Dataset, MultiCohort
-from cpg_workflows.utils import exists, get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
+from cpg_workflows.utils import exists, get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing, ExpectedResultT
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -536,6 +536,34 @@ class RunTrainedIndelVqsrOnCombinedVcf(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=indel_recal_job)
 
 
+@stage(required_stages=RunTrainedIndelVqsrOnCombinedVcf)
+class AnnotateGnomadV4WithEchtvar(MultiCohortStage):
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'vqsr_with_gnomAD_annotation.vcf.bgz'
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(multicohort)
+
+        # new job
+        job = get_batch().new_job('AnnotateGnomadV4WithEchtvar', self.get_job_attrs(multicohort))
+        job.image(image_path('echtvar'))
+        job.memory('highmem')
+        job.cpu(4)
+
+        # read the echtvar data file into the Batch
+        echtvar_resource = get_batch().read_input(config_retrieve(['workflow', 'echtvar']))
+
+        # read the VCF into the Batch
+        vqsr_vcf = inputs.as_path(target=multicohort, stage=RunTrainedIndelVqsrOnCombinedVcf)
+        vqsr_vcf_in_batch = get_batch().read_input(str(vqsr_vcf))
+
+        job.command(f'echtvar anno -e {echtvar_resource} {vqsr_vcf_in_batch} {job.output}')
+
+        get_batch().write_output(job.output, str(outputs))
+
+        return self.make_outputs(multicohort, data=outputs, jobs=job)
+
+
 @stage(analysis_type='custom', required_stages=[CreateDenseMtFromVdsWithHail])
 class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     """
@@ -576,7 +604,7 @@ class AnnotateFragmentedVcfWithVep(MultiCohortStage):
     required_stages=[
         CreateDenseMtFromVdsWithHail,
         AnnotateFragmentedVcfWithVep,
-        RunTrainedIndelVqsrOnCombinedVcf,
+        AnnotateGnomadV4WithEchtvar,
     ],
 )
 class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
@@ -600,7 +628,7 @@ class AnnotateCohortSmallVariantsWithHailQuery(MultiCohortStage):
 
         outputs = self.expected_outputs(multicohort)
         vep_ht_path = inputs.as_path(target=multicohort, stage=AnnotateFragmentedVcfWithVep)
-        vqsr_vcf = inputs.as_path(target=multicohort, stage=RunTrainedIndelVqsrOnCombinedVcf)
+        vqsr_vcf = inputs.as_path(target=multicohort, stage=AnnotateGnomadV4WithEchtvar)
         variant_mt = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='mt')
 
         job = get_batch().new_job(self.name, self.get_job_attrs(multicohort))

@@ -42,6 +42,9 @@ snps_recal_disc_size = 20
 # most recently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
 #default_jar_spec_revision = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 
+# path to an echtvar-encoded gnomAD V4.1 Exome & Genome annotation resource
+echtvar = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"
+
 [workflow.es_index]
 # if false, use a non-preemptible instance to run the ES export
 spot_instance = false
