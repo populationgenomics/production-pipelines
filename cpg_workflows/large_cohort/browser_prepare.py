@@ -36,7 +36,7 @@ def variant_id(locus: hl.expr.LocusExpression, alleles: hl.expr.ArrayExpression,
     return var_id
 
 
-def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, output_path: str):
+def prepare_gnomad_v4_variants_helper(ds_path: str, exome_or_genome: str) -> hl.Table:
     ds = hl.read_table(ds_path)
     g = hl.eval(ds.globals)
 
@@ -319,13 +319,13 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
         hl.or_missing(ds.info.monoallelic, "monoallelic"),
     ]
 
-    if exomes_or_genomes == "exomes":
-        flags = flags + [
-            hl.or_missing(ds.region_flags.fail_interval_qc, "fail_interval_qc"),
-            # Don't have these capture regions yet
-            # hl.or_missing(ds.region_flags.outside_ukb_capture_region, "outside_ukb_capture_region"),
-            # hl.or_missing(ds.region_flags.outside_broad_capture_region, "outside_broad_capture_region"),
-        ]
+    # if exome_or_genome == "exome":
+    #     flags = flags + [
+    #         hl.or_missing(ds.region_flags.fail_interval_qc, "fail_interval_qc"),
+    #         # Don't have these capture regions yet
+    #         hl.or_missing(ds.region_flags.outside_ukb_capture_region, "outside_ukb_capture_region"),
+    #         hl.or_missing(ds.region_flags.outside_broad_capture_region, "outside_broad_capture_region"),
+    #     ]
 
     ds = ds.annotate(flags=hl.set(flags).filter(hl.is_defined))
 
@@ -336,25 +336,101 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
     ################
 
     # Drop unused fields
-    # ds = ds.drop("allele_info", "a_index", "info", "was_split", "grpmax", "vqsr_results")
+    ds = ds.drop("allele_info", "a_index", "info", "was_split", "grpmax", "vqsr_results")
 
     # Elevate variant_id and rsids to top level
     ds.describe()
     ds = ds.transmute(**ds.gnomad)
-    ds = ds.select(**{exomes_or_genomes: ds.row_value})
-    ds = ds.annotate(
-        variant_id=ds[exomes_or_genomes].variant_id,
-        rsids=ds[exomes_or_genomes].rsids,
-        **{exomes_or_genomes: ds[exomes_or_genomes].drop("variant_id", "rsids")},
-    )
-    # ds = ds.rename({"gnomad": exomes_or_genomes})
+    ds = ds.select(**{exome_or_genome: ds.row_value})
+    # ds = ds.annotate(
+    #     variant_id=ds[exome_or_genome].variant_id,
+    #     rsids=ds[exome_or_genome].rsids,
+    #     **{exome_or_genome: ds[exome_or_genome].drop("variant_id", "rsids")},
+    # )
+    # ds = ds.rename({"gnomad": exome_or_genome})
     ds.describe()
 
-    # ds = ds.annotate(
-    #     variant_id=ds.gnomad.variant_id,
-    #     rsids=ds.gnomad.rsids,
-    # )
-    # ds = ds.annotate(gnomad=ds.gnomad.drop("variant_id", "rsids"))
-    ds.write(output_path, overwrite=True)
+    # ds.write(output_path, overwrite=True)
 
     return ds
+
+
+def prepare_v4_variants(
+    exome_ds_path: str,
+    genome_ds_path: str,
+    browser_outpath: str,
+    exome_variants_outpath: str,
+    genome_variants_outpath: str,
+) -> hl.Table:
+    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome')
+    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome')
+
+    # checkpoint datasets
+    exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
+    genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
+
+    variants = exome_variants.join(genome_variants, "outer")
+
+    shared_fields = [
+        # "lcr",
+        # "nonpar",
+        "rsids",
+        # "segdup",
+        # "vep", <--- investigate generating this field
+        # "in_silico_predictors", <--- investigate generating this field
+        "variant_id",
+    ]
+    variants = variants.annotate(
+        **{field: hl.or_else(variants.exome[field], variants.genome[field]) for field in shared_fields},
+    )
+
+    variants = variants.annotate(exome=variants.exome.drop(*shared_fields), genome=variants.genome.drop(*shared_fields))
+
+    # Colocated variants
+    variants = variants.cache()
+    variants_by_locus = variants.select(
+        variants.variant_id,
+        exome_ac_raw=hl.struct(**{f: variants.exome.freq[f].ac_raw for f in variants.exome.freq.dtype.fields}),
+        genome_ac_raw=hl.struct(
+            **{f: variants.genome.freq[f].ac_raw for f in variants.genome.freq.dtype.fields},
+        ),
+    )
+    variants_by_locus = variants_by_locus.group_by("locus").aggregate(
+        variants=hl.agg.collect(variants_by_locus.row_value),
+    )
+
+    def subset_filter(subset):
+        def fn(variant):
+            return hl.if_else(
+                subset in list(variant.exome_ac_raw) and (variant.exome_ac_raw[subset] > 0),
+                True,
+                subset in list(variant.genome_ac_raw) and (variant.genome_ac_raw[subset] > 0),
+            )
+
+        return fn
+
+    variants_by_locus = variants_by_locus.annotate(
+        variant_ids=hl.struct(
+            **{
+                subset: variants_by_locus.variants.filter(subset_filter(subset)).map(lambda variant: variant.variant_id)
+                for subset in ["all", "non_ukb", "hgdp", "tgp"]
+            },
+        ),
+    )
+
+    variants = variants.annotate(colocated_variants=variants_by_locus[variants.locus].variant_ids)
+    variants = variants.annotate(
+        colocated_variants=hl.struct(
+            **{
+                subset: variants.colocated_variants[subset].filter(lambda variant_id: variant_id != variants.variant_id)
+                for subset in ["all", "non_ukb", "hgdp", "tgp"]
+            },
+        ),
+    )
+
+    # joint_frequency_data = prepare_gnomad_v4_variants_joint_frequency_helper(variants_joint_frequency_path)
+    # variants = variants.annotate(**joint_frequency_data[variants.locus, variants.alleles])
+
+    variants.write(browser_outpath, overwrite=True)
+
+    return variants

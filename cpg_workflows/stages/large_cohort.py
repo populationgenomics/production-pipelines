@@ -531,7 +531,17 @@ class PrepareBrowserTable(CohortStage):
             browser_version = slugify(browser_version)
 
         browser_version = browser_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / get_workflow().name / browser_version / 'browser.ht'
+        return {
+            'browser': cohort.analysis_dataset.prefix() / get_workflow().name / browser_version / 'browser.ht',
+            'exome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'exome_variants.ht',
+            'genome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'genome_variants.ht',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import browser_prepare
@@ -542,13 +552,21 @@ class PrepareBrowserTable(CohortStage):
         )
         j.image(image_path('cpg_workflows'))
 
+        exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+        genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+
         j.command(
             query_command(
                 browser_prepare,
-                browser_prepare.prepare_gnomad_v4_variants_helper.__name__,
-                str(inputs.as_path(cohort, Frequencies)),
-                str(config_retrieve(['workflow', 'sequencing_type'])),
-                str(self.expected_outputs(cohort)),
+                browser_prepare.prepare_v4_variants.__name__,
+                # hard-coding frequencies for now
+                exome_freq_ht_path,
+                genome_freq_ht_path,
+                # str(inputs.as_path(cohort, Frequencies)),
+                # str(config_retrieve(['workflow', 'sequencing_type']) + 's'),
+                str(self.expected_outputs(cohort)['browser']),
+                str(self.expected_outputs(cohort)['exome_variants']),
+                str(self.expected_outputs(cohort)['genome_variants']),
                 setup_gcp=True,
             ),
         )
