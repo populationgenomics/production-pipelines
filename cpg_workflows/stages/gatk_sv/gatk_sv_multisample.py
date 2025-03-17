@@ -278,7 +278,7 @@ class GatherBatchEvidence(CohortStage):
                 str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz')
                 for sequencing_group in sequencing_groups
             ]
-
+        # The inputs are from a different workflow, so we need to check if they exist manually
         check_paths_exist(input_dict)
 
         input_dict |= get_references(
