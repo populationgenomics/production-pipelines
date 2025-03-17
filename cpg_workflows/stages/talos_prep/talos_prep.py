@@ -72,7 +72,7 @@ class ExtractDataFromCohortMt(CohortStage):
 
         # either get a mt from metamist, or take one from config
         if (input_mt := config_retrieve(['workflow', cohort.id, 'mt'], None)) is None:
-            get_logger().info(f'No config entry retrieved at workflow/{cohort.name}/mt')
+            get_logger().info(f'No config entry retrieved at workflow/{cohort.id}/mt')
             input_mt = query_for_latest_hail_object(
                 dataset=cohort.analysis_dataset.name,
                 analysis_type='matrixtable',

@@ -113,9 +113,6 @@ def query_for_sv_vcf(dataset: str) -> str | None:
         str, the path to the latest VCF for the given type
     """
 
-    # TODO remove once we're good to go
-    return 'gs://cpg-seqr-test/gatk_sv/eb0b368b1a27a04ab9be111c34ae56ab9e8ebf_4531/SpiceUpSVIDs/fresh_ids.vcf.bgz'
-
     sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
 
     # hot swapping to a string we can freely modify

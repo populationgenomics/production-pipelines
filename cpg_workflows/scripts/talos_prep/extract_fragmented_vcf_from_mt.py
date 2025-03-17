@@ -60,6 +60,7 @@ def main(
     # replace the existing INFO block to just have AC/AN/AF - no other carry-over
     # this is based on the structure we already achieved in annotate_cohort
     # drop every other field (scrapping all the previously generated VEP/ClinVar/etc)
+    # these fields are mangled a little in AnnotateCohort - revisit that
     mt = mt.select_rows(
         info=hl.struct(
             AF=mt.AF,
