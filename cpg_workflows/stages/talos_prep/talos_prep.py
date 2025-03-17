@@ -190,7 +190,6 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {cohort.id}')
         job.image(image_path('bcftools_120'))
         job.cpu(4)
-        job.memory('highmem')
         job.storage('20G')
 
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
@@ -205,6 +204,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
             bcftools index -t {gnomad_annotated_vcf}
             bcftools csq --force -f {fasta} \
                 --local-csq \
+                --threads 4 \
                 -g {gff3_file} \
                 -B 10 \
                 -Oz -o {job.output["vcf.bgz"]} \
