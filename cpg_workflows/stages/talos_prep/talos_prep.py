@@ -320,7 +320,7 @@ class CompressMtIntoTarball(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar.gz'
+        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar.zst'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
