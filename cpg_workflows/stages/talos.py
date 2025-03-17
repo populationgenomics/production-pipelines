@@ -92,14 +92,18 @@ def get_date_string() -> str:
     return config_retrieve(['workflow', 'date_folder_override'], CHUNKY_DATE)
 
 
-@lru_cache(1)
-def get_date_folder() -> str:
+@cache
+def get_output_folder(cohort: Cohort, category: str | None = None) -> Path:
     """
-    allows override of the date folder to continue/re-run previous analyses
+    get the path to the output folder to use
+    Args:
+        cohort ():
+        category (): optional category to use
+
     Returns:
-        either an override in config, or the default "reanalysis/(today, YYYY-MM-DD)"
+        Path to the output location
     """
-    return join('reanalysis', get_date_string())
+    return cohort.analysis_dataset.prefix(category=category) / 'talos' / cohort.id / get_date_string()
 
 
 @cache
@@ -246,7 +250,7 @@ class GeneratePED(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'pedigree.ped'
+        return get_output_folder(cohort) / 'pedigree.ped'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         expected_out = self.expected_outputs(cohort)
@@ -265,7 +269,7 @@ class MakeRuntimeConfig(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'config.toml'
+        return get_output_folder(cohort) / 'config.toml'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
@@ -321,7 +325,7 @@ class MakePhenopackets(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'phenopackets.json'
+        return get_output_folder(cohort) / 'phenopackets.json'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         """
@@ -367,7 +371,7 @@ class GeneratePanelData(CohortStage):
         """
         only one output, the panel data
         """
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'hpo_panel_data.json'
+        return get_output_folder(cohort) / 'hpo_panel_data.json'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {cohort.id}')
@@ -399,7 +403,7 @@ class QueryPanelapp(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'panelapp_data.json'
+        return get_output_folder(cohort) / 'panelapp_data.json'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {cohort.id}')
@@ -424,7 +428,7 @@ class QueryPanelapp(CohortStage):
 class FindGeneSymbolMap(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'symbol_to_ensg.json'
+        return get_output_folder(cohort) / 'symbol_to_ensg.json'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find Symbol-ENSG lookup: {cohort.id}')
@@ -453,7 +457,7 @@ class RunHailFiltering(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'hail_labelled.vcf.bgz'
+        return get_output_folder(cohort) / 'hail_labelled.vcf.bgz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
@@ -567,7 +571,7 @@ class RunHailFilteringSV(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> Path:
         if query_for_sv_vcf(cohort.name):
-            return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'labelled_SVs.vcf.bgz'
+            return get_output_folder(cohort) / 'labelled_SVs.vcf.bgz'
         return {}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -640,7 +644,7 @@ class ValidateMOI(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'summary_output.json'
+        return get_output_folder(cohort) / 'summary_output.json'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos summary: {cohort.id}')
@@ -696,10 +700,9 @@ class ValidateMOI(CohortStage):
 class HPOFlagging(CohortStage):
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        date_prefix = self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder()
         return {
-            'pheno_annotated': date_prefix / 'pheno_annotated_report.json',
-            'pheno_filtered': date_prefix / 'pheno_filtered_report.json',
+            'pheno_annotated': get_output_folder(cohort) / 'pheno_annotated_report.json',
+            'pheno_filtered': get_output_folder(cohort) / 'pheno_filtered_report.json',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -745,7 +748,7 @@ class HPOFlagging(CohortStage):
 )
 class CreateTalosHtml(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / get_date_folder() / 'reports.tar.gz'
+        return get_output_folder(cohort) / 'reports.tar.gz'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos HTML: {cohort.id}')
@@ -769,7 +772,10 @@ class CreateTalosHtml(CohortStage):
 
         cmd_string = f'CreateTalosHTML --input {results_json} --panelapp {panel_input} --output summary_output.html '
 
-        if report_splitting := config_retrieve(['workflow', 'report_splitting', cohort.analysis_dataset.name], False,):
+        if report_splitting := config_retrieve(
+            ['workflow', 'report_splitting', cohort.analysis_dataset.name],
+            False,
+        ):
             cmd_string += f' --split_samples {report_splitting}'
 
         job.command(cmd_string)
@@ -790,10 +796,9 @@ class CreateTalosHtml(CohortStage):
 )
 class UploadTalosHtml(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, str | Path]:
-        date_folder_prefix = self.get_stage_cohort_prefix(cohort=cohort, category='web') / get_date_folder()
         return {
-            'results_html': date_folder_prefix / 'summary_output.html',
-            'folder': str(date_folder_prefix),
+            'results_html': get_output_folder(cohort, category='web') / 'summary_output.html',
+            'folder': str(get_output_folder(cohort, category='web')),
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
@@ -827,10 +832,9 @@ class MinimiseOutputForSeqr(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        analysis_folder_prefix = self.get_stage_cohort_prefix(cohort=cohort, category='analysis') / 'seqr_files'
         return {
-            'seqr_file': analysis_folder_prefix / f'{get_date_folder()}_seqr.json',
-            'seqr_pheno_file': analysis_folder_prefix / f'{get_date_folder()}_seqr_pheno.json',
+            'seqr_file': get_output_folder(cohort, category='analysis') / f'{get_date_string()}_seqr.json',
+            'seqr_pheno_file': get_output_folder(cohort, category='analysis') / f'{get_date_string()}_seqr_pheno.json',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
