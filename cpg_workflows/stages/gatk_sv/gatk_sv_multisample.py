@@ -149,7 +149,7 @@ def check_paths_exist(input_dict: dict[str, Any]):
             path = to_path(str_path)
             if not path.exists():
                 sg_id = path.name.split('/')[-1].split('.')[0]
-                invalid_paths[k].append(sg_id)
+                invalid_paths[sg_id].append(str_path)
     if invalid_paths:
         error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
         raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
