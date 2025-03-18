@@ -283,7 +283,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
                         metric=metric,
                         value=hl.float(
                             nullify_nan(ds.info[metric][0]),
-                        ),  # default_compute_info() annotates below fields as hl.array(hl.float64) so need to get value in array
+                        ),
                     )
                     for metric in [
                         "InbreedingCoeff",
@@ -322,9 +322,8 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
     if exomes_or_genomes == "exomes":
         flags = flags + [
             hl.or_missing(ds.region_flags.fail_interval_qc, "fail_interval_qc"),
-            # Don't have these capture regions yet
-            # hl.or_missing(ds.region_flags.outside_ukb_capture_region, "outside_ukb_capture_region"),
-            # hl.or_missing(ds.region_flags.outside_broad_capture_region, "outside_broad_capture_region"),
+            hl.or_missing(ds.region_flags.outside_ukb_capture_region, "outside_ukb_capture_region"),
+            hl.or_missing(ds.region_flags.outside_broad_capture_region, "outside_broad_capture_region"),
         ]
 
     ds = ds.annotate(flags=hl.set(flags).filter(hl.is_defined))
@@ -338,22 +337,11 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exomes_or_genomes: str, outp
     # Drop unused fields
     # ds = ds.drop("allele_info", "a_index", "info", "was_split", "grpmax", "vqsr_results")
 
-    # Elevate variant_id and rsids to top level
     ds.describe()
     ds = ds.transmute(**ds.gnomad)
     ds = ds.select(**{exomes_or_genomes: ds.row_value})
-    ds = ds.annotate(
-        variant_id=ds[exomes_or_genomes].variant_id,
-        rsids=ds[exomes_or_genomes].rsids,
-        **{exomes_or_genomes: ds[exomes_or_genomes].drop("variant_id", "rsids")},
-    )
     # ds = ds.rename({"gnomad": exomes_or_genomes})
-    ds.describe()
 
-    # ds = ds.annotate(
-    #     variant_id=ds.gnomad.variant_id,
-    #     rsids=ds.gnomad.rsids,
-    # )
     # ds = ds.annotate(gnomad=ds.gnomad.drop("variant_id", "rsids"))
     ds.write(output_path, overwrite=True)
 

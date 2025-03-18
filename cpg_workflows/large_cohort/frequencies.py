@@ -207,7 +207,10 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_globals(
         faf_meta=faf_meta,
-        faf_index_dict=make_faf_index_dict(faf_meta, pops=['Europe', 'oth', 'Other']),  # <--- Discuss
+        faf_index_dict=make_faf_index_dict(
+            faf_meta,
+            pops=['Europe', 'oth', 'Other'],
+        ),  # <--- Discuss. This is the field where we want the set() of populations from the pop field in the inferred_pop.ht
     )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
