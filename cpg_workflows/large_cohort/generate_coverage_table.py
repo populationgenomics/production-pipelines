@@ -5,6 +5,7 @@ import hail as hl
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import output_path
+from cpg_utils.hail_batch import get_batch
 from cpg_workflows.utils import can_reuse
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
@@ -17,10 +18,31 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def merge_coverage_tables(
+    coverage_tables: list[hl.Table],
+) -> hl.Table:
+    """
+    Merge coverage tables.
+
+    :param coverage_tables: List of coverage tables.
+    :return: Merged coverage table.
+    """
+    return hl.Table.union(*coverage_tables)
+
+
+def shard_vds(vds_path: str, contig: str) -> hl.vds.VariantDataset:
+    """
+    Shard a VDS file.
+    """
+    return hl.vds.filter_intervals(
+        hl.vds.read_vds(vds_path),
+        [hl.parse_locus_interval(contig, reference_genome='GRCh38')],
+    )
+
+
 def compute_coverage_stats(
     mtds: Union[hl.MatrixTable, hl.vds.VariantDataset],
     reference_ht: hl.Table,
-    tmp_prefix: str,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -75,12 +97,13 @@ def compute_coverage_stats(
     # `no_raw_group` to exclude the "raw" group so there is a single annotation
     # representing the full samples set. `freq_meta` is updated below to remove "group"
     # from all dicts.
-    group_membership_ht = generate_freq_group_membership_array(
+    group_membership_ht: hl.Table = generate_freq_group_membership_array(
         ht,
         strata_expr,
         no_raw_group=True,
     )
     print(f'group_membership_ht: {group_membership_ht.describe()}')
+    print(f'group_membership_ht: {group_membership_ht.show()}')
 
     n_samples = group_membership_ht.count()
     sample_counts = group_membership_ht.index_globals().freq_meta_sample_count
@@ -201,7 +224,6 @@ def compute_coverage_stats(
             mt.group_membership,
         ),
     ).rows()
-    ht = ht.checkpoint(tmp_prefix + '/' + 'coverage_stats.ht', overwrite=True)
     print(f'ht: {ht.describe()}')
     # ht = ht.checkpoint(hl.utils.new_temp_file("coverage_stats", "ht"))
 
@@ -268,22 +290,23 @@ def compute_coverage_stats(
     return ht
 
 
-def get_reference_genome(ref_genome: str) -> hl.ReferenceGenome:
+def get_reference_genome(ref_genome: str, contig: str) -> hl.ReferenceGenome:
     rg = hl.get_reference(ref_genome)
-    reference_ht = reference_genome.get_reference_ht(rg)
+    reference_ht = reference_genome.get_reference_ht(rg, [contig])
     return reference_ht
 
 
-def calculate_coverage_ht(vds_path: str, out_path: str, tmp_prefix: str) -> hl.Table:
+def calculate_coverage_ht(vds_path: str, contig: str) -> hl.Table:
     """
     Calculate coverage for each sample.
     """
     # The `reference_ht` is a Table that contains a row for each locus coverage that should be
     # computed on. It needs to be keyed by `locus`.
-    vds = hl.vds.read_vds(vds_path)
+    vds = hl.vds.filter_chromosomes(hl.vds.read_vds(vds_path), keep=[contig])
 
     logging.info('Calculating coverage stats...')
-    reference_ht: hl.Table = get_reference_genome('GRCh38')
+    reference_ht: hl.Table = get_reference_genome('GRCh38', contig=contig)
+    logging.info(f'reference_ht: {reference_ht.describe()}')
     # if can_reuse(str(to_path(tmp_prefix) / 'reference.ht')):
     #     logging.info(f'Reading reference_ht from {str(to_path(tmp_prefix) / "reference.ht")}...')
     #     reference_ht = hl.read_table(output_path('reference.ht', 'tmp'))
@@ -291,10 +314,10 @@ def calculate_coverage_ht(vds_path: str, out_path: str, tmp_prefix: str) -> hl.T
     #     logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / "reference.ht")}...')
     #     reference_ht = reference_ht.checkpoint(str(to_path(tmp_prefix) / 'reference.ht'), overwrite=True)
     logging.info(f'reference_ht: {reference_ht.describe()}')
-    coverage_ht: hl.Table = compute_coverage_stats(vds, reference_ht, tmp_prefix=tmp_prefix)
+    coverage_ht: hl.Table = compute_coverage_stats(vds, reference_ht)
     logging.info(f'coverage_ht: {coverage_ht.describe()}')
 
-    logging.info(f'Writing coverage data to {out_path}...')
-    coverage_ht.write(out_path, overwrite=True)
-    logging.info('Coverage stats written to table.')
+    # logging.info(f'Writing coverage data to {out_path}...')
+    # coverage_ht.write(out_path, overwrite=True)
+    # logging.info('Coverage stats written to table.')
     return coverage_ht
