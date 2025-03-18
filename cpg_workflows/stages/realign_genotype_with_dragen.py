@@ -114,10 +114,7 @@ class UploadDataToIca(SequencingGroupStage):
         upload_job.command(
             cpg_utils.hail_batch.command(
                 f"""
-                pwd
-                df --si
-                {ICA_CLI_SETUP}
-                cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
+                function upload_cram {{
                 if [[ $cram_status != "AVAILABLE" ]]
                 then
                     mkdir $BATCH_TMPDIR/{sequencing_group.name}
@@ -131,6 +128,12 @@ class UploadDataToIca(SequencingGroupStage):
                 icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
 
                 jq -n --arg cram_id $(cat cram_id) --arg crai_id $(cat crai_id) '{{cram_fid: $cram_id, crai_fid: $crai_id}}' > {upload_job.ofile}
+
+                }}
+
+                {ICA_CLI_SETUP}
+                cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
+                retry upload_cram
                 """,
                 define_retry_function=True,
             ),
@@ -367,12 +370,6 @@ class DownloadCramFromIca(SequencingGroupStage):
             cpg_utils.hail_batch.command(
                 f"""
                 function download_cram {{
-                {ICA_CLI_SETUP}
-                mkdir -p {sequencing_group.name}
-                pipeline_id_filename=$(basename {pipeline_id_path})
-                gcloud storage cp {pipeline_id_path} .
-                pipeline_id=$(cat $pipeline_id_filename)
-                echo "Pipeline ID: $pipeline_id"
                 cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
                 crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
                 cram_md5=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
@@ -399,6 +396,13 @@ class DownloadCramFromIca(SequencingGroupStage):
                 gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
                 gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
                 }}
+
+                {ICA_CLI_SETUP}
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
 
                 retry download_cram
                 """,
@@ -466,12 +470,6 @@ class DownloadGvcfFromIca(SequencingGroupStage):
             cpg_utils.hail_batch.command(
                 f"""
                 function download_gvcf {{
-                {ICA_CLI_SETUP}
-                mkdir -p {sequencing_group.name}
-                pipeline_id_filename=$(basename {pipeline_id_path})
-                gcloud storage cp {pipeline_id_path} .
-                pipeline_id=$(cat $pipeline_id_filename)
-                echo "Pipeline ID: $pipeline_id"
                 gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
                 gvcf_tbi_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --match-mode EXACT -o json | jq -r '.items[].id')
                 gvcf_md5_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
@@ -498,6 +496,13 @@ class DownloadGvcfFromIca(SequencingGroupStage):
                 gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
                 gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
                 }}
+
+                {ICA_CLI_SETUP}
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
 
                 retry download_gvcf
                 """,
@@ -554,13 +559,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         ica_download_job.command(
             cpg_utils.hail_batch.command(
                 f"""
-                {ICA_CLI_SETUP}
-                # List all files in the folder except crams and gvcf and download them
-                mkdir -p {sequencing_group.name}
-                pipeline_id_filename=$(basename {pipeline_id_path})
-                gcloud storage cp {pipeline_id_path} .
-                pipeline_id=$(cat $pipeline_id_filename)
-                echo "Pipeline ID: $pipeline_id"
+                function download_extra_data {{
                 files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
                 while IFS= read -r line; do
                     name=$(echo "$line" | awk '{{print $1}}')
@@ -569,6 +568,17 @@ class DownloadDataFromIca(SequencingGroupStage):
                     icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
                 done <<< "$files_and_ids"
                 gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/dragen_metrics/{sequencing_group.name}/
+                }}
+
+                {ICA_CLI_SETUP}
+                # List all files in the folder except crams and gvcf and download them
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
+
+                retry download_extra_data
                 """,
                 define_retry_function=True,
             ),
