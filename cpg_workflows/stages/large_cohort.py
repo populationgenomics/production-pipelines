@@ -518,7 +518,6 @@ class GenerateCoverageTable(CohortStage):
             shard_j_result = shard_j.call(
                 generate_coverage_table.shard_vds,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(self.tmp_prefix),
                 contig,
             )
             shard_j_results.append(shard_j_result)
