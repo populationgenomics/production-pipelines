@@ -24,7 +24,7 @@ def compute_coverage_stats(
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
-    strata_expr: Optional[list[dict[str, hl.expr.StringExpression]]] = None,
+    strata_expr: Optional[dict[str, hl.expr.StringExpression]] = None,
 ) -> hl.Table:
     """
     Compute coverage statistics for every base of the `reference_ht` provided.
@@ -56,15 +56,15 @@ def compute_coverage_stats(
         mt = mtds
 
     if strata_expr is None:
-        strata_expr = [{}]
+        strata_expr = {}
         no_strata = True
     else:
         no_strata = False
 
     # Annotate the MT cols with each of the expressions in strata_expr and redefine
     # strata_expr based on the column HT with added annotations.
-    ht = mt.annotate_cols(**{k: v for d in strata_expr for k, v in d.items()}).cols()
-    strata_expr = [{k: ht[k] for k in d} for d in strata_expr]
+    ht = mt.annotate_cols(**{k: v for d in strata_expr for k, v in d.items()}).cols()  # type: ignore
+    strata_expr = [{k: ht[k] for k in d} for d in strata_expr]  # type: ignore
 
     # Use the function for creating the frequency stratified by `freq_meta`,
     # `freq_meta_sample_count`, and `group_membership` annotations to give
