@@ -20,6 +20,7 @@ logger.setLevel(logging.INFO)
 def compute_coverage_stats(
     mtds: Union[hl.MatrixTable, hl.vds.VariantDataset],
     reference_ht: hl.Table,
+    tmp_prefix: str,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -200,7 +201,9 @@ def compute_coverage_stats(
             mt.group_membership,
         ),
     ).rows()
-    ht = ht.checkpoint(hl.utils.new_temp_file("coverage_stats", "ht"))
+    ht = ht.checkpoint(tmp_prefix + '/' + 'coverage_stats.ht', overwrite=True)
+    print(f'ht: {ht.describe()}')
+    # ht = ht.checkpoint(hl.utils.new_temp_file("coverage_stats", "ht"))
 
     # This expression aggregates the DP counter in reverse order of the
     # coverage_over_x_bins and computes the cumulative sum over them.
@@ -288,7 +291,7 @@ def calculate_coverage_ht(vds_path: str, out_path: str, tmp_prefix: str) -> hl.T
     #     logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / "reference.ht")}...')
     #     reference_ht = reference_ht.checkpoint(str(to_path(tmp_prefix) / 'reference.ht'), overwrite=True)
     logging.info(f'reference_ht: {reference_ht.describe()}')
-    coverage_ht: hl.Table = compute_coverage_stats(vds, reference_ht)
+    coverage_ht: hl.Table = compute_coverage_stats(vds, reference_ht, tmp_prefix=tmp_prefix)
     logging.info(f'coverage_ht: {coverage_ht.describe()}')
 
     logging.info(f'Writing coverage data to {out_path}...')
