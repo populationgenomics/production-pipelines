@@ -47,8 +47,8 @@ def shard_vds(vds_path: str, contig: str) -> hl.vds.VariantDataset:
 
 
 def compute_coverage_stats(
-    mtds: Union[hl.MatrixTable, hl.vds.VariantDataset],
-    reference_ht: hl.Table,
+    mtds_path: str,
+    reference_ht_path: str,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -79,6 +79,8 @@ def compute_coverage_stats(
     """
     from cpg_utils.hail_batch import init_batch
 
+    mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
+    reference_ht: hl.Table = hl.read_table(reference_ht_path)
     init_batch()
     print(f'mtds: {mtds.describe()}')
     print(mtds.variant_data.show(n_cols=1))
