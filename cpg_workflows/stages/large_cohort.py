@@ -508,6 +508,8 @@ class GenerateCoverageTable(CohortStage):
         contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         chr22_reference_ht_path = config_retrieve(['large_cohort', 'output_versions', 'chr22_ref_ht'], default=None)
         chr22_vds_path = config_retrieve(['large_cohort', 'output_versions', 'chr22_vds'], default=None)
+        logging.info(f'chr22_reference_ht_path: {chr22_reference_ht_path} | {type(chr22_reference_ht_path)}')
+        logging.info(f'chr22_vds_path: {chr22_vds_path} | {type(chr22_vds_path)}')
         # job to split VDS into chromosome-length contigs
         # coverage_jobs = []
         # coverage_j_results = []
