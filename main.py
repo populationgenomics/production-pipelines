@@ -28,6 +28,7 @@ from cpg_workflows.stages.large_cohort import (
     GenerateCoverageTable,
     LoadVqsr,
     PrepareBrowserTable,
+    ShardVds,
 )
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
@@ -93,6 +94,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         CramMultiQC,
         PrepareBrowserTable,
         GenerateCoverageTable,
+        ShardVds,
     ],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
