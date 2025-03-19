@@ -310,7 +310,7 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
     analysis_type='talos_prep',
     required_stages=[JumpAnnotationsFromHtToFinalMt],
 )
-class CompressMtIntoTarball(CohortStage):
+class SquashMtIntoTarball(CohortStage):
     """
     Localise the MatrixTable, and create a tarball
     Don't attempt additional compression - it's
