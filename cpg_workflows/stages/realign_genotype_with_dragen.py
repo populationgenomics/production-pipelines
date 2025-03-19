@@ -5,10 +5,9 @@ from typing import TYPE_CHECKING, Final
 import coloredlogs
 
 import cpg_utils
-import cpg_utils.hail_batch
 from cpg_utils.cloud import get_path_components_from_gcp_path
 from cpg_utils.config import config_retrieve
-from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, get_batch
+from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, command, get_batch
 from cpg_workflows.stages.dragen_ica import (
     cancel_ica_pipeline_run,
     monitor_align_genotype_with_dragen,
@@ -111,8 +110,9 @@ class UploadDataToIca(SequencingGroupStage):
         authenticate_cloud_credentials_in_job(upload_job)
 
         # Check if the CRAM already exists in ICA before uploading. If it exists, just return the ID for the CRAM and CRAI
+        # The internal `command` method is a wrapper from cpg_utils.hail_batch that extends the normal hail batch command
         upload_job.command(
-            cpg_utils.hail_batch.command(
+            command(
                 f"""
                 function upload_cram {{
                 if [[ $cram_status != "AVAILABLE" ]]
@@ -367,7 +367,7 @@ class DownloadCramFromIca(SequencingGroupStage):
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            cpg_utils.hail_batch.command(
+            command(
                 f"""
                 function download_cram {{
                 cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
@@ -467,7 +467,7 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            cpg_utils.hail_batch.command(
+            command(
                 f"""
                 function download_gvcf {{
                 gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
@@ -557,7 +557,7 @@ class DownloadDataFromIca(SequencingGroupStage):
         # Download an entire folder (except crams and gvcfs) with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            cpg_utils.hail_batch.command(
+            command(
                 f"""
                 function download_extra_data {{
                 files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
