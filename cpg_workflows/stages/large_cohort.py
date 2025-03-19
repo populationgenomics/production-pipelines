@@ -557,7 +557,9 @@ class GenerateCoverageTable(CohortStage):
         merge_j.depends_on(*coverage_jobs)
         merge_j_result = merge_j.call(generate_coverage_table.merge_coverage_tables, coverage_j_results)
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[merge_j])
+        jobs = coverage_jobs + [merge_j]
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
 # @stage(required_stages=[Frequencies])
