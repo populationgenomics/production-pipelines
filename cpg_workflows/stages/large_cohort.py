@@ -552,6 +552,7 @@ class GenerateCoverageTable(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         merge_j.image(image_path('cpg_workflows'))
+        merge_j.depends_on(*coverage_j_results)
         merge_j_result = merge_j.call(generate_coverage_table.merge_coverage_tables, coverage_j_results)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[merge_j_result])
