@@ -505,84 +505,25 @@ class GenerateCoverageTable(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
 
-        contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+        # contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
 
-        # job to split VDS into chromosome-length contigs
-        # coverage_jobs = []
-        # coverage_j_results = []
-        chr22_reference_ht_path = config_retrieve(['large_cohort', 'output_versions', 'chr22_ref_ht'], default=None)
-        chr22_vds_path = config_retrieve(['large_cohort', 'output_versions', 'chr22_vds'], default=None)
-        logging.info(f'chr22_reference_ht_path: {chr22_reference_ht_path} | {type(chr22_reference_ht_path)}')
-        logging.info(f'chr22_vds_path: {chr22_vds_path} | {type(chr22_vds_path)}')
-
-        coverage_j = get_batch().new_python_job(
-            'CalculateCoverage_chr22',
+        j = get_batch().new_job(
+            'GenerateCoverageTable',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
-        coverage_j.image(image_path('cpg_workflows'))
-
-        shard_result = coverage_j.call(
-            generate_coverage_table.shard_vds,
-            str(inputs.as_path(cohort, Combiner, key='vds')),
-            'chr22',
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                generate_coverage_table,
+                generate_coverage_table.run.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(self.tmp_prefix),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
         )
 
-        coverage_j.call(
-            generate_coverage_table.compute_coverage_stats,
-            shard_result.as_str(),
-            chr22_reference_ht_path,
-        )
-
-        # for contig in contigs:
-        #     coverage_j = get_batch().new_python_job(
-        #         f'CalculateCoverage_{contig}',
-        #         (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        #     )
-        #     coverage_j.image(image_path('cpg_workflows'))
-        #     shard_result = coverage_j.call(
-        #         generate_coverage_table.shard_vds,
-        #         str(inputs.as_path(cohort, Combiner, key='vds')),
-        #         contig,
-        #     )
-
-        # # Generate reference table for each contig
-        # reference_ht_j = get_batch().new_python_job(
-        #     f'GenerateReferenceTable_{contig}',
-        #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        # )
-        # reference_ht_j.image(image_path('cpg_workflows'))
-        # reference_ht_result = coverage_j.call(generate_coverage_table.get_reference_genome, 'GRCh38', contig)
-
-        # Calculate coverage for each contig
-        # coverage_j = get_batch().new_python_job(
-        #     f'CalculateCoverage_{contig}',
-        #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        # )
-        # coverage_j.image(image_path('cpg_workflows'))
-        # coverage_j_result = coverage_j.call(
-        #     generate_coverage_table.compute_coverage_stats,
-        #     shard_result,
-        #     reference_ht_result,
-        # )
-        # coverage_j.depends_on(
-        #     shard_j,
-        #     reference_ht_j,
-        # )
-        # coverage_jobs.append(coverage_j)
-        # coverage_j_results.append(coverage_j_result)
-
-        # job to merge all hail tables into one
-        # merge_j = get_batch().new_python_job(
-        #     'MergeCoverageTables',
-        #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        # )
-        # merge_j.image(image_path('cpg_workflows'))
-        # merge_j.depends_on(*coverage_jobs)
-        # merge_j_result = merge_j.call(generate_coverage_table.merge_coverage_tables, coverage_j_results)
-
-        # jobs = coverage_jobs + [merge_j]
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_j)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
 # @stage(required_stages=[Frequencies])

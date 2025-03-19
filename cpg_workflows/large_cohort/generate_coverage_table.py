@@ -27,28 +27,28 @@ def merge_coverage_tables(
     :param coverage_tables: List of coverage tables.
     :return: Merged coverage table.
     """
-    from cpg_utils.hail_batch import init_batch
+    # from cpg_utils.hail_batch import init_batch
 
-    init_batch()
+    # init_batch()
     return hl.Table.union(*coverage_tables)
 
 
-def shard_vds(vds_path: str, contig: str) -> hl.vds.VariantDataset:
+def shard_vds(vds: hl.vds.VariantDataset, contig: str) -> hl.vds.VariantDataset:
     """
     Shard a VDS file.
     """
-    from cpg_utils.hail_batch import init_batch
+    # from cpg_utils.hail_batch import init_batch
 
-    init_batch()
+    # init_batch()
     return hl.vds.filter_intervals(
-        hl.vds.read_vds(vds_path),
+        vds,
         [hl.parse_locus_interval(contig, reference_genome='GRCh38')],
     )
 
 
 def compute_coverage_stats(
-    mtds_path: str,
-    reference_ht_path: str,
+    mtds: hl.vds.VariantDataset,
+    reference_ht: hl.Table,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -77,12 +77,12 @@ def compute_coverage_stats(
         coverage stats by.
     :return: Table with per-base coverage stats
     """
-    from cpg_utils.hail_batch import init_batch
+    # from cpg_utils.hail_batch import init_batch
 
-    init_batch()
+    # init_batch()
 
-    mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
-    reference_ht: hl.Table = hl.read_table(reference_ht_path)
+    # mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
+    # reference_ht: hl.Table = hl.read_table(reference_ht_path)
     print(f'mtds: {mtds.variant_data.describe()}')
     print(mtds.variant_data.show(n_cols=1))
     is_vds = isinstance(mtds, hl.vds.VariantDataset)
@@ -303,13 +303,51 @@ def compute_coverage_stats(
     return ht
 
 
-def get_reference_genome(ref_genome: str, contig: str) -> hl.ReferenceGenome:
-    from cpg_utils.hail_batch import init_batch
+def get_reference_genome(rg: hl.Table, contig: str) -> hl.ReferenceGenome:
+    return reference_genome.get_reference_ht(rg, [contig])
 
-    init_batch()
-    rg = hl.get_reference(ref_genome)
-    reference_ht = reference_genome.get_reference_ht(rg, [contig])
-    return reference_ht
+
+def run(vds_path: str, tmp_prefix: str, out_coverage_ht_path: str) -> hl.Table:
+    """
+    Main function.
+    """
+    coverage_tables = []
+    rg = hl.get_reference('GRCh38')
+    contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+    vds = hl.vds.read_vds(vds_path)
+    for contig in contigs:
+        # split vds by contig
+        logging.info(f'Sharding VDS for contig {contig}...')
+        sharded_vds = shard_vds(vds, contig)
+        logging.info(f'sharded_vds: {sharded_vds.variant_data.describe()}')
+        logging.info(f'Checkpointing sharded_vds to {str(to_path(tmp_prefix) / f"{contig}_sharded_vds.vds")}...')
+        sharded_vds.write(str(to_path(tmp_prefix) / f'{contig}_sharded_vds.vds'), overwrite=True)
+
+        # generate reference_ht for contig
+        logging.info(f'Generating reference_ht for contig {contig}...')
+        reference_ht = get_reference_genome(rg, contig)
+        logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / f"{contig}_reference.ht")}...')
+        reference_ht.write(str(to_path(tmp_prefix) / f'{contig}_reference.ht'), overwrite=True)
+
+        # calculate coverage for contig
+        logging.info(f'Calculating coverage for contig {contig}...')
+        coverage_ht = calculate_coverage_ht(sharded_vds, reference_ht)
+        logging.info(f'coverage_ht: {coverage_ht.describe()}')
+        logging.info(f'Checkpointing coverage_ht to {str(to_path(tmp_prefix) / f"{contig}_coverage.ht")}...')
+        coverage_ht.write(str(to_path(tmp_prefix) / f'{contig}_coverage.ht'), overwrite=True)
+
+        coverage_tables.append(coverage_ht)
+
+    # merge coverage tables
+    logging.info('Merging coverage tables...')
+    coverage_ht = merge_coverage_tables(coverage_tables)
+    logging.info(f'coverage_ht: {coverage_ht.describe()}')
+
+    # write coverage_ht to output path
+    logging.info(f'Writing coverage_ht to {out_coverage_ht_path}...')
+    coverage_ht.write(out_coverage_ht_path, overwrite=True)
+
+    return coverage_ht
 
 
 def calculate_coverage_ht(vds_path: str, contig: str) -> hl.Table:
