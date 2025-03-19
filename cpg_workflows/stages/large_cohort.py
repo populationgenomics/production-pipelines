@@ -519,7 +519,7 @@ class ShardVds(CohortStage):
                 generate_coverage_table,
                 generate_coverage_table.shard_vds.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(self.expected_outputs(cohort)),
+                self.expected_outputs(cohort),
                 setup_gcp=True,
             ),
         )
