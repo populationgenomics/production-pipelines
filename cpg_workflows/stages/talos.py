@@ -432,7 +432,7 @@ class RunHailFiltering(DatasetStage):
             input_mt = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type=TALOS_PREP_TYPE,
-                object_suffix='.mt.tar.zst',
+                object_suffix='.mt.tar',
             )
 
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
@@ -506,8 +506,8 @@ class RunHailFiltering(DatasetStage):
 
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
-        mt_name = input_mt.split('/')[-1].removesuffix('.tar.zst')
-        job.command(f'tar --zstd -xf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
+        mt_name = input_mt.split('/')[-1].removesuffix('.tar')
+        job.command(f'tar -xf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
 
         job.command(f'export TALOS_CONFIG={conf_in_batch}')
         job.command(

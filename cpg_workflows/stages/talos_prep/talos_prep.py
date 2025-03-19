@@ -312,20 +312,13 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
 )
 class CompressMtIntoTarball(CohortStage):
     """
-    Localise the MatrixTable, and compress it into a tarball
+    Localise the MatrixTable, and create a tarball
+    Don't attempt additional compression - it's
     Means that Talos downstream of this won't need GCloud installed
-
-    I'm generating a tarball with compression...
-    unsure if that's meaningful, given that Hail objects are already compressed
-
-    Tar's default compression: https://batch.hail.populationgenomics.org.au/batches/591717/jobs/1, 60 mins compressing
-    Zstd compression: https://batch.hail.populationgenomics.org.au/batches/591728/jobs/1, 20 mins, 6 mins compressing
-    Even faster would be no compression... but given that this is the permanent artifact for the run, it's best to keep
-    it as small as possible
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar.zst'
+        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
 
@@ -342,9 +335,10 @@ class CompressMtIntoTarball(CohortStage):
         mt_name = mt.split('/')[-1]
 
         # copy the MT into the image, bundle it into a Tar-Ball
-        job.command(f'gcloud --no-user-output-enabled storage cp -r {mt} $BATCH_TMPDIR')
+        job.command(f'gcloud --no-user-output-enabled storage cp --do-not-decompress -r {mt} $BATCH_TMPDIR')
         job.command(f'mv $BATCH_TMPDIR/{mt_name} {cohort.id}.mt')
-        job.command(f'tar --remove-files -c --use-compress-program=zstdmt -f {job.output} {cohort.id}.mt')
+        # no compression - the Hail objects are all internally gzipped so not much to gain there
+        job.command(f'tar --remove-files -cf {job.output} {cohort.id}.mt')
 
         get_batch().write_output(job.output, str(output))
 
