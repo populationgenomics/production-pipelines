@@ -8,6 +8,7 @@ from requests import get
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.large_cohort import generate_coverage_table
 from cpg_workflows.targets import Cohort, SequencingGroup
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
@@ -503,7 +504,6 @@ class GenerateCoverageTable(CohortStage):
         return cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version / 'coverage.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_coverage_table
 
         contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
 
@@ -549,17 +549,17 @@ class GenerateCoverageTable(CohortStage):
             coverage_j_results.append(coverage_j_result)
 
         # job to merge all hail tables into one
-        merge_j = get_batch().new_python_job(
-            'MergeCoverageTables',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
-        merge_j.image(image_path('cpg_workflows'))
-        merge_j.depends_on(*coverage_jobs)
-        merge_j_result = merge_j.call(generate_coverage_table.merge_coverage_tables, coverage_j_results)
+        # merge_j = get_batch().new_python_job(
+        #     'MergeCoverageTables',
+        #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        # )
+        # merge_j.image(image_path('cpg_workflows'))
+        # merge_j.depends_on(*coverage_jobs)
+        # merge_j_result = merge_j.call(generate_coverage_table.merge_coverage_tables, coverage_j_results)
 
-        jobs = coverage_jobs + [merge_j]
+        # jobs = coverage_jobs + [merge_j]
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
 
 
 # @stage(required_stages=[Frequencies])
