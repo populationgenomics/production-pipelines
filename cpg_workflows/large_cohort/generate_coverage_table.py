@@ -80,6 +80,8 @@ def compute_coverage_stats(
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
+    logging.info(f'mtds_path: {mtds_path}')
+    logging.info(f'reference_ht_path: {reference_ht_path}')
 
     mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
