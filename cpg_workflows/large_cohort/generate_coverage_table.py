@@ -80,6 +80,8 @@ def compute_coverage_stats(
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
+    print(f'mtds: {mtds.describe()}')
+    print(mtds.variant_data.show(n_cols=1))
     is_vds = isinstance(mtds, hl.vds.VariantDataset)
     if is_vds:
         mt = mtds.variant_data
