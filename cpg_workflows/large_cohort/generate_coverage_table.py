@@ -27,6 +27,9 @@ def merge_coverage_tables(
     :param coverage_tables: List of coverage tables.
     :return: Merged coverage table.
     """
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     return hl.Table.union(*coverage_tables)
 
 
@@ -34,6 +37,9 @@ def shard_vds(vds_path: str, contig: str) -> hl.vds.VariantDataset:
     """
     Shard a VDS file.
     """
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     return hl.vds.filter_intervals(
         hl.vds.read_vds(vds_path),
         [hl.parse_locus_interval(contig, reference_genome='GRCh38')],
@@ -71,6 +77,9 @@ def compute_coverage_stats(
         coverage stats by.
     :return: Table with per-base coverage stats
     """
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     is_vds = isinstance(mtds, hl.vds.VariantDataset)
     if is_vds:
         mt = mtds.variant_data
@@ -291,6 +300,9 @@ def compute_coverage_stats(
 
 
 def get_reference_genome(ref_genome: str, contig: str) -> hl.ReferenceGenome:
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     rg = hl.get_reference(ref_genome)
     reference_ht = reference_genome.get_reference_ht(rg, [contig])
     return reference_ht

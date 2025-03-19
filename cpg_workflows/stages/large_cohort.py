@@ -508,7 +508,7 @@ class GenerateCoverageTable(CohortStage):
         contigs = [f'chr{i}' for i in range(1, 23)] + ['X', 'Y', 'chrM']
 
         # job to split VDS into chromosome-length contigs
-        shard_j_results = []
+        coverage_j_results = []
         for contig in contigs:
             shard_j = get_batch().new_python_job(
                 f'ShardVds_{contig}',
@@ -520,20 +520,14 @@ class GenerateCoverageTable(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 contig,
             )
-            shard_j_results.append(shard_j_result)
 
-        # job to calculate coverage for each chromosome and output individual hail table
-        assert len(contigs) == len(shard_j_results)
-
-        coverage_j_results = []
-        for contig, shard_j_result in zip(contigs, shard_j_results):
             # Generate reference table for each contig
-            reference_ht_job = get_batch().new_python_job(
+            reference_ht_j = get_batch().new_python_job(
                 f'GenerateReferenceTable_{contig}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
-            reference_ht_job.image(image_path('cpg_workflows'))
-            reference_ht_result = reference_ht_job.call(generate_coverage_table.get_reference_genome, 'GRCh38', contig)
+            reference_ht_j.image(image_path('cpg_workflows'))
+            reference_ht_j_result = reference_ht_j.call(generate_coverage_table.get_reference_genome, 'GRCh38', contig)
 
             # Calculate coverage for each contig
             coverage_j = get_batch().new_python_job(
@@ -544,7 +538,11 @@ class GenerateCoverageTable(CohortStage):
             coverage_j_result = coverage_j.call(
                 generate_coverage_table.compute_coverage_stats,
                 shard_j_result,
-                reference_ht_result,
+                reference_ht_j_result,
+            )
+            coverage_j.depends_on(
+                shard_j,
+                reference_ht_j,
             )
             coverage_j_results.append(coverage_j_result)
 
