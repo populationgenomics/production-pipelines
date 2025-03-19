@@ -496,8 +496,12 @@ class Frequencies(CohortStage):
 @stage(required_stages=[Combiner])
 class ShardVds(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
+        if sharded_vds_version := config_retrieve(['large_cohort', 'output_versions', 'sharded_vds'], default=None):
+            sharded_vds_version = slugify(sharded_vds_version)
+
+        sharded_vds_version = sharded_vds_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / 'sharded_vds' / f'{contig}.vds'
+            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / sharded_vds_version / f'{contig}.vds'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
 
