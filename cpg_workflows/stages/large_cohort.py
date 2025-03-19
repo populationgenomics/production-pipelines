@@ -521,15 +521,15 @@ class GenerateCoverageTable(CohortStage):
         )
         coverage_j.image(image_path('cpg_workflows'))
 
-        # shard_result = coverage_j.call(
-        #     generate_coverage_table.shard_vds,
-        #     str(inputs.as_path(cohort, Combiner, key='vds')),
-        #     'chr22',
-        # )
+        shard_result = coverage_j.call(
+            generate_coverage_table.shard_vds,
+            str(inputs.as_path(cohort, Combiner, key='vds')),
+            'chr22',
+        )
 
         coverage_j.call(
             generate_coverage_table.compute_coverage_stats,
-            chr22_vds_path,
+            shard_result.as_str(),
             chr22_reference_ht_path,
         )
 
