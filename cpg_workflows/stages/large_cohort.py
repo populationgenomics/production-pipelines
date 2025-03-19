@@ -505,7 +505,7 @@ class GenerateCoverageTable(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
 
-        contigs = [f'chr{i}' for i in range(1, 23)] + ['X', 'Y', 'chrM']
+        contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
 
         # job to split VDS into chromosome-length contigs
         coverage_jobs = []
