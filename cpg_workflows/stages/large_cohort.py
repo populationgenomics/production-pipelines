@@ -510,40 +510,40 @@ class GenerateCoverageTable(CohortStage):
         # job to split VDS into chromosome-length contigs
         coverage_j_results = []
         for contig in contigs:
-            shard_j = get_batch().new_python_job(
-                f'ShardVds_{contig}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-            )
-            shard_j.image(image_path('cpg_workflows'))
-            shard_j_result = shard_j.call(
-                generate_coverage_table.shard_vds,
-                str(inputs.as_path(cohort, Combiner, key='vds')),
-                contig,
-            )
-
-            # Generate reference table for each contig
-            reference_ht_j = get_batch().new_python_job(
-                f'GenerateReferenceTable_{contig}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-            )
-            reference_ht_j.image(image_path('cpg_workflows'))
-            reference_ht_j_result = reference_ht_j.call(generate_coverage_table.get_reference_genome, 'GRCh38', contig)
-
-            # Calculate coverage for each contig
             coverage_j = get_batch().new_python_job(
                 f'CalculateCoverage_{contig}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
             coverage_j.image(image_path('cpg_workflows'))
+            shard_result = coverage_j.call(
+                generate_coverage_table.shard_vds,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                contig,
+            )
+
+            # # Generate reference table for each contig
+            # reference_ht_j = get_batch().new_python_job(
+            #     f'GenerateReferenceTable_{contig}',
+            #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            # )
+            # reference_ht_j.image(image_path('cpg_workflows'))
+            reference_ht_result = coverage_j.call(generate_coverage_table.get_reference_genome, 'GRCh38', contig)
+
+            # Calculate coverage for each contig
+            # coverage_j = get_batch().new_python_job(
+            #     f'CalculateCoverage_{contig}',
+            #     (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            # )
+            # coverage_j.image(image_path('cpg_workflows'))
             coverage_j_result = coverage_j.call(
                 generate_coverage_table.compute_coverage_stats,
-                shard_j_result,
-                reference_ht_j_result,
+                shard_result,
+                reference_ht_result,
             )
-            coverage_j.depends_on(
-                shard_j,
-                reference_ht_j,
-            )
+            # coverage_j.depends_on(
+            #     shard_j,
+            #     reference_ht_j,
+            # )
             coverage_j_results.append(coverage_j_result)
 
         # job to merge all hail tables into one
