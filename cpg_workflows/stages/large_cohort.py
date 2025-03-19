@@ -494,6 +494,36 @@ class Frequencies(CohortStage):
 
 
 @stage(required_stages=[Combiner])
+class ShardVds(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        return {
+            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / 'sharded_vds' / f'{contig}.vds'
+            for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_coverage_table
+
+        j = get_batch().new_job(
+            'ShardVds',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                generate_coverage_table,
+                generate_coverage_table.shard_vds.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[Combiner])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):

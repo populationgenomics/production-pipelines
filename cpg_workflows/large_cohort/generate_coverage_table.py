@@ -33,17 +33,18 @@ def merge_coverage_tables(
     return hl.Table.union(*coverage_tables)
 
 
-def shard_vds(vds: hl.vds.VariantDataset, contig: str) -> hl.vds.VariantDataset:
+def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDataset:
     """
     Shard a VDS file.
     """
     # from cpg_utils.hail_batch import init_batch
 
     # init_batch()
-    return hl.vds.filter_intervals(
-        vds,
-        [hl.parse_locus_interval(contig, reference_genome='GRCh38')],
-    )
+    vds = hl.vds.read_vds(vds_path)
+    for contig, out_path in output_dict.items():
+        sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig)], reference_genome='GRCh38')
+        sharded_vds.write(out_path, overwrite=True)
+    return sharded_vds
 
 
 def compute_coverage_stats(
@@ -318,7 +319,7 @@ def run(vds_path: str, tmp_prefix: str, out_coverage_ht_path: str) -> hl.Table:
     for contig in contigs:
         # split vds by contig
         logging.info(f'Sharding VDS for contig {contig}...')
-        sharded_vds = shard_vds(vds, contig)
+        sharded_vds = shard_vds(vds, {contig: contig})
         logging.info(f'sharded_vds: {sharded_vds.variant_data.describe()}')
         logging.info(f'Checkpointing sharded_vds to {str(to_path(tmp_prefix) / f"{contig}_sharded_vds.vds")}...')
         sharded_vds.write(str(to_path(tmp_prefix) / f'{contig}_sharded_vds.vds'), overwrite=True)
