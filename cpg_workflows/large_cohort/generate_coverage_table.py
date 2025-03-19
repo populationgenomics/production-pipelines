@@ -117,7 +117,6 @@ def compute_coverage_stats(
     n_samples = group_membership_ht.count()
     sample_counts = group_membership_ht.index_globals().freq_meta_sample_count
 
-    logger.info("Computing coverage stats on %d samples.", n_samples)
     # Filter datasets to interval list
     if interval_ht is not None:
         reference_ht = reference_ht.filter(
