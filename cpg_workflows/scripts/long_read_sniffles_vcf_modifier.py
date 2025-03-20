@@ -120,8 +120,10 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
                     l_split = line.rstrip().split('\t')
                     l_split[9] = new_id
                     if len(l_split) > 10 and new_id_01 and new_id_02:
-                        l_split[10] = new_id_01
-                        l_split[11] = new_id_02
+                        # If we have two new IDs, we need to replace the old IDs with the new ones
+                        # Sometimes the IDs of the extra two individuals are swapped, so we need to check which one is which
+                        l_split[10] = new_id_01 if '01-PB' in l_split[10] else new_id_02
+                        l_split[11] = new_id_02 if '01-PB' in l_split[10] else new_id_01
                     f_out.write('\t'.join(l_split) + '\n')
                     continue
 
