@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.36.12',
+    version='1.36.13',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -86,6 +86,12 @@ setup(
             'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_gene_tsvs:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
+            # script for extraction a region-limited part of a MatrixTable into VCF
+            'extract_vcf_from_mt = cpg_workflows.scripts.talos_prep.extract_fragmented_vcf_from_mt:cli_main',
+            # parse the annotated VCF into a HT
+            'convert_annotated_vcf_to_ht = cpg_workflows.scripts.talos_prep.convert_annotated_vcf_to_ht:cli_main',
+            # hop the annotations from a Hail Table to a MatrixTable
+            'transfer_annotations_to_vcf = cpg_workflows.scripts.talos_prep.transfer_annotations_to_vcf:cli_main',
         ],
     },
 )

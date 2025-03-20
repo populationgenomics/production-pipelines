@@ -266,6 +266,8 @@ def shard_gcnv(
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
 
+        # todo think about parallelising the tar compress/extract with zstd
+        # tar -c --use-compress-program=zstdmt -f
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
 
