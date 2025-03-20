@@ -309,7 +309,8 @@ def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.R
 
     init_batch()
     rg = hl.get_reference(ref)
-    return reference_genome.get_reference_ht(rg, [contig])
+    ht: hl.Table = reference_genome.get_reference_ht(rg, [contig])
+    return ht.checkpoint(out_path, overwrite=True)
 
 
 def run(vds_path: str, tmp_prefix: str, out_coverage_ht_path: str) -> hl.Table:
