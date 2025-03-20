@@ -541,7 +541,10 @@ class GenerateReferenceCoverageTable(CohortStage):
 
         ref_cov_version = ref_cov_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / ref_cov_version / f'{contig}.vds'
+            f'{contig}': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / ref_cov_version
+            / f'{contig}_coverage_reference.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
 
@@ -551,7 +554,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         jobs = []
         for contig, out_path in self.expected_outputs(cohort).items():
             j = get_batch().new_python_job(
-                'GenerateReferenceTable',
+                f'GenerateReferenceTable_{contig}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
             j.image(image_path('cpg_workflows'))
