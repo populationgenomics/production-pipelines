@@ -1,24 +1,20 @@
 import logging
-from datetime import datetime
 from math import ceil
 from typing import TYPE_CHECKING, Final
 
 import coloredlogs
-from sklearn import pipeline
 
 import cpg_utils
 from cpg_utils.cloud import get_path_components_from_gcp_path
-from cpg_utils.config import config_retrieve, image_path
-from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, get_batch
+from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import Batch, authenticate_cloud_credentials_in_job, command, get_batch
 from cpg_workflows.stages.dragen_ica import (
     cancel_ica_pipeline_run,
     monitor_align_genotype_with_dragen,
     prepare_ica_for_analysis,
     run_align_genotype_with_dragen,
 )
-from cpg_workflows.status import MetamistStatusReporter
 from cpg_workflows.targets import SequencingGroup
-from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import SequencingGroupStage, StageInput, StageOutput, stage
 
 if TYPE_CHECKING:
@@ -114,24 +110,33 @@ class UploadDataToIca(SequencingGroupStage):
         authenticate_cloud_credentials_in_job(upload_job)
 
         # Check if the CRAM already exists in ICA before uploading. If it exists, just return the ID for the CRAM and CRAI
+        # The internal `command` method is a wrapper from cpg_utils.hail_batch that extends the normal hail batch command
         upload_job.command(
-            f"""
-            {ICA_CLI_SETUP}
-            cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
-            if [[ $cram_status != "AVAILABLE" ]]
-            then
-                mkdir {sequencing_group.name}
-                gcloud storage cp {sequencing_group.cram} .
-                gcloud storage cp {sequencing_group.cram}.crai .
-                icav2 projectdata upload {sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
-                icav2 projectdata upload {sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
-            fi
+            command(
+                f"""
+                function upload_cram {{
+                if [[ $cram_status != "AVAILABLE" ]]
+                then
+                    mkdir $BATCH_TMPDIR/{sequencing_group.name}
+                    gcloud storage cp {sequencing_group.cram} $BATCH_TMPDIR/{sequencing_group.name}/
+                    gcloud storage cp {sequencing_group.cram}.crai $BATCH_TMPDIR/{sequencing_group.name}/
+                    icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
+                    icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
+                fi
+                df --si
+                icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
+                icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
 
-            icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
-            icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
+                jq -n --arg cram_id $(cat cram_id) --arg crai_id $(cat crai_id) '{{cram_fid: $cram_id, crai_fid: $crai_id}}' > {upload_job.ofile}
 
-            jq -n --arg cram_id $(cat cram_id) --arg crai_id $(cat crai_id) '{{cram_fid: $cram_id, crai_fid: $crai_id}}' > {upload_job.ofile}
-            """,
+                }}
+
+                {ICA_CLI_SETUP}
+                cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
+                retry upload_cram
+                """,
+                define_retry_function=True,
+            ),
         )
         get_batch().write_output(upload_job.ofile, str(output))
         return self.make_outputs(
@@ -172,7 +177,6 @@ class ManageDragenPipeline(SequencingGroupStage):
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:
-
         sg_bucket: cpg_utils.Path = sequencing_group.dataset.prefix()
 
         outputs = self.expected_outputs(sequencing_group=sequencing_group)
@@ -363,35 +367,47 @@ class DownloadCramFromIca(SequencingGroupStage):
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            f"""
-            {ICA_CLI_SETUP}
-            mkdir -p {sequencing_group.name}
-            pipeline_id_filename=$(basename {pipeline_id_path})
-            gcloud storage cp {pipeline_id_path} .
-            pipeline_id=$(cat $pipeline_id_filename)
-            echo "Pipeline ID: $pipeline_id"
-            cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
-            crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
-            cram_md5=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
-            icav2 projectdata download $cram_id {sequencing_group.name}/{sequencing_group.name}.cram --exclude-source-path
-            icav2 projectdata download $crai_id {sequencing_group.name}/{sequencing_group.name}.cram.crai --exclude-source-path
-            icav2 projectdata download $cram_md5 {sequencing_group.name}/{sequencing_group.name}.cram.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+            command(
+                f"""
+                function download_cram {{
+                cram_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id')
+                crai_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id')
+                cram_md5=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
+                icav2 projectdata download $cram_id {sequencing_group.name}/{sequencing_group.name}.cram --exclude-source-path
+                icav2 projectdata download $crai_id {sequencing_group.name}/{sequencing_group.name}.cram.crai --exclude-source-path
+                icav2 projectdata download $cram_md5 {sequencing_group.name}/{sequencing_group.name}.cram.md5sum --exclude-source-path
 
-            # Check the md5sum of the downloaded CRAM file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/{sequencing_group.name}.cram.md5sum)
-            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
-                echo "Error: MD5 checksums do not match!"
-                echo "GCS MD5: $gcloud_md5_hash"
-                echo "ICA MD5: $ica_md5_hash"
-                exit 1
-            else
-                echo "MD5 checksums match."
-            fi
-        """,
+                # Get md5sum of the downloaded CRAM file and compare it with the ICA md5sum
+                # Checking here because using icav2 package to download which doesn't automatically perform checksum matching
+                ica_md5_hash=$(cat {sequencing_group.name}/{sequencing_group.name}.cram.md5sum)
+                cram_md5=$(cat {sequencing_group.name}/{sequencing_group.name}.cram | md5sum | cut -d " " -f1)
+                if [ "$cram_md5" != "$ica_md5_hash" ]; then
+                    echo "Error: MD5 checksums do not match!"
+                    echo "ICA MD5: $ica_md5_hash"
+                    echo "Cram MD5: $cram_md5"
+                    exit 1
+                else
+                    echo "MD5 checksums match."
+                fi
+
+                # Copy the CRAM and CRAI files to the bucket
+                # Checksums are already checked by `gcloud storage cp`
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.crai gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.cram.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/cram/
+                }}
+
+                {ICA_CLI_SETUP}
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
+
+                retry download_cram
+                """,
+                define_retry_function=True,
+            ),
         )
 
         return self.make_outputs(
@@ -451,35 +467,47 @@ class DownloadGvcfFromIca(SequencingGroupStage):
         # Download just the CRAM and CRAI files  with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            f"""
-            {ICA_CLI_SETUP}
-            mkdir -p {sequencing_group.name}
-            pipeline_id_filename=$(basename {pipeline_id_path})
-            gcloud storage cp {pipeline_id_path} .
-            pipeline_id=$(cat $pipeline_id_filename)
-            echo "Pipeline ID: $pipeline_id"
-            gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
-            gvcf_tbi_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --match-mode EXACT -o json | jq -r '.items[].id')
-            gvcf_md5_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
-            icav2 projectdata download $gvcf_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
-            icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
-            icav2 projectdata download $gvcf_md5_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
-            gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+            command(
+                f"""
+                function download_gvcf {{
+                gvcf_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz --match-mode EXACT -o json | jq -r '.items[].id')
+                gvcf_tbi_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.tbi --match-mode EXACT -o json | jq -r '.items[].id')
+                gvcf_md5_id=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --match-mode EXACT -o json | jq -r '.items[].id')
+                icav2 projectdata download $gvcf_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz --exclude-source-path
+                icav2 projectdata download $gvcf_tbi_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi --exclude-source-path
+                icav2 projectdata download $gvcf_md5_id {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum --exclude-source-path
 
-            # Check the md5sum of the downloaded gVCF file
-            gcloud_md5_hash=$(gcloud storage hash --hex gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz | grep 'md5_hash' | awk '{{print $2}}')
-            ica_md5_hash=$(gcloud storage cat gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
-            if [ "$gcloud_md5_hash" != "$ica_md5_hash" ]; then
-                echo "Error: MD5 checksums do not match!"
-                echo "GCS MD5: $gcloud_md5_hash"
-                echo "ICA MD5: $ica_md5_hash"
-                exit 1
-            else
-                echo "MD5 checksums match."
-            fi
-        """,
+                # Get md5sum of the downloaded gVCF file and compare it with the ICA md5sum
+                # Checking here because using icav2 package to download which doesn't automatically perform checksum matching
+                ica_md5_hash=$(cat {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum)
+                gvcf_md5=$(cat {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz | md5sum | cut -d " " -f1)
+                if [ "$gvcf_md5" != "$ica_md5_hash" ]; then
+                    echo "Error: MD5 checksums do not match!"
+                    echo "ICA MD5: $ica_md5_hash"
+                    echo "Gvcf MD5: $gvcf_md5"
+                    exit 1
+                else
+                    echo "MD5 checksums match."
+                fi
+
+                # Copy the gVCF and gVCF TBI files to the bucket
+                # Checksums are already checked by `gcloud storage cp`
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.tbi gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+                gcloud storage cp {sequencing_group.name}/{sequencing_group.name}.hard-filtered.gvcf.gz.md5sum gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/base_gvcf/
+                }}
+
+                {ICA_CLI_SETUP}
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
+
+                retry download_gvcf
+                """,
+                define_retry_function=True,
+            ),
         )
 
         return self.make_outputs(
@@ -529,23 +557,31 @@ class DownloadDataFromIca(SequencingGroupStage):
         # Download an entire folder (except crams and gvcfs) with ICA. Don't log projectId or API key
         authenticate_cloud_credentials_in_job(ica_download_job)
         ica_download_job.command(
-            f"""
-            {ICA_CLI_SETUP}
-            # List all files in the folder except crams and gvcf and download them
-            mkdir -p {sequencing_group.name}
-            pipeline_id_filename=$(basename {pipeline_id_path})
-            gcloud storage cp {pipeline_id_path} .
-            pipeline_id=$(cat $pipeline_id_filename)
-            echo "Pipeline ID: $pipeline_id"
-            files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
-            while IFS= read -r line; do
-                name=$(echo "$line" | awk '{{print $1}}')
-                id=$(echo "$line" | awk '{{print $2}}')
-                echo "Downloading $name with ID $id"
-                icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
-            done <<< "$files_and_ids"
-            gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/dragen_metrics/{sequencing_group.name}/
-        """,
+            command(
+                f"""
+                function download_extra_data {{
+                files_and_ids=$(icav2 projectdata list --parent-folder /{bucket_name}/{ica_analysis_output_folder}/{sequencing_group.name}/{sequencing_group.name}-$pipeline_id/{sequencing_group.name}/ -o json | jq -r '.items[] | select(.details.name | test(".cram|.gvcf") | not) | "\(.details.name) \(.id)"')
+                while IFS= read -r line; do
+                    name=$(echo "$line" | awk '{{print $1}}')
+                    id=$(echo "$line" | awk '{{print $2}}')
+                    echo "Downloading $name with ID $id"
+                    icav2 projectdata download $id {sequencing_group.name}/$name --exclude-source-path
+                done <<< "$files_and_ids"
+                gcloud storage cp --recursive {sequencing_group.name}/* gs://{bucket_name}/{GCP_FOLDER_FOR_ICA_DOWNLOAD}/dragen_metrics/{sequencing_group.name}/
+                }}
+
+                {ICA_CLI_SETUP}
+                # List all files in the folder except crams and gvcf and download them
+                mkdir -p {sequencing_group.name}
+                pipeline_id_filename=$(basename {pipeline_id_path})
+                gcloud storage cp {pipeline_id_path} .
+                pipeline_id=$(cat $pipeline_id_filename)
+                echo "Pipeline ID: $pipeline_id"
+
+                retry download_extra_data
+                """,
+                define_retry_function=True,
+            ),
         )
 
         return self.make_outputs(
