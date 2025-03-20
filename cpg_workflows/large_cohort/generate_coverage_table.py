@@ -304,7 +304,8 @@ def compute_coverage_stats(
     return ht
 
 
-def get_reference_genome(rg: hl.Table, contig: str) -> hl.ReferenceGenome:
+def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.ReferenceGenome:
+    rg = hl.get_reference(ref)
     return reference_genome.get_reference_ht(rg, [contig])
 
 
@@ -326,7 +327,7 @@ def run(vds_path: str, tmp_prefix: str, out_coverage_ht_path: str) -> hl.Table:
 
         # generate reference_ht for contig
         logging.info(f'Generating reference_ht for contig {contig}...')
-        reference_ht = get_reference_genome(rg, contig)
+        reference_ht = generate_reference_coverage_ht('GRCh38', contig, '')
         logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / f"{contig}_reference.ht")}...')
         reference_ht.write(str(to_path(tmp_prefix) / f'{contig}_reference.ht'), overwrite=True)
 
@@ -360,7 +361,7 @@ def calculate_coverage_ht(vds_path: str, contig: str) -> hl.Table:
     vds = hl.vds.filter_chromosomes(hl.vds.read_vds(vds_path), keep=[contig])
 
     logging.info('Calculating coverage stats...')
-    reference_ht: hl.Table = get_reference_genome('GRCh38', contig=contig)
+    reference_ht: hl.Table = generate_reference_coverage_ht('GRCh38', contig=contig, out_path='')
     logging.info(f'reference_ht: {reference_ht.describe()}')
     # if can_reuse(str(to_path(tmp_prefix) / 'reference.ht')):
     #     logging.info(f'Reading reference_ht from {str(to_path(tmp_prefix) / "reference.ht")}...')

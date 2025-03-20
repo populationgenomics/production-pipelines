@@ -527,6 +527,45 @@ class ShardVds(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage(required_stages=[ShardVds])  # maybe not required?
+class GenerateReferenceCoverageTable(CohortStage):
+    """
+    The `reference_ht` is a Table that contains a row for each locus coverage that should be
+    computed on. It needs to be keyed by `locus`. The `reference_ht` can e.g. be
+    created using `get_reference_ht`.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if ref_cov_version := config_retrieve(['large_cohort', 'output_versions', 'reference_coverage'], default=None):
+            ref_cov_version = slugify(ref_cov_version)
+
+        ref_cov_version = ref_cov_version or get_workflow().output_version
+        return {
+            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / ref_cov_version / f'{contig}.vds'
+            for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_coverage_table
+
+        jobs = []
+        for contig, out_path in self.expected_outputs(cohort).items():
+            j = get_batch().new_python_job(
+                'GenerateReferenceTable',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(image_path('cpg_workflows'))
+            j.call(
+                generate_coverage_table.generate_reference_coverage_ht,
+                ref='GRCh38',
+                contig=contig,
+                out_path=out_path,
+            )
+            jobs.append(j)
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[jobs])
+
+
 @stage(required_stages=[Combiner])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
