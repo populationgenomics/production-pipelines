@@ -42,7 +42,7 @@ def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDatas
     # init_batch()
     vds = hl.vds.read_vds(vds_path)
     for contig, out_path in output_dict.items():
-        sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig)], reference_genome='GRCh38')
+        sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig, reference_genome='GRCh38')])
         sharded_vds.write(out_path, overwrite=True)
     return sharded_vds
 
