@@ -26,7 +26,7 @@ exome_realignment_shards = 1
 #intervals_path =
 
 # Experimentally validated best reblocking bands for GATK ReblockGVCF
-reblock_gq_bands = [13, 20, 30, 40] 
+reblock_gq_bands = [13, 20, 30, 40]
 
 # Write dataset MTs for these datasets. Required for the AnnotateDataset stage
 # write_mt_for_datasets = []
