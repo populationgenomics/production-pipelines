@@ -305,6 +305,9 @@ def compute_coverage_stats(
 
 
 def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.ReferenceGenome:
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     rg = hl.get_reference(ref)
     return reference_genome.get_reference_ht(rg, [contig])
 
