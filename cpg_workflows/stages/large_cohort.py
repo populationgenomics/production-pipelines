@@ -562,7 +562,7 @@ class GenerateReferenceCoverageTable(CohortStage):
                 generate_coverage_table.generate_reference_coverage_ht,
                 ref='GRCh38',
                 contig=contig,
-                out_path=out_path,
+                out_path=str(out_path),
             )
             jobs.append(j)
 
