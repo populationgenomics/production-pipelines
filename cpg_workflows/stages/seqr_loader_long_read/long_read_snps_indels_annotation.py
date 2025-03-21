@@ -217,7 +217,8 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteLRSIDtoSGIDMappingFile, 'lrs_sgid_mapping')
         local_mapping = get_batch().read_input(lrs_sg_id_map)
 
-        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if sg_vcfs[sg.id]["joint_called"] else ""}{lr_snps_indels_vcf} prior to annotation')
+        joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
+        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if joint_called else ""}{lr_snps_indels_vcf} prior to annotation')
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
