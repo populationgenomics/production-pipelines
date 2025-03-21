@@ -56,7 +56,7 @@ FAMILY_LRS_IDS_QUERY = gql(
           samples {
             externalId
             meta
-            sequencingGroups(technology: {eq_: "long-read"}, type: {eq: "genome"}) {
+            sequencingGroups(technology: {eq: "long-read"}, type: {eq: "genome"}) {
               id
             }
           }
