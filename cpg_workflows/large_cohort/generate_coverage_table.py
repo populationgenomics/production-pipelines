@@ -48,9 +48,9 @@ def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDatas
 
 
 def compute_coverage_stats(
-    mtds: hl.vds.VariantDataset,
-    reference_ht: hl.Table,
-    out_path: Optional[str] = None,
+    mtds_path: str,
+    reference_ht_path: str,
+    out_path: str,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -83,8 +83,8 @@ def compute_coverage_stats(
 
     # init_batch()
 
-    # mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
-    # reference_ht: hl.Table = hl.read_table(reference_ht_path)
+    mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
+    reference_ht: hl.Table = hl.read_table(reference_ht_path)
     print(f'mtds: {mtds.variant_data.describe()}')
     print(mtds.variant_data.show(n_cols=1))
     is_vds = isinstance(mtds, hl.vds.VariantDataset)
@@ -312,73 +312,3 @@ def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.R
     rg = hl.get_reference(ref)
     ht: hl.Table = reference_genome.get_reference_ht(rg, [contig])
     return ht.checkpoint(out_path, overwrite=True)
-
-
-def run(vds_path: str, tmp_prefix: str, out_coverage_ht_path: str) -> hl.Table:
-    """
-    Main function.
-    """
-    coverage_tables = []
-    rg = hl.get_reference('GRCh38')
-    contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
-    vds = hl.vds.read_vds(vds_path)
-    for contig in contigs:
-        # split vds by contig
-        logging.info(f'Sharding VDS for contig {contig}...')
-        sharded_vds = shard_vds(vds, {contig: contig})
-        logging.info(f'sharded_vds: {sharded_vds.variant_data.describe()}')
-        logging.info(f'Checkpointing sharded_vds to {str(to_path(tmp_prefix) / f"{contig}_sharded_vds.vds")}...')
-        sharded_vds.write(str(to_path(tmp_prefix) / f'{contig}_sharded_vds.vds'), overwrite=True)
-
-        # generate reference_ht for contig
-        logging.info(f'Generating reference_ht for contig {contig}...')
-        reference_ht = generate_reference_coverage_ht('GRCh38', contig, '')
-        logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / f"{contig}_reference.ht")}...')
-        reference_ht.write(str(to_path(tmp_prefix) / f'{contig}_reference.ht'), overwrite=True)
-
-        # calculate coverage for contig
-        logging.info(f'Calculating coverage for contig {contig}...')
-        coverage_ht = calculate_coverage_ht(sharded_vds, reference_ht)
-        logging.info(f'coverage_ht: {coverage_ht.describe()}')
-        logging.info(f'Checkpointing coverage_ht to {str(to_path(tmp_prefix) / f"{contig}_coverage.ht")}...')
-        coverage_ht.write(str(to_path(tmp_prefix) / f'{contig}_coverage.ht'), overwrite=True)
-
-        coverage_tables.append(coverage_ht)
-
-    # merge coverage tables
-    logging.info('Merging coverage tables...')
-    coverage_ht = merge_coverage_tables(coverage_tables)
-    logging.info(f'coverage_ht: {coverage_ht.describe()}')
-
-    # write coverage_ht to output path
-    logging.info(f'Writing coverage_ht to {out_coverage_ht_path}...')
-    coverage_ht.write(out_coverage_ht_path, overwrite=True)
-
-    return coverage_ht
-
-
-def calculate_coverage_ht(vds_path: str, contig: str) -> hl.Table:
-    """
-    Calculate coverage for each sample.
-    """
-    # The `reference_ht` is a Table that contains a row for each locus coverage that should be
-    # computed on. It needs to be keyed by `locus`.
-    vds = hl.vds.filter_chromosomes(hl.vds.read_vds(vds_path), keep=[contig])
-
-    logging.info('Calculating coverage stats...')
-    reference_ht: hl.Table = generate_reference_coverage_ht('GRCh38', contig=contig, out_path='')
-    logging.info(f'reference_ht: {reference_ht.describe()}')
-    # if can_reuse(str(to_path(tmp_prefix) / 'reference.ht')):
-    #     logging.info(f'Reading reference_ht from {str(to_path(tmp_prefix) / "reference.ht")}...')
-    #     reference_ht = hl.read_table(output_path('reference.ht', 'tmp'))
-    # else:
-    #     logging.info(f'Checkpointing reference_ht to {str(to_path(tmp_prefix) / "reference.ht")}...')
-    #     reference_ht = reference_ht.checkpoint(str(to_path(tmp_prefix) / 'reference.ht'), overwrite=True)
-    logging.info(f'reference_ht: {reference_ht.describe()}')
-    coverage_ht: hl.Table = compute_coverage_stats(vds, reference_ht)
-    logging.info(f'coverage_ht: {coverage_ht.describe()}')
-
-    # logging.info(f'Writing coverage data to {out_path}...')
-    # coverage_ht.write(out_path, overwrite=True)
-    # logging.info('Coverage stats written to table.')
-    return coverage_ht
