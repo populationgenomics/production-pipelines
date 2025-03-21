@@ -148,8 +148,7 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
             if not lrs_id:
                 get_logger().warning(f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
                 continue
-            for sg in sample['sequencingGroups']:
-                lrs_sgid_mapping[lrs_id] = sg['id']
+            lrs_sgid_mapping[lrs_id] = sg['id']
     return lrs_sgid_mapping
 
 
