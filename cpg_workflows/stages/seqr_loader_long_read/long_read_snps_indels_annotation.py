@@ -121,7 +121,6 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
     return list(sgs_to_skip)
 
 
-@lru_cache
 def query_for_lrs_sg_id_mapping(datasets: list[str]):
     """
     Query metamist for the LRS ID corresponding to each sequencing group ID
@@ -166,6 +165,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
                 f.write(f'{lrs_id} {sg_id}\n')
 
         return self.make_outputs(multicohort, data=outputs)
+
 
 @stage(required_stages=WriteLRSIDtoSGIDMappingFile)
 class ReFormatPacBioSNPsIndels(SequencingGroupStage):
