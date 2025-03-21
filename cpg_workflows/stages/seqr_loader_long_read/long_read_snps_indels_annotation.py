@@ -183,7 +183,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
             for lrs_id, sg_id in lrs_sgid_mapping.items():
                 f.write(f'{lrs_id} {sg_id}\n')
 
-        return self.make_outputs(multicohort, data=output)
+        return self.make_outputs(multicohort, data=output, reusable=False)
 
 
 @stage(required_stages=[WriteLRSIDtoSGIDMappingFile])
