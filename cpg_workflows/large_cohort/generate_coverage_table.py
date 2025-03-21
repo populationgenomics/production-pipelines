@@ -50,6 +50,7 @@ def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDatas
 def compute_coverage_stats(
     mtds: hl.vds.VariantDataset,
     reference_ht: hl.Table,
+    out_path: Optional[str] = None,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
@@ -301,7 +302,7 @@ def compute_coverage_stats(
             coverage_stats_meta_sample_count=(group_membership_ht.index_globals().freq_meta_sample_count),
         )
 
-    return ht
+    return ht.checkpoint(out_path, overwrite=True)
 
 
 def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.ReferenceGenome:

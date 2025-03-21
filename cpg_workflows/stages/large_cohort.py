@@ -2,6 +2,7 @@ import logging
 from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+import coverage
 from numpy import require
 from requests import get
 
@@ -569,35 +570,42 @@ class GenerateReferenceCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[jobs])
 
 
-@stage(required_stages=[Combiner])
+@stage(required_stages=[Combiner, ShardVds, GenerateReferenceCoverageTable])
 class GenerateCoverageTable(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
         coverage_version = coverage_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version / 'coverage.ht'
+        return {
+            f'{contig}': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / coverage_version
+            / f'{contig}_coverage.ht'
+            for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
 
-        # contigs = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
-
-        j = get_batch().new_job(
-            'GenerateCoverageTable',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
-        j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                generate_coverage_table,
-                generate_coverage_table.run.__name__,
-                str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(self.tmp_prefix),
-                str(self.expected_outputs(cohort)),
-                setup_gcp=True,
-            ),
-        )
+        converage_jobs = []
+        for contig, out_path in self.expected_outputs(cohort).items():
+            j = get_batch().new_job(
+                f'GenerateCoverageTable_{contig}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(image_path('cpg_workflows'))
+            j.command(
+                query_command(
+                    generate_coverage_table,
+                    generate_coverage_table.compute_coverage_stats.__name__,
+                    str(inputs.as_path(cohort, ShardVds, key=contig)),
+                    str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
+                    str(out_path),
+                    setup_gcp=True,
+                ),
+            )
+            converage_jobs.append(j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
