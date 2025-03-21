@@ -99,18 +99,28 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
                 }
 
     # Prefer the joint-called VCFs over the single-sample VCFs
-    return_dict = {}
+    sg_vcfs = {}
     for sg_id, single_sample_vcf in single_sample_vcfs.items():
         if sg_id not in joint_called_vcfs:
-            return_dict[sg_id] = single_sample_vcf
+            sg_vcfs[sg_id] = single_sample_vcf
             continue
-        return_dict[sg_id] = joint_called_vcfs[sg_id]
+        sg_vcfs[sg_id] = joint_called_vcfs[sg_id]
+
+    # Remove the parents entries if their family has a joint-called VCF
+    sgs_to_skip = find_sgs_to_skip(sg_vcfs)
+    return_dict = {}
+    for sg_id, vcf_analysis in sg_vcfs.items():
+        if sg_id in sgs_to_skip:
+            get_logger().info(f'Skipping {sg_id} as it is a parent in a joint-called VCF')
+            continue
+        return_dict[sg_id] = vcf_analysis
 
     return return_dict
 
 def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
     """
     Find the SGs to skip in the reformatting stage
+    These are the parents if the family has been joint-called
     """
     sgs_to_skip = set()
     joint_called_families = set()
@@ -122,7 +132,6 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
         analysis_meta = vcf_analysis['meta']
         if analysis_meta.get('family_id', '') in joint_called_families and not analysis_meta.get('joint_called', False):
             sgs_to_skip.add(sg_id)
-            # get_logger().info(f'Skipping {sg_id} | Participant: {analysis_meta.get("participant_id", "")} as it is a parent in a joint-called VCF')
     return sgs_to_skip
 
 
@@ -174,34 +183,6 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
 
         return self.make_outputs(multicohort, data=output)
 
-# @stage
-# class WriteSGsToSkipFile(MultiCohortStage):
-#     """
-#     Write the SGs to skip to a file
-#     """
-
-#     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-#         return {
-#             'sgs_to_skip': self.prefix / 'sgs_to_skip.txt',
-#         }
-
-#     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
-#         """
-#         Write the SGs to skip to a file
-#         This is used to skip the reformatting stage for parents in joint-called VCFs
-#         """
-#         output = self.expected_outputs(multicohort)
-
-#         all_sgs_to_skip = set()
-#         for dataset in multicohort.get_datasets():
-#             sg_vcfs = query_for_snps_indels_vcfs(dataset.name)
-#             all_sgs_to_skip.update(find_sgs_to_skip(sg_vcfs))
-#         if not to_path(output['sgs_to_skip']).exists():
-#             with output['sgs_to_skip'].open('w') as f:
-#                 for sg_id in all_sgs_to_skip:
-#                     f.write(f'{sg_id}\n')
-
-#         return self.make_outputs(multicohort, data=output)
 
 @stage(required_stages=[WriteLRSIDtoSGIDMappingFile])
 class ReFormatPacBioSNPsIndels(SequencingGroupStage):
@@ -229,10 +210,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         # find the VCFs for this dataset
         dataset_name = sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level'])=='test' else sg.dataset.name
         sg_vcfs = query_for_snps_indels_vcfs(dataset_name=dataset_name)
-        # sgs_to_skip = inputs.as_path(get_multicohort(), WriteSGsToSkipFile, 'sgs_to_skip').read_text().splitlines()
-        sgs_to_skip = find_sgs_to_skip(sg_vcfs)
-        if sg.id in sgs_to_skip:
-            get_logger().info(f'Skipping {sg.id} | {sg.participant_id} as it is a parent in a joint-called VCF')
+        if sg.id not in sg_vcfs:
             return None
 
         expected_outputs = self.expected_outputs(sg)
