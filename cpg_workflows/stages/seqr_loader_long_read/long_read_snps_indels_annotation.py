@@ -199,7 +199,8 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         - this is skipped for the parents in trio joint-called VCFs
         """
         # find the VCFs for this dataset
-        sg_vcfs = query_for_snps_indels_vcfs(dataset_name=sg.dataset.name)
+        dataset_name = sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level'])=='test' else sg.dataset.name
+        sg_vcfs = query_for_snps_indels_vcfs(dataset_name=dataset_name)
         sgs_to_skip = find_sgs_to_skip(sg_vcfs)
         if sg.id in sgs_to_skip:
             get_logger().info(f'Skipping {sg.id} | {sg.participant_id} as it is a parent in a joint-called VCF')
@@ -208,7 +209,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         expected_outputs = self.expected_outputs(sg)
         # instead of handling, we should probably just exclude this and run again
         if sg.id not in sg_vcfs:
-            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {sg.dataset.name}')
+            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {dataset_name}')
 
         lr_snps_indels_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
