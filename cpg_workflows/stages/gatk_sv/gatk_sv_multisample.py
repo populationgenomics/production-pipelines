@@ -29,7 +29,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
 )
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, Dataset, MultiCohort
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_logger, ExpectedResultT
 from cpg_workflows.workflow import (
     CohortStage,
     DatasetStage,
@@ -38,7 +38,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     get_multicohort,
     get_workflow,
-    stage,
+    stage, TargetT, Action,
 )
 from metamist.graphql import gql, query
 
@@ -1417,3 +1417,17 @@ class MtToEsSv(DatasetStage):
         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
 
         return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
+
+
+@stage(required_stages=SpiceUpSVIDs)
+class SplitAnnotatedVcfByDataset(DatasetStage):
+    """
+    takes the whole MultiCohort annotated VCF
+    splits it up into separate VCFs for each dataset
+    """
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / 'annotated_sv.vcf.bgz'
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+
+        ...
