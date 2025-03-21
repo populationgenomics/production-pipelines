@@ -115,7 +115,7 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
     sgs_to_skip = set()
     for sg_id, vcf_analysis in sg_vcf_dict.items():
         analysis_meta = vcf_analysis['meta']
-        get_logger().info(f'Checking {sg_id} | Participant: {analysis_meta.get("participant_id", "")} | Joint-called: {analysis_meta.get('joint_called', False)}')
+        get_logger().info(f'Checking {sg_id} | Participant: {analysis_meta.get("participant_id", "")} | Joint-called: {analysis_meta.get("joint_called", False)}')
         if analysis_meta.get('joint_called', False) and not analysis_meta.get('participant_id', '').endswith('00'):
             sgs_to_skip.add(sg_id)
     return list(sgs_to_skip)
