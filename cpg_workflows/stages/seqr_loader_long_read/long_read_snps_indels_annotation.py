@@ -113,11 +113,16 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
     Find the SGs to skip in the reformatting stage
     """
     sgs_to_skip = set()
+    joint_called_families = set()
     for sg_id, vcf_analysis in sg_vcf_dict.items():
         analysis_meta = vcf_analysis['meta']
-        get_logger().info(f'Checking {sg_id} | Participant: {analysis_meta.get("participant_id", "")} | Joint-called: {analysis_meta.get("joint_called", False)}')
-        if analysis_meta.get('joint_called', False) and not analysis_meta.get('participant_id', '').endswith('00'):
+        if analysis_meta.get('joint_called', False):
+            joint_called_families.add(analysis_meta.get('family_id', ''))
+    for sg_id, vcf_analysis in sg_vcf_dict.items():
+        analysis_meta = vcf_analysis['meta']
+        if analysis_meta.get('family_id', '') in joint_called_families and not analysis_meta.get('joint_called', False):
             sgs_to_skip.add(sg_id)
+            get_logger().info(f'Skipping {sg_id} | Participant: {analysis_meta.get("participant_id", "")} as it is a parent in a joint-called VCF')
     return list(sgs_to_skip)
 
 
