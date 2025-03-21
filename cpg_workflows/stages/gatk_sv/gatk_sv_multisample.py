@@ -1235,7 +1235,7 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=strvctvre_job)
 
 
-@stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv', analysis_keys=['new_id_vcf'])
+@stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
 class SpiceUpSVIDs(MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
@@ -1246,11 +1246,8 @@ class SpiceUpSVIDs(MultiCohortStage):
     If the return is None, False, and the IDs will be generated from the call attributes alone
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {
-            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
-            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
-        }
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'fresh_ids.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         input_vcf = get_batch().read_input(str(inputs.as_path(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')))
@@ -1270,7 +1267,7 @@ class SpiceUpSVIDs(MultiCohortStage):
         bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
 
         # get the output root to write to
-        get_batch().write_output(bcftools_job.output, str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz'))
+        get_batch().write_output(bcftools_job.output, str(expected_output).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(multicohort, data=expected_output, jobs=[pyjob, bcftools_job])
 
@@ -1293,7 +1290,7 @@ class AnnotateCohortSv(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSVIDs, key='new_id_vcf')
+        vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSVIDs)
         checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
 
         job = annotate_cohort_jobs_sv(
@@ -1419,8 +1416,8 @@ class MtToEsSv(DatasetStage):
         return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
 
 
-@stage(required_stages=SpiceUpSVIDs)
-class SplitAnnotatedVcfByDataset(DatasetStage):
+@stage(required_stages=SpiceUpSVIDs, analysis_type='single_dataset_sv_annotated')
+class SplitAnnotatedSvVcfByDataset(DatasetStage):
     """
     takes the whole MultiCohort annotated VCF
     splits it up into separate VCFs for each dataset
@@ -1429,5 +1426,24 @@ class SplitAnnotatedVcfByDataset(DatasetStage):
         return dataset.prefix() / 'annotated_sv.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(dataset)
+        input_vcf = get_batch().read_input(inputs.as_path(get_multicohort(), SpiceUpSVIDs))
 
-        ...
+        # write a temp file for this dataset containing all relevant SGs
+        sgids_list_path = dataset.tmp_prefix() / get_workflow().output_version / 'sgid-list.txt'
+        if not config_retrieve(['workflow', 'dry_run'], False):
+            with sgids_list_path.open('w') as f:
+                for sgid in dataset.get_sequencing_group_ids():
+                    f.write(f'{sgid}\n')
+        job = get_batch().new_job(
+            name=f'SplitAnnotatedSvVcfByDataset: {dataset}',
+            attributes=self.get_job_attrs() | {'tool': 'bcftools'}
+        )
+        job.image(image_path('bctools_120'))
+        job.cpu(1).memory('highmem').storage('10Gi')
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.command(f'bcftools view {input_vcf} -S {sgids_list_path} -Oz -o {job.output["vcf.bgz"]} --write-index=tbi')
+
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(dataset, data=output, jobs=job)

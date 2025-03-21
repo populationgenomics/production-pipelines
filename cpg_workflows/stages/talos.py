@@ -113,8 +113,8 @@ def query_for_sv_vcf(dataset: str) -> str | None:
     Returns:
         str, the path to the latest VCF for the given type
     """
-
-    sv_type = 'cnv' if config_retrieve(['workflow', 'sequencing_type']) == 'exome' else 'sv'
+    sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+    analysis_type = 'single_dataset_cnv_annotated' if sequencing_type == 'exome' else 'single_dataset_sv_annotated'
 
     # hot swapping to a string we can freely modify
     query_dataset = dataset
@@ -122,20 +122,10 @@ def query_for_sv_vcf(dataset: str) -> str | None:
     if config_retrieve(['workflow', 'access_level']) == 'test' and 'test' not in query_dataset:
         query_dataset += '-test'
 
-    # we want the last annotated VCF output
-    # at some point later I'll come back and generate a subset Stage
-    final_stage_lookup = {'cnv': 'AnnotateCNVVcfWithStrvctvre', 'sv': 'SpiceUpSVIDs'}
-
-    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': sv_type})
+    result = query(MTA_QUERY, variables={'dataset': query_dataset, 'type': analysis_type})
     vcf_by_date: dict[str, str] = {}
     for analysis in result['project']['analyses']:
-        if (
-            analysis['output']
-            and analysis['output'].endswith('.vcf.bgz')
-            and (analysis['meta']['sequencing_type'] == config_retrieve(['workflow', 'sequencing_type']))
-            and (analysis['meta']['stage'] == final_stage_lookup[sv_type])
-        ):
-            vcf_by_date[analysis['timestampCompleted']] = analysis['output']
+        vcf_by_date[analysis['timestampCompleted']] = analysis['output']
 
     # perfectly acceptable to not have an input SV MT
     if not vcf_by_date:
@@ -737,7 +727,7 @@ class CreateTalosHtml(DatasetStage):
         job.command('cd html_outputs')
 
         command_string = (
-            'CreateTalosHTML ' f'--input {results_json} ' f'--panelapp {panel_input} ' '--output summary_output.html '
+            f'CreateTalosHTML --input {results_json} --panelapp {panel_input} --output summary_output.html '
         )
 
         if report_splitting := config_retrieve(['workflow', 'report_splitting', dataset.name], False):
