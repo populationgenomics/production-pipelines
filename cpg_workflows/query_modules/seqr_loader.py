@@ -63,7 +63,7 @@ def annotate_cohort(
     # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
     # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
     if long_read:
-        mt = mt.drop('info.AF', 'info.AC', 'info.AN')
+        mt = mt.drop('info')
         mt = hl.variant_qc(mt)
         mt = mt.annotate_rows(
             info=mt.info.annotate(
