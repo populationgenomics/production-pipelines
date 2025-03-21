@@ -2,7 +2,6 @@ import logging
 from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
-import coverage
 from numpy import require
 from requests import get
 
