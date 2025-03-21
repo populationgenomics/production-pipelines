@@ -141,7 +141,8 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
     """
     lrs_sgid_mapping = {}
     for dataset in datasets:
-        dataset = dataset + '-test' if config_retrieve(['workflow', 'access_level'])=='test' else dataset
+        if config_retrieve(['workflow', 'access_level'])=='test' and not dataset.endswith('-test'):
+            dataset = dataset + '-test'
         family_results = query(FAMILY_LRS_IDS_QUERY, variables={'dataset': dataset})
         for family in family_results['project']['families']:
             for participant in family['participants']:
