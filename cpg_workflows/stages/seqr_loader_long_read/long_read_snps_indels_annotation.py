@@ -195,7 +195,7 @@ class WriteSGsToSkipFile(MultiCohortStage):
         all_sgs_to_skip = set()
         for dataset in multicohort.get_datasets():
             sg_vcfs = query_for_snps_indels_vcfs(dataset.name)
-            all_sgs_to_skip.add(find_sgs_to_skip(sg_vcfs))
+            all_sgs_to_skip.update(find_sgs_to_skip(sg_vcfs))
         if not to_path(output['sgs_to_skip']).exists():
             with output['sgs_to_skip'].open('w') as f:
                 for sg_id in all_sgs_to_skip:
