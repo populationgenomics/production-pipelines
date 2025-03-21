@@ -171,8 +171,8 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
         output = self.expected_outputs(multicohort)
 
         lrs_sgid_mapping = query_for_lrs_sg_id_mapping([d.name for d in multicohort.get_datasets()])
-        get_logger().info(f'Writing LRS ID to SG ID mapping: {lrs_sgid_mapping}')
         mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
+        get_logger().info(f'Writing LRS ID to SG ID mapping to {mapping_file_path}')
         with mapping_file_path.open('w') as f:
             for lrs_id, sg_id in lrs_sgid_mapping.items():
                 f.write(f'{lrs_id} {sg_id}\n')
