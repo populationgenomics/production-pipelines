@@ -77,7 +77,7 @@ def cli_main():
     )
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True, new_id_01: str | None = None, new_id_02: str | None = None):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: bool = True):
     """
     Scrolls through the VCF and performs a few updates:
 
@@ -93,11 +93,8 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
         file_in (str): localised, VCF directly from Sniffles
         file_out (str): local batch output path, same VCF with INFO/ALT alterations
         fa (str): path to a reference FastA file, requires an implicit fa.fai index
-        new_id (str): CPG ID, required inside the reformatted VCF
         sex (int): 0=Unknown, 1=Male, 2=Female
         sv (bool): True=SV, False=SNPs_Indels
-        new_id_01 (str): CPG ID for individual 01 (joint called VCFs)
-        new_id_02 (str): CPG ID for individual 02 (joint called VCFs)
     """
 
     # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
@@ -115,17 +112,6 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
             if line.startswith('#'):
                 if 'FORMAT=<ID=ID' in line and sv:
                     f_out.write('##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
-
-                if line.startswith('#CHR') and new_id:
-                    l_split = line.rstrip().split('\t')
-                    l_split[9] = new_id
-                    if len(l_split) > 10 and new_id_01 and new_id_02:
-                        # If we have two new IDs, we need to replace the old IDs with the new ones
-                        # Sometimes the IDs of the extra two individuals are swapped, so we need to check which one is which
-                        l_split[10] = new_id_01 if '01-PB' in l_split[10] else new_id_02
-                        l_split[11] = new_id_02 if '01-PB' in l_split[10] else new_id_01
-                    f_out.write('\t'.join(l_split) + '\n')
-                    continue
 
                 if 'FORMAT=<ID=AF,Number=1' in line and not sv:
                     # Correct the AF field to have 'Number=A' for SNPs/Indels, to allow for multiple AF values

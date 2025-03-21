@@ -2,8 +2,6 @@
 Workflow for finding long-read SNPs_Indels files, updating file contents, merging, and annotating the results
 """
 
-from functools import cache
-
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
@@ -18,7 +16,7 @@ from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.resources import joint_calling_scatter_count
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
-from cpg_workflows.utils import get_logger
+from cpg_workflows.utils import get_logger, lru_cache
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -49,9 +47,9 @@ VCF_QUERY = gql(
 
 FAMILY_LRS_IDS_QUERY = gql(
     """
-    query MyQuery($dataset: String!, $family_id: String!) {
+    query MyQuery($dataset: String!) {
   project(name: $dataset) {
-    families(externalId: {eq: $family_id}) {
+    families {
         externalId
         participants {
           externalId
@@ -69,7 +67,7 @@ FAMILY_LRS_IDS_QUERY = gql(
     """,
 )
 
-@cache
+@lru_cache
 def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
@@ -82,45 +80,94 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
     """
-    return_dict: dict[str, dict] = {}
+    single_sample_vcfs: dict[str, dict] = {}
+    joint_called_vcfs: dict[str, dict] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if analysis['output'].endswith('snp_indel.phased.vcf.gz'):
-                joint_called = analysis['meta'].get('joint_called', False)
-                family_id = analysis['meta'].get('family_id', None)
-                return_dict[sg['id']] = {
+            if not analysis['output'].endswith('snp_indel.phased.vcf.gz'):
+                continue
+            if analysis['meta'].get('joint_called', False):
+                joint_called_vcfs[sg['id']] = {
                     'output': analysis['output'],
-                    'joint_called': joint_called,
-                    'family_id': family_id,
+                    'meta': analysis['meta'],
                 }
+            else:
+                single_sample_vcfs[sg['id']] = {
+                    'output': analysis['output'],
+                    'meta': analysis['meta'],
+                }
+
+    # Prefer the joint-called VCFs over the single-sample VCFs
+    return_dict = {}
+    for sg_id, single_sample_vcf in single_sample_vcfs.items():
+        if sg_id not in joint_called_vcfs:
+            return_dict[sg_id] = single_sample_vcf
+            continue
+        return_dict[sg_id] = joint_called_vcfs[sg_id]
 
     return return_dict
 
-
-def query_for_family_id_mapping(dataset: str, family_id: str):
+@lru_cache
+def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
     """
-    Query metamist for the family ID mapping, to get the SG IDs for each family member
-    and the LRS IDs that correspond to each of these family members / SG IDs
+    Find the SGs to skip in the reformatting stage
     """
-    lrs_sgid_family_mapping = {}
-    family_results = query(FAMILY_LRS_IDS_QUERY, variables={'dataset': dataset, 'family_id': family_id})
-    for family in family_results['project']['families']:
-        for participant in family['participants']:
-            for sample in participant['samples']:
-                if not sample['sequencingGroups']:
-                    continue
-                lrs_id = sample['meta'].get('lrs_id', None)
-                if not lrs_id:
-                    get_logger().warning(f'No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
-                    continue
-                lrs_individual_number = lrs_id.split('-')[1]
-                for sg in sample['sequencingGroups']:
-                    lrs_sgid_family_mapping[lrs_individual_number] = sg['id']
-    return lrs_sgid_family_mapping
+    sgs_to_skip = set()
+    for sg_id, vcf_analysis in sg_vcf_dict.items():
+        analysis_meta = vcf_analysis['meta']
+        if analysis_meta['joint_called'] and not analysis_meta['participant_id'].endswith('00'):
+            sgs_to_skip.add(sg_id)
+    return list(sgs_to_skip)
 
+
+@lru_cache
+def query_for_lrs_sg_id_mapping(datasets: list[str]):
+    """
+    Query metamist for the LRS ID corresponding to each sequencing group ID
+    """
+    lrs_sgid_mapping = {}
+    for dataset in datasets:
+        family_results = query(FAMILY_LRS_IDS_QUERY, variables={'dataset': dataset})
+        for family in family_results['project']['families']:
+            for participant in family['participants']:
+                for sample in participant['samples']:
+                    if not sample['sequencingGroups']:
+                        continue
+                    lrs_id = sample['meta'].get('lrs_id', None)
+                    if not lrs_id:
+                        get_logger().warning(f'No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
+                        continue
+                    for sg in sample['sequencingGroups']:
+                        lrs_sgid_mapping[lrs_id] = sg['id']
+    return lrs_sgid_mapping
 
 @stage
+class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
+    """
+    Write the LRS ID to SG ID mapping to a file
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {
+            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.tsv',
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Write the LRS ID to SG ID mapping to a file
+        This is used by bcftools reheader to update the sample IDs in the VCFs
+        """
+        outputs = self.expected_outputs(multicohort)
+
+        lrs_sgid_mapping = query_for_lrs_sg_id_mapping(list(multicohort._datasets_by_name.keys()))
+        with open(outputs['lrs_sgid_mapping'], 'w') as f:
+            for lrs_id, sg_id in lrs_sgid_mapping.items():
+                f.write(f'{lrs_id} {sg_id}\n')
+
+        return self.make_outputs(multicohort, data=outputs)
+
+@stage(required_stages=WriteLRSIDtoSGIDMappingFile)
 class ReFormatPacBioSNPsIndels(SequencingGroupStage):
     """
     take each of the long-read SNPs Indels VCFs, and re-format the contents
@@ -141,26 +188,27 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         a python job to change the VCF contents
         - use a python job to modify all VCF lines, in-line
         - use a follow-up job to block-gzip and index
+        - this is skipped for the parents in trio joint-called VCFs
         """
-
-        # find the vcf for this SG
-        query_result = query_for_snps_indels_vcfs(dataset_name=sg.dataset.name)
+        # find the VCFs for this dataset
+        sg_vcfs = query_for_snps_indels_vcfs(dataset_name=sg.dataset.name)
+        sgs_to_skip = find_sgs_to_skip(sg_vcfs)
+        if sg.id in sgs_to_skip:
+            get_logger().info(f'Skipping {sg.id} | {sg.participant_id} as it is a parent in a joint-called VCF')
+            return None
 
         expected_outputs = self.expected_outputs(sg)
-
         # instead of handling, we should probably just exclude this and run again
-        if sg.id not in query_result:
+        if sg.id not in sg_vcfs:
             raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {sg.dataset.name}')
 
-        lr_snps_indels_vcf: str = query_result[sg.id]['output']
-        if query_result[sg.id]['joint_called']:
-            get_logger().info(f'{sg.id} is joint called, getting the family SG IDs')
-            family_id_mapping = query_for_family_id_mapping(sg.dataset.name, query_result[sg.id]['family_id'])
-        else:
-            family_id_mapping = None
+        lr_snps_indels_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
 
-        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if query_result[sg.id]["joint_called"] else ""}{lr_snps_indels_vcf} prior to annotation')
+        lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteLRSIDtoSGIDMappingFile, 'lrs_sgid_mapping')
+        local_mapping = get_batch().read_input(lrs_sg_id_map)
+
+        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if sg_vcfs[sg.id]["joint_called"] else ""}{lr_snps_indels_vcf} prior to annotation')
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
@@ -174,20 +222,17 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             'modify_sniffles '
             f'--vcf_in {local_vcf} '
             f'--vcf_out {mod_job.output} '
-            f'--new_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sex} '
-            f'--new_id_01 {family_id_mapping["01"]} ' if family_id_mapping else ''
-            f'--new_id_02 {family_id_mapping["02"]} ' if family_id_mapping else '',
+            f'--sex {sex} ',
         )
 
-        # normalise, then block-gzip and index that result
+        # normalise, reheader, then block-gzip and index that result
         tabix_job = get_batch().new_job(f'Normalising, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
         tabix_job.command(
-            f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
+            f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools reheader --samples {local_mapping} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
         )
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
@@ -218,6 +263,9 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
         # do a bcftools merge on all input files
         modified_vcfs = inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)
+        if len(modified_vcfs) == 1:
+            get_logger().info('Only one VCF found, skipping merge')
+            return None
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
@@ -251,7 +299,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=merge_job)
 
 
-@stage(required_stages=MergeLongReadSNPsIndels)
+@stage(required_stages=[ReFormatPacBioSNPsIndels, MergeLongReadSNPsIndels])
 class SiteOnlyVCFs(MultiCohortStage):
     """
     Get the site-only VCFs from the merged VCF
@@ -285,10 +333,15 @@ class SiteOnlyVCFs(MultiCohortStage):
         if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
             exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
 
+        if len(inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)) == 1:
+            merged_vcf_path = inputs.as_path(multicohort, ReFormatPacBioSNPsIndels, 'vcf')
+        else:
+            merged_vcf_path = inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf')
+
         vcf_jobs = split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             b=get_batch(),
             scatter_count=scatter_count,
-            merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
+            merged_vcf_path=merged_vcf_path,
             tmp_bucket=self.tmp_prefix / 'tmp',
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             intervals_path=intervals_path,
@@ -340,7 +393,7 @@ class VepLRS(MultiCohortStage):
         return self.make_outputs(multicohort, outputs, jobs)
 
 
-@stage(required_stages=[MergeLongReadSNPsIndels, VepLRS])
+@stage(required_stages=[ReFormatPacBioSNPsIndels, MergeLongReadSNPsIndels, VepLRS])
 class AnnotateCohortLRSNPsIndels(MultiCohortStage):
     """
     First step to transform annotated SNPs Indels callset data into a seqr ready format
@@ -358,7 +411,11 @@ class AnnotateCohortLRSNPsIndels(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
+        if len(inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)) == 1:
+            vcf_path = inputs.as_path(multicohort, ReFormatPacBioSNPsIndels, 'vcf')
+        else:
+            vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
+
         vep_ht_path = inputs.as_path(target=multicohort, stage=VepLRS, key='ht')
 
         job = annotate_cohort_jobs_snps_indels(
