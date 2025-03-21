@@ -108,7 +108,6 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
 
     return return_dict
 
-@lru_cache
 def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
     """
     Find the SGs to skip in the reformatting stage
