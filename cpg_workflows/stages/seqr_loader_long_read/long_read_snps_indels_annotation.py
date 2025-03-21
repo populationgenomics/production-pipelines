@@ -45,25 +45,22 @@ VCF_QUERY = gql(
 }""",
 )
 
-FAMILY_LRS_IDS_QUERY = gql(
+LRS_IDS_QUERY = gql(
     """
     query MyQuery($dataset: String!) {
-  project(name: $dataset) {
-    families {
-        externalId
-        participants {
-          externalId
-          samples {
+    project(name: $dataset) {
+      sequencingGroups(technology: {eq: "long-read"}, type: {eq: "genome"}) {
+          id
+          sample {
             externalId
             meta
-            sequencingGroups(technology: {eq: "long-read"}, type: {eq: "genome"}) {
-              id
+            participant {
+              externalId
             }
           }
         }
       }
     }
-}
     """,
 )
 
@@ -143,18 +140,16 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
     for dataset in datasets:
         if config_retrieve(['workflow', 'access_level'])=='test' and not dataset.endswith('-test'):
             dataset = dataset + '-test'
-        family_results = query(FAMILY_LRS_IDS_QUERY, variables={'dataset': dataset})
-        for family in family_results['project']['families']:
-            for participant in family['participants']:
-                for sample in participant['samples']:
-                    if not sample['sequencingGroups']:
-                        continue
-                    lrs_id = sample['meta'].get('lrs_id', None)
-                    if not lrs_id:
-                        get_logger().warning(f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
-                        continue
-                    for sg in sample['sequencingGroups']:
-                        lrs_sgid_mapping[lrs_id] = sg['id']
+        query_results = query(LRS_IDS_QUERY, variables={'dataset': dataset})
+        for sg in query_results['project']['sequencingGroups']:
+            sample = sg['sample']
+            participant = sample['meta'].get('participant', {})
+            lrs_id = sample['meta'].get('lrs_id', None)
+            if not lrs_id:
+                get_logger().warning(f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
+                continue
+            for sg in sample['sequencingGroups']:
+                lrs_sgid_mapping[lrs_id] = sg['id']
     return lrs_sgid_mapping
 
 
@@ -183,7 +178,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
             for lrs_id, sg_id in lrs_sgid_mapping.items():
                 f.write(f'{lrs_id} {sg_id}\n')
 
-        return self.make_outputs(multicohort, data=output, reusable=False)
+        return self.make_outputs(multicohort, data=output)
 
 
 @stage(required_stages=[WriteLRSIDtoSGIDMappingFile])
