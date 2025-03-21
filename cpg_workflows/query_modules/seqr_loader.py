@@ -62,17 +62,17 @@ def annotate_cohort(
     # and then recompute AC/AF/AN correctly from the variant QC table
     # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
     # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
-    if long_read:
-        mt = mt.drop('AF')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(
-            info=mt.info.annotate(
-                AF=mt.variant_qc.AF,
-                AN=mt.variant_qc.AN,
-                AC=mt.variant_qc.AC,
-            ),
-        )
-        mt = mt.drop('variant_qc')
+    # if long_read:
+    #     mt = mt.drop('AF')
+    #     mt = hl.variant_qc(mt)
+    #     mt = mt.annotate_rows(
+    #         info=mt.info.annotate(
+    #             AF=mt.variant_qc.AF,
+    #             AN=mt.variant_qc.AN,
+    #             AC=mt.variant_qc.AC,
+    #         ),
+    #     )
+    #     mt = mt.drop('variant_qc')
 
     # Remove any contigs not in the 22 autosomes, X, Y, M
     if remove_invalid_contigs:
