@@ -17,7 +17,12 @@ from cpg_workflows.stages.cram_qc import CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
-from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import FilterBatch, GenotypeBatch, MtToEsSv, SplitAnnotatedSvVcfByDataset
+from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import (
+    FilterBatch,
+    GenotypeBatch,
+    MtToEsSv,
+    SplitAnnotatedSvVcfByDataset,
+)
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV, SplitAnnotatedCnvVcfByDataset
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC

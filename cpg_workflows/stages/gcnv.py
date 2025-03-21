@@ -780,7 +780,7 @@ class SplitAnnotatedCnvVcfByDataset(DatasetStage):
 
         job = get_batch().new_job(
             name=f'SplitAnnotatedCnvVcfByDataset: {dataset}',
-            attributes=self.get_job_attrs() | {'tool': 'bcftools'}
+            attributes=self.get_job_attrs() | {'tool': 'bcftools'},
         )
         job.image(image_path('bctools_120'))
         job.cpu(1).memory('highmem').storage('10Gi')

@@ -29,7 +29,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
 )
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Cohort, Dataset, MultiCohort
-from cpg_workflows.utils import get_logger, ExpectedResultT
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     CohortStage,
     DatasetStage,
@@ -38,7 +38,7 @@ from cpg_workflows.workflow import (
     StageOutput,
     get_multicohort,
     get_workflow,
-    stage, TargetT, Action,
+    stage,
 )
 from metamist.graphql import gql, query
 
@@ -1422,6 +1422,7 @@ class SplitAnnotatedSvVcfByDataset(DatasetStage):
     takes the whole MultiCohort annotated VCF
     splits it up into separate VCFs for each dataset
     """
+
     def expected_outputs(self, dataset: Dataset) -> Path:
         return dataset.prefix() / 'annotated_sv.vcf.bgz'
 
@@ -1437,7 +1438,7 @@ class SplitAnnotatedSvVcfByDataset(DatasetStage):
                     f.write(f'{sgid}\n')
         job = get_batch().new_job(
             name=f'SplitAnnotatedSvVcfByDataset: {dataset}',
-            attributes=self.get_job_attrs() | {'tool': 'bcftools'}
+            attributes=self.get_job_attrs() | {'tool': 'bcftools'},
         )
         job.image(image_path('bctools_120'))
         job.cpu(1).memory('highmem').storage('10Gi')
