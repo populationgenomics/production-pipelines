@@ -151,7 +151,7 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
                         continue
                     lrs_id = sample['meta'].get('lrs_id', None)
                     if not lrs_id:
-                        get_logger().warning(f'No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
+                        get_logger().warning(f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
                         continue
                     for sg in sample['sequencingGroups']:
                         lrs_sgid_mapping[lrs_id] = sg['id']
@@ -177,11 +177,11 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
         output = self.expected_outputs(multicohort)
 
         lrs_sgid_mapping = query_for_lrs_sg_id_mapping([d.name for d in multicohort.get_datasets()])
-        if not to_path(output['lrs_sgid_mapping']).exists():
-            mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
-            with mapping_file_path.open('w') as f:
-                for lrs_id, sg_id in lrs_sgid_mapping.items():
-                    f.write(f'{lrs_id} {sg_id}\n')
+        get_logger().info(f'Writing LRS ID to SG ID mapping: {lrs_sgid_mapping}')
+        mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
+        with mapping_file_path.open('w') as f:
+            for lrs_id, sg_id in lrs_sgid_mapping.items():
+                f.write(f'{lrs_id} {sg_id}\n')
 
         return self.make_outputs(multicohort, data=output)
 
