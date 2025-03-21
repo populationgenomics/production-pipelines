@@ -609,6 +609,37 @@ class GenerateCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage(required_stages=[GenerateCoverageTable])
+class MergeCoverageTables(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
+            coverage_version = slugify(coverage_version)
+
+        coverage_version = coverage_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version / 'merged_coverage.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_coverage_table
+
+        j = get_batch().new_job(
+            'MergeCoverageTables',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                generate_coverage_table,
+                generate_coverage_table.merge_coverage_tables.__name__,
+                [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
 # @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):

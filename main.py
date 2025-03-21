@@ -28,6 +28,7 @@ from cpg_workflows.stages.large_cohort import (
     GenerateCoverageTable,
     GenerateReferenceCoverageTable,
     LoadVqsr,
+    MergeCoverageTables,
     PrepareBrowserTable,
     ShardVds,
 )
@@ -97,6 +98,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GenerateCoverageTable,
         ShardVds,
         GenerateReferenceCoverageTable,
+        MergeCoverageTables,
     ],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],

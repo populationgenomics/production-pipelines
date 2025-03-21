@@ -19,7 +19,8 @@ logger.setLevel(logging.INFO)
 
 
 def merge_coverage_tables(
-    coverage_tables: list[hl.Table],
+    coverage_table_paths: list[str],
+    out_path: str,
 ) -> hl.Table:
     """
     Merge coverage tables.
@@ -30,7 +31,9 @@ def merge_coverage_tables(
     # from cpg_utils.hail_batch import init_batch
 
     # init_batch()
-    return hl.Table.union(*coverage_tables)
+    coverage_tables = [hl.read_table(coverage_table_path) for coverage_table_path in coverage_table_paths]
+    merged_coverage_table = hl.Table.union(*coverage_tables)
+    return merged_coverage_table.checkpoint(out_path, overwrite=True)
 
 
 def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDataset:
