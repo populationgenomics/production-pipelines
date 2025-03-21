@@ -160,7 +160,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        lrs_sgid_mapping = query_for_lrs_sg_id_mapping(list(multicohort._datasets_by_name.keys()))
+        lrs_sgid_mapping = query_for_lrs_sg_id_mapping(multicohort._datasets_by_name.keys())
         with open(outputs['lrs_sgid_mapping'], 'w') as f:
             for lrs_id, sg_id in lrs_sgid_mapping.items():
                 f.write(f'{lrs_id} {sg_id}\n')
