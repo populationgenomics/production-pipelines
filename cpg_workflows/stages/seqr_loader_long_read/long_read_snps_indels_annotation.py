@@ -244,7 +244,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         )
 
         # normalise, reheader, then block-gzip and index that result
-        tabix_job = get_batch().new_job(f'Normalising, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
+        tabix_job = get_batch().new_job(f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
