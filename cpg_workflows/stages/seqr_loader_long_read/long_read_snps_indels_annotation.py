@@ -141,6 +141,16 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
                         lrs_sgid_mapping[lrs_id] = sg['id']
     return lrs_sgid_mapping
 
+
+def write_lrs_sgid_mapping(lrs_sgid_mapping: dict[str, str], prefix: Path):
+    """
+    Write the LRS ID to SG ID mapping to a file
+    """
+    mapping_file_path = prefix / 'lrs_sgid_mapping.txt'
+    with mapping_file_path.open('w') as f:
+        for lrs_id, sg_id in lrs_sgid_mapping.items():
+            f.write(f'{lrs_id} {sg_id}\n')
+
 @stage
 class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
     """
@@ -149,7 +159,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
-            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.tsv',
+            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.txt',
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -157,14 +167,13 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
         Write the LRS ID to SG ID mapping to a file
         This is used by bcftools reheader to update the sample IDs in the VCFs
         """
-        outputs = self.expected_outputs(multicohort)
+        output = self.expected_outputs(multicohort)
 
         lrs_sgid_mapping = query_for_lrs_sg_id_mapping([d.name for d in multicohort.get_datasets()])
-        with open(outputs['lrs_sgid_mapping'], 'w') as f:
-            for lrs_id, sg_id in lrs_sgid_mapping.items():
-                f.write(f'{lrs_id} {sg_id}\n')
+        if not to_path(output['lrs_sgid_mapping']).exists():
+            write_lrs_sgid_mapping(lrs_sgid_mapping, self.prefix)
 
-        return self.make_outputs(multicohort, data=outputs)
+        return self.make_outputs(multicohort, data=output)
 
 
 @stage(required_stages=WriteLRSIDtoSGIDMappingFile)
