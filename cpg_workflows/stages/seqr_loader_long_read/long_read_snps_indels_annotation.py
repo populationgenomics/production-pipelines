@@ -122,7 +122,7 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> list[str]:
         analysis_meta = vcf_analysis['meta']
         if analysis_meta.get('family_id', '') in joint_called_families and not analysis_meta.get('joint_called', False):
             sgs_to_skip.add(sg_id)
-            get_logger().info(f'Skipping {sg_id} | Participant: {analysis_meta.get("participant_id", "")} as it is a parent in a joint-called VCF')
+            # get_logger().info(f'Skipping {sg_id} | Participant: {analysis_meta.get("participant_id", "")} as it is a parent in a joint-called VCF')
     return list(sgs_to_skip)
 
 
@@ -285,7 +285,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
-            for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in multicohort.get_sequencing_group_ids()]
+            for each_vcf in [str(modified_vcfs.get(sgid, {}).get('vcf')) for sgid in multicohort.get_sequencing_group_ids() if sgid in modified_vcfs]
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
