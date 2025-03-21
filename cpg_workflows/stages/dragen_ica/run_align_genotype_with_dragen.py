@@ -17,9 +17,11 @@ from cpg_workflows.stages.dragen_ica import ica_utils
 
 def submit_dragen_run(
     cram_id: str,
-    cram_index_id: str,
     dragen_ht_id: str,
     cram_reference_id: str,
+    qc_cross_cont_vcf_id: str,
+    qc_cov_region_1_id: str,
+    qc_cov_region_2_id: str,
     dragen_pipeline_id: str,
     ica_output_folder_id: str,
     user_tags: list[str],
@@ -42,26 +44,28 @@ def submit_dragen_run(
         analysisInput=NextflowAnalysisInput(
             inputs=[
                 AnalysisDataInput(parameterCode='crams', dataIds=[cram_id]),
-                AnalysisDataInput(parameterCode='crais', dataIds=[cram_index_id]),
                 AnalysisDataInput(parameterCode='ref_tar', dataIds=[dragen_ht_id]),
                 AnalysisDataInput(parameterCode='cram_reference', dataIds=[cram_reference_id]),
+                AnalysisDataInput(parameterCode='qc_cross_cont_vcf', dataIds=[qc_cross_cont_vcf_id]),
+                AnalysisDataInput(parameterCode='qc_coverage_region_1', dataIds=[qc_cov_region_1_id]),
+                AnalysisDataInput(parameterCode='qc_coverage_region_2', dataIds=[qc_cov_region_2_id]),
             ],
             parameters=[
-                AnalysisParameterInput(
-                    code='enable_map_align',
-                    value='True',
-                ),
-                AnalysisParameterInput(code='enable_map_align_output', value='True'),
+                AnalysisParameterInput(code='enable_map_align', value='true'),
+                AnalysisParameterInput(code='enable_map_align_output', value='true'),
                 AnalysisParameterInput(code='output_format', value='CRAM'),
-                AnalysisParameterInput(code='enable_duplicate_marking', value='True'),
-                AnalysisParameterInput(code='enable_variant_caller', value='True'),
-                AnalysisParameterInput(code='vc_emit_reference_confidence', value='GVCF'),
-                AnalysisParameterInput(code='vc_enable_vcf_output', value='False'),
-                AnalysisParameterInput(code='enable_cnv', value='True'),
-                AnalysisParameterInput(code='enable_sv', value='True'),
+                AnalysisParameterInput(code='enable_duplicate_marking', value='true'),
+                AnalysisParameterInput(code='enable_variant_caller', value='true'),
+                AnalysisParameterInput(code='vc_emit_ref_confidence', value='GVCF'),
+                AnalysisParameterInput(code='vc_enable_vcf_output', value='false'),
+                AnalysisParameterInput(code='enable_cnv', value='true'),
+                AnalysisParameterInput(code='cnv_segmentation_mode', value='SLM'),
+                AnalysisParameterInput(code='enable_sv', value='true'),
+                AnalysisParameterInput(code='enable_cyp2d6', value='true'),
+                AnalysisParameterInput(code='repeat_genotype_enable', value='false'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value='--vc-hard-filter "DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1" --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true',
+                    value="--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter 'DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1' --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --qc-coverage-reports-1 cov_report,cov_report --qc-coverage-filters-1 'mapq<1,bq<0,mapq<1,bq<0'",
                 ),
             ],
         ),
@@ -82,13 +86,17 @@ def run(
     analysis_output_fid_path: str,
     dragen_ht_id: str,
     cram_reference_id: str,
+    qc_cross_cont_vcf_id: str,
+    qc_cov_region_1_id: str,
+    qc_cov_region_2_id: str,
     dragen_pipeline_id: str,
     user_tags: list[str],
     technical_tags: list[str],
     reference_tags: list[str],
     user_reference: str,
     api_root: str,
-) -> dict[str, str]:
+    output_path: str,
+) -> str:
     """_summary_
 
     Args:
@@ -102,10 +110,9 @@ def run(
         reference_tags (list[str]): List of reference tags for the analysis (optional, can be empty)
         user_reference (str): A reference name for the pipeline run
         api_root (str): The ICA API root
-
-    Returns:
-        dict[str, str]: A dict holding the pipeline ID
+        output_path (str): The path to write the pipeline ID to
     """
+
     SECRETS: dict[Literal['projectID', 'apiKey'], str] = ica_utils.get_ica_secrets()
     project_id: str = SECRETS['projectID']
     api_key: str = SECRETS['apiKey']
@@ -125,9 +132,11 @@ def run(
         path_params: dict[str, str] = {'projectId': project_id}
         analysis_run_id: str = submit_dragen_run(
             cram_id=ica_fids['cram_fid'],
-            cram_index_id=ica_fids['crai_fid'],
             dragen_ht_id=dragen_ht_id,
             cram_reference_id=cram_reference_id,
+            qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
+            qc_cov_region_1_id=qc_cov_region_1_id,
+            qc_cov_region_2_id=qc_cov_region_2_id,
             dragen_pipeline_id=dragen_pipeline_id,
             ica_output_folder_id=analysis_output_fid['analysis_output_fid'],
             user_tags=user_tags,
@@ -139,4 +148,7 @@ def run(
         )
 
         logging.info(f'Submitted ICA run with pipeline ID: {analysis_run_id}')
-        return {'pipeline_id': analysis_run_id}
+        with cpg_utils.to_path(output_path).open('w') as f:
+            f.write(analysis_run_id)
+
+    return analysis_run_id

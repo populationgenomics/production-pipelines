@@ -6,13 +6,22 @@ status_reporter = 'metamist'
 #last_stages = ['CreateDenseMtFromVdsWithHail']
 
 ## if this is False, we will not check for existing VDS - always create fresh VDS from gVCFs
-check_for_existing_vds = false
+# as of 11-02-2025 we have a base VDS for all exome and genome datasets, so by default, do check
+check_for_existing_vds = true
+
+# during development and the transition to input_cohorts over input_datasets, there are some instances
+# where we have VDS entries in Metamist, but the analysis entry contains SG IDs which weren't combined into the VDS
+# this is not expected to be a long term problem, but is a way of confirming explicitly which SGs still need combining
+manually_check_vds_sg_ids = true
 
 ## If this is populated with an integer, we will use the VDS with this ID in Metamist as the starting point
 #use_specific_vds = 1234
 
 ## Subsetting and AnnotateDataset will only run for these datasets
 #write_mt_for_datasets = ['test_dataset', ]
+
+## Writing an es-index will only run for these datasets
+#create_es_index_for_datasets = ['test_dataset', ]
 
 ## number of partitions to coalesce the data into
 densify_partitions = 2500
@@ -28,19 +37,14 @@ indel_recal_disc_size = 20
 snps_gather_disc_size = 10
 snps_recal_disc_size = 20
 
+# without this setting we use the native Hail version in the container
+# not currently in use as the cpg-utils default contains these patches by default, plus extra logging
+# most recently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
+#default_jar_spec_revision = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
+
 [workflow.es_index]
 # if false, use a non-preemptible instance to run the ES export
 spot_instance = false
-
-# choices of jar specs to use for the various steps
-# without this setting we would default to matching the native Hail version in the container
-# currently set to 'a8be268326b2ac168035b629a78465c9d94fc7b9' - 0.2.133 + 400'retry + StreamConstraints patch
-[workflow.jar_spec_revisions]
-annotate_cohort = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
-annotate_dataset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
-combiner = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
-densify = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
-subset = 'a8be268326b2ac168035b629a78465c9d94fc7b9'
 
 [combiner]
 # used to decide if we should resume from a previous combiner plan

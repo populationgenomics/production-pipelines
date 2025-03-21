@@ -4,6 +4,7 @@ single-sample components of the GATK SV workflow
 
 import json
 import logging
+from functools import cache
 from typing import Any
 
 from cpg_utils import Path, to_path
@@ -30,7 +31,17 @@ from cpg_workflows.workflow import (
 )
 
 
-@stage(analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS], analysis_type='sv')
+@cache
+def get_sv_callers():
+    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
+        callers = [caller for caller in SV_CALLERS if caller in only_jobs]
+        if not callers:
+            logging.warning('No SV callers enabled')
+        return callers
+    return SV_CALLERS
+
+
+@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()] if get_sv_callers() else None, analysis_type='sv')
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
@@ -65,9 +76,18 @@ class GatherSampleEvidence(SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in SV_CALLERS:
+        for caller in get_sv_callers():
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
+
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
+            # remove the expected outputs for the jobs that are not in only_jobs
+            new_expected = {}
+            for job in only_jobs:
+                for key, path in d.items():
+                    if job in key:
+                        new_expected[key] = path
+            d = new_expected
 
         return d
 
@@ -115,6 +135,23 @@ class GatherSampleEvidence(SequencingGroupStage):
         )
 
         expected_d = self.expected_outputs(sequencing_group)
+
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
+            # if only_jobs is set, only run the specified jobs
+            # this is useful for samples which need to re-run specific jobs
+            # e.g. if manta failed and needs to be re-run with more memory
+
+            # disable the evidence collection jobs if they're not in only_jobs
+            if 'coverage_counts' not in only_jobs:
+                input_dict['collect_coverage'] = False
+            if 'pesr' not in only_jobs:
+                input_dict['collect_pesr'] = False
+
+            # disable the caller jobs that are not in only_jobs by nulling their docker image
+            for key, val in input_dict.items():
+                if key in [f'{caller}_docker' for caller in SV_CALLERS]:
+                    caller = key.removesuffix('_docker')
+                    input_dict[key] = val if caller in only_jobs else None
 
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/

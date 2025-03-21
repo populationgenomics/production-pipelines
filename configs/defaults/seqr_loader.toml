@@ -19,8 +19,14 @@ vep_version = '110'
 # Write the sorted BAM file to the temp bucket after alignment and before MarkDuplicates
 checkpoint_sorted_bam = false
 
+# Shard exome BAMs and CRAMs with bazam to align them in chunks
+exome_realignment_shards = 1
+
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
+
+# Experimentally validated best reblocking bands for GATK ReblockGVCF
+reblock_gq_bands = [13, 20, 30, 40]
 
 # Write dataset MTs for these datasets. Required for the AnnotateDataset stage
 # write_mt_for_datasets = []

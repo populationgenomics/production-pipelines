@@ -160,7 +160,9 @@ def align(
         realignment_shards_num = 10
     else:
         assert sequencing_group.sequencing_type == 'exome'
-        realignment_shards_num = 1
+        # consider setting the shard count to at least 2 when the input is large,
+        # or else dragen-os can run out of memory and cause the VM to continually restart
+        realignment_shards_num = config_retrieve(['workflow', 'exome_realignment_shards'], 1)
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = (

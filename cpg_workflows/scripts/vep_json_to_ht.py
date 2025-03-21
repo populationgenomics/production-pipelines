@@ -26,6 +26,7 @@ from argparse import ArgumentParser
 
 import hail as hl
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
 
@@ -39,7 +40,11 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
         out_path ():
     """
 
-    init_batch()
+    init_batch(
+        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    )
 
     # Differences relative to the 105 schema:
     # - minimised, int32, new field at top level
@@ -201,14 +206,18 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
 
     ht = hl.import_table(paths=vep_result_paths, no_header=True, types={'f0': json_schema})
     ht = ht.transmute(vep=ht.f0)
-    # Can't use ht.vep.start for start because it can be modified by VEP (e.g. it
-    # happens for indels). So instead parsing POS from the original VCF line stored
-    # as ht.vep.input field.
-    original_vcf_line = ht.vep.input
-    start = hl.parse_int(original_vcf_line.split('\t')[1])
-    chrom = ht.vep.seq_region_name
-    ht = ht.annotate(locus=hl.locus(chrom, start))
-    ht = ht.key_by(ht.locus)
+    # we're using split multiallelics, so we need to compound key on chr/pos/ref/alt
+    # the ref and alt can't be taken from the VEP output, as they are manipulated
+    # e.g. ["T","-"] for a Deletion, or ["-","AC"] for an insertion
+    # instead we need to generate the Alleles from the exact VCF input String
+    # this issue was alluded to in the previous script which formatted VEP annotations as a Hail Table, but that script
+    # didn't use alleles at all (joining only on chr:pos, multiallelics were not split)
+    split_vep_input = ht.vep.input.split('\t')
+    ht = ht.annotate(
+        locus=hl.locus(ht.vep.seq_region_name, hl.parse_int(split_vep_input[1])),
+        alleles=[split_vep_input[3], split_vep_input[4]],
+    )
+    ht = ht.key_by(ht.locus, ht.alleles)
     ht.write(out_path, overwrite=True)
 
 
