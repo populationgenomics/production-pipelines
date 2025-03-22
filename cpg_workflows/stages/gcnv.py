@@ -580,12 +580,8 @@ class AnnotateCNV(MultiCohortStage):
 
 @stage(required_stages=AnnotateCNV, analysis_type='cnv', analysis_keys=['strvctvre_vcf'])
 class AnnotateCNVVcfWithStrvctvre(MultiCohortStage):
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        prefix = self.prefix
-        return {
-            'strvctvre_vcf': prefix / 'cnv_strvctvre_annotated.vcf.bgz',
-            'strvctvre_vcf_index': prefix / 'cnv_strvctvre_annotated.vcf.bgz.tbi',
-        }
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'cnv_strvctvre_annotated.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         strv_job = get_batch().new_job('StrVCTVRE', self.get_job_attrs() | {'tool': 'strvctvre'})
@@ -617,7 +613,7 @@ class AnnotateCNVVcfWithStrvctvre(MultiCohortStage):
 
         get_batch().write_output(
             strv_job.output_vcf,
-            str(expected_d['strvctvre_vcf']).replace('.vcf.bgz', ''),
+            str(expected_d).replace('.vcf.bgz', ''),
         )
         return self.make_outputs(multicohort, data=expected_d, jobs=strv_job)
 
@@ -636,7 +632,7 @@ class AnnotateCohortgCNV(MultiCohortStage):
         Fire up the job to ingest the cohort VCF as a MT, and rearrange the annotations
         """
 
-        vcf_path = str(inputs.as_path(target=multicohort, stage=AnnotateCNVVcfWithStrvctvre, key='strvctvre_vcf'))
+        vcf_path = str(inputs.as_path(target=multicohort, stage=AnnotateCNVVcfWithStrvctvre))
         outputs = self.expected_outputs(multicohort)
 
         j = get_batch().new_job('annotate gCNV cohort', self.get_job_attrs(multicohort))
@@ -759,3 +755,38 @@ class MtToEsCNV(DatasetStage):
         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
 
         return self.make_outputs(dataset, data=outputs, jobs=job)
+
+
+@stage(required_stages=AnnotateCNVVcfWithStrvctvre, analysis_type='single_dataset_cnv_annotated')
+class SplitAnnotatedCnvVcfByDataset(DatasetStage):
+    """
+    takes the whole MultiCohort annotated VCF
+    splits it up into separate VCFs for each dataset
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / 'annotated_sv.vcf.bgz'
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(dataset)
+        input_vcf = get_batch().read_input(inputs.as_path(get_multicohort(), AnnotateCNVVcfWithStrvctvre))
+
+        # write a temp file for this dataset containing all relevant SGs
+        sgids_list_path = dataset.tmp_prefix() / get_workflow().output_version / 'sgid-list.txt'
+        if not config_retrieve(['workflow', 'dry_run'], False):
+            with sgids_list_path.open('w') as f:
+                for sgid in dataset.get_sequencing_group_ids():
+                    f.write(f'{sgid}\n')
+
+        job = get_batch().new_job(
+            name=f'SplitAnnotatedCnvVcfByDataset: {dataset}',
+            attributes=self.get_job_attrs() | {'tool': 'bcftools'},
+        )
+        job.image(image_path('bctools_120'))
+        job.cpu(1).memory('highmem').storage('10Gi')
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.command(f'bcftools view {input_vcf} -S {sgids_list_path} -Oz -o {job.output["vcf.bgz"]} --write-index=tbi')
+
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(dataset, data=output, jobs=job)
