@@ -159,6 +159,7 @@ def annotate_cohort(
 
     ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
     clinvar_ht = hl.read_table(reference_path('seqr_clinvar'))
+    gnomad_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
 
     mt = hl.variant_qc(mt)
     mt = mt.annotate_rows(
