@@ -495,7 +495,7 @@ class Frequencies(CohortStage):
 
 @stage(required_stages=[Combiner])
 class ShardVds(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if sharded_vds_version := config_retrieve(['large_cohort', 'output_versions', 'sharded_vds'], default=None):
             sharded_vds_version = slugify(sharded_vds_version)
 
@@ -569,7 +569,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[jobs])
 
 
-@stage(required_stages=[Combiner, ShardVds, GenerateReferenceCoverageTable])
+@stage(required_stages=[ShardVds, GenerateReferenceCoverageTable])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
