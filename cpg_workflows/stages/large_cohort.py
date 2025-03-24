@@ -501,7 +501,11 @@ class ShardVds(CohortStage):
 
         sharded_vds_version = sharded_vds_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix() / get_workflow().name / sharded_vds_version / f'{contig}.vds'
+            f'{contig}': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / 'sharded_vds'
+            / sharded_vds_version
+            / f'{contig}.vds'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
 
@@ -543,6 +547,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
+            / 'reference_coverage'
             / ref_cov_version
             / f'{contig}_coverage_reference.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
@@ -579,6 +584,7 @@ class GenerateCoverageTable(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
+            / 'split_coverage'
             / coverage_version
             / f'{contig}_coverage.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
@@ -616,7 +622,13 @@ class MergeCoverageTables(CohortStage):
             coverage_version = slugify(coverage_version)
 
         coverage_version = coverage_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version / 'merged_coverage.ht'
+        return (
+            cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / 'merged_coverage'
+            / coverage_version
+            / 'merged_coverage.ht'
+        )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
