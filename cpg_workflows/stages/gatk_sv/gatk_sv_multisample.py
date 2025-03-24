@@ -769,11 +769,14 @@ class MakeCohortVcf(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """create output paths"""
-        return {
+        outputs = {
             'vcf': self.prefix / 'cleaned.vcf.gz',
             'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
-            'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz',
         }
+        if config_retrieve(['MakeCohortVcf', 'MainVcfQc', 'do_per_sample_qc'], False):
+            outputs |= {'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz'}
+
+        return outputs
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
