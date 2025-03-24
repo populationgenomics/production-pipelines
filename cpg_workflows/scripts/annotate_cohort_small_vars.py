@@ -54,6 +54,7 @@ The popmax AF/homs should be taken from the separate fields
 
 
 ALTERNATIVELY, we can just use the `joint.grpmax` struct, which contains AC/AN/AF/Hom for the most frequent population
+I don't think we would want to filter/display just the single population-maximum, keen to take a curator lead on this
 """
 
 from argparse import ArgumentParser
