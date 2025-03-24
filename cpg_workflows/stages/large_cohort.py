@@ -566,7 +566,7 @@ class GenerateReferenceCoverageTable(CohortStage):
             )
             jobs.append(j)
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[jobs])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
 @stage(required_stages=[ShardVds, GenerateReferenceCoverageTable])
@@ -606,7 +606,7 @@ class GenerateCoverageTable(CohortStage):
             )
             converage_jobs.append(j)
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=converage_jobs)
 
 
 @stage(required_stages=[GenerateCoverageTable])
