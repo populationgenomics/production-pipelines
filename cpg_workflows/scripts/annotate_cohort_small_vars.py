@@ -40,7 +40,7 @@ population 'adj' -  genotype calls have been adjusted to account for potential t
     - "joint.freq"
 
 3. use the globals to find the index of the 'adj' population for joint.freq:
-    - "target_index = ht.globals.joint_globals.freq_index_dict[target_pop][target_pop]"
+    - "target_index = ht.globals.joint_globals.freq_index_dict[target_pop]"
 
 4. pull out the relevant struct for this population:
     - "ht[row_key].joint.freq[target_index]"
