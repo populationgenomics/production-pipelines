@@ -202,6 +202,7 @@ def annotate_cohort(
         xstop=variant_id.get_expr_for_xpos(mt.locus) + hl.len(mt.alleles[0]) - 1,
         clinvar_data=clinvar_ht[mt.row_key],
         ref_data=ref_ht[mt.row_key],
+        gnomad4=gnomad_ht[mt.row_key].joint.freq,
     )
 
     # this was previously executed in the MtToEs job, as it wasn't possible on QoB
