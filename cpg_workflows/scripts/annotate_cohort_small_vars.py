@@ -45,16 +45,17 @@ population 'adj' -  genotype calls have been adjusted to account for potential t
 4. pull out the relevant struct for this population:
     - "ht[row_key].joint.freq[target_index]"
 
-This same process should be repeated for the "adj_XY" population for hemi counts,
-and could be done for the fafmax struct for the FAF_AF field, or we use "joint.fafmax.faf99_max"
+This same process should be repeated for the "adj_XY" population for hemi counts.
 
-The popmax AF/homs should be taken from the separate fields
-- joint.grpmax.AF
-- joint.grpmax.homozygote_count
+The popmax AF/fafmax should be taken from the separate 'max' fields as they are useful aggregated max values:
+- joint.grpmax.AF: the max AF seen in any sub-population
+- joint.fafmax.faf95_ma: the max filtering allele frequency seen in any sub-population
 
+---
 
-ALTERNATIVELY, we can just use the `joint.grpmax` struct, which contains AC/AN/AF/Hom for the most frequent population
-I don't think we would want to filter/display just the single population-maximum, keen to take a curator lead on this
+Alternatively, we can just use the `joint.grpmax` struct for everything, which contains AC/AN/AF/Hom for the most
+frequent population I don't think we would want to filter/display just the single population-maximum,
+keen to take a curator lead on this
 """
 
 from argparse import ArgumentParser
@@ -161,13 +162,13 @@ def load_vqsr(vcf_path: str, ht_path: Path) -> hl.Table:
 
 def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
     """
-    all steps relating to the annotation of gnomAD v4(.1) data
+    All steps relating to the annotation of gnomAD v4(.1) data
 
     Args:
-        ht ():
+        mt (hl.MatrixTable): the input MT
 
     Returns:
-
+        same MT, with gnomAD 4 annotations placed into the INFO struct as a nested Struct
     """
 
     gnomad4_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
