@@ -244,7 +244,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view -Ov | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}')
+        tabix_job.command(f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}')
         tabix_job.command(
             f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
         )
