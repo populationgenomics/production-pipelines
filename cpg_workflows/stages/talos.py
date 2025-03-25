@@ -471,7 +471,7 @@ class RunHailFiltering(DatasetStage):
             )
             localised_exomiser = get_batch().read_input(exomiser_tar)
 
-            job.command(f'tar -xzf {localised_exomiser} -C $BATCH_TMPDIR')
+            job.command(f'tar -xf {localised_exomiser} -C $BATCH_TMPDIR')
             exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/exomiser_{dataset.name}.ht" '
         except ValueError:
             get_logger().info(f'No exomiser results found for {dataset.name}, skipping')
