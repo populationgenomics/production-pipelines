@@ -39,58 +39,80 @@ this workflow is designed to be something which could be executed easily off-sit
     - Data is written into permanent storage, and registered into Metamist
 """
 
+from functools import cache
+
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.stages.talos import query_for_latest_hail_object
-from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_batch, get_workflow, stage
+from cpg_workflows.targets import Cohort, Dataset
+from cpg_workflows.utils import exists, get_logger
+from cpg_workflows.workflow import CohortStage, DatasetStage, StageInput, StageOutput, get_batch, get_workflow, stage
 
 SHARD_MANIFEST = 'shard-manifest.txt'
 
 
+@cache
+def does_final_file_path_exist(dataset: Dataset) -> bool:
+    """
+    This workflow includes the generation of a lot of temporary files and folders
+    If I run it again, I don't want to accidentally regenerate all the intermediates, even though the final output
+    exists. In that scenario I just want no jobs to be planned.
+
+    This method builds the path to the final object, and checks if it exists in GCP
+    If it does, we can skip all other
+
+    Args:
+        dataset ():
+
+    Returns:
+
+    """
+    path = get_workflow().prefix / SquashMtIntoTarball.name / f'{dataset.name}.mt.tar'
+    return exists(path)
+
+
 @stage
-class ExtractDataFromCohortMt(CohortStage):
+class ExtractDataFromCohortMt(DatasetStage):
     """
     extract some plain calls from a joint-callset
     these calls are a region-filtered subset, limited to genic regions
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        # get prefix for this cohort
-        cohort_prefix = get_workflow().cohort_prefix(cohort, category='tmp')
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
 
         return {
             # write path for the full (region-limited) MatrixTable, stripped of info fields
-            'mt': cohort_prefix / f'{cohort.id}.mt',
+            'mt': self.tmp_prefix / f'{dataset.name}.mt',
             # this will be the write path for fragments of sites-only VCF
-            'sites_only_vcf_dir': str(cohort_prefix / f'{cohort.id}_separate.vcf.bgz'),
+            'sites_only_vcf_dir': str(self.tmp_prefix / f'{dataset.name}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments
-            'sites_only_vcf_manifest': cohort_prefix / f'{cohort.id}_separate.vcf.bgz' / SHARD_MANIFEST,
+            'sites_only_vcf_manifest': self.tmp_prefix / f'{dataset.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         script is called extract_vcf_from_mt
         """
+        outputs = self.expected_outputs(dataset)
+
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, outputs, jobs=[])
 
         # either get a mt from metamist, or take one from config
-        if (input_mt := config_retrieve(['workflow', cohort.id, 'mt'], None)) is None:
-            get_logger().info(f'No config entry retrieved at workflow/{cohort.id}/mt')
-            input_mt = query_for_latest_hail_object(
-                dataset=cohort.analysis_dataset.name,
+        if (input_mt := query_for_latest_hail_object(
+                dataset=dataset.name,
                 analysis_type='matrixtable',
                 object_suffix='.mt',
-            )
-
-        outputs = self.expected_outputs(cohort)
+            )) is None:
+            raise ValueError(f'No MatrixTable found in Metamist for {dataset.name}')
 
         # get the BED file - does not need to be localised
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
         bed = reference_path(f'ensembl_{ensembl_version}/merged_bed')
 
-        job = get_batch().new_job(f'ExtractDataFromCohortMt: {cohort.id}')
+        job = get_batch().new_job(f'ExtractDataFromCohortMt: {dataset.name}')
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(
@@ -103,7 +125,7 @@ class ExtractDataFromCohortMt(CohortStage):
             """,
         )
 
-        return self.make_outputs(cohort, outputs, jobs=job)
+        return self.make_outputs(dataset, outputs, jobs=job)
 
 
 @stage(required_stages=ExtractDataFromCohortMt)
@@ -318,6 +340,7 @@ class SquashMtIntoTarball(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
+        self.prefix
         return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
