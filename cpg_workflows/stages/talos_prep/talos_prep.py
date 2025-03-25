@@ -215,7 +215,11 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
             get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
             return self.make_outputs(dataset, output, jobs=[])
 
-        gnomad_annotated_vcf = get_batch().read_input(str(inputs.as_path(dataset, AnnotateGnomadFrequenciesWithEchtvar)))
+        gnomad_annotated_vcf = get_batch().read_input(
+            str(
+                inputs.as_path(dataset, AnnotateGnomadFrequenciesWithEchtvar),
+            ),
+        )
 
         # get the GFF3 file required to generate consequences
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
