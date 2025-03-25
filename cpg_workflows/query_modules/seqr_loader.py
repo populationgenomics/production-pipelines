@@ -116,13 +116,13 @@ def annotate_cohort(
     # the index_correction is required to align the AC/AF with the correct allele
     # in the split multi-allelics
     # index_correction = 0 if long_read else 1
-    index_correction = 1
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - index_correction]],
-            AC=[mt.info.AC[mt.a_index - index_correction]],
-        ),
-    )
+    # index_correction = 1
+    # mt = mt.annotate_rows(
+    #     info=mt.info.annotate(
+    #         AF=[mt.info.AF[mt.a_index - index_correction]],
+    #         AC=[mt.info.AC[mt.a_index - index_correction]],
+    #     ),
+    # )
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
