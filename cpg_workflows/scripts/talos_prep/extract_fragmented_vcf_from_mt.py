@@ -23,7 +23,6 @@ from cpg_utils.config import config_retrieve, genome_build
 from cpg_utils.hail_batch import init_batch
 from cpg_workflows.utils import get_logger
 
-
 # VQSR filters are added to the VQSR VCF, but we don't retain these header lines when we copy the VQSR info over
 # to the variant MatrixTable during AnnotateCohort.
 # If we export VCFs here without these header lines, there's a possibility that downstream tools won't be able to
@@ -33,22 +32,22 @@ from cpg_workflows.utils import get_logger
 VQSR_FILTERS = {
     'filter': {
         "VQSRTrancheINDEL99.95to100.00": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -39995.8675 <= x < -20.9224"
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -39995.8675 <= x < -20.9224",
         },
         "VQSRTrancheINDEL99.00to99.50": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -1.4652 <= x < -0.6489"
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -1.4652 <= x < -0.6489",
         },
         "VQSRTrancheINDEL99.50to99.90": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -8.3914 <= x < -1.4652"
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -8.3914 <= x < -1.4652",
         },
         "VQSRTrancheINDEL99.95to100.00+": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod < -39995.8675"
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod < -39995.8675",
         },
         "VQSRTrancheSNP99.00to99.90+": {
-            "Description": "Truth sensitivity tranche level for SNP model at VQS Lod < -10.0"
+            "Description": "Truth sensitivity tranche level for SNP model at VQS Lod < -10.0",
         },
         "VQSRTrancheINDEL99.90to99.95": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -20.9224 <= x < -8.3914"
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -20.9224 <= x < -8.3914",
         },
     },
 }
@@ -101,7 +100,10 @@ def main(
 
     mt.describe()
 
-    mt.write(output_mt, overwrite=True,)
+    mt.write(
+        output_mt,
+        overwrite=True,
+    )
 
     # now read that location for speed, and write the sites-only VCF
     # keep partitions consistent
