@@ -69,7 +69,6 @@ from cpg_utils.hail_batch import genome_build, init_batch
 from cpg_workflows.utils import can_reuse, get_logger
 from hail_scripts.computed_fields import variant_id, vep
 
-
 # adj is the adjusted population, which is the default for gnomAD v4
 # all samples across all groups, adjusted for technical artifacts
 GNOMAD_TARGET_POP = 'adj'
@@ -187,14 +186,12 @@ def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
             AN=gnomad4_row.joint.freq[target_index].AN,
             AF=gnomad4_row.joint.freq[target_index].AF,
             Hom=gnomad4_row.joint.freq[target_index].homozygote_count,
-
             # a couple of max-value entries
             FAF_AF=gnomad4_row.joint.fafmax.faf95_max,
             AF_POPMAX_OR_GLOBAL=gnomad4_row.joint.grpmax.AF,
-
             # not 100% sure about this one... target the `adj_XY` population
             Hemi=gnomad4_row.joint.freq[target_xy_index].AC,
-        )
+        ),
     )
 
 
