@@ -39,58 +39,82 @@ this workflow is designed to be something which could be executed easily off-sit
     - Data is written into permanent storage, and registered into Metamist
 """
 
+from functools import cache
+
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_workflows.jobs.gcloud_composer import gcloud_compose_vcf_from_manifest
 from cpg_workflows.stages.talos import query_for_latest_hail_object
-from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import get_logger
-from cpg_workflows.workflow import CohortStage, StageInput, StageOutput, get_batch, get_workflow, stage
+from cpg_workflows.targets import Dataset
+from cpg_workflows.utils import exists, get_logger
+from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, get_batch, get_workflow, stage
 
 SHARD_MANIFEST = 'shard-manifest.txt'
 
 
+@cache
+def does_final_file_path_exist(dataset: Dataset) -> bool:
+    """
+    This workflow includes the generation of a lot of temporary files and folders
+    If I run it again, I don't want to accidentally regenerate all the intermediates, even though the final output
+    exists. In that scenario I just want no jobs to be planned.
+
+    This method builds the path to the final object, and checks if it exists in GCP
+    If it does, we can skip all other
+
+    Args:
+        dataset ():
+
+    Returns:
+
+    """
+    path = get_workflow().prefix / SquashMtIntoTarball.name / f'{dataset.name}.mt.tar'
+    return exists(path)
+
+
 @stage
-class ExtractDataFromCohortMt(CohortStage):
+class ExtractDataFromDatasetMt(DatasetStage):
     """
     extract some plain calls from a joint-callset
     these calls are a region-filtered subset, limited to genic regions
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        # get prefix for this cohort
-        cohort_prefix = get_workflow().cohort_prefix(cohort, category='tmp')
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
 
         return {
             # write path for the full (region-limited) MatrixTable, stripped of info fields
-            'mt': cohort_prefix / f'{cohort.id}.mt',
+            'mt': self.tmp_prefix / f'{dataset.name}.mt',
             # this will be the write path for fragments of sites-only VCF
-            'sites_only_vcf_dir': str(cohort_prefix / f'{cohort.id}_separate.vcf.bgz'),
+            'sites_only_vcf_dir': str(self.tmp_prefix / f'{dataset.name}_separate.vcf.bgz'),
             # this will be the file which contains the name of all fragments
-            'sites_only_vcf_manifest': cohort_prefix / f'{cohort.id}_separate.vcf.bgz' / SHARD_MANIFEST,
+            'sites_only_vcf_manifest': self.tmp_prefix / f'{dataset.name}_separate.vcf.bgz' / SHARD_MANIFEST,
         }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         script is called extract_vcf_from_mt
         """
+        outputs = self.expected_outputs(dataset)
+
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, outputs, jobs=[])
 
         # either get a mt from metamist, or take one from config
-        if (input_mt := config_retrieve(['workflow', cohort.id, 'mt'], None)) is None:
-            get_logger().info(f'No config entry retrieved at workflow/{cohort.id}/mt')
-            input_mt = query_for_latest_hail_object(
-                dataset=cohort.analysis_dataset.name,
+        if (
+            input_mt := query_for_latest_hail_object(
+                dataset=dataset.name,
                 analysis_type='matrixtable',
                 object_suffix='.mt',
             )
-
-        outputs = self.expected_outputs(cohort)
+        ) is None:
+            raise ValueError(f'No MatrixTable found in Metamist for {dataset.name}')
 
         # get the BED file - does not need to be localised
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
         bed = reference_path(f'ensembl_{ensembl_version}/merged_bed')
 
-        job = get_batch().new_job(f'ExtractDataFromCohortMt: {cohort.id}')
+        job = get_batch().new_job(f'ExtractDataFromCohortMt: {dataset.name}')
         job.storage('10Gi')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(
@@ -103,27 +127,26 @@ class ExtractDataFromCohortMt(CohortStage):
             """,
         )
 
-        return self.make_outputs(cohort, outputs, jobs=job)
+        return self.make_outputs(dataset, outputs, jobs=job)
 
 
-@stage(required_stages=ExtractDataFromCohortMt)
-class ConcatenateSitesOnlyVcfFragments(CohortStage):
+@stage(required_stages=ExtractDataFromDatasetMt)
+class ConcatenateSitesOnlyVcfFragments(DatasetStage):
     """
     glue all the mini-VCFs together
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return self.prefix / f'{dataset.name}_sites_only_reassembled.vcf.bgz'
 
-        cohort_prefix = get_workflow().cohort_prefix(cohort)
-        return cohort_prefix / f'{cohort.id}_sites_only_reassembled.vcf.bgz'
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
         trigger a rolling merge using gcloud compose, gluing all the individual files together
         """
 
-        output = self.expected_outputs(cohort)
-        sites_manifest = inputs.as_dict(cohort, ExtractDataFromCohortMt)['sites_only_vcf_manifest']
+        output = self.expected_outputs(dataset)
+
+        sites_manifest = inputs.as_dict(dataset, ExtractDataFromDatasetMt)['sites_only_vcf_manifest']
 
         if not sites_manifest.exists():
             raise ValueError(
@@ -139,27 +162,31 @@ class ConcatenateSitesOnlyVcfFragments(CohortStage):
             final_size='10Gi',
             create_index=False,
         )
-        return self.make_outputs(cohort, data=output, jobs=jobs)
+        return self.make_outputs(dataset, data=output, jobs=jobs)
 
 
 @stage(required_stages=ConcatenateSitesOnlyVcfFragments)
-class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
+class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
     """
     Annotate this cohort joint-call VCF with gnomad frequencies, write to tmp storage
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / 'gnomad_frequency_annotated.vcf.bgz'
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return self.tmp_prefix / 'gnomad_frequency_annotated.vcf.bgz'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(cohort)
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(dataset)
 
-        sites_vcf = get_batch().read_input(str(inputs.as_path(cohort, ConcatenateSitesOnlyVcfFragments)))
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, outputs, jobs=[])
+
+        sites_vcf = get_batch().read_input(str(inputs.as_path(dataset, ConcatenateSitesOnlyVcfFragments)))
 
         # this is a single whole-genome file, generated by the echtvar workflow
         gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar_gnomad']))
 
-        job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {cohort.id}')
+        job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name}')
         job.image(image_path('echtvar'))
         job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
         job.storage('20Gi')
@@ -168,22 +195,31 @@ class AnnotateGnomadFrequenciesWithEchtvar(CohortStage):
 
         get_batch().write_output(job.output, str(outputs))
 
-        return self.make_outputs(cohort, data=outputs, jobs=job)
+        return self.make_outputs(dataset, data=outputs, jobs=job)
 
 
 @stage(required_stages=AnnotateGnomadFrequenciesWithEchtvar)
-class AnnotateConsequenceWithBcftools(CohortStage):
+class AnnotateConsequenceWithBcftools(DatasetStage):
     """
     Take the VCF with gnomad frequencies, and annotate with consequences using BCFtools
     Writes into a cohort-specific permanent folder
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / 'consequence_annotated.vcf.bgz'
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
-        output = self.expected_outputs(cohort)
-        gnomad_annotated_vcf = get_batch().read_input(str(inputs.as_path(cohort, AnnotateGnomadFrequenciesWithEchtvar)))
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(dataset)
+
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, output, jobs=[])
+
+        gnomad_annotated_vcf = get_batch().read_input(
+            str(
+                inputs.as_path(dataset, AnnotateGnomadFrequenciesWithEchtvar),
+            ),
+        )
 
         # get the GFF3 file required to generate consequences
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
@@ -192,7 +228,7 @@ class AnnotateConsequenceWithBcftools(CohortStage):
         # get the fasta
         fasta = get_batch().read_input(reference_path('broad/ref_fasta'))
 
-        job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {cohort.id}')
+        job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {dataset.name}')
         job.image(image_path('bcftools_120'))
         job.cpu(4)
         job.storage('20G')
@@ -220,23 +256,27 @@ class AnnotateConsequenceWithBcftools(CohortStage):
 
         get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(cohort, data=output, jobs=job)
+        return self.make_outputs(dataset, data=output, jobs=job)
 
 
 @stage(required_stages=AnnotateConsequenceWithBcftools)
-class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
+class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
     """
     Join the annotated sites-only VCF, with AlphaMissense, and with gene/transcript information
     exporting as a HailTable
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        # output will be a tarball, containing the {cohort.id}_annotations.ht directory
-        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / f'{cohort.id}_annotations.ht'
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        # output will be a tarball, containing the {dataset.name}_annotations.ht directory
+        return self.tmp_prefix / f'{dataset.name}_annotations.ht'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        output = self.expected_outputs(cohort)
+        output = self.expected_outputs(dataset)
+
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, output, jobs=[])
 
         # pull the alphamissense TarBall location from config, and localise it
         alphamissense = reference_path('alphamissense/ht')
@@ -251,9 +291,9 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
         gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
 
         # get the annotated VCF & index
-        vcf = str(inputs.as_path(cohort, AnnotateConsequenceWithBcftools))
+        vcf = str(inputs.as_path(dataset, AnnotateConsequenceWithBcftools))
 
-        job = get_batch().new_job(f'ProcessAnnotatedSitesOnlyVcfIntoHt: {cohort.id}')
+        job = get_batch().new_job(f'ProcessAnnotatedSitesOnlyVcfIntoHt: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.cpu(4)
         job.storage('20Gi')
@@ -268,30 +308,34 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(CohortStage):
             f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")} ',
         )
 
-        return self.make_outputs(cohort, data=output, jobs=job)
+        return self.make_outputs(dataset, data=output, jobs=job)
 
 
-@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ExtractDataFromCohortMt])
-class JumpAnnotationsFromHtToFinalMt(CohortStage):
+@stage(required_stages=[ProcessAnnotatedSitesOnlyVcfIntoHt, ExtractDataFromDatasetMt])
+class JumpAnnotationsFromHtToFinalMt(DatasetStage):
     """
     Join the annotated sites-only VCF, with AlphaMissense, and with gene/transcript information
     exporting as a HailTable
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort, category='tmp') / f'{cohort.id}_talos_ready.mt'
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return self.tmp_prefix / f'{dataset.name}_talos_ready.mt'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        output = self.expected_outputs(cohort)
+        output = self.expected_outputs(dataset)
+
+        if does_final_file_path_exist(dataset):
+            get_logger().info(f'Skipping {self.name} for {dataset.name}, final workflow output already exists')
+            return self.make_outputs(dataset, output, jobs=[])
 
         # get the region-limited MT
-        mt = str(inputs.as_path(cohort, ExtractDataFromCohortMt, 'mt'))
+        mt = str(inputs.as_path(dataset, ExtractDataFromDatasetMt, 'mt'))
 
         # get the table of compressed annotations
-        annotations = str(inputs.as_path(cohort, ProcessAnnotatedSitesOnlyVcfIntoHt))
+        annotations = str(inputs.as_path(dataset, ProcessAnnotatedSitesOnlyVcfIntoHt))
 
-        job = get_batch().new_job(f'JumpAnnotationsFromHtToFinalMt: {cohort.id}')
+        job = get_batch().new_job(f'JumpAnnotationsFromHtToFinalMt: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.cpu(16)
         job.memory('highmem')
@@ -303,43 +347,43 @@ class JumpAnnotationsFromHtToFinalMt(CohortStage):
             f'--output {str(output)}',
         )
 
-        return self.make_outputs(cohort, data=output, jobs=job)
+        return self.make_outputs(dataset, data=output, jobs=job)
 
 
 @stage(
     analysis_type='talos_prep',
     required_stages=[JumpAnnotationsFromHtToFinalMt],
 )
-class SquashMtIntoTarball(CohortStage):
+class SquashMtIntoTarball(DatasetStage):
     """
     Localise the MatrixTable, and create a tarball
     Don't attempt additional compression - it's
     Means that Talos downstream of this won't need GCloud installed
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        return self.get_stage_cohort_prefix(cohort=cohort) / f'{cohort.id}.mt.tar'
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return self.prefix / f'{dataset.name}.mt.tar'
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
-        output = self.expected_outputs(cohort)
+        output = self.expected_outputs(dataset)
 
-        job = get_batch().new_job(f'CompressMtIntoTarball: {cohort.id}')
+        job = get_batch().new_job(f'CompressMtIntoTarball: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.memory('highmem')
         job.cpu(4)
         job.storage(config_retrieve(['talos_prep', 'mt_storage'], '250Gi'))
 
         # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
-        mt = str(inputs.as_path(cohort, JumpAnnotationsFromHtToFinalMt))
+        mt = str(inputs.as_path(dataset, JumpAnnotationsFromHtToFinalMt))
         mt_name = mt.split('/')[-1]
 
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp --do-not-decompress -r {mt} $BATCH_TMPDIR')
-        job.command(f'mv $BATCH_TMPDIR/{mt_name} {cohort.id}.mt')
+        job.command(f'mv $BATCH_TMPDIR/{mt_name} {dataset.name}.mt')
         # no compression - the Hail objects are all internally gzipped so not much to gain there
-        job.command(f'tar --remove-files -cf {job.output} {cohort.id}.mt')
+        job.command(f'tar --remove-files -cf {job.output} {dataset.name}.mt')
 
         get_batch().write_output(job.output, str(output))
 
-        return self.make_outputs(cohort, data=output, jobs=job)
+        return self.make_outputs(dataset, data=output, jobs=job)

@@ -464,30 +464,18 @@ class RunHailFiltering(DatasetStage):
             if 'exomiser' in config_retrieve(['ValidateMOI']):
                 raise ValueError('Exomiser is not required in this workflow')
 
-            exomiser_ht = query_for_latest_hail_object(
+            exomiser_tar = query_for_latest_hail_object(
                 dataset=dataset.name,
                 analysis_type='exomiser',
-                object_suffix='.ht',
+                object_suffix='.ht.tar',
             )
-            exomiser_name = exomiser_ht.split('/')[-1]
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {exomiser_ht} $BATCH_TMPDIR')
-            job.command('echo "Exomiser HT copied"')
-            exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/{exomiser_name}" '
+            localised_exomiser = get_batch().read_input(exomiser_tar)
+
+            job.command(f'tar -xf {localised_exomiser} -C $BATCH_TMPDIR')
+            exomiser_argument = f'--exomiser "${{BATCH_TMPDIR}}/exomiser_{dataset.name}.ht" '
         except ValueError:
             get_logger().info(f'No exomiser results found for {dataset.name}, skipping')
             exomiser_argument = ' '
-
-        # find, localise, and use the SpliceVarDB table, if available - if not, don't pass the flag
-        # currently just passed in from config, will eventually be generated a different way
-        if svdb := config_retrieve(['RunHailFiltering', 'svdb_ht'], None):
-            if not exists(svdb):
-                raise ValueError(f'SVDB {svdb} does not exist')
-            svdb_name = svdb.split('/')[-1]
-            job.command(f'gcloud --no-user-output-enabled storage cp -r {svdb} $BATCH_TMPDIR')
-            job.command('echo "SpliceVarDB MT copied"')
-            svdb_argument = f'--svdb "${{BATCH_TMPDIR}}/{svdb_name}" '
-        else:
-            svdb_argument = ' '
 
         # find the clinvar table, localise, and expand
         clinvar_tar = get_clinvar_table()
@@ -496,6 +484,8 @@ class RunHailFiltering(DatasetStage):
 
         # read in the massive MT, and unpack it
         localised_mt = get_batch().read_input(input_mt)
+
+        # this will eventually be <DATASET>.tar, but for now detect manually
         mt_name = input_mt.split('/')[-1].removesuffix('.tar')
         job.command(f'tar -xf {localised_mt} -C $BATCH_TMPDIR && rm {localised_mt}')
 
@@ -509,7 +499,6 @@ class RunHailFiltering(DatasetStage):
             f'--clinvar "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.ht" '
             f'--pm5 "${{BATCH_TMPDIR}}/clinvarbitration_data/clinvar_decisions.pm5.ht" '
             f'--checkpoint "${{BATCH_TMPDIR}}/checkpoint.mt" '
-            f'{svdb_argument} '
             f'{exomiser_argument} ',
         )
         get_batch().write_output(job.output, str(expected_out).removesuffix('.vcf.bgz'))
