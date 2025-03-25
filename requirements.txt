@@ -1,0 +1,25 @@
+cpg-utils>=5.1.1
+cyvcf2==0.30.18
+analysis-runner>=2.43.3
+# Pin Hail at CPGs installed version
+hail==0.2.134
+networkx>=2.8.3
+# Avoid dependency resolution backtracking
+grpcio-status>=1.48,<1.50
+onnx
+onnxruntime
+skl2onnx
+metamist>=6.9.0
+pandas
+# Avoid 0.4.7 which is incompatible
+peddy>=0.4.8
+pyfaidx>=0.8.1.1
+fsspec
+slack_sdk
+elasticsearch==8.*
+coloredlogs
+bokeh
+numpy
+click
+tenacity
+toml
