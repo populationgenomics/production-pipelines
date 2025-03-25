@@ -219,15 +219,19 @@ class ManageDragenPipeline(SequencingGroupStage):
             )
 
         # Test if a previous pipeline should be re-monitored. Used for when monitor stage on batch crashes and we want to resume
-        if (resume := config_retrieve(['ica', 'management', 'monitor_previous'], False)) and cpg_utils.to_path(
-            outputs['pipeline_id'],
-        ).exists():
+        if (
+            config_retrieve(['ica', 'management', 'monitor_previous'], False)
+            and cpg_utils.to_path(
+                outputs['pipeline_id'],
+            ).exists()
+        ):
             logging.info(f'Previous pipeline found for {sequencing_group.name}, not setting off a new one')
             with open(cpg_utils.to_path(outputs['pipeline_id']), 'rt') as pipeline_fid_handle:
                 align_genotype_job_result: str = pipeline_fid_handle.read().rstrip()
-        elif resume:
-            logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
-            return self.make_outputs(target=sequencing_group)
+        # We shouldn't actually want to catch this case, either we have a running pipeline in ICA with a pipeline ID registered in GCP, or we don't. We need both peices of information in order to resume.
+        # elif resume:
+        #     logging.warning(f'No previous pipeline found for {sequencing_group.name}, but resume flag set.')
+        #     return self.make_outputs(target=sequencing_group)
         else:
             dragen_pipeline_id = config_retrieve(['ica', 'pipelines', 'dragen_3_7_8'])
             dragen_ht_id: str = config_retrieve(['ica', 'pipelines', 'dragen_ht_id'])
