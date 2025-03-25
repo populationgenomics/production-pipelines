@@ -366,10 +366,11 @@ class ExomiserSeqrTSV(DatasetStage):
         return self.make_outputs(dataset, data=output, jobs=job)
 
 
-@stage(required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE, analysis_keys=['json', 'ht'])
+@stage(required_stages=[RunExomiser], analysis_type=EXOMISER_ANALYSIS_TYPE, analysis_keys=['json', 'ht.tar'])
 class ExomiserVariantsTSV(DatasetStage):
     """
     Parse the Exomiser variant-level results into a JSON file and a Hail Table
+    Compress the Hail Table so Talos won't need gcloud to use the results
     """
 
     def expected_outputs(self, dataset: Dataset):
@@ -378,7 +379,7 @@ class ExomiserVariantsTSV(DatasetStage):
 
         return {
             'json': prefix / 'exomiser_variant_results.json',
-            'ht': prefix / 'exomiser_variant_results.ht',
+            'ht.tar': prefix / 'exomiser_variant_results.ht.tar',
         }
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
@@ -398,9 +399,16 @@ class ExomiserVariantsTSV(DatasetStage):
         job = get_batch().new_job('Combine Exomiser Variant-level TSVs')
         job.image(config_retrieve(['workflow', 'driver_image']))
 
-        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output output')
+        job.declare_resource_group(output={'ht.tar': '{root}.ht.tar', 'json': '{root}.json'})
 
-        # recursive copy of the HT
-        job.command(f'gcloud storage cp -r output.ht {str(outputs["ht"])}')
-        job.command(f'gcloud storage cp -r output.json {str(outputs["json"])}')
+        job.command(f'combine_exomiser_variants --input {" ".join(family_files)} --output {job.output}')
+
+        # tar the files into a single object
+        # move it first, so we don't tar the whole path to the temp file
+        job.command(
+            f'mv {job.output}.ht exomiser_{dataset.name}.ht && '
+            f'tar --remove-files -cf {job.output}.ht.tar exomiser_{dataset.name}.ht')
+
+        get_batch().write_output(job.output, str(outputs['json']).removesuffix('.json'))
+
         return self.make_outputs(dataset, data=outputs, jobs=job)
