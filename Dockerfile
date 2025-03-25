@@ -1,8 +1,9 @@
 FROM australia-southeast1-docker.pkg.dev/analysis-runner/images/driver:latest
 
-COPY requirements.txt README.md setup.py .
+COPY requirements.txt README.md .
 RUN pip install --no-cache-dir -r  requirements.txt
 
+COPY setup.py .
 COPY cpg_workflows cpg_workflows
 COPY seqr-loading-pipelines/hail_scripts hail_scripts
 COPY gnomad_methods/gnomad gnomad
