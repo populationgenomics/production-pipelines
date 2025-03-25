@@ -407,7 +407,8 @@ class ExomiserVariantsTSV(DatasetStage):
         # move it first, so we don't tar the whole path to the temp file
         job.command(
             f'mv {job.output}.ht exomiser_{dataset.name}.ht && '
-            f'tar --remove-files -cf {job.output}.ht.tar exomiser_{dataset.name}.ht')
+            f'tar --remove-files -cf {job.output}.ht.tar exomiser_{dataset.name}.ht',
+        )
 
         get_batch().write_output(job.output, str(outputs['json']).removesuffix('.json'))
 
