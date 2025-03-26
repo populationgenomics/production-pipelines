@@ -72,12 +72,13 @@ def frequency_annotations(
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
     """
 
-    logging.info('Reading full sparse MT and metadata table...')
     if samples_to_remove := config_retrieve(['large_cohort', 'frequencies', 'samples_to_remove'], []):
+        logging.info(f'Removing {len(samples_to_remove)} samples from the VDS...')
         logging.info(f'Number of samples before filtering: {len(vds.variant_data.s.collect())}')
         logging.info(f'Removing {len(samples_to_remove)} samples from the dataset...')
         vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
         logging.info(f'Number of samples after filtering: {len(vds.variant_data.s.collect())}')
+    logging.info('Reading full sparse MT and metadata table...')
 
     logging.info('Splitting multiallelics')
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
