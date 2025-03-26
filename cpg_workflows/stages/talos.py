@@ -278,11 +278,10 @@ class MakeRuntimeConfig(DatasetStage):
         # optionally, all SG IDs to remove from analysis
         new_config['ValidateMOI']['solved_cases'] = dataset_conf.get('solved_cases', [])
 
-        # these attributes are present, or missing completely
-        if all(x in seq_type_conf for x in SEQR_KEYS):
-            for key in SEQR_KEYS:
-                if key in seq_type_conf:
-                    new_config['CreateTalosHTML'][key] = seq_type_conf[key]
+        # adapt to new hyperlink config structure
+        if hyperlinks := seq_type_conf.get('hyperlinks'):
+            new_config['CreateTalosHTML']['hyperlinks'] = hyperlinks
+
         if 'external_labels' in seq_type_conf:
             new_config['CreateTalosHTML']['external_labels'] = seq_type_conf['external_labels']
 
