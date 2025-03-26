@@ -338,15 +338,10 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exome_or_genome: str) -> hl.
     # Drop unused fields
     # ds = ds.drop("allele_info", "a_index", "info", "was_split", "grpmax", "vqsr_results")
 
-    # Elevate variant_id and rsids to top level
     ds.describe()
     ds = ds.transmute(**ds.gnomad)
     ds = ds.select(**{exome_or_genome: ds.row_value})
-    # ds = ds.annotate(
-    #     variant_id=ds[exome_or_genome].variant_id,
-    #     rsids=ds[exome_or_genome].rsids,
-    #     **{exome_or_genome: ds[exome_or_genome].drop("variant_id", "rsids")},
-    # )
+
     # ds = ds.rename({"gnomad": exome_or_genome})
     ds.describe()
 
