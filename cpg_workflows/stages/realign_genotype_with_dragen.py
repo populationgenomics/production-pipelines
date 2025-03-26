@@ -123,19 +123,38 @@ class UploadDataToIca(SequencingGroupStage):
                     icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram /{bucket}/{upload_folder}/{sequencing_group.name}/
                     icav2 projectdata upload $BATCH_TMPDIR/{sequencing_group.name}/{sequencing_group.name}.cram.crai /{bucket}/{upload_folder}/{sequencing_group.name}/
                 fi
+                }}
 
+                function get_fids {{
                 # Add a random delay before calling the ICA API to hopefully stop empty JSON files from being written to GCP
-                sleep $((random % 30))
+                sleep $((shuf -i 1-30 -n 1))
                 icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].id' > cram_id
                 icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram.crai --match-mode EXACT -o json | jq -r '.items[].id' > crai_id
 
                 jq -n --arg cram_id $(cat cram_id) --arg crai_id $(cat crai_id) '{{cram_fid: $cram_id, crai_fid: $crai_id}}' > {upload_job.ofile}
-
                 }}
 
                 {ICA_CLI_SETUP}
                 cram_status=$(icav2 projectdata list --parent-folder /{bucket}/{upload_folder}/{sequencing_group.name}/ --data-type FILE --file-name {sequencing_group.name}.cram --match-mode EXACT -o json | jq -r '.items[].details.status')
                 retry upload_cram
+                get_fids
+
+                # Try 10 times to call the ICA API to get the required file ID data
+                counter=0
+
+                while true
+                    do
+                    if [ -s {upload_job.ofile} ]
+                    then
+                        break
+                    elif [ $counter -eq 10 ]
+                    then
+                        exit 1
+                    else
+                        get_fids
+                    fi
+                    counter=$((counter+1))
+                done
                 """,
                 define_retry_function=True,
             ),
