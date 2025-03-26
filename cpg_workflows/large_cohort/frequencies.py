@@ -215,7 +215,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable, inferred_pop_ht: hl.Tab
         faf_meta=faf_meta,
         faf_index_dict=make_faf_index_dict(
             faf_meta,
-            pops=list(inferred_pop_ht.aggregate(hl.agg.collect_as_set(inferred_pop_ht.pop))),  # <-- unique pop labels,
+            pops=list(inferred_pop_ht.aggregate(hl.agg.collect_as_set(inferred_pop_ht.pop))),  # unique pop labels,
         ),
     )
     mt = mt.annotate_rows(
