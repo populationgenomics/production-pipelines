@@ -110,7 +110,7 @@ def frequency_annotations(
 
     mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
 
-    mt = _compute_filtering_af_and_popmax(mt)
+    mt = _compute_filtering_af_and_popmax(mt, inferred_pop_ht)
 
     mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'), overwrite=True)
 
@@ -194,7 +194,7 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
     return mt
 
 
-def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
+def _compute_filtering_af_and_popmax(mt: hl.MatrixTable, inferred_pop_ht: hl.Table) -> hl.MatrixTable:
     logging.info('Computing filtering allele frequencies and popmax...')
     faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX, pop_label='gen_anc')
     mt = mt.select_rows(
@@ -209,8 +209,8 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         faf_meta=faf_meta,
         faf_index_dict=make_faf_index_dict(
             faf_meta,
-            pops=['Europe', 'oth', 'Other'],
-        ),  # <--- Discuss. This is the field where we want the set() of populations from the pop field in the inferred_pop.ht
+            pops=list(inferred_pop_ht.aggregate(hl.agg.collect_as_set(inferred_pop_ht.pop))),  # <-- unique pop labels,
+        ),
     )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
