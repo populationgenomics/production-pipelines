@@ -347,12 +347,9 @@ class MakeSiteOnlyVcf(CohortStage):
         site_only_version = site_only_version or get_workflow().output_version
 
         return {
-            # 'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
-            # 'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
-            'ht': cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / site_only_version
-            / 'siteonly.ht',
+            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
+            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -383,7 +380,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                # str(self.expected_outputs(cohort)['vcf']),
+                str(self.expected_outputs(cohort)['vcf']),
                 str(self.expected_outputs(cohort)['ht']),
                 str(self.tmp_prefix),
                 init_batch_args=init_batch_args,

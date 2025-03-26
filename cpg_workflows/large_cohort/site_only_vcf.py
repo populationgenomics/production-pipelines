@@ -19,7 +19,7 @@ def run(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
-    # out_vcf_path: str,
+    out_vcf_path: str,
     out_ht_path: str,
     tmp_prefix: str,
 ):
@@ -37,9 +37,9 @@ def run(
         relateds_to_drop_ht=relateds_to_drop_ht,
         out_ht_path=site_only_ht_path,
     )
-    # logging.info(f'Writing site-only VCF to {out_vcf_path}')
-    # assert to_path(out_vcf_path).suffix == '.bgz'
-    # hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
+    logging.info(f'Writing site-only VCF to {out_vcf_path}')
+    assert to_path(out_vcf_path).suffix == '.bgz'
+    hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
     logging.info(f'Writing site-only HT to {out_ht_path}')
     site_only_ht.write(str(out_ht_path), overwrite=True)
 
