@@ -60,15 +60,16 @@ def does_final_file_path_exist(dataset: Dataset) -> bool:
     exists. In that scenario I just want no jobs to be planned.
 
     This method builds the path to the final object, and checks if it exists in GCP
-    If it does, we can skip all other
+    If it does, we can skip all other stages
 
     Args:
-        dataset ():
+        dataset (Dataset):
 
     Returns:
-
+        bool, whether the final file in the workflow already exists
     """
-    path = get_workflow().prefix / SquashMtIntoTarball.name / f'{dataset.name}.mt.tar'
+    # if the name of the SquashMtIntoTarball Stage changes, update this String
+    path = get_workflow().prefix / 'SquashMtIntoTarball' / f'{dataset.name}.mt.tar'
     return exists(path)
 
 
