@@ -1,4 +1,5 @@
 import logging
+import subprocess
 import time
 from random import randint
 from typing import Literal
@@ -7,12 +8,12 @@ import coloredlogs
 import icasdk
 from icasdk.apis.tags import project_analysis_api
 
-import cpg_utils
 from cpg_workflows.stages.dragen_ica import ica_utils
 
 
 def run(
     ica_pipeline_id: str | dict[str, str],
+    pipeline_id_file: str,
     api_root: str,
 ) -> dict[str, str]:
     """Monitor a pipeline running in ICA
@@ -60,4 +61,8 @@ def run(
         elif pipeline_status in ['ABORTING', 'ABORTED']:
             raise Exception(f'Pipeline run {pipeline_id} has been cancelled.')
         else:
+            # Log failed ICA pipeline to a file somewhere
+            # Delete the pipeline ID file
+            logging.info(f'Deleting the pipeline run ID file {pipeline_id_file}')
+            subprocess.run(['gcloud', 'storage', 'rm', f'{pipeline_id_file}'])
             raise Exception(f'The pipeline run {pipeline_id} has failed, please check ICA for more info.')
