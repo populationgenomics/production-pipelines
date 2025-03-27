@@ -64,5 +64,5 @@ def run(
             # Log failed ICA pipeline to a file somewhere
             # Delete the pipeline ID file
             logging.info(f'Deleting the pipeline run ID file {pipeline_id_file}')
-            subprocess.run(['gcloud', 'storage', 'rm', f'{pipeline_id_file}'])
+            subprocess.run(['gcloud', 'storage', 'rm', pipeline_id_file])
             raise Exception(f'The pipeline run {pipeline_id} has failed, please check ICA for more info.')
