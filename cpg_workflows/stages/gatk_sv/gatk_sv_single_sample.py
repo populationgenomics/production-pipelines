@@ -36,12 +36,12 @@ def get_sv_callers():
     if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
         callers = [caller for caller in SV_CALLERS if caller in only_jobs]
         if not callers:
-            raise ValueError('No SV callers enabled')
+            logging.warning('No SV callers enabled')
         return callers
     return SV_CALLERS
 
 
-@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()], analysis_type='sv')
+@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()] if get_sv_callers() else None, analysis_type='sv')
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence

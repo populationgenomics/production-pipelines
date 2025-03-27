@@ -8,23 +8,15 @@ status_reporter = 'metamist'
 #clinvar_decisions = "HailTable path to private ClinVar"
 #clinvar_pm5 = "HailTable path to ClinVar PM5"
 
-# this can be "custom" or "matrixtable"
-# "custom" if the analysis entry type written by seqr_loader
-# "matrixtable" if the analysis entry type written by the rd_combiner
-mt_entry_type = 'matrixtable'
-
 [GeneratePanelData]
 default_panel = 137
 obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
-panelapp = 'https://panelapp.agha.umccr.org/api/v1/panels'
-require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5']
+panelapp = 'https://panelapp-aus.org/api/v1/panels'
+require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5', 'HFE']
+
 # forbidden_genes = ['a', 'b']
 # forced_panels = [1, 2]
 within_x_months = 6
-
-[FindGeneSymbolMap]
-# much higher than this and we get into throttling issues
-chunk_size = 800
 
 [ValidateMOI]
 # thresholds for different filters during the MOI checks
@@ -32,6 +24,7 @@ gnomad_dominant = 0.001
 gnomad_max_homs_dominant = 0
 gnomad_max_homs_recessive = 1
 gnomad_max_ac_dominant = 10
+max_callset_ac_dominant = 10
 gnomad_max_hemi = 1
 callset_af_sv_dominant = 0.01
 
@@ -39,23 +32,26 @@ callset_af_sv_dominant = 0.01
 # stripped down form, e.g. 'categoryboolean6' is '6'
 phenotype_match = ['6']
 
-## all these labels will be removed
-#ignore_categories = ['categoryboolean6']
+# bin these off for now
+ignore_categories = ['exomiser', 'svdb']
+support_categories = ['5', '6']
 
 # by default, only consider the top 2 exomiser results
 exomiser_rank_threshold = 2
+
+allow_common_clinvar = true
 
 [RunHailFiltering]
 # variables for the hail operations, including CSQ sets and filter thresholds
 ac_threshold = 0.01
 # for de novo testing, use HIGH consequence terms + these terms
-additional_csq = ['missense_variant']
+additional_csq = ['missense']
 # maximum allowed population frequency - dominant variants will have a stricter threshold applied later
 af_semi_rare = 0.01
 # maximum presence in a SV callset to be considered potentially pathogenic
 callset_af_sv_recessive = 0.03
-# all VEP consequences considered HIGH impact
-critical_csq = ['frameshift_variant', 'splice_acceptor_variant', 'splice_donor_variant', 'start_lost', 'stop_gained', 'stop_lost', 'transcript_ablation']
+# all consequences considered HIGH impact
+critical_csq = ['frameshift', 'splice_acceptor', 'splice_donor', 'start_lost', 'stop_gained', 'stop_lost']
 # used in de novo calculation - highest %Alt reads for a parent to be considered WT
 max_parent_ab = 0.05
 # min read depth required for variant calls
@@ -64,11 +60,11 @@ minimum_depth = 10
 spliceai = 0.5
 
 # for generating the VCF output - these are the fields pulled from the MT, in this order
-csq_string = ['consequence', 'symbol', 'gene', 'feature', 'mane_select', 'biotype', 'exon', 'hgvsc', 'hgvsp', 'cdna_position', 'cds_position', 'protein_position', 'variant_class', 'ensp', 'lof', 'sift', 'polyphen', 'am_class', 'am_pathogenicity']
+csq_string = [ "consequence", "gene_id", "gene", "transcript", "mane_id", "mane", "biotype", "dna_change", "amino_acid_change", "codon", "ensp", "am_class", "am_pathogenicity",]
 
 # config entries relating to size of VM provisioned for Hail
 [RunHailFiltering.cores]
-sv = 2
+sv = 8
 small_variants = 16
 
 # total allocated RAM, String
@@ -117,6 +113,7 @@ phenio_db = 'gs://cpg-common-test/references/aip/phenotype.db'
 gene_to_phenotype = 'gs://cpg-common-test/references/aip/genes_to_phenotype.txt'
 
 [talos_stages.ValidateMOI]
-cpu = 4.0
-memory = 'highmem'
+# memory issues fixed, we can process 7000 samples together in undedr 1GB
+cpu = 1
+memory = 'standard'
 storage = '10Gi'

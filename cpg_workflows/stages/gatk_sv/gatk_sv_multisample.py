@@ -2,6 +2,7 @@
 All post-batching stages of the GATK-SV workflow
 """
 
+from collections import defaultdict
 from functools import cache
 from itertools import combinations
 from typing import Any
@@ -138,6 +139,22 @@ def check_for_cohort_overlaps(multicohort: MultiCohort):
         raise ValueError('\n'.join(errors))
 
 
+def check_paths_exist(input_dict: dict[str, Any]):
+    """
+    Check that all paths in the input_dict exist
+    """
+    invalid_paths = defaultdict(list)
+    for k in ['counts', 'PE_files', 'SD_files', 'SR_files'] + [f'{caller}_vcfs' for caller in SV_CALLERS]:
+        for str_path in input_dict[k]:
+            path = to_path(str_path)
+            if not path.exists():
+                sg_id = path.name.split('/')[-1].split('.')[0]
+                invalid_paths[sg_id].append(str_path)
+    if invalid_paths:
+        error_str = '\n'.join([f'{k}: {", ".join(v)}' for k, v in invalid_paths.items()])
+        raise FileNotFoundError(f'The following paths do not exist:\n{error_str}')
+
+
 @stage
 class MakeMultiCohortCombinedPed(MultiCohortStage):
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
@@ -261,6 +278,8 @@ class GatherBatchEvidence(CohortStage):
                 str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz')
                 for sequencing_group in sequencing_groups
             ]
+        # The inputs are from a different workflow, so we need to check if they exist manually
+        check_paths_exist(input_dict)
 
         input_dict |= get_references(
             [
@@ -750,11 +769,14 @@ class MakeCohortVcf(MultiCohortStage):
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict:
         """create output paths"""
-        return {
+        outputs = {
             'vcf': self.prefix / 'cleaned.vcf.gz',
             'vcf_index': self.prefix / 'cleaned.vcf.gz.tbi',
-            'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz',
         }
+        if config_retrieve(['MakeCohortVcf', 'MainVcfQc', 'do_per_sample_qc'], False):
+            outputs |= {'vcf_qc': self.prefix / 'cleaned_SV_VCF_QC_output.tar.gz'}
+
+        return outputs
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         """
@@ -1216,7 +1238,7 @@ class AnnotateVcfWithStrvctvre(MultiCohortStage):
         return self.make_outputs(multicohort, data=expected_d, jobs=strvctvre_job)
 
 
-@stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv', analysis_keys=['new_id_vcf'])
+@stage(required_stages=AnnotateVcfWithStrvctvre, analysis_type='sv')
 class SpiceUpSVIDs(MultiCohortStage):
     """
     Overwrites the GATK-SV assigned IDs with a meaningful ID
@@ -1227,11 +1249,8 @@ class SpiceUpSVIDs(MultiCohortStage):
     If the return is None, False, and the IDs will be generated from the call attributes alone
     """
 
-    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
-        return {
-            'new_id_vcf': self.prefix / 'fresh_ids.vcf.bgz',
-            'new_id_index': self.prefix / 'fresh_ids.vcf.bgz.tbi',
-        }
+    def expected_outputs(self, multicohort: MultiCohort) -> Path:
+        return self.prefix / 'fresh_ids.vcf.bgz'
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         input_vcf = get_batch().read_input(str(inputs.as_path(multicohort, AnnotateVcfWithStrvctvre, 'strvctvre_vcf')))
@@ -1251,7 +1270,7 @@ class SpiceUpSVIDs(MultiCohortStage):
         bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
 
         # get the output root to write to
-        get_batch().write_output(bcftools_job.output, str(expected_output['new_id_vcf']).removesuffix('.vcf.bgz'))
+        get_batch().write_output(bcftools_job.output, str(expected_output).removesuffix('.vcf.bgz'))
 
         return self.make_outputs(multicohort, data=expected_output, jobs=[pyjob, bcftools_job])
 
@@ -1274,7 +1293,7 @@ class AnnotateCohortSv(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSVIDs, key='new_id_vcf')
+        vcf_path = inputs.as_path(target=multicohort, stage=SpiceUpSVIDs)
         checkpoint_prefix = to_path(outputs['tmp_prefix']) / 'checkpoints'
 
         job = annotate_cohort_jobs_sv(
@@ -1398,3 +1417,45 @@ class MtToEsSv(DatasetStage):
         job.command(f'mt_to_es --mt_path "${{BATCH_TMPDIR}}/{mt_name}" --index {index_name} --flag {flag_name}')
 
         return self.make_outputs(dataset, data=outputs['index_name'], jobs=job)
+
+
+@stage(required_stages=SpiceUpSVIDs, analysis_type='single_dataset_sv_annotated')
+class SplitAnnotatedSvVcfByDataset(DatasetStage):
+    """
+    takes the whole MultiCohort annotated VCF
+    splits it up into separate VCFs for each dataset
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> Path:
+        return dataset.prefix() / 'annotated_sv.vcf.bgz'
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(dataset)
+        input_vcf = get_batch().read_input(inputs.as_path(get_multicohort(), SpiceUpSVIDs))
+
+        # write a temp file for this dataset containing all relevant SGs
+        sgids_list_path = dataset.tmp_prefix() / get_workflow().output_version / 'sgid-list.txt'
+        if not config_retrieve(['workflow', 'dry_run'], False):
+            with sgids_list_path.open('w') as f:
+                for sgid in dataset.get_sequencing_group_ids():
+                    f.write(f'{sgid}\n')
+        job = get_batch().new_job(
+            name=f'SplitAnnotatedSvVcfByDataset: {dataset}',
+            attributes=self.get_job_attrs() | {'tool': 'bcftools'},
+        )
+        job.image(image_path('bcftools_120'))
+        job.cpu(1).memory('highmem').storage('10Gi')
+        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+
+        local_sgid_file = get_batch().read_input(sgids_list_path)
+        job.command(
+            f'bcftools view {input_vcf} '
+            f'--force-samples '
+            f'-S {local_sgid_file} '
+            f'-Oz -o {job.output["vcf.bgz"]} '
+            f'--write-index=tbi',
+        )
+
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+
+        return self.make_outputs(dataset, data=output, jobs=job)
