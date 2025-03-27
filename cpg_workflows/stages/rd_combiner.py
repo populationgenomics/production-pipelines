@@ -669,10 +669,11 @@ class SubsetMatrixTableToDatasetUsingHailQuery(DatasetStage):
             family_sg_ids = None
 
         # write a list of all the SG IDs to retain
+        # don't try and extract samples which didn't have a gVCF
         if not config_retrieve(['workflow', 'dry_run'], False):
             with outputs['id_file'].open('w') as f:
                 for sg in dataset.get_sequencing_groups():
-                    if (family_sg_ids is None) or sg.id in family_sg_ids:
+                    if ((family_sg_ids is None) or sg.id in family_sg_ids) and (sg.gvcf is not None):
                         f.write(f'{sg.id}\n')
 
         job = get_batch().new_job(self.name, self.get_job_attrs(dataset))
