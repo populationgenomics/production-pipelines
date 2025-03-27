@@ -49,6 +49,9 @@ VQSR_FILTERS = {
         "VQSRTrancheINDEL99.90to99.95": {
             "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -20.9224 <= x < -8.3914",
         },
+        "VQSRTrancheSNP99.90to100.00+": {
+            "Description": "Truth sensitivity tranche level for SNP model",
+        },
     },
 }
 
