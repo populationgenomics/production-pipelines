@@ -381,7 +381,7 @@ class SquashMtIntoTarball(DatasetStage):
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp --do-not-decompress -r {mt} $BATCH_TMPDIR')
 
-        # once the data is copied - cd into the tmpdir before changing the filename with a mv, then tar it up
+        # once the data is copied - cd into the tmpdir, then tar it up
         job.command(f'cd $BATCH_TMPDIR')
         # no compression - the Hail objects are all internally gzipped so not much to gain there
         job.command(f'tar --remove-files -cf {job.output} {dataset.name}.mt')
