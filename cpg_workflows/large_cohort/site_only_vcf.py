@@ -20,6 +20,7 @@ def run(
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
+    out_ht_path: str,
     tmp_prefix: str,
 ):
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
@@ -39,6 +40,8 @@ def run(
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
+    logging.info(f'Writing site-only HT to {out_ht_path}')
+    site_only_ht.write(str(out_ht_path), overwrite=True)
 
 
 def vds_to_site_only_ht(
@@ -54,8 +57,15 @@ def vds_to_site_only_ht(
         return hl.read_table(str(out_ht_path))
 
     mt = hl.vds.to_dense_mt(vds)
+    mt.describe()
+    logging.info(f'columns in mt: {mt.cols().count()}')
+    logging.info(f'rows in mt: {mt.rows().count()}')
+    sample_qc_ht = sample_qc_ht.annotate(filters=hl.empty_set(hl.tstr))
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+    logging.info('After filtering samples:')
+    logging.info(f'columns in mt: {mt.cols().count()}')
+    logging.info(f'rows in mt: {mt.rows().count()}')
     mt = _filter_rows_and_add_tags(mt)
     var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
     var_ht = adjust_vcf_incompatible_types(
