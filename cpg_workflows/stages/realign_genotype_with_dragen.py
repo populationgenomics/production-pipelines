@@ -342,7 +342,7 @@ class ManageDragenPipeline(SequencingGroupStage):
         pipeline_run_results = monitor_pipeline_run.call(
             monitor_align_genotype_with_dragen.run,
             ica_pipeline_id=align_genotype_job_result,
-            pipeline_id_file=outputs['pipeline_id'],
+            pipeline_id_file=str(outputs['pipeline_id']),
             api_root=ICA_REST_ENDPOINT,
         ).as_json()
 
