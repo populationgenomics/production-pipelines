@@ -31,14 +31,17 @@ from cpg_workflows.utils import get_logger
 # Or we can just bundle a dictionary here of all the VQSR headers we could be applying.
 VQSR_FILTERS = {
     'filter': {
-        "VQSRTrancheINDEL99.95to100.00": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -39995.8675 <= x < -20.9224",
-        },
         "VQSRTrancheINDEL99.00to99.50": {
             "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -1.4652 <= x < -0.6489",
         },
         "VQSRTrancheINDEL99.50to99.90": {
             "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -8.3914 <= x < -1.4652",
+        },
+        "VQSRTrancheINDEL99.90to99.95": {
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -20.9224 <= x < -8.3914",
+        },
+        "VQSRTrancheINDEL99.95to100.00": {
+            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -39995.8675 <= x < -20.9224",
         },
         "VQSRTrancheINDEL99.95to100.00+": {
             "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod < -39995.8675",
@@ -46,11 +49,11 @@ VQSR_FILTERS = {
         "VQSRTrancheSNP99.00to99.90+": {
             "Description": "Truth sensitivity tranche level for SNP model at VQS Lod < -10.0",
         },
-        "VQSRTrancheINDEL99.90to99.95": {
-            "Description": "Truth sensitivity tranche level for INDEL model at VQS Lod: -20.9224 <= x < -8.3914",
+        "VQSRTrancheSNP99.90to100.00": {
+            "Description": "Truth sensitivity tranche level for SNP model at VQS Lod: -10.0 <= x < -4.37",
         },
         "VQSRTrancheSNP99.90to100.00+": {
-            "Description": "Truth sensitivity tranche level for SNP model",
+            "Description": "Truth sensitivity tranche level for SNP model at VQS Lod < -10.0",
         },
     },
 }
