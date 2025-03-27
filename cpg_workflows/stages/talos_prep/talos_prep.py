@@ -320,7 +320,7 @@ class JumpAnnotationsFromHtToFinalMt(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_talos_ready.mt'
+        return self.tmp_prefix / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -377,14 +377,12 @@ class SquashMtIntoTarball(DatasetStage):
 
         # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
         mt = str(inputs.as_path(dataset, JumpAnnotationsFromHtToFinalMt))
-        mt_name = mt.split('/')[-1]
 
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp --do-not-decompress -r {mt} $BATCH_TMPDIR')
 
         # once the data is copied - cd into the tmpdir before changing the filename with a mv, then tar it up
         job.command(f'cd $BATCH_TMPDIR')
-        job.command(f'mv {mt_name} {dataset.name}.mt')
         # no compression - the Hail objects are all internally gzipped so not much to gain there
         job.command(f'tar --remove-files -cf {job.output} {dataset.name}.mt')
 
