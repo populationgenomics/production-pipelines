@@ -1448,7 +1448,13 @@ class SplitAnnotatedSvVcfByDataset(DatasetStage):
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         local_sgid_file = get_batch().read_input(sgids_list_path)
-        job.command(f'bcftools view {input_vcf} -S {local_sgid_file} -Oz -o {job.output["vcf.bgz"]} --write-index=tbi')
+        job.command(
+            f'bcftools view {input_vcf} '
+            f'--force-samples '
+            f'-S {local_sgid_file} '
+            f'-Oz -o {job.output["vcf.bgz"]} '
+            f'--write-index=tbi',
+        )
 
         get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
 
