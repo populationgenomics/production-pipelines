@@ -157,7 +157,7 @@ class ConcatenateSitesOnlyVcfFragments(DatasetStage):
 
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=sites_manifest,
-            intermediates_path=str(self.tmp_prefix / 'sites_temporary_compose_intermediates'),
+            intermediates_path=str(self.tmp_prefix / dataset.name / 'sites_temporary_compose_intermediates'),
             output_path=str(output),
             job_attrs={'stage': self.name},
             final_size='10Gi',
