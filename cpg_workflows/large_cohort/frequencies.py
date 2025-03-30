@@ -108,7 +108,18 @@ def frequency_annotations(
     # The algorithm assumes all samples are unrelated:
     mt = mt.annotate_rows(InbreedingCoeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
 
-    mt = annotate_labels(mt, inferred_pop_ht, sample_qc_ht)
+    # Annotate pop and sex labels
+    mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
+
+    mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
+
+    # Annotate frequency strata
+    mt = annotate_freq(
+        mt,
+        sex_expr=mt.sex,
+        additional_strata_expr=[{'gen_anc': mt.gen_anc}],
+        pop_expr=mt.gen_anc,
+    )
 
     mt = _compute_filtering_af_and_popmax(mt, inferred_pop_ht)
 
@@ -150,20 +161,6 @@ def frequency_annotations(
     freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
 
     return freq_ht
-
-
-def annotate_labels(mt: hl.MatrixTable, inferred_pop_ht: hl.Table, sample_qc_ht: hl.Table) -> hl.MatrixTable:
-    mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
-
-    mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
-
-    mt = annotate_freq(
-        mt,
-        sex_expr=mt.sex,
-        additional_strata_expr=[{'gen_anc': mt.gen_anc}],
-        pop_expr=mt.gen_anc,
-    )
-    return mt
 
 
 def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixTable:
