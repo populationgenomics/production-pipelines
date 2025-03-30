@@ -22,6 +22,9 @@ def submit_dragen_run(
     qc_cross_cont_vcf_id: str,
     qc_cov_region_1_id: str,
     qc_cov_region_2_id: str,
+    gvcf_gq_bands: str,
+    qc_coverage_filters: str,
+    vc_hard_filter: str,
     dragen_pipeline_id: str,
     ica_output_folder_id: str,
     user_tags: list[str],
@@ -65,7 +68,16 @@ def submit_dragen_run(
                 AnalysisParameterInput(code='repeat_genotype_enable', value='false'),
                 AnalysisParameterInput(
                     code='additional_args',
-                    value="--read-trimmers polyg --soft-read-trimmers none --vc-hard-filter 'DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1' --vc-frd-max-effective-depth 40 --vc-enable-joint-detection true --qc-coverage-ignore-overlaps true --qc-coverage-count-soft-clipped-bases true --qc-coverage-reports-1 cov_report,cov_report --qc-coverage-filters-1 'mapq<1,bq<0,mapq<1,bq<0'",
+                    value=f"""--read-trimmers polyg
+                    --soft-read-trimmers none
+                    --vc-hard-filter '{vc_hard_filter}'
+                    --vc-frd-max-effective-depth 40
+                    --vc-enable-joint-detection true
+                    --qc-coverage-ignore-overlaps true
+                    --qc-coverage-count-soft-clipped-bases true
+                    --qc-coverage-reports-1 cov_report,cov_report
+                    --qc-coverage-filters-1 '{qc_coverage_filters}'
+                    --vc-gvcf-gq-bands {gvcf_gq_bands}""",
                 ),
                 AnalysisParameterInput(code='dragen_reports', value='false'),
             ],
@@ -90,6 +102,9 @@ def run(
     qc_cross_cont_vcf_id: str,
     qc_cov_region_1_id: str,
     qc_cov_region_2_id: str,
+    gvcf_gq_bands: str,
+    qc_coverage_filters: str,
+    vc_hard_filter: str,
     dragen_pipeline_id: str,
     user_tags: list[str],
     technical_tags: list[str],
@@ -138,6 +153,9 @@ def run(
             qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
             qc_cov_region_1_id=qc_cov_region_1_id,
             qc_cov_region_2_id=qc_cov_region_2_id,
+            gvcf_gq_bands=gvcf_gq_bands,
+            qc_coverage_filters=qc_coverage_filters,
+            vc_hard_filter=vc_hard_filter,
             dragen_pipeline_id=dragen_pipeline_id,
             ica_output_folder_id=analysis_output_fid['analysis_output_fid'],
             user_tags=user_tags,

@@ -18,6 +18,11 @@ technical_tags = ['test_technical_tag']
 user_tags = ['test_user_tags']
 reference_tags = ['test_reference_tags']
 
+[ica.dragen_extra_options]
+gvcf_gq_bands = '10 20 30 40 60 80'
+qc_coverage_filters = 'mapq<1,bq<0,mapq<1,bq<0'
+vc_hard_filter = 'DRAGENHardQUAL:all:QUAL<5.0;LowDepth:all:DP<=1'
+
 # The pipeline ID is from ICA and is specific to the exact pipeline being run. This should not need to be changed.
 [ica.pipelines]
 dragen_version = 'dragen_3_7_8'

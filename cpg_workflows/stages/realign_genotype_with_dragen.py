@@ -303,9 +303,12 @@ class ManageDragenPipeline(SequencingGroupStage):
             reference_tags: list[str] = config_retrieve(['ica', 'tags', 'reference_tags'])
             user_reference: str = sequencing_group.name
 
-            qc_cross_cont_vcf_id = config_retrieve(['ica', 'qc', 'cross_cont_vcf'])
-            qc_cov_region_1_id = config_retrieve(['ica', 'qc', 'coverage_region_1'])
-            qc_cov_region_2_id = config_retrieve(['ica', 'qc', 'coverage_region_2'])
+            qc_cross_cont_vcf_id: str = config_retrieve(['ica', 'qc', 'cross_cont_vcf'])
+            qc_cov_region_1_id: str = config_retrieve(['ica', 'qc', 'coverage_region_1'])
+            qc_cov_region_2_id: str = config_retrieve(['ica', 'qc', 'coverage_region_2'])
+            gvcf_gq_bands: str = config_retrieve(['ica', 'dragen_extra_options', 'gvcf_gq_bands'])
+            qc_coverage_filters: str = config_retrieve(['ica', 'dragen_extra_options', 'qc_coverage_filters'])
+            vc_hard_filter: str = config_retrieve(['ica', 'dragen_extra_options', 'vc_hard_filter'])
 
             align_genotype_job: PythonJob = get_batch().new_python_job(
                 name='AlignGenotypeWithDragen',
@@ -322,6 +325,9 @@ class ManageDragenPipeline(SequencingGroupStage):
                 qc_cross_cont_vcf_id=qc_cross_cont_vcf_id,
                 qc_cov_region_1_id=qc_cov_region_1_id,
                 qc_cov_region_2_id=qc_cov_region_2_id,
+                gvcf_gq_bands=gvcf_gq_bands,
+                qc_coverage_filters=qc_coverage_filters,
+                vc_hard_filter=vc_hard_filter,
                 dragen_pipeline_id=dragen_pipeline_id,
                 user_tags=user_tags,
                 technical_tags=technical_tags,

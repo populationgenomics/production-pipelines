@@ -49,7 +49,7 @@ def run(
             path_params=path_params | {'analysisId': pipeline_id},
         )
         # Other running statuses are REQUESTED AWAITINGINPUT INPROGRESS
-        while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTED']:
+        while pipeline_status not in ['SUCCEEDED', 'FAILED', 'FAILEDFINAL', 'ABORTING', 'ABORTED']:
             time.sleep(600 + randint(-60, 60))
             pipeline_status = ica_utils.check_ica_pipeline_status(
                 api_instance=api_instance,
@@ -58,11 +58,14 @@ def run(
         if pipeline_status == 'SUCCEEDED':
             logging.info(f'Pipeline run {pipeline_id} has succeeded')
             return {'pipeline': pipeline_id, 'status': 'success'}
-        elif pipeline_status in ['ABORTING', 'ABORTED']:
-            raise Exception(f'Pipeline run {pipeline_id} has been cancelled.')
         else:
-            # Log failed ICA pipeline to a file somewhere
-            # Delete the pipeline ID file
-            logging.info(f'Deleting the pipeline run ID file {pipeline_id_file}')
+            # The pipeline either failed or was cancelled, so delete the pipeline ID stored in GCP
+            logging.info(
+                f'The ICA pipeline has status: {pipeline_status}. Deleting the pipeline run ID file {pipeline_id_file}',
+            )
             subprocess.run(['gcloud', 'storage', 'rm', pipeline_id_file])
-            raise Exception(f'The pipeline run {pipeline_id} has failed, please check ICA for more info.')
+            if pipeline_status in ['ABORTING', 'ABORTED']:
+                raise Exception(f'Pipeline run {pipeline_id} has been cancelled.')
+            else:
+                # Log failed ICA pipeline to a file somewhere
+                raise Exception(f'The pipeline run {pipeline_id} has failed, please check ICA for more info.')
