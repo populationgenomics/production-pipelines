@@ -28,9 +28,6 @@ def merge_coverage_tables(
     :param coverage_tables: List of coverage tables.
     :return: Merged coverage table.
     """
-    # from cpg_utils.hail_batch import init_batch
-
-    # init_batch()
     coverage_tables = [hl.read_table(coverage_table_path) for coverage_table_path in coverage_table_paths]
     merged_coverage_table = hl.Table.union(*coverage_tables)
     return merged_coverage_table.checkpoint(out_path, overwrite=True)
@@ -40,9 +37,6 @@ def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDatas
     """
     Shard a VDS file.
     """
-    # from cpg_utils.hail_batch import init_batch
-
-    # init_batch()
     vds = hl.vds.read_vds(vds_path)
     for contig, out_path in output_dict.items():
         sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig, reference_genome='GRCh38')])
@@ -82,14 +76,9 @@ def compute_coverage_stats(
         coverage stats by.
     :return: Table with per-base coverage stats
     """
-    # from cpg_utils.hail_batch import init_batch
-
-    # init_batch()
-
     mtds: hl.vds.VariantDataset = hl.vds.read_vds(mtds_path)
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
-    print(f'mtds: {mtds.variant_data.describe()}')
-    print(mtds.variant_data.show(n_cols=1))
+
     is_vds = isinstance(mtds, hl.vds.VariantDataset)
     if is_vds:
         mt = mtds.variant_data
@@ -121,8 +110,6 @@ def compute_coverage_stats(
         strata_expr,
         no_raw_group=True,
     )
-    print(f'group_membership_ht: {group_membership_ht.describe()}')
-    print(f'group_membership_ht: {group_membership_ht.show()}')
 
     n_samples = group_membership_ht.count()
     sample_counts = group_membership_ht.index_globals().freq_meta_sample_count
@@ -197,7 +184,6 @@ def compute_coverage_stats(
         # Densify
         mt = hl.experimental.densify(mtds)
 
-    print(f'mt: {mt.describe()}')
     # Filter rows where the reference is missing
     mt = mt.filter_rows(mt._in_ref)
 
@@ -209,9 +195,6 @@ def compute_coverage_stats(
         group_membership=group_membership_ht[mt.col_key].group_membership,
     )
 
-    print(f'mt after annotating with group membership: {mt.describe()}')
-    print(f'mt after annotating with group membership: {mt.show()}')
-    print(f'group_membership_ht show(): {group_membership_ht.show()}')
     # Compute coverage stats
     coverage_over_x_bins = sorted(coverage_over_x_bins)
     max_coverage_bin = coverage_over_x_bins[-1]
@@ -242,8 +225,6 @@ def compute_coverage_stats(
             mt.group_membership,
         ),
     ).rows()
-    print(f'ht: {ht.describe()}')
-    # ht = ht.checkpoint(hl.utils.new_temp_file("coverage_stats", "ht"))
 
     # This expression aggregates the DP counter in reverse order of the
     # coverage_over_x_bins and computes the cumulative sum over them.
