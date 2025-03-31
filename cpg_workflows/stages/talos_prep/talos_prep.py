@@ -173,7 +173,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / 'gnomad_frequency_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_gnomad_frequency_annotated.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(dataset)
@@ -207,7 +207,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_consequence_annotated.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
@@ -306,7 +306,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
             f'--gene_bed {gene_roi} '
             f'--am {alphamissense} '
             f'--mane {mane_json} '
-            f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")} ',
+            f'--checkpoint_dir {str(self.tmp_prefix / f"{dataset.name}_annotation_checkpoint")} ',
         )
 
         return self.make_outputs(dataset, data=output, jobs=job)
