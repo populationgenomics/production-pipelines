@@ -478,8 +478,8 @@ class ShardVds(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
-            / sharded_vds_version
             / 'sharded_vds'
+            / sharded_vds_version
             / f'{contig}.vds'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
