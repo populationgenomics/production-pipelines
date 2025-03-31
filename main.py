@@ -25,7 +25,6 @@ from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, Validati
 from cpg_workflows.stages.large_cohort import (
     AncestryPlots,
     Frequencies,
-    GenerateCoverageTable,
     LoadVqsr,
     PrepareBrowserTable,
 )
@@ -92,7 +91,6 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         PrepareBrowserTable,
-        GenerateCoverageTable,
     ],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv],
