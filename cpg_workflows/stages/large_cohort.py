@@ -523,7 +523,6 @@ class GenerateReferenceCoverageTable(CohortStage):
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / ref_cov_version
-            / 'reference_coverage'
             / f'{contig}_coverage_reference.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
