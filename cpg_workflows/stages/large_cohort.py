@@ -578,7 +578,7 @@ class GenerateCoverageTable(CohortStage):
             j.command(
                 query_command(
                     generate_coverage_table,
-                    generate_coverage_table.compute_coverage_stats.__name__,
+                    generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, ShardVds, key=contig)),
                     str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
                     str(out_path),

@@ -44,6 +44,15 @@ def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDatas
     return sharded_vds
 
 
+def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
+    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
+    reference_ht: hl.Table = hl.read_table(reference_ht_path)
+
+    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, reference_ht)
+
+    return coverage_ht.checkpoint(out_path, overwrite=True)
+
+
 def compute_coverage_stats(
     mtds_path: str,
     reference_ht_path: str,
