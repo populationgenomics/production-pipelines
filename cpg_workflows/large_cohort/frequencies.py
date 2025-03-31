@@ -33,6 +33,7 @@ def run(
     relateds_to_drop_ht_path: str,
     infer_pop_ht_path: str,
     site_only_ht_path: str,
+    vqsr_ht_path: str,
     out_ht_path: str,
 ):
     if can_reuse(out_ht_path):
@@ -46,6 +47,7 @@ def run(
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
     inferred_pop_ht = hl.read_table(str(infer_pop_ht_path))
     site_only_ht = hl.read_table(str(site_only_ht_path))
+    vqsr_ht = hl.read_table(str(vqsr_ht_path))
 
     logging.info('Generating frequency annotations...')
     freq_ht = frequency_annotations(
@@ -54,6 +56,7 @@ def run(
         relateds_to_drop_ht,
         inferred_pop_ht,
         site_only_ht,
+        vqsr_ht,
         out_ht_path,
     )
     logging.info(f'Writing out frequency data to {out_ht_path}...')
@@ -66,6 +69,7 @@ def frequency_annotations(
     relateds_to_drop_ht: hl.Table,
     inferred_pop_ht: hl.Table,
     site_only_ht: hl.Table,
+    vqsr_ht: hl.Table,
     out_ht_path: str,
 ) -> hl.Table:
     """
@@ -139,6 +143,9 @@ def frequency_annotations(
     )
 
     freq_ht = mt.rows()
+
+    # Annotate freq_ht with the 'filters' field from VQSR
+    freq_ht = freq_ht.annotate(filters=vqsr_ht[freq_ht.key].filters)
 
     freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
 
@@ -216,8 +223,6 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
 
-    # Populating 'filters' field with empty set for now
-    mt = mt.annotate_rows(filters=hl.empty_set(hl.tstr))  # <-- Discuss
     return mt
 
 
