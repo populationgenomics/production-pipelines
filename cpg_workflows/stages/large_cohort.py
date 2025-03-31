@@ -478,8 +478,8 @@ class ShardVds(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
-            / 'sharded_vds'
             / sharded_vds_version
+            / 'sharded_vds'
             / f'{contig}.vds'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
@@ -522,8 +522,8 @@ class GenerateReferenceCoverageTable(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
-            / 'reference_coverage'
             / ref_cov_version
+            / 'reference_coverage'
             / f'{contig}_coverage_reference.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
@@ -559,8 +559,8 @@ class GenerateCoverageTable(CohortStage):
         return {
             f'{contig}': cohort.analysis_dataset.prefix()
             / get_workflow().name
-            / 'split_coverage'
             / coverage_version
+            / 'split_coverage'
             / f'{contig}_coverage.ht'
             for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         }
@@ -600,8 +600,8 @@ class MergeCoverageTables(CohortStage):
         return (
             cohort.analysis_dataset.prefix()
             / get_workflow().name
-            / 'merged_coverage'
             / coverage_version
+            / 'merged_coverage'
             / 'merged_coverage.ht'
         )
 
