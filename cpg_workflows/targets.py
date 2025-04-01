@@ -686,7 +686,9 @@ class SequencingGroup(Target):
         # Only set if the file exists / found in Metamist:
         self.gvcf: GvcfPath | None = None
         self.cram: CramPath | None = None
-        # TODO: Add a gvcf meta field, so we can track where it came from.
+        # These stage name fields are populated when the crams/gvcfs are pulled from metamist
+        # they allow you to track which stage produced the file, in the case where there are
+        # multiple active analyses for a single sequencing group
         self.gvcf_stage_name: str | None = None
         self.cram_stage_name: str | None = None
 
