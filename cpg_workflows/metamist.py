@@ -103,7 +103,7 @@ GET_ANALYSES_QUERY = gql(
     """
         query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
             project(name: $metamist_proj) {
-                analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}, meta: {stage: {eq: $stage_name}}) {
+                analyses (active: {eq: true}, type: {eq: $analysis_type}, status: {eq: $analysis_status}) {
                     id
                     type
                     meta
@@ -435,23 +435,22 @@ class Metamist:
         """
         metamist_proj = self.get_metamist_proj(dataset)
 
-        # Dynamically retrieve the correct stage_name field based on analysis_type
-        stage_name_key = f"{analysis_type.value.lower()}_stage_name"
-        stage_name = meta.get(stage_name_key) if meta else None
-
         analyses = query(
             GET_ANALYSES_QUERY,
             variables={
                 'metamist_proj': metamist_proj,
                 'analysis_type': analysis_type.value,
                 'analysis_status': analysis_status.name,
-                'stage_name': stage_name,
             },
         )
 
-        analysis_per_sid: dict[str, Analysis] = dict()
+        raw_analyses = analyses['project']['analyses']
+        if meta:
+            raw_analyses = filter_analyses_by_meta(raw_analyses, meta)
 
-        for analysis in analyses['project']['analyses']:
+        analysis_per_sid: dict[str, Analysis] = {}
+
+        for analysis in raw_analyses:
             a = Analysis.parse(analysis)
             if not a:
                 continue
@@ -765,3 +764,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
             )
 
         return fastq_pairs
+
+
+def filter_analyses_by_meta(analyses: list[dict], meta_filter: dict) -> list[dict]:
+    """Filter analyses by matching key-value pairs in the meta field."""
+    return [a for a in analyses if a.get("meta") and all(a["meta"].get(k) == v for k, v in meta_filter.items())]
