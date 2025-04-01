@@ -687,6 +687,8 @@ class SequencingGroup(Target):
         self.gvcf: GvcfPath | None = None
         self.cram: CramPath | None = None
         # TODO: Add a gvcf meta field, so we can track where it came from.
+        self.gvcf_stage_name: str | None = None
+        self.cram_stage_name: str | None = None
 
     def __repr__(self):
         values = {
