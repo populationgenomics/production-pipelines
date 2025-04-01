@@ -278,12 +278,23 @@ def get_gvcf_meta():
 
 
 def get_cram_meta():
-    """Retrieve CRAM meta dictionary. At present, this pulls the stage name that was used
-    to derive the current cram. If the user doesn't specify this stage the metamist behaviour
-    will default to latest. This handles the case where we have multiple active crams and need
-    to specify which should be selected."""
+    """Retrieve CRAM meta dictionary from user config. At present, this pulls the stage name
+    and source used to derive the current cram. If the user doesn't specify these values,
+    Metamist will default to latest. This handles the case where we have multiple active crams
+    and need to specify which should be selected."""
+
     stage_name = config_retrieve(['workflow', 'cram_stage_name'], default=None)
-    return {'cram_stage_name': stage_name} if stage_name else {}
+    cram_source = config_retrieve(['workflow', 'cram_source'], default=None)
+
+    # At present this allows for both fields to be specified.
+    meta = {}
+    if stage_name:
+        meta['cram_stage_name'] = stage_name
+    if cram_source:
+        # Source is a bit vague, but it needs to match the meta field
+        meta['source'] = cram_source
+
+    return meta
 
 
 def _populate_analysis(cohort: Cohort) -> None:
