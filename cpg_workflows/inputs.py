@@ -268,21 +268,40 @@ def _populate_alignment_inputs(
     return None
 
 
+def get_gvcf_meta():
+    """Retrieve GVCF meta dictionary. At present, this pulls the stage name that was used
+    to derive the current gvcf. If the user doesn't specify this stage the metamist behaviour
+    will default to latest. This handles the case where we have multiple active gvcfs and need
+    to specify which should be selected."""
+    stage_name = config_retrieve(['workflow', 'gvcf_stage_name'])
+    return {'gvcf_stage_name': stage_name} if stage_name else {}
+
+
+def get_cram_meta():
+    """Retrieve CRAM meta dictionary. At present, this pulls the stage name that was used
+    to derive the current cram. If the user doesn't specify this stage the metamist behaviour
+    will default to latest. This handles the case where we have multiple active crams and need
+    to specify which should be selected."""
+    stage_name = config_retrieve(['workflow', 'cram_stage_name'])
+    return {'cram_stage_name': stage_name} if stage_name else {}
+
+
 def _populate_analysis(cohort: Cohort) -> None:
     """
     Populate Analysis entries.
     """
     for dataset in cohort.get_datasets():
-        # TODO: Parameterize an additional meta field here. Pull it from the config.
         gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
+            meta=get_gvcf_meta(),
         )
         cram_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
+            meta=get_cram_meta(),
         )
 
         for sequencing_group in dataset.get_sequencing_groups():
