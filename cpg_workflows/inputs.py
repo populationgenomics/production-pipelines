@@ -273,7 +273,7 @@ def get_gvcf_meta():
     to derive the current gvcf. If the user doesn't specify this stage the metamist behaviour
     will default to latest. This handles the case where we have multiple active gvcfs and need
     to specify which should be selected."""
-    stage_name = config_retrieve(['workflow', 'gvcf_stage_name'])
+    stage_name = config_retrieve(['workflow', 'gvcf_stage_name'], default=None)
     return {'gvcf_stage_name': stage_name} if stage_name else {}
 
 
@@ -282,7 +282,7 @@ def get_cram_meta():
     to derive the current cram. If the user doesn't specify this stage the metamist behaviour
     will default to latest. This handles the case where we have multiple active crams and need
     to specify which should be selected."""
-    stage_name = config_retrieve(['workflow', 'cram_stage_name'])
+    stage_name = config_retrieve(['workflow', 'cram_stage_name'], default=None)
     return {'cram_stage_name': stage_name} if stage_name else {}
 
 
