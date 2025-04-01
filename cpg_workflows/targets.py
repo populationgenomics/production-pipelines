@@ -686,6 +686,7 @@ class SequencingGroup(Target):
         # Only set if the file exists / found in Metamist:
         self.gvcf: GvcfPath | None = None
         self.cram: CramPath | None = None
+        # TODO: Add a gvcf meta field, so we can track where it came from.
 
     def __repr__(self):
         values = {

@@ -99,6 +99,7 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
 )
 
 
+# TODO, add a filter for meta, stage.
 GET_ANALYSES_QUERY = gql(
     """
         query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
@@ -434,7 +435,7 @@ class Metamist:
         is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
         metamist_proj = self.get_metamist_proj(dataset)
-
+        # TODO, add meta to the query.
         analyses = query(
             GET_ANALYSES_QUERY,
             variables={

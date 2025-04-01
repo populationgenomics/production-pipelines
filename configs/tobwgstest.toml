@@ -1,0 +1,15 @@
+[workflow]
+sequencing_type = 'genome'
+skip_sgs_with_missing_input = true
+highmem_workers = true
+scatter_count = 20
+output_version = 'v1.1'
+dry_run = true
+first_stages = ['Relatedness']
+last_stages = ['Frequencies']
+dataset_gcp_project = 'tob-wgs'
+dataset = 'tob-wgs'
+access_level = 'test'
+
+[hail]
+dry_run=true
