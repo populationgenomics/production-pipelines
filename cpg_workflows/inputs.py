@@ -290,18 +290,21 @@ def _populate_analysis(cohort: Cohort) -> None:
     """
     Populate Analysis entries.
     """
+
+    gvcf_meta = get_gvcf_meta()
+    cram_meta = get_cram_meta()
     for dataset in cohort.get_datasets():
         gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
-            meta=get_gvcf_meta(),
+            meta=gvcf_meta,
         )
         cram_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
-            meta=get_cram_meta(),
+            meta=cram_meta,
         )
 
         for sequencing_group in dataset.get_sequencing_groups():

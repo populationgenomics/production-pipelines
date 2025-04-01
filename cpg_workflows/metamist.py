@@ -99,7 +99,6 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
 )
 
 
-# TODO, add a filter for meta, stage.
 GET_ANALYSES_QUERY = gql(
     """
         query AnalysesQuery($metamist_proj: String!, $analysis_type: String!, $analysis_status: AnalysisStatus!) {
