@@ -326,8 +326,8 @@ def _populate_analysis(cohort: Cohort) -> None:
                     analysis.output,
                 )
                 sequencing_group.gvcf = GvcfPath(path=analysis.output)
-                if get_gvcf_meta():
-                    sequencing_group.gvcf_stage_name = get_gvcf_meta()['gvcf_stage_name']
+                if gvcf_meta:
+                    sequencing_group.gvcf_stage_name = gvcf_meta.get('gvcf_stage_name')
             elif exists(sequencing_group.make_gvcf_path()):
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
@@ -343,8 +343,8 @@ def _populate_analysis(cohort: Cohort) -> None:
                 if not exists(crai_path):
                     crai_path = None
                 sequencing_group.cram = CramPath(analysis.output, crai_path)
-                if get_cram_meta():
-                    sequencing_group.cram_stage_name = get_cram_meta()['cram_stage_name']
+                if cram_meta:
+                    sequencing_group.cram_stage_name = cram_meta.get('cram_stage_name')
 
             elif exists(sequencing_group.make_cram_path()):
                 logging.warning(
