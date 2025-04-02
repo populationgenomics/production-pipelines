@@ -58,6 +58,10 @@ def annotate_cohort(
     )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
+    # 2025-04-02:
+    # The INFO fields AC/AN/AF are now computed with bcftools +fill-tags -t AF,AN,AC
+    # So no need to use hl.variant_qc here
+    #
     # in our long-read VCFs, AF is present as an Entry field, so we need to drop it from entries,
     # and then recompute AC/AF/AN correctly from the variant QC table
     # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
@@ -111,6 +115,10 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
+    # 2024-04-02:
+    # The INFO fields AC/AN/AF are now computed with bcftools +fill-tags -t AF,AN,AC
+    # So no need to modify them here
+    #
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
     # these elements become a 1-element array
     # the index_correction is required to align the AC/AF with the correct allele
