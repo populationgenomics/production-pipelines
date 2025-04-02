@@ -64,6 +64,7 @@ LRS_IDS_QUERY = gql(
     """,
 )
 
+
 @lru_cache
 def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     """
@@ -114,6 +115,7 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
 
     return return_dict
 
+
 def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
     """
     Find the SGs to skip in the reformatting stage
@@ -138,7 +140,7 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
     """
     lrs_sgid_mapping = {}
     for dataset in datasets:
-        if config_retrieve(['workflow', 'access_level'])=='test' and not dataset.endswith('-test'):
+        if config_retrieve(['workflow', 'access_level']) == 'test' and not dataset.endswith('-test'):
             dataset = dataset + '-test'
         query_results = query(LRS_IDS_QUERY, variables={'dataset': dataset})
         for sg in query_results['project']['sequencingGroups']:
@@ -146,7 +148,9 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
             participant = sample['participant']
             lrs_id = sample['meta'].get('lrs_id', None)
             if not lrs_id:
-                get_logger().warning(f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}')
+                get_logger().warning(
+                    f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}',
+                )
                 continue
             lrs_sgid_mapping[lrs_id] = sg['id']
     return lrs_sgid_mapping
@@ -196,15 +200,18 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_snps_indels.vcf.bgz.tbi',
         }
 
-    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         a python job to change the VCF contents
         - use a python job to modify all VCF lines, in-line
-        - use a follow-up job to block-gzip and index
+        - a bcftools job to reheader the VCF with the replacement sample IDs, and then sort
+        - use a follow-up job to block-gzip
         - this is skipped for the parents in trio joint-called VCFs
         """
         # find the VCFs for this dataset
-        dataset_name = sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level'])=='test' else sg.dataset.name
+        dataset_name = (
+            sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
+        )
         sg_vcfs = query_for_snps_indels_vcfs(dataset_name=dataset_name)
         if sg.id not in sg_vcfs:
             return None
@@ -221,7 +228,9 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         local_mapping = get_batch().read_input(lrs_sg_id_map)
 
         joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
-        mod_job = get_batch().new_bash_job(f'Convert {"joint-called " if joint_called else ""}{lr_snps_indels_vcf} prior to annotation')
+        mod_job = get_batch().new_bash_job(
+            f'Convert {"joint-called " if joint_called else ""}{lr_snps_indels_vcf} prior to annotation',
+        )
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
@@ -232,19 +241,20 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
         sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
         mod_job.command(
-            'modify_sniffles '
-            f'--vcf_in {local_vcf} '
-            f'--vcf_out {mod_job.output} '
-            f'--fa {fasta} '
-            f'--sex {sex} ',
+            'modify_sniffles ' f'--vcf_in {local_vcf} ' f'--vcf_out {mod_job.output} ' f'--fa {fasta} ' f'--sex {sex} ',
         )
 
         # normalise, reheader, then block-gzip and index that result
-        tabix_job = get_batch().new_job(f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
+        tabix_job = get_batch().new_job(
+            f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}',
+            {'tool': 'bcftools'},
+        )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}')
+        tabix_job.command(
+            f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}',
+        )
         tabix_job.command(
             f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
         )
@@ -270,7 +280,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        Use bcftools to merge all the VCFs
+        Use bcftools to merge all the VCFs, and then fill in the tags (requires bcftools 1.12+)
         """
 
         outputs = self.expected_outputs(multicohort)
@@ -283,7 +293,11 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
-            for each_vcf in [str(modified_vcfs.get(sgid, {}).get('vcf')) for sgid in multicohort.get_sequencing_group_ids() if sgid in modified_vcfs]
+            for each_vcf in [
+                str(modified_vcfs.get(sgid, {}).get('vcf'))
+                for sgid in multicohort.get_sequencing_group_ids()
+                if sgid in modified_vcfs
+            ]
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
@@ -302,11 +316,11 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         # -m: merge strategy
         # -0: compression level
         merge_job.command(
-            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
+            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o ' f'temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
-        merge_job.command(f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC')
-        # merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
+        merge_job.command(
+            f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
+        )
 
         # write the result out
         get_batch().write_output(merge_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))  # type: ignore
