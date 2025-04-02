@@ -217,9 +217,6 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             return None
 
         expected_outputs = self.expected_outputs(sg)
-        # instead of handling, we should probably just exclude this and run again
-        if sg.id not in sg_vcfs:
-            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {dataset_name}')
 
         lr_snps_indels_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
