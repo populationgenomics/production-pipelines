@@ -92,6 +92,8 @@ class ValidationMtToVcf(SequencingGroupStage):
 
         exp_output = self.expected_outputs(sequencing_group)
 
+        clean_argument = '--clean ' if config_retrieve(['workflow', 'vcf_pass_only'], True) else ''
+
         job = get_batch().new_job(f'{sequencing_group.id} VCF from MT ({hash_str})')
         job.image(config_retrieve(['workflow', 'driver_image']))
         job.command(
@@ -99,7 +101,7 @@ class ValidationMtToVcf(SequencingGroupStage):
             f'--input {input_mt} '
             f'--sample_id {sequencing_group.id} '
             f'--output {str(exp_output)} '
-            '--clean ',
+            f'{clean_argument}',
         )
 
         return self.make_outputs(sequencing_group, data=exp_output, jobs=job)
