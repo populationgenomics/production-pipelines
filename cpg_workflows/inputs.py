@@ -317,7 +317,9 @@ def _populate_analysis(cohort: Cohort) -> None:
             dataset=dataset.name,
             meta=cram_meta,
         )
-
+        print('=======Populating analysis for dataset========', dataset.name)
+        print('gvcf_by_sgid', gvcf_by_sgid)
+        print('cram_by_sgid', cram_by_sgid)
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
                 # assert file exists
@@ -327,6 +329,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                 )
                 sequencing_group.gvcf = GvcfPath(path=analysis.output)
                 if gvcf_meta:
+                    print('gvcf_meta', gvcf_meta)
                     sequencing_group.gvcf_stage_name = gvcf_meta.get('gvcf_stage_name')
             elif exists(sequencing_group.make_gvcf_path()):
                 logging.warning(
@@ -344,6 +347,7 @@ def _populate_analysis(cohort: Cohort) -> None:
                     crai_path = None
                 sequencing_group.cram = CramPath(analysis.output, crai_path)
                 if cram_meta:
+                    print('cram_meta', cram_meta)
                     sequencing_group.cram_stage_name = cram_meta.get('cram_stage_name')
 
             elif exists(sequencing_group.make_cram_path()):

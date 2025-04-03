@@ -445,8 +445,11 @@ class Metamist:
         )
 
         raw_analyses = analyses['project']['analyses']
+        print('Before filtering')
+        print(f'Found {len(raw_analyses)} analyses')
         if meta:
             raw_analyses = filter_analyses_by_meta(raw_analyses, meta)
+            print(f'Filtered analyses by meta: {meta}, found {len(raw_analyses)}')
 
         analysis_per_sid: dict[str, Analysis] = {}
 
