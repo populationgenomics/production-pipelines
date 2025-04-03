@@ -12,8 +12,12 @@ from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre_job, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
+from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import (
+    find_sgs_to_skip,
+    query_for_lrs_sg_id_mapping,
+)
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
-from cpg_workflows.utils import get_logger, lru_cache
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -61,7 +65,7 @@ VCF_QUERY = gql(
 )
 
 
-@lru_cache
+@cache
 def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     """
     query metamist for the PacBio SV VCFs
@@ -110,46 +114,6 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
         return_dict[sg_id] = vcf_analysis
 
     return return_dict
-
-
-def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
-    """
-    Find the SGs to skip in the reformatting stage
-    These are the parents if the family has been joint-called
-    """
-    sgs_to_skip = set()
-    joint_called_families = set()
-    for sg_id, vcf_analysis in sg_vcf_dict.items():
-        analysis_meta = vcf_analysis['meta']
-        if analysis_meta.get('joint_called', False):
-            joint_called_families.add(analysis_meta.get('family_id', ''))
-    for sg_id, vcf_analysis in sg_vcf_dict.items():
-        analysis_meta = vcf_analysis['meta']
-        if analysis_meta.get('family_id', '') in joint_called_families and not analysis_meta.get('joint_called', False):
-            sgs_to_skip.add(sg_id)
-    return sgs_to_skip
-
-
-def query_for_lrs_sg_id_mapping(datasets: list[str]):
-    """
-    Query metamist for the LRS ID corresponding to each sequencing group ID
-    """
-    lrs_sgid_mapping = {}
-    for dataset in datasets:
-        if config_retrieve(['workflow', 'access_level']) == 'test' and not dataset.endswith('-test'):
-            dataset = dataset + '-test'
-        query_results = query(LRS_IDS_QUERY, variables={'dataset': dataset})
-        for sg in query_results['project']['sequencingGroups']:
-            sample = sg['sample']
-            participant = sample['participant']
-            lrs_id = sample['meta'].get('lrs_id', None)
-            if not lrs_id:
-                get_logger().warning(
-                    f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}',
-                )
-                continue
-            lrs_sgid_mapping[lrs_id] = sg['id']
-    return lrs_sgid_mapping
 
 
 @stage

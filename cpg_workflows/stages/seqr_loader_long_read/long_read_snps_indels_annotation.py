@@ -2,6 +2,8 @@
 Workflow for finding long-read SNPs_Indels files, updating file contents, merging, and annotating the results
 """
 
+from functools import cache
+
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
@@ -16,7 +18,7 @@ from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.resources import joint_calling_scatter_count
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
-from cpg_workflows.utils import get_logger, lru_cache
+from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
     DatasetStage,
     MultiCohortStage,
@@ -65,7 +67,7 @@ LRS_IDS_QUERY = gql(
 )
 
 
-@lru_cache
+@cache
 def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
@@ -238,7 +240,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
         sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
         mod_job.command(
-            'modify_sniffles ' f'--vcf_in {local_vcf} ' f'--vcf_out {mod_job.output} ' f'--fa {fasta} ' f'--sex {sex} ',
+            f'modify_sniffles --vcf_in {local_vcf} --vcf_out {mod_job.output} --fa {fasta} --sex {sex} ',
         )
 
         # normalise, reheader, then block-gzip and index that result
@@ -313,7 +315,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         # -m: merge strategy
         # -0: compression level
         merge_job.command(
-            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o ' f'temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
+            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(
             f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
