@@ -274,7 +274,7 @@ def get_gvcf_meta():
     will default to latest. This handles the case where we have multiple active gvcfs and need
     to specify which should be selected."""
     stage_name = config_retrieve(['workflow', 'gvcf_stage_name'], default=None)
-    return {'gvcf_stage_name': stage_name} if stage_name else {}
+    return {'stage': stage_name} if stage_name else {}
 
 
 def get_cram_meta():
@@ -289,7 +289,7 @@ def get_cram_meta():
     # At present this allows for both fields to be specified.
     meta = {}
     if stage_name:
-        meta['cram_stage_name'] = stage_name
+        meta['stage'] = stage_name
     if cram_source:
         # Source is a bit vague, but it needs to match the meta field
         meta['source'] = cram_source
