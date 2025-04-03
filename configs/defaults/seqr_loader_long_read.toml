@@ -6,6 +6,9 @@ status_reporter = 'metamist'
 [workflow.bam_to_cram]
 analysis_type = 'pacbio_cram'
 
+[workflow.long_read_vcf_annotation]
+pipeface_versions = ['v0.6.1']
+
 [resource_overrides.bam_to_cram]
 nthreads = 1
 storage_gb = 50

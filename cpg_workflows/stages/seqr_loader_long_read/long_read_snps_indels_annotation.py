@@ -68,7 +68,7 @@ LRS_IDS_QUERY = gql(
 
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
+def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: list[str] | None) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -85,6 +85,11 @@ def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, dict]:
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
+            if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
+                )
+                continue
             if not analysis['output'].endswith('snp_indel.phased.vcf.gz'):
                 continue
             if analysis['meta'].get('joint_called', False):
@@ -214,7 +219,13 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         dataset_name = (
             sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
         )
-        sg_vcfs = query_for_snps_indels_vcfs(dataset_name=dataset_name)
+        sg_vcfs = query_for_snps_indels_vcfs(
+            dataset_name=dataset_name,
+            pipeface_versions=config_retrieve(
+                ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
+                default=None,
+            ),
+        )
         if sg.id not in sg_vcfs:
             return None
 
