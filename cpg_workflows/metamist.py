@@ -444,9 +444,16 @@ class Metamist:
             },
         )
 
-        analysis_per_sid: dict[str, Analysis] = dict()
+        raw_analyses = analyses['project']['analyses']
+        print('Before filtering')
+        print(f'Found {len(raw_analyses)} analyses')
+        if meta:
+            raw_analyses = filter_analyses_by_meta(raw_analyses, meta)
+            print(f'Filtered analyses by meta: {meta}, found {len(raw_analyses)}')
 
-        for analysis in analyses['project']['analyses']:
+        analysis_per_sid: dict[str, Analysis] = {}
+
+        for analysis in raw_analyses:
             a = Analysis.parse(analysis)
             if not a:
                 continue
@@ -760,3 +767,12 @@ def parse_reads(  # pylint: disable=too-many-return-statements
             )
 
         return fastq_pairs
+
+
+def filter_analyses_by_meta(analyses: list[dict], meta_filter: dict) -> list[dict]:
+    """Filter analyses by matching key-value pairs in the meta field."""
+    print(f'==========Filtering analyses by meta: {meta_filter}=======')
+    for analysis in analyses:
+        print(f'{analysis}')
+        print(f'{analysis.get("meta")}')
+    return [a for a in analyses if a.get('meta') and all(a['meta'].get(k) == v for k, v in meta_filter.items())]
