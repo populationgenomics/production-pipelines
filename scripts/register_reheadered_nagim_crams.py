@@ -80,13 +80,6 @@ MUTATION_QUERY = gql(
 )
 
 
-# Precomputed hashes (as per classify_SQ()) for common reference sets
-KNOWN_REFS = {
-    '49f7a7583b832aed0104b1901f9cf5fd': 'Homo_sapiens_assembly38_masked',
-    '760a471d32c9a356ffb37f632bebfea3': 'Homo_sapiens_assembly38[unmasked]',
-}
-
-
 def do_metamist_update(
     dry_run: bool,
     dataset: str,
