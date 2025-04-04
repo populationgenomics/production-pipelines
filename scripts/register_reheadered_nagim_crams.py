@@ -153,14 +153,14 @@ def main(
         if str(reheadered_path) not in flist:
             continue
         try:
-            real_sequnging_group: str = sample_by_id[analysis_by_path[fname]['sequencingGroups'][0]['sample']['id']]
+            real_sequncing_group: str = sample_by_id[analysis_by_path[fname]['sequencingGroups'][0]['sample']['id']]
         except KeyError:
             logging.info(f'The sample {analysis_by_path[fname]["sequencingGroups"][0]["sample"]["id"]} is not active.')
             continue
         do_metamist_update(
             dry_run=dry_run,
             dataset=dataset,
-            activeseqgroup=real_sequnging_group,
+            activeseqgroup=real_sequncing_group,
             oldanalysis=analysis_by_path[fname],
             oldpath=fname,
             newpath=str(reheadered_path),
