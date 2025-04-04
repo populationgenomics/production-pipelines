@@ -118,11 +118,14 @@ def frequency_annotations(
     mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
 
     # Annotate frequency strata
+    # Forcing annotate_freq to use 'gen_anc' as the pop label here
     mt = annotate_freq(
         mt,
         sex_expr=mt.sex,
-        additional_strata_expr=[{'gen_anc': mt.gen_anc}],
-        pop_expr=mt.gen_anc,
+        additional_strata_expr=[
+            {'gen_anc': mt.gen_anc},
+            {'gen_anc': mt.gen_anc, 'sex': mt.sex},
+        ],
     )
 
     mt = _compute_filtering_af_and_popmax(mt)
@@ -207,7 +210,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         'rsid',
         'variant_qc',
         faf=faf,
-        popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX),
+        popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX, pop_label='gen_anc'),
     )
     mt = mt.annotate_globals(
         faf_meta=faf_meta,
@@ -218,7 +221,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
-            faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == ['adj', mt.popmax.pop])].faf95,
+            faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == [mt.popmax.gen_anc, 'adj'])].faf95,
         ),
     )
     mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
