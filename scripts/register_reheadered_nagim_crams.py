@@ -136,7 +136,7 @@ def main(
     sample_by_id = {
         sample['id']: sample['sequencingGroups'][0]['id']
         for sample in project_samples
-        if len(sample['sequencingGroups']) != 0 and len(sample['sequencingGroups'][0]['analyses']) != 0
+        if sample['sequencingGroups'] and sample['sequencingGroups'][0]['analyses']
     }
 
     cram_list = analysis_by_path.keys()
