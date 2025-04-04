@@ -122,14 +122,12 @@ def main(
     gcs_prefix: str,
     dry_run: bool,
 ):
-    # config = get_config(True)
+    config = get_config(True)
 
-    # dataset = config['workflow']['dataset']
-    # if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
-    #     dataset = f'{dataset}-test'
+    dataset = config['workflow']['dataset']
+    if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
+        dataset = f'{dataset}-test'
     coloredlogs.install(level=logging.INFO)
-
-    dataset = 'tob-wgs-test'
 
     project_analyses = query(FIND_ANALYSES, {'project': dataset})['project']['analyses']
     analysis_by_path = {analysis['output']: analysis for analysis in project_analyses if 'nagim' in analysis['output']}
