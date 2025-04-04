@@ -54,7 +54,6 @@ def cli_main():
     parser = ArgumentParser(description='CLI for the Sniffles VCF modification script')
     parser.add_argument('--vcf_in', help='Path to a localised VCF, this will be modified', required=True)
     parser.add_argument('--vcf_out', help='Path to an output location for the modified VCF', required=True)
-    parser.add_argument('--new_id', help='The Sample ID we want in the output VCF', default=None)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
     parser.add_argument('--sex', help='0=Unknown,1=Male, 2=Female', default=0, type=int)
     parser.add_argument(
@@ -63,18 +62,16 @@ def cli_main():
         action='store_true',
     )
     args = parser.parse_args()
-
     modify_sniffles_vcf(
         file_in=args.vcf_in,
         file_out=args.vcf_out,
         fa=args.fa,
-        new_id=args.new_id,
         sex=args.sex,
         sv=args.sv,
     )
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None = None, sex: int = 0, sv: bool = True):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: bool = True):
     """
     Scrolls through the VCF and performs a few updates:
 
@@ -90,7 +87,6 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
         file_in (str): localised, VCF directly from Sniffles
         file_out (str): local batch output path, same VCF with INFO/ALT alterations
         fa (str): path to a reference FastA file, requires an implicit fa.fai index
-        new_id (str): CPG ID, required inside the reformatted VCF
         sex (int): 0=Unknown, 1=Male, 2=Female
         sv (bool): True=SV, False=SNPs_Indels
     """
@@ -110,12 +106,6 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, new_id: str | None
             if line.startswith('#'):
                 if 'FORMAT=<ID=ID' in line and sv:
                     f_out.write('##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
-
-                if line.startswith('#CHR') and new_id:
-                    l_split = line.rstrip().split('\t')
-                    l_split[9] = new_id
-                    f_out.write('\t'.join(l_split) + '\n')
-                    continue
 
                 if 'FORMAT=<ID=AF,Number=1' in line and not sv:
                     # Correct the AF field to have 'Number=A' for SNPs/Indels, to allow for multiple AF values
