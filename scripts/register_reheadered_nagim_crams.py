@@ -52,7 +52,7 @@ query SamplesQuery($project: String!) {
   project(name: $project) {
     samples {
       id
-      sequencingGroups {
+      sequencingGroups(activeOnly: {eq: true}) {
         id
         analyses(type: {eq: "cram"}, active: {eq: true}) {
           id
@@ -122,12 +122,14 @@ def main(
     gcs_prefix: str,
     dry_run: bool,
 ):
-    config = get_config(True)
+    # config = get_config(True)
 
-    dataset = config['workflow']['dataset']
-    if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
-        dataset = f'{dataset}-test'
+    # dataset = config['workflow']['dataset']
+    # if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
+    #     dataset = f'{dataset}-test'
     coloredlogs.install(level=logging.INFO)
+
+    dataset = 'tob-wgs-test'
 
     project_analyses = query(FIND_ANALYSES, {'project': dataset})['project']['analyses']
     analysis_by_path = {analysis['output']: analysis for analysis in project_analyses if 'nagim' in analysis['output']}
@@ -152,7 +154,11 @@ def main(
         reheadered_path = path.parent / 'reheadered' / path.name
         if str(reheadered_path) not in flist:
             continue
-        real_sequnging_group: str = sample_by_id[analysis_by_path[fname]['sequencingGroups'][0]['sample']['id']]
+        try:
+            real_sequnging_group: str = sample_by_id[analysis_by_path[fname]['sequencingGroups'][0]['sample']['id']]
+        except KeyError:
+            logging.info(f'The sample {analysis_by_path[fname]["sequencingGroups"][0]["sample"]["id"]} is not active.')
+            continue
         do_metamist_update(
             dry_run=dry_run,
             dataset=dataset,
