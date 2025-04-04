@@ -119,6 +119,8 @@ def frequency_annotations(
 
     # Annotate frequency strata
     # Forcing annotate_freq to use 'gen_anc' as the pop label here
+    # The ordering of freq_meta is important for the downstream faf and popmax code and
+    # could be a potential source of bugs if the ordering of additional_strata_expr is changed
     mt = annotate_freq(
         mt,
         sex_expr=mt.sex,
@@ -221,6 +223,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     )
     mt = mt.annotate_rows(
         popmax=mt.popmax.annotate(
+            # Order of strata dictionaries in faf_meta affects data returned by lambda function
             faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == [mt.popmax.gen_anc, 'adj'])].faf95,
         ),
     )
