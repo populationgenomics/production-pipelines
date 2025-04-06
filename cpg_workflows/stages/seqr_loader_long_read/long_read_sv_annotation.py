@@ -86,7 +86,7 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -
         for analysis in sg['analyses']:
             if not analysis['meta'].get('variant_type') == 'SV':
                 continue
-            if pipeface_versions and analysis['meta'].get('pipeline_version') not in pipeface_versions:
+            if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
                 )
@@ -286,7 +286,7 @@ class MergeLongReadSVs(MultiCohortStage):
         # -m: merge strategy
         # -0: compression level
         merge_job.command(
-            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o ' f'temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
+            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(
             f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
