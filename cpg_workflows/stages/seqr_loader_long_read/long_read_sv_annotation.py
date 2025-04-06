@@ -267,7 +267,11 @@ class MergeLongReadSVs(MultiCohortStage):
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
-            for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in multicohort.get_sequencing_group_ids()]
+            for each_vcf in [
+                str(modified_vcfs.get(sgid, {}).get('vcf'))
+                for sgid in multicohort.get_sequencing_group_ids()
+                if sgid in modified_vcfs
+            ]
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
