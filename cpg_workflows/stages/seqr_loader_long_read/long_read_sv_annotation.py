@@ -66,7 +66,7 @@ VCF_QUERY = gql(
 
 
 @cache
-def query_for_sv_vcfs(dataset_name: str, pipeface_versions: list[str] | None) -> dict[str, dict]:
+def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -> dict[str, dict]:
     """
     query metamist for the PacBio SV VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -74,7 +74,7 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: list[str] | None) ->
 
     Args:
         dataset_name (str):
-        pipeface_versions (list[str] | None): a list of pipeface versions to filter on
+        pipeface_versions (tuple[str] | None): a tuple of pipeface versions to filter on (hashable, so can be cached)
 
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
@@ -178,12 +178,15 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         dataset_name = (
             sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
         )
+        pipeface_versions = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
+            default=None,
+        )
+        if pipeface_versions:
+            pipeface_versions = tuple(pipeface_versions)
         sg_vcfs = query_for_sv_vcfs(
             dataset_name=dataset_name,
-            pipeface_versions=config_retrieve(
-                ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
-                default=None,
-            ),
+            pipeface_versions=pipeface_versions,
         )
         if sg.id not in sg_vcfs:
             return None

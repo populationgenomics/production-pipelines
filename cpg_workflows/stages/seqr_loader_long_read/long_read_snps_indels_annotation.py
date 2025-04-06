@@ -68,14 +68,15 @@ LRS_IDS_QUERY = gql(
 
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: list[str] | None) -> dict[str, dict]:
+def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
     this is cached - used in a SequencingGroupStage, but we only want to query for it once instead of once/SG
 
     Args:
-        dataset_name (str):
+        dataset_name (str): the name of the dataset
+        pipeface_versions (tuple[str] | None): a tuple of allowed pipeface versions (hashable, so can be cached)
 
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
@@ -219,12 +220,15 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         dataset_name = (
             sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
         )
+        pipeface_versions = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
+            default=None,
+        )
+        if pipeface_versions:
+            pipeface_versions = tuple(pipeface_versions)
         sg_vcfs = query_for_snps_indels_vcfs(
             dataset_name=dataset_name,
-            pipeface_versions=config_retrieve(
-                ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
-                default=None,
-            ),
+            pipeface_versions=pipeface_versions,
         )
         if sg.id not in sg_vcfs:
             return None
