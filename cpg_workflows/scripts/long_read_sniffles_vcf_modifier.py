@@ -128,7 +128,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: 
             new_base = fasta_client.get_seq(chrom, position, position)
 
             # a quick check, if we can
-            if l_split[3] != 'N':
+            if l_split[3] not in ('N', '.'):
                 # If using the hg38 masked reference, the base will always be upper case
                 # So make sure the comparison to the Sniffles REF is upper case too
                 assert (
