@@ -59,9 +59,6 @@ def initialise_sample_table() -> hl.Table:
     Export the cohort into a sample-level Hail Table.
     """
     training_pop = get_config()['large_cohort'].get('training_pop')
-    print(f'get_multicohort().get_sequencing_groups(): {get_multicohort().get_sequencing_groups()}')
-    for s in get_multicohort().get_sequencing_groups():
-        print(f's: {s.id}, gvcf: {s.gvcf}, dataset: {s.dataset.name}, {s.gvcf_stage_name}')
     entries = [
         {
             's': s.id,
