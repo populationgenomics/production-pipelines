@@ -8,6 +8,8 @@ analysis_type = 'pacbio_cram'
 
 [workflow.long_read_vcf_annotation]
 pipeface_versions = ['v0.6.1']
+sv_callers = ['cutesv']
+snps_indels_callers = ['deeptrio', 'deepvariant']
 
 [resource_overrides.bam_to_cram]
 nthreads = 1
