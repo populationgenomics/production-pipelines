@@ -204,6 +204,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         local_id_mapping = get_batch().read_input(lrs_sg_id_map)
 
         lrs_id_sex_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDandSexMappingFiles, 'lrs_id_sex_mapping')
+        local_sex_mapping =  get_batch().read_input(lrs_id_sex_map)
 
         joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
         mod_job = get_batch().new_bash_job(
@@ -222,7 +223,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             f'--vcf_in {local_vcf} '
             f'--vcf_out {mod_job.output} '
             f'--fa {fasta} '
-            f'--sex_mapping_file {lrs_id_sex_map}',
+            f'--sex_mapping_file {local_sex_mapping}',
         )
 
         # normalise, reheader, then block-gzip and index that result

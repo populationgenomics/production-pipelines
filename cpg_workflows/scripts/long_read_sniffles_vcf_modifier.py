@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 
 from pyfaidx import Fasta
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 
 DUP = 'DUP'
 DEL = 'DEL'
@@ -82,7 +82,7 @@ def cli_main():
     )
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: Path):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: str):
     """
     Scrolls through the SV VCF and performs a few updates:
     - replaces the ALT allele with a symbolic "<TYPE>", derived from the SVTYPE INFO field
@@ -95,14 +95,14 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
         file_in (str): localised, VCF directly from Sniffles
         file_out (str): local batch output path, same VCF with INFO/ALT alterations
         fa (str): path to a reference FastA file, requires an implicit fa.fai index
-        sex_mapping_file (Path): path to a file which maps LRS ID to sex value
+        sex_mapping_file (str): path to a file which maps LRS ID to sex value
     """
 
     # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
     fasta_client = Fasta(filename=fa, as_raw=True)
 
     # Get the dict of LRS ID to sex value
-    sex_mapping = read_sex_mapping_file(sex_mapping_file)
+    sex_mapping = read_sex_mapping_file(to_path(sex_mapping_file))
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
