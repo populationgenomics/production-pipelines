@@ -38,7 +38,7 @@ def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: 
     Returns:
         int, the CN value (copy number)
     """
-    if '0' not in genotype or '1' not in genotype:
+    if '0' not in genotype and '1' not in genotype:
         # if there are no 0s or 1s, we can't determine the CN
         return '.'
 
@@ -129,7 +129,11 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
             # set the reference allele to be the correct reference base
             chrom = l_split[0]
             position = int(l_split[1])
-            new_base = fasta_client.get_seq(chrom, position, position)
+            try:
+                new_base = fasta_client.get_seq(chrom, position, position)
+            except Exception as e:
+                print(f'Error getting sequence for {chrom}:{position} - {e}')
+                continue
 
             # a quick check, if we can
             if l_split[3] not in ('N', '.'):
