@@ -301,7 +301,6 @@ class GatherBatchEvidence(CohortStage):
             [
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_pipeline_qc_docker',
                 'linux_docker',
@@ -376,7 +375,6 @@ class ClusterBatch(CohortStage):
         input_dict |= get_images(
             [
                 'linux_docker',
-                'sv_pipeline_base_docker',
                 'gatk_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
@@ -450,10 +448,8 @@ class GenerateBatchMetrics(CohortStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'linux_docker',
             ],
         )
@@ -543,7 +539,7 @@ class FilterBatch(CohortStage):
             input_dict[f'{caller}_vcf'] = clusterbatch_d[f'clustered_{caller}_vcf']
 
         input_dict |= get_images(
-            ['sv_pipeline_base_docker', 'sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker'],
+            ['sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker'],
         )
 
         input_dict |= get_references(['primary_contigs_list'])
@@ -567,8 +563,6 @@ class FilterBatch(CohortStage):
 @stage(required_stages=FilterBatch)
 class MergeBatchSites(MultiCohortStage):
     """
-    OMG, my first true MultiCohortStage!
-
     This Stage runs between GenerateBatchMetrics and FilterBatch
     This takes the component VCFs from individual batches and merges them into
     a single VCF (one for PESR and one for depth-only calls).
@@ -731,10 +725,8 @@ class GenotypeBatch(CohortStage):
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'linux_docker',
             ],
         )
