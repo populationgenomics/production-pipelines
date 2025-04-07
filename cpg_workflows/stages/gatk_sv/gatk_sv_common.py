@@ -303,8 +303,9 @@ def queue_annotate_sv_jobs(
         'prefix': multicohort.name,
         'ped_file': make_combined_ped(multicohort, prefix),
         'sv_per_shard': 5000,
-        'population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
-        'ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
+        'external_af_ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_ref_bed': config_retrieve(['references', 'gnomad_sv']),
         'use_hail': False,
     }
 
@@ -312,7 +313,6 @@ def queue_annotate_sv_jobs(
         [
             'noncoding_bed',
             'protein_coding_gtf',
-            {'ref_bed': 'external_af_ref_bed'},
             {'contig_list': 'primary_contigs_list'},
         ],
     )

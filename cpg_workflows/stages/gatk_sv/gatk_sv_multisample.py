@@ -774,6 +774,8 @@ class MakeCohortVcf(MultiCohortStage):
         """
         Instead of taking a direct dependency on the previous stage,
         we use the output hash to find all the previous batches
+
+        TODO by default we want do_per_sample_qc to be disabled
         """
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
@@ -799,7 +801,9 @@ class MakeCohortVcf(MultiCohortStage):
             'cohort_name': multicohort.name,
             'batches': all_batch_names,
             'ped_file': str(pedigree_input),
-            'ref_dict': str(get_fasta().with_suffix('.dict')),
+            'reference_fasta': get_fasta(),
+            'reference_fasta_fai': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
             'chr_x': 'chrX',
             'chr_y': 'chrY',
             'min_sr_background_fail_batches': 0.5,
@@ -826,8 +830,6 @@ class MakeCohortVcf(MultiCohortStage):
             [
                 'bin_exclude',
                 'mei_bed',
-                'depth_exclude_list',
-                'empty_file',
                 # same attr, two names
                 'primary_contigs_list',
                 {'contig_list': 'primary_contigs_list'},
@@ -840,11 +842,8 @@ class MakeCohortVcf(MultiCohortStage):
         # images!
         input_dict |= get_images(
             [
+                'gatk_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_base_docker',
-                'sv_pipeline_hail_docker',
-                'sv_pipeline_updates_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_pipeline_qc_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
@@ -1046,7 +1045,7 @@ class FilterGenotypes(MultiCohortStage):
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(multicohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': str(pedigree_input),
-            'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.3),
+            'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.4),
             'recalibrate_gq_args': config_retrieve(['references', 'gatk_sv', 'recalibrate_gq_args']),
             'sl_filter_args': config_retrieve(['references', 'gatk_sv', 'sl_filter_args']),
         }
