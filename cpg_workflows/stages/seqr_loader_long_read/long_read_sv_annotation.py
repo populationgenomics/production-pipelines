@@ -14,7 +14,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre
 from cpg_workflows.stages.seqr_loader import es_password
 from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import (
     find_sgs_to_skip,
-    query_for_lrs_sg_id_mapping,
+    query_for_lrs_sg_id_and_sex_mapping,
 )
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
 from cpg_workflows.utils import get_logger
@@ -29,25 +29,6 @@ from cpg_workflows.workflow import (
     stage,
 )
 from metamist.graphql import gql, query
-
-LRS_IDS_QUERY = gql(
-    """
-    query MyQuery($dataset: String!) {
-    project(name: $dataset) {
-      sequencingGroups(technology: {eq: "long-read"}, type: {eq: "genome"}) {
-          id
-          sample {
-            externalId
-            meta
-            participant {
-              externalId
-            }
-          }
-        }
-      }
-    }
-    """,
-)
 
 VCF_QUERY = gql(
     """
@@ -66,7 +47,7 @@ VCF_QUERY = gql(
 
 
 @cache
-def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -> dict[str, dict]:
+def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None, sv_callers: tuple[str] | None) -> dict[str, dict]:
     """
     query metamist for the PacBio SV VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -75,6 +56,7 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -
     Args:
         dataset_name (str):
         pipeface_versions (tuple[str] | None): a tuple of pipeface versions to filter on (hashable, so can be cached)
+        sv_callers (tuple[str] | None): a tuple of SV callers to filter on (hashable, so can be cached)
 
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
@@ -84,7 +66,12 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if not analysis['meta'].get('variant_type') == 'SV':
+            if analysis['meta'].get('variant_type') != 'SV':
+                continue
+            if sv_callers and analysis['meta'].get('caller') not in sv_callers:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed SV caller: {sv_callers}',
+                )
                 continue
             if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
                 get_logger().info(
@@ -123,14 +110,15 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -
 
 
 @stage
-class WriteSVLRSIDtoSGIDMappingFile(MultiCohortStage):
+class WriteSVLRSIDtoSGIDandSexMappingFiles(MultiCohortStage):
     """
     Write the LRS ID to SG ID mapping to a file
     """
 
     def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
         return {
-            'lrs_sgid_mapping': self.prefix / 'lrs_SV_sgid_mapping.txt',
+            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.txt',
+            'lrs_id_sex_mapping': self.prefix / 'lrs_id_sex_mapping.txt',
         }
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
@@ -140,17 +128,22 @@ class WriteSVLRSIDtoSGIDMappingFile(MultiCohortStage):
         """
         output = self.expected_outputs(multicohort)
 
-        lrs_sgid_mapping = query_for_lrs_sg_id_mapping([d.name for d in multicohort.get_datasets()])
-        mapping_file_path = self.prefix / 'lrs_SV_sgid_mapping.txt'
-        get_logger().info(f'Writing LRS ID to SG ID mapping to {mapping_file_path}')
-        with mapping_file_path.open('w') as f:
+        lrs_sgid_mapping, lrs_id_sex_mapping = query_for_lrs_sg_id_and_sex_mapping([d.name for d in multicohort.get_datasets()])
+        sgid_mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
+        sex_mapping_file_path = self.prefix / 'lrs_id_sex_mapping.txt'
+        get_logger().info(f'Writing LRS ID to SG ID mapping to {sgid_mapping_file_path}')
+        with sgid_mapping_file_path.open('w') as f:
             for lrs_id, sg_id in lrs_sgid_mapping.items():
                 f.write(f'{lrs_id} {sg_id}\n')
+        get_logger().info(f'Writing LRS ID to participant sex mapping to {sex_mapping_file_path}')
+        with sex_mapping_file_path.open('w') as f:
+            for lrs_id, sex_val in lrs_id_sex_mapping.items():
+                f.write(f'{lrs_id} {sex_val}\n')
 
         return self.make_outputs(multicohort, data=output)
 
 
-@stage(required_stages=[WriteSVLRSIDtoSGIDMappingFile])
+@stage(required_stages=[WriteSVLRSIDtoSGIDandSexMappingFiles])
 class ReFormatPacBioSVs(SequencingGroupStage):
     """
     take each of the long-read SV VCFs, and re-format the contents
@@ -184,9 +177,17 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         )
         if pipeface_versions:
             pipeface_versions = tuple(pipeface_versions)
+        sv_callers = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'sv_callers'],
+            default=None,
+        )
+        if sv_callers:
+            sv_callers = tuple(sv_callers)
+
         sg_vcfs = query_for_sv_vcfs(
             dataset_name=dataset_name,
             pipeface_versions=pipeface_versions,
+            sv_callers=sv_callers,
         )
         if sg.id not in sg_vcfs:
             return None
@@ -196,8 +197,10 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         lr_sv_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDMappingFile, 'lrs_sgid_mapping')
-        local_mapping = get_batch().read_input(lrs_sg_id_map)
+        lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDandSexMappingFiles, 'lrs_sgid_mapping')
+        local_id_mapping = get_batch().read_input(lrs_sg_id_map)
+
+        lrs_id_sex_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDandSexMappingFiles, 'lrs_id_sex_mapping')
 
         joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
         mod_job = get_batch().new_bash_job(
@@ -211,14 +214,12 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
-        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
         mod_job.command(
             'modify_sniffles '
             f'--vcf_in {local_vcf} '
             f'--vcf_out {mod_job.output} '
             f'--fa {fasta} '
-            f'--sex {sex} '
-            '--sv',
+            f'--sex_mapping_file {lrs_id_sex_map}',
         )
 
         # normalise, reheader, then block-gzip and index that result
@@ -230,7 +231,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
         tabix_job.command(
-            f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}',
+            f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',
         )
         tabix_job.command(
             f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',

@@ -3,11 +3,25 @@ from argparse import ArgumentParser
 
 from pyfaidx import Fasta
 
+from cpg_utils import Path
+
 DUP = 'DUP'
 DEL = 'DEL'
 CHRX = 'chrX'
 CHRY = 'chrY'
 CHRM = 'chrM'
+
+def read_sex_mapping_file(sex_mapping_file_path: Path) -> dict[str, int]:
+    """
+    Read in the mapping file and return the mapping of LRS ID to sex value
+    """
+    sex_mapping = {}
+    with open(sex_mapping_file_path, 'r') as f:
+        lines = f.readlines()
+        for line in lines:
+            sex_mapping[line.split()[0]] = int(line.split()[1])
+
+    return sex_mapping
 
 
 def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: int) -> int:
@@ -26,6 +40,9 @@ def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: 
     Returns:
         int, the CN value (copy number)
     """
+    if '0' not in genotype or '1' not in genotype:
+        # if there are no 0s or 1s, we can't determine the CN
+        return '.'
 
     # determine the baseline copy number
     # conditions where the copy number is 1
@@ -55,31 +72,22 @@ def cli_main():
     parser.add_argument('--vcf_in', help='Path to a localised VCF, this will be modified', required=True)
     parser.add_argument('--vcf_out', help='Path to an output location for the modified VCF', required=True)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
-    parser.add_argument('--sex', help='0=Unknown,1=Male, 2=Female', default=0, type=int)
-    parser.add_argument(
-        '--sv',
-        help='Boolean flag to indicate if the VCF is SVs. False=SNPs_Indels',
-        action='store_true',
-    )
+    parser.add_argument('--sex_mapping_file', help='Path to a file containing LRS IDs and participant sexes', required=True)
     args = parser.parse_args()
     modify_sniffles_vcf(
         file_in=args.vcf_in,
         file_out=args.vcf_out,
         fa=args.fa,
-        sex=args.sex,
-        sv=args.sv,
+        sex_mapping_file=args.sex_mapping_file,
     )
 
 
-def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: bool = True):
+def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: Path):
     """
-    Scrolls through the VCF and performs a few updates:
-
-    - replaces the External Sample ID with the internal CPG identifier (if both are provided)
-
-    And if the VCF contains SVs:
+    Scrolls through the SV VCF and performs a few updates:
     - replaces the ALT allele with a symbolic "<TYPE>", derived from the SVTYPE INFO field
     - swaps out the REF (huge for deletions, a symbolic "N" for insertions) with the ref base
+    - adds a CN field to the FORMAT field, and fills it with copy number values based on the genotype/sex
 
     rebuilds the VCF following those edits, and writes the compressed data back out
 
@@ -87,12 +95,14 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: 
         file_in (str): localised, VCF directly from Sniffles
         file_out (str): local batch output path, same VCF with INFO/ALT alterations
         fa (str): path to a reference FastA file, requires an implicit fa.fai index
-        sex (int): 0=Unknown, 1=Male, 2=Female
-        sv (bool): True=SV, False=SNPs_Indels
+        sex_mapping_file (Path): path to a file which maps LRS ID to sex value
     """
 
     # as_raw as a specifier here means that get_seq queries are just the sequence, no contig ID attached
     fasta_client = Fasta(filename=fa, as_raw=True)
+
+    # Get the dict of LRS ID to sex value
+    sex_mapping = read_sex_mapping_file(sex_mapping_file)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
@@ -104,18 +114,14 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: 
 
             # alter the sample line in the header
             if line.startswith('#'):
-                if 'FORMAT=<ID=ID' in line and sv:
+                if 'FORMAT=<ID=GT' in line:
                     f_out.write('##FORMAT=<ID=RD_CN,Number=1,Type=Integer,Description="Copy number of this variant">\n')
 
-                if 'FORMAT=<ID=AF,Number=1' in line and not sv:
-                    # Correct the AF field to have 'Number=A' for SNPs/Indels, to allow for multiple AF values
-                    line = line.replace('Number=1', 'Number=A')
+                if 'CHROM' in line:
+                    # Find the sample IDs in the header line to match to the input sex values
+                    l_split = line.rstrip().split('\t')
+                    sample_ids = l_split[9:]
 
-                f_out.write(line)
-                continue
-
-            if not sv:
-                # if we're not dealing with SVs, just write the line and move on
                 f_out.write(line)
                 continue
 
@@ -148,17 +154,18 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex: int = 0, sv: 
             # get the SVTYPE, always present
             sv_type = info_dict['SVTYPE']
 
-            # pull out the GT section of the FORMAT field
-            gt_string = dict(zip(l_split[8].split(':'), l_split[9].split(':')))['GT']
-
-            # determine the copy number, based on deviation from the baseline
-            copy_number = translate_var_and_sex_to_cn(contig=chrom, var_type=sv_type, genotype=gt_string, sex=sex)
-
             # update the FORMAT schema field
             l_split[8] = f'{l_split[8]}:CN'
 
-            # update the FORMAT content field
-            l_split[9] = f'{l_split[9]}:{copy_number}'
+            for i, sample_id in enumerate(sample_ids, start=9):
+                # pull out the GT section of the FORMAT field
+                gt_string = dict(zip(l_split[8].split(':'), l_split[i].split(':')))['GT']
+
+                # determine the copy number, based on deviation from the baseline
+                copy_number = translate_var_and_sex_to_cn(contig=chrom, var_type=sv_type, genotype=gt_string, sex=sex_mapping[sample_id])
+
+                # update the FORMAT content field for this sample
+                l_split[i] = f'{l_split[i]}:{copy_number}'
 
             # replace the alt with a symbolic String
             l_split[4] = f'<{sv_type}>'

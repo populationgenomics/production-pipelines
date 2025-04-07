@@ -58,6 +58,7 @@ LRS_IDS_QUERY = gql(
             meta
             participant {
               externalId
+              reportedSex
             }
           }
         }
@@ -68,7 +69,7 @@ LRS_IDS_QUERY = gql(
 
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None) -> dict[str, dict]:
+def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None, snps_indels_callers: tuple[str] | None) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -89,6 +90,11 @@ def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] 
             if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
+                )
+                continue
+            if snps_indels_callers and analysis['meta'].get('caller') not in snps_indels_callers:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed caller: {snps_indels_callers}',
                 )
                 continue
             if not analysis['output'].endswith('snp_indel.phased.vcf.gz'):
@@ -142,11 +148,12 @@ def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
     return sgs_to_skip
 
 
-def query_for_lrs_sg_id_mapping(datasets: list[str]):
+def query_for_lrs_sg_id_and_sex_mapping(datasets: list[str]):
     """
-    Query metamist for the LRS ID corresponding to each sequencing group ID
+    Query metamist for the LRS ID corresponding to each sequencing group ID, and to its participant's sex
     """
     lrs_sgid_mapping = {}
+    lrs_id_sex_mapping = {}
     for dataset in datasets:
         if config_retrieve(['workflow', 'access_level']) == 'test' and not dataset.endswith('-test'):
             dataset = dataset + '-test'
@@ -161,7 +168,8 @@ def query_for_lrs_sg_id_mapping(datasets: list[str]):
                 )
                 continue
             lrs_sgid_mapping[lrs_id] = sg['id']
-    return lrs_sgid_mapping
+            lrs_id_sex_mapping[lrs_id] = participant['reportedSex']
+    return lrs_sgid_mapping, lrs_id_sex_mapping
 
 
 @stage
@@ -182,7 +190,7 @@ class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
         """
         output = self.expected_outputs(multicohort)
 
-        lrs_sgid_mapping = query_for_lrs_sg_id_mapping([d.name for d in multicohort.get_datasets()])
+        lrs_sgid_mapping, _ = query_for_lrs_sg_id_and_sex_mapping([d.name for d in multicohort.get_datasets()])
         mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
         get_logger().info(f'Writing LRS ID to SG ID mapping to {mapping_file_path}')
         with mapping_file_path.open('w') as f:
@@ -226,9 +234,16 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         )
         if pipeface_versions:
             pipeface_versions = tuple(pipeface_versions)
+        snps_indels_callers = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'snps_indels_callers'],
+            default=None,
+        )
+        if snps_indels_callers:
+            snps_indels_callers = tuple(snps_indels_callers)
         sg_vcfs = query_for_snps_indels_vcfs(
             dataset_name=dataset_name,
             pipeface_versions=pipeface_versions,
+            snps_indels_callers=snps_indels_callers,
         )
         if sg.id not in sg_vcfs:
             return None
@@ -239,35 +254,24 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
 
         lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteLRSIDtoSGIDMappingFile, 'lrs_sgid_mapping')
-        local_mapping = get_batch().read_input(lrs_sg_id_map)
+        local_id_mapping = get_batch().read_input(lrs_sg_id_map)
 
         joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
-        mod_job = get_batch().new_bash_job(
-            f'Convert {"joint-called " if joint_called else ""}{lr_snps_indels_vcf} prior to annotation',
-        )
-        mod_job.storage('10Gi')
-        mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
         # mandatory argument
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
         fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
-        # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
-        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
-        mod_job.command(
-            f'modify_sniffles --vcf_in {local_vcf} --vcf_out {mod_job.output} --fa {fasta} --sex {sex} ',
-        )
-
         # normalise, reheader, then block-gzip and index that result
         tabix_job = get_batch().new_job(
-            f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}',
+            f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}: {"joint-called " if joint_called else ""}{lr_snps_indels_vcf}',
             {'tool': 'bcftools'},
         )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
         tabix_job.command(
-            f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_mapping} -o {tabix_job.reheadered}',
+            f'bcftools view -Ov {local_vcf} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',
         )
         tabix_job.command(
             f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
@@ -277,7 +281,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
         # write from temp storage into GCP
         get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(target=sg, jobs=[mod_job, tabix_job], data=expected_outputs)
+        return self.make_outputs(target=sg, jobs=[tabix_job], data=expected_outputs)
 
 
 @stage(required_stages=ReFormatPacBioSNPsIndels)
