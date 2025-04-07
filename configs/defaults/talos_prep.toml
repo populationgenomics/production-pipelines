@@ -1,0 +1,13 @@
+[workflow]
+name = "talos_prep"
+
+mane_version = "1.4"
+ensembl_version = "113"
+
+#last_stages = ['ExtractDataFromDatasetMt']
+
+[annotations]
+# this contains the gnomad exomes & genomes data
+# generated using this echtvar image https://github.com/populationgenomics/images/tree/main/images/echtvar
+# and this config https://github.com/populationgenomics/images/blob/main/images/echtvar/config.json
+echtvar_gnomad = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"

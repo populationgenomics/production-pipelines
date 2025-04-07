@@ -5,7 +5,7 @@ from setuptools import find_packages, setup
 setup(
     name='cpg_workflows',
     # This tag is automatically updated by bumpversion
-    version='1.36.10',
+    version='1.36.21',
     description='CPG workflows for Hail Batch',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -16,7 +16,7 @@ setup(
         'cpg-utils>=5.1.1',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
-        'hail==0.2.133',  # Pin Hail at CPG's installed version
+        'hail>=0.2.133',
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
         'grpcio-status>=1.48,<1.50',  # Avoid dependency resolution backtracking
@@ -86,6 +86,12 @@ setup(
             'combine_exomiser_genes = cpg_workflows.scripts.combine_exomiser_gene_tsvs:cli_main',
             # script for combining multiple per-family exomiser Variant-level TSVs into a single JSON & Hail Table
             'combine_exomiser_variants = cpg_workflows.scripts.combine_exomiser_variant_tsvs:cli_main',
+            # script for extraction a region-limited part of a MatrixTable into VCF
+            'extract_vcf_from_mt = cpg_workflows.scripts.talos_prep.extract_fragmented_vcf_from_mt:cli_main',
+            # parse the annotated VCF into a HT
+            'convert_annotated_vcf_to_ht = cpg_workflows.scripts.talos_prep.convert_annotated_vcf_to_ht:cli_main',
+            # hop the annotations from a Hail Table to a MatrixTable
+            'transfer_annotations_to_vcf = cpg_workflows.scripts.talos_prep.transfer_annotations_to_vcf:cli_main',
         ],
     },
 )
