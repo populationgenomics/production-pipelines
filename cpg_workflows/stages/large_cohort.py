@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 HAIL_QUERY: Final = 'hail query'
 
 
+# TODO, update analysis_meta here to pull the gvcf.type, and store this in metamist.
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
