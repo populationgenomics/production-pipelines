@@ -8,7 +8,7 @@ from os.path import join
 
 import hail as hl
 
-from cpg_utils.config import get_config, reference_path
+from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import generator_chunks, read_hail
 
@@ -63,6 +63,8 @@ GENCODE_FILE_HEADER = [
     'phase',
     'info',
 ]
+
+POPULATION_PREFIX = config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
 
 
 # yoinking some methods out of hail_scripts.computed_fields
@@ -180,7 +182,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
         hail_version=hl.version(),
         datasetType='SV',
     )
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
+    if sequencing_type := config_retrieve(['workflow', 'sequencing_type']):
         # Map to Seqr-style string
         # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
         mt = mt.annotate_globals(
@@ -228,8 +230,8 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpo
         end=mt.info.END,
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
-        gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
-        gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
+        gnomad_svs_ID=mt.info[f'{POPULATION_PREFIX}_SVID'],
+        gnomad_svs_AF=mt.info[f'{POPULATION_PREFIX}_AF'],
         gnomad_svs_AC=hl.missing('float64'),
         gnomad_svs_AN=hl.missing('float64'),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
