@@ -3,15 +3,13 @@ from argparse import ArgumentParser
 
 from pyfaidx import Fasta
 
-from cpg_utils import Path, to_path
-
 DUP = 'DUP'
 DEL = 'DEL'
 CHRX = 'chrX'
 CHRY = 'chrY'
 CHRM = 'chrM'
 
-def read_sex_mapping_file(sex_mapping_file_path: Path) -> dict[str, int]:
+def read_sex_mapping_file(sex_mapping_file_path: str) -> dict[str, int]:
     """
     Read in the mapping file and return the mapping of LRS ID to sex value
     """
@@ -102,7 +100,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
     fasta_client = Fasta(filename=fa, as_raw=True)
 
     # Get the dict of LRS ID to sex value
-    sex_mapping = read_sex_mapping_file(to_path(sex_mapping_file))
+    sex_mapping = read_sex_mapping_file(sex_mapping_file)
 
     # read and write compressed. This is only a single sample VCF, but... it's good practice
     with gzip.open(file_in, 'rt') as f, gzip.open(file_out, 'wt') as f_out:
