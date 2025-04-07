@@ -68,12 +68,12 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None, s
         for analysis in sg['analyses']:
             if analysis['meta'].get('variant_type') != 'SV':
                 continue
-            if sv_callers and analysis['meta'].get('caller') not in sv_callers:
+            if sv_callers and analysis['meta'].get('caller', 'unkown') not in sv_callers:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed SV caller: {sv_callers}',
                 )
                 continue
-            if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
+            if pipeface_versions and analysis['meta'].get('pipeface_version', 'unkown') not in pipeface_versions:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
                 )
@@ -96,6 +96,9 @@ def query_for_sv_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None, s
             sg_vcfs[sg_id] = single_sample_vcf
             continue
         sg_vcfs[sg_id] = joint_called_vcfs[sg_id]
+    for sg_id, joint_called_vcf in joint_called_vcfs.items():
+        if sg_id not in sg_vcfs:
+            sg_vcfs[sg_id] = joint_called_vcf
 
     # Remove the parents entries if their family has a joint-called VCF
     sgs_to_skip = find_sgs_to_skip(sg_vcfs)

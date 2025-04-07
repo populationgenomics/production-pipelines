@@ -87,12 +87,12 @@ def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] 
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if pipeface_versions and analysis['meta'].get('pipeface_version') not in pipeface_versions:
+            if pipeface_versions and analysis['meta'].get('pipeface_version', 'unkown') not in pipeface_versions:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
                 )
                 continue
-            if snps_indels_callers and analysis['meta'].get('caller') not in snps_indels_callers:
+            if snps_indels_callers and analysis['meta'].get('caller', 'unkown') not in snps_indels_callers:
                 get_logger().info(
                     f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed caller: {snps_indels_callers}',
                 )
@@ -117,6 +117,9 @@ def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] 
             sg_vcfs[sg_id] = single_sample_vcf
             continue
         sg_vcfs[sg_id] = joint_called_vcfs[sg_id]
+    for sg_id, joint_called_vcf in joint_called_vcfs.items():
+        if sg_id not in sg_vcfs:
+            sg_vcfs[sg_id] = joint_called_vcf
 
     # Remove the parents entries if their family has a joint-called VCF
     sgs_to_skip = find_sgs_to_skip(sg_vcfs)
