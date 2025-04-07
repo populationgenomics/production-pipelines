@@ -109,7 +109,7 @@ class GatherSampleEvidence(SequencingGroupStage):
             reference_dict=str(get_fasta().with_suffix('.dict')),
             reference_version='38',
             # a cost-improvement in cloud environments
-            move_bam_or_cram_files=True
+            move_bam_or_cram_files=True,
         )
 
         # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
