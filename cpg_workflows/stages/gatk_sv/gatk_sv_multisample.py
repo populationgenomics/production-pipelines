@@ -797,6 +797,13 @@ class MakeCohortVcf(MultiCohortStage):
         disc_files = [gatherbatchevidence_outputs[cohort]['merged_PE'] for cohort in all_batch_names]
         median_cov_files = [gatherbatchevidence_outputs[cohort]['median_cov'] for cohort in all_batch_names]
 
+        track_names = config_retrieve(['references', 'gatk_sv', 'clustering_track_names'])
+        track_bed_files = [
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_sr']),
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_sd']),
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_rm']),
+        ]
+
         input_dict: dict[str, Any] = {
             'cohort_name': multicohort.name,
             'batches': all_batch_names,
@@ -824,6 +831,8 @@ class MakeCohortVcf(MultiCohortStage):
             'depth_gt_rd_sep_files': depth_depth_cutoff,
             'median_coverage_files': median_cov_files,
             'rf_cutoff_files': filter_batch_cutoffs,
+            'track_names': track_names,
+            'track_bed_files': track_bed_files,
         }
 
         input_dict |= get_references(
