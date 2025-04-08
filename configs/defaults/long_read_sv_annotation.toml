@@ -3,6 +3,9 @@ name = 'long_read_sv_annotation'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 status_reporter = 'metamist'
 
+# update this when cpg_workflows.scripts.get_gencode_gtf.sh is re-run
+gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
+
 [references.gatk_sv]
 # a couple of annotation arguments are not files
 # github.com/broadinstitute/gatk-sv/blob/main/inputs/templates/test/AnnotateVcf/AnnotateVcf.json.tmpl#L4-L8
@@ -15,3 +18,12 @@ strvctvre_phylop = 'gs://cpg-common-test/references/hg38.phyloP100way.bw'
 gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2023-07-13-4.4.0.0-43-gd79823f9c-NIGHTLY-SNAPSHOT"
 sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:5994670"
 sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2023-09-13-v0.28.3-beta-af8362e3"
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'

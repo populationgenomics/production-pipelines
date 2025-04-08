@@ -38,6 +38,7 @@ VCF_QUERY = gql(
     sequencingGroups {
       id
       analyses(type: {eq: "pacbio_vcf"}) {
+        meta
         output
         outputs
       }
@@ -46,31 +47,167 @@ VCF_QUERY = gql(
 }""",
 )
 
+LRS_IDS_QUERY = gql(
+    """
+    query MyQuery($dataset: String!) {
+    project(name: $dataset) {
+      sequencingGroups(technology: {eq: "long-read"}, type: {eq: "genome"}) {
+          id
+          sample {
+            externalId
+            meta
+            participant {
+              externalId
+              reportedSex
+            }
+          }
+        }
+      }
+    }
+    """,
+)
+
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str) -> dict[str, str]:
+def query_for_snps_indels_vcfs(
+    dataset_name: str,
+    pipeface_versions: tuple[str] | None,
+    snps_indels_callers: tuple[str] | None,
+) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
     this is cached - used in a SequencingGroupStage, but we only want to query for it once instead of once/SG
 
     Args:
-        dataset_name (str):
+        dataset_name (str): the name of the dataset
+        pipeface_versions (tuple[str] | None): a tuple of allowed pipeface versions (hashable, so can be cached)
 
     Returns:
         a dictionary of the SG IDs and their phased SNPs Indels VCF
     """
-    return_dict: dict[str, str] = {}
+    single_sample_vcfs: dict[str, dict] = {}
+    joint_called_vcfs: dict[str, dict] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if analysis['output'].endswith('snp_indel.phased.vcf.gz'):
-                return_dict[sg['id']] = analysis['output']
+            if pipeface_versions and analysis['meta'].get('pipeface_version', 'unkown') not in pipeface_versions:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
+                )
+                continue
+            if snps_indels_callers and analysis['meta'].get('caller', 'unkown') not in snps_indels_callers:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed caller: {snps_indels_callers}',
+                )
+                continue
+            if not analysis['output'].endswith('snp_indel.phased.vcf.gz'):
+                continue
+            if analysis['meta'].get('joint_called', False):
+                joint_called_vcfs[sg['id']] = {
+                    'output': analysis['output'],
+                    'meta': analysis['meta'],
+                }
+            else:
+                single_sample_vcfs[sg['id']] = {
+                    'output': analysis['output'],
+                    'meta': analysis['meta'],
+                }
+
+    # Prefer the joint-called VCFs over the single-sample VCFs
+    sg_vcfs = {}
+    for sg_id, single_sample_vcf in single_sample_vcfs.items():
+        if sg_id not in joint_called_vcfs:
+            sg_vcfs[sg_id] = single_sample_vcf
+            continue
+        sg_vcfs[sg_id] = joint_called_vcfs[sg_id]
+    for sg_id, joint_called_vcf in joint_called_vcfs.items():
+        if sg_id not in sg_vcfs:
+            sg_vcfs[sg_id] = joint_called_vcf
+
+    # Remove the parents entries if their family has a joint-called VCF
+    sgs_to_skip = find_sgs_to_skip(sg_vcfs)
+    return_dict = {}
+    for sg_id, vcf_analysis in sg_vcfs.items():
+        if sg_id in sgs_to_skip:
+            get_logger().info(f'Skipping {sg_id} as it is a parent in a joint-called VCF')
+            continue
+        return_dict[sg_id] = vcf_analysis
 
     return return_dict
 
 
+def find_sgs_to_skip(sg_vcf_dict: dict[str, dict]) -> set[str]:
+    """
+    Find the SGs to skip in the reformatting stage
+    These are the parents if the family has been joint-called
+    """
+    sgs_to_skip = set()
+    joint_called_families = set()
+    for sg_id, vcf_analysis in sg_vcf_dict.items():
+        analysis_meta = vcf_analysis['meta']
+        if analysis_meta.get('joint_called', False):
+            joint_called_families.add(analysis_meta.get('family_id', ''))
+    for sg_id, vcf_analysis in sg_vcf_dict.items():
+        analysis_meta = vcf_analysis['meta']
+        if analysis_meta.get('family_id', '') in joint_called_families and not analysis_meta.get('joint_called', False):
+            sgs_to_skip.add(sg_id)
+    return sgs_to_skip
+
+
+def query_for_lrs_sg_id_and_sex_mapping(datasets: list[str]):
+    """
+    Query metamist for the LRS ID corresponding to each sequencing group ID, and to its participant's sex
+    """
+    lrs_sgid_mapping = {}
+    lrs_id_sex_mapping = {}
+    for dataset in datasets:
+        if config_retrieve(['workflow', 'access_level']) == 'test' and not dataset.endswith('-test'):
+            dataset = dataset + '-test'
+        query_results = query(LRS_IDS_QUERY, variables={'dataset': dataset})
+        for sg in query_results['project']['sequencingGroups']:
+            sample = sg['sample']
+            participant = sample['participant']
+            lrs_id = sample['meta'].get('lrs_id', None)
+            if not lrs_id:
+                get_logger().warning(
+                    f'{dataset} :: No LRS ID found for {participant["externalId"]} - {sample["externalId"]}',
+                )
+                continue
+            lrs_sgid_mapping[lrs_id] = sg['id']
+            lrs_id_sex_mapping[lrs_id] = participant['reportedSex']
+    return lrs_sgid_mapping, lrs_id_sex_mapping
+
+
 @stage
+class WriteLRSIDtoSGIDMappingFile(MultiCohortStage):
+    """
+    Write the LRS ID to SG ID mapping to a file
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {
+            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.txt',
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Write the LRS ID to SG ID mapping to a file
+        This is used by bcftools reheader to update the sample IDs in the VCFs
+        """
+        output = self.expected_outputs(multicohort)
+
+        lrs_sgid_mapping, _ = query_for_lrs_sg_id_and_sex_mapping([d.name for d in multicohort.get_datasets()])
+        mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
+        get_logger().info(f'Writing LRS ID to SG ID mapping to {mapping_file_path}')
+        with mapping_file_path.open('w') as f:
+            for lrs_id, sg_id in lrs_sgid_mapping.items():
+                f.write(f'{lrs_id} {sg_id}\n')
+
+        return self.make_outputs(multicohort, data=output)
+
+
+@stage(required_stages=[WriteLRSIDtoSGIDMappingFile])
 class ReFormatPacBioSNPsIndels(SequencingGroupStage):
     """
     take each of the long-read SNPs Indels VCFs, and re-format the contents
@@ -86,58 +223,72 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_snps_indels.vcf.bgz.tbi',
         }
 
-    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         a python job to change the VCF contents
         - use a python job to modify all VCF lines, in-line
-        - use a follow-up job to block-gzip and index
+        - a bcftools job to reheader the VCF with the replacement sample IDs, and then sort
+        - use a follow-up job to block-gzip
+        - this is skipped for the parents in trio joint-called VCFs
         """
-
-        # find the vcf for this SG
-        query_result = query_for_snps_indels_vcfs(dataset_name=sg.dataset.name)
+        # find the VCFs for this dataset
+        dataset_name = (
+            sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
+        )
+        pipeface_versions = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
+            default=None,
+        )
+        if pipeface_versions:
+            pipeface_versions = tuple(pipeface_versions)
+        snps_indels_callers = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'snps_indels_callers'],
+            default=None,
+        )
+        if snps_indels_callers:
+            snps_indels_callers = tuple(snps_indels_callers)
+        sg_vcfs = query_for_snps_indels_vcfs(
+            dataset_name=dataset_name,
+            pipeface_versions=pipeface_versions,
+            snps_indels_callers=snps_indels_callers,
+        )
+        if sg.id not in sg_vcfs:
+            return None
 
         expected_outputs = self.expected_outputs(sg)
 
-        # instead of handling, we should probably just exclude this and run again
-        if sg.id not in query_result:
-            raise ValueError(f'No SNPsIndels VCFs recorded for {sg.id} in dataset {sg.dataset.name}')
-
-        lr_snps_indels_vcf: str = query_result[sg.id]
+        lr_snps_indels_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_snps_indels_vcf)
 
-        mod_job = get_batch().new_bash_job(f'Convert {lr_snps_indels_vcf} prior to annotation')
-        mod_job.storage('10Gi')
-        mod_job.image(config_retrieve(['workflow', 'driver_image']))
+        lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteLRSIDtoSGIDMappingFile, 'lrs_sgid_mapping')
+        local_id_mapping = get_batch().read_input(lrs_sg_id_map)
+
+        joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
 
         # mandatory argument
         ref_fasta = config_retrieve(['workflow', 'ref_fasta'])
         fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
-        # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
-        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
-        mod_job.command(
-            'modify_sniffles '
-            f'--vcf_in {local_vcf} '
-            f'--vcf_out {mod_job.output} '
-            f'--new_id {sg.id} '
-            f'--fa {fasta} '
-            f'--sex {sex} ',
+        # normalise, reheader, then block-gzip and index that result
+        tabix_job = get_batch().new_job(
+            f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}: {"joint-called " if joint_called else ""}{lr_snps_indels_vcf}',
+            {'tool': 'bcftools'},
         )
-
-        # normalise, then block-gzip and index that result
-        tabix_job = get_batch().new_job(f'Normalising, BGZipping, and Indexing for {sg.id}', {'tool': 'bcftools'})
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
         tabix_job.command(
-            f'bcftools norm -m -any -f {fasta} -c s {mod_job.output} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
+            f'bcftools view -Ov {local_vcf} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',
+        )
+        tabix_job.command(
+            f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
         )
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
         get_batch().write_output(tabix_job.vcf_out, str(expected_outputs['vcf']).removesuffix('.vcf.bgz'))
 
-        return self.make_outputs(target=sg, jobs=[mod_job, tabix_job], data=expected_outputs)
+        return self.make_outputs(target=sg, jobs=[tabix_job], data=expected_outputs)
 
 
 @stage(required_stages=ReFormatPacBioSNPsIndels)
@@ -154,21 +305,28 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        Use bcftools to merge all the VCFs
+        Use bcftools to merge all the VCFs, and then fill in the tags (requires bcftools 1.12+)
         """
 
         outputs = self.expected_outputs(multicohort)
 
         # do a bcftools merge on all input files
         modified_vcfs = inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)
+        if len(modified_vcfs) == 1:
+            get_logger().info('Only one VCF found, skipping merge')
+            return None
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
-            for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in multicohort.get_sequencing_group_ids()]
+            for each_vcf in [
+                str(modified_vcfs.get(sgid, {}).get('vcf'))
+                for sgid in multicohort.get_sequencing_group_ids()
+                if sgid in modified_vcfs
+            ]
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
-        merge_job.image(image=image_path('bcftools'))
+        merge_job.image(image=image_path('bcftools_120'))
 
         # guessing at resource requirements
         merge_job.cpu(4)
@@ -183,10 +341,11 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         # -m: merge strategy
         # -0: compression level
         merge_job.command(
-            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m none -0',  # type: ignore
+            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
-        merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
+        merge_job.command(
+            f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
+        )
 
         # write the result out
         get_batch().write_output(merge_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))  # type: ignore
@@ -194,7 +353,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         return self.make_outputs(multicohort, data=outputs, jobs=merge_job)
 
 
-@stage(required_stages=MergeLongReadSNPsIndels)
+@stage(required_stages=[ReFormatPacBioSNPsIndels, MergeLongReadSNPsIndels])
 class SiteOnlyVCFs(MultiCohortStage):
     """
     Get the site-only VCFs from the merged VCF
@@ -228,10 +387,15 @@ class SiteOnlyVCFs(MultiCohortStage):
         if config_retrieve(['workflow', 'exclude_intervals_path'], default=None):
             exclude_intervals_path = to_path(config_retrieve(['workflow', 'exclude_intervals_path']))
 
+        if len(inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)) == 1:
+            merged_vcf_path = inputs.as_path(multicohort, ReFormatPacBioSNPsIndels, 'vcf')
+        else:
+            merged_vcf_path = inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf')
+
         vcf_jobs = split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
             b=get_batch(),
             scatter_count=scatter_count,
-            merged_vcf_path=inputs.as_path(multicohort, MergeLongReadSNPsIndels, 'vcf'),
+            merged_vcf_path=merged_vcf_path,
             tmp_bucket=self.tmp_prefix / 'tmp',
             out_siteonly_vcf_part_paths=out_siteonly_vcf_part_paths,
             intervals_path=intervals_path,
@@ -283,7 +447,7 @@ class VepLRS(MultiCohortStage):
         return self.make_outputs(multicohort, outputs, jobs)
 
 
-@stage(required_stages=[MergeLongReadSNPsIndels, VepLRS])
+@stage(required_stages=[ReFormatPacBioSNPsIndels, MergeLongReadSNPsIndels, VepLRS])
 class AnnotateCohortLRSNPsIndels(MultiCohortStage):
     """
     First step to transform annotated SNPs Indels callset data into a seqr ready format
@@ -301,7 +465,11 @@ class AnnotateCohortLRSNPsIndels(MultiCohortStage):
         """
         outputs = self.expected_outputs(multicohort)
 
-        vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
+        if len(inputs.as_dict_by_target(ReFormatPacBioSNPsIndels)) == 1:
+            vcf_path = inputs.as_path(multicohort, ReFormatPacBioSNPsIndels, 'vcf')
+        else:
+            vcf_path = inputs.as_path(target=multicohort, stage=MergeLongReadSNPsIndels, key='vcf')
+
         vep_ht_path = inputs.as_path(target=multicohort, stage=VepLRS, key='ht')
 
         job = annotate_cohort_jobs_snps_indels(
