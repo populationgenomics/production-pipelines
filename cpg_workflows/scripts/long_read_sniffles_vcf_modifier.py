@@ -157,7 +157,7 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
             sv_type = info_dict['SVTYPE']
 
             # update the FORMAT schema field
-            l_split[8] = f'{l_split[8]}:CN'
+            l_split[8] = f'{l_split[8]}:RD_CN'
 
             for i, sample_id in enumerate(sample_ids, start=9):
                 # pull out the GT section of the FORMAT field
