@@ -132,7 +132,12 @@ def main(
     project_analyses = query(FIND_ANALYSES, {'project': dataset})['project']['analyses']
     analysis_by_path = {analysis['output']: analysis for analysis in project_analyses if 'nagim' in analysis['output']}
     project_samples = query(FIND_SAMPLES, {'project': dataset})['project']['samples']
-    sample_by_id = {sample['id']: sample['sequencingGroups'][0]['id'] for sample in project_samples}
+
+    sample_by_id = {
+        sample['id']: sample['sequencingGroups'][0]['id']
+        for sample in project_samples
+        if sample['sequencingGroups'] and sample['sequencingGroups'][0]['analyses']
+    }
 
     cram_list = analysis_by_path.keys()
 
