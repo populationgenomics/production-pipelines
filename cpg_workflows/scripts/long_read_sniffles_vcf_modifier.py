@@ -21,6 +21,7 @@ SV_ANNOTATION_TYPES = [
     'INV',
 ]
 
+
 def read_sex_mapping_file(sex_mapping_file_path: str) -> dict[str, int]:
     """
     Read in the mapping file and return the mapping of LRS ID to sex value
@@ -34,7 +35,7 @@ def read_sex_mapping_file(sex_mapping_file_path: str) -> dict[str, int]:
     return sex_mapping
 
 
-def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: int) -> int:
+def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: int) -> int | str:
     """
     Translate a variant and sex to a CN value
     using CN==2 as a baseline, this is modified up or down based on the variant call
@@ -48,7 +49,7 @@ def translate_var_and_sex_to_cn(contig: str, var_type: str, genotype: str, sex: 
         sex (int): 0=Unknown, 1=Male, 2=Female
 
     Returns:
-        int, the CN value (copy number)
+        int | string, the CN value (copy number) or '.' if not applicable
     """
     if '0' not in genotype and '1' not in genotype:
         # if there are no 0s or 1s, we can't determine the CN
@@ -82,7 +83,11 @@ def cli_main():
     parser.add_argument('--vcf_in', help='Path to a localised VCF, this will be modified', required=True)
     parser.add_argument('--vcf_out', help='Path to an output location for the modified VCF', required=True)
     parser.add_argument('--fa', help='Path to a FASTA sequence file for GRCh38', required=True)
-    parser.add_argument('--sex_mapping_file', help='Path to a file containing LRS IDs and participant sexes', required=True)
+    parser.add_argument(
+        '--sex_mapping_file',
+        help='Path to a file containing LRS IDs and participant sexes',
+        required=True,
+    )
     args = parser.parse_args()
     modify_sniffles_vcf(
         file_in=args.vcf_in,
@@ -179,7 +184,12 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
                 gt_string = dict(zip(l_split[8].split(':'), l_split[i].split(':')))['GT']
 
                 # determine the copy number, based on deviation from the baseline
-                copy_number = translate_var_and_sex_to_cn(contig=chrom, var_type=sv_type, genotype=gt_string, sex=sex_mapping[sample_id])
+                copy_number = translate_var_and_sex_to_cn(
+                    contig=chrom,
+                    var_type=sv_type,
+                    genotype=gt_string,
+                    sex=sex_mapping[sample_id],
+                )
 
                 # update the FORMAT content field for this sample
                 l_split[i] = f'{l_split[i]}:{copy_number}'

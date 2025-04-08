@@ -69,7 +69,11 @@ LRS_IDS_QUERY = gql(
 
 
 @cache
-def query_for_snps_indels_vcfs(dataset_name: str, pipeface_versions: tuple[str] | None, snps_indels_callers: tuple[str] | None) -> dict[str, dict]:
+def query_for_snps_indels_vcfs(
+    dataset_name: str,
+    pipeface_versions: tuple[str] | None,
+    snps_indels_callers: tuple[str] | None,
+) -> dict[str, dict]:
     """
     query metamist for the PacBio SNPs_Indels VCFs
     return a dictionary of each CPG ID and its corresponding VCF
