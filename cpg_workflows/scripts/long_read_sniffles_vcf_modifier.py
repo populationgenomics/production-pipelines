@@ -9,6 +9,18 @@ CHRX = 'chrX'
 CHRY = 'chrY'
 CHRM = 'chrM'
 
+SV_ANNOTATION_TYPES = [
+    # From GATKSVVCFConstants.StructuralVariantAnnotationType enum
+    'BND',
+    'CNV',
+    'CPX',
+    'CTX',
+    'DEL',
+    'DUP',
+    'INS',
+    'INV',
+]
+
 def read_sex_mapping_file(sex_mapping_file_path: str) -> dict[str, int]:
     """
     Read in the mapping file and return the mapping of LRS ID to sex value
@@ -155,6 +167,9 @@ def modify_sniffles_vcf(file_in: str, file_out: str, fa: str, sex_mapping_file: 
 
             # get the SVTYPE, always present
             sv_type = info_dict['SVTYPE']
+            if sv_type not in SV_ANNOTATION_TYPES:
+                print(f'Forbidden SVTYPE: {sv_type}, at {chrom}:{position}')
+                continue
 
             # update the FORMAT schema field
             l_split[8] = f'{l_split[8]}:RD_CN'
