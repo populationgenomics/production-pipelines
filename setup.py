@@ -15,7 +15,7 @@ setup(
     install_requires=[
         'cpg-utils>=5.1.1',
         'cyvcf2==0.30.18',
-        'analysis-runner>=2.43.3',
+        'analysis-runner>=3.0.0',
         'hail>=0.2.133',
         'networkx>=2.8.3',
         'obonet>=0.3.1',  # for HPO parsing
