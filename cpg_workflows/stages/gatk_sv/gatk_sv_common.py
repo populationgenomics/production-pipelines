@@ -18,7 +18,7 @@ from cpg_utils.hail_batch import command, get_batch
 from cpg_workflows.batch import make_job_name
 from cpg_workflows.workflow import Cohort, Dataset, MultiCohort
 
-GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
+GATK_SV_COMMIT = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
@@ -303,8 +303,9 @@ def queue_annotate_sv_jobs(
         'prefix': multicohort.name,
         'ped_file': make_combined_ped(multicohort, prefix),
         'sv_per_shard': 5000,
-        'population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
-        'ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
+        'external_af_ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_ref_bed': config_retrieve(['references', 'gnomad_sv']),
         'use_hail': False,
     }
 
@@ -312,7 +313,6 @@ def queue_annotate_sv_jobs(
         [
             'noncoding_bed',
             'protein_coding_gtf',
-            {'ref_bed': 'external_af_ref_bed'},
             {'contig_list': 'primary_contigs_list'},
         ],
     )
