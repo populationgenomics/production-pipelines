@@ -334,6 +334,19 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
         # Filter on the genotypes.
         return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
 
+    # Colocated variants are represented as a semicolon-separated list of rsids.
+    # We only want the first one, and we want to truncate it to 512 characters.
+    # This is to ensure that the rsid field is not too long for the es export.
+    mt = mt.annotate_rows(
+        rsid=hl.str(
+            hl.if_else(
+                hl.str(mt.rsid).contains(';'),
+                hl.str(mt.rsid).split(';')[0],
+                mt.rsid,
+            )[:512],
+        ),
+    )
+
     # 2022-07-28 mfranklin: Initially the code looked like:
     #           {**_genotype_filter_samples(lambda g: g.num_alt == i) for i in ...}
     #   except the lambda definition doesn't bind the loop variable i in this scope
