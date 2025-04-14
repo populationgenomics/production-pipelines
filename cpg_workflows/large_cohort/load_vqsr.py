@@ -50,7 +50,7 @@ def load_vqsr(
     # one, with one AS_FilterStatus value. So for the first one indexing by allele
     # index would work, but for the second one it would throw an index out of bounds:
     # `HailException: array index out of bounds: index=1, length=1`
-    ht = ht.annotate(info=ht.info.drop(*[f for f in ht.info if f.startswith('AS_')]))
+    # ht = ht.annotate(info=ht.info.drop(*[f for f in ht.info if f.startswith('AS_')]))
 
     unsplit_count = ht.count()
     ht = hl.split_multi_hts(ht)
