@@ -27,7 +27,7 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatch
 from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV, SplitAnnotatedCnvVcfByDataset
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf
-from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr
+from cpg_workflows.stages.large_cohort import AncestryPlots, Frequencies, LoadVqsr, MergeCoverageTables
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
@@ -86,7 +86,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         ConvertPacBioBamToCram,
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf],
-    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC],
+    'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC, MergeCoverageTables],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv, SplitAnnotatedSvVcfByDataset],
     'rare_disease_rnaseq': [Outrider, Fraser],
