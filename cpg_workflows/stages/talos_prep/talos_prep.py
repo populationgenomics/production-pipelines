@@ -60,15 +60,16 @@ def does_final_file_path_exist(dataset: Dataset) -> bool:
     exists. In that scenario I just want no jobs to be planned.
 
     This method builds the path to the final object, and checks if it exists in GCP
-    If it does, we can skip all other
+    If it does, we can skip all other stages
 
     Args:
-        dataset ():
+        dataset (Dataset):
 
     Returns:
-
+        bool, whether the final file in the workflow already exists
     """
-    path = get_workflow().prefix / SquashMtIntoTarball.name / f'{dataset.name}.mt.tar'
+    # if the name of the SquashMtIntoTarball Stage changes, update this String
+    path = get_workflow().prefix / 'SquashMtIntoTarball' / f'{dataset.name}.mt.tar'
     return exists(path)
 
 
@@ -156,7 +157,7 @@ class ConcatenateSitesOnlyVcfFragments(DatasetStage):
 
         jobs = gcloud_compose_vcf_from_manifest(
             manifest_path=sites_manifest,
-            intermediates_path=str(self.tmp_prefix / 'sites_temporary_compose_intermediates'),
+            intermediates_path=str(self.tmp_prefix / dataset.name / 'sites_temporary_compose_intermediates'),
             output_path=str(output),
             job_attrs={'stage': self.name},
             final_size='10Gi',
@@ -172,7 +173,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / 'gnomad_frequency_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_gnomad_frequency_annotated.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(dataset)
@@ -206,7 +207,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / 'consequence_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_consequence_annotated.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
@@ -305,7 +306,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
             f'--gene_bed {gene_roi} '
             f'--am {alphamissense} '
             f'--mane {mane_json} '
-            f'--checkpoint_dir {str(self.tmp_prefix / "annotation_checkpoint")} ',
+            f'--checkpoint_dir {str(self.tmp_prefix / f"{dataset.name}_annotation_checkpoint")} ',
         )
 
         return self.make_outputs(dataset, data=output, jobs=job)
@@ -319,7 +320,7 @@ class JumpAnnotationsFromHtToFinalMt(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_talos_ready.mt'
+        return self.tmp_prefix / f'{dataset.name}.mt'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -376,11 +377,12 @@ class SquashMtIntoTarball(DatasetStage):
 
         # get the annotated MatrixTable - needs to be localised by copy, Hail Batch's service backend can't write local
         mt = str(inputs.as_path(dataset, JumpAnnotationsFromHtToFinalMt))
-        mt_name = mt.split('/')[-1]
 
         # copy the MT into the image, bundle it into a Tar-Ball
         job.command(f'gcloud --no-user-output-enabled storage cp --do-not-decompress -r {mt} $BATCH_TMPDIR')
-        job.command(f'mv $BATCH_TMPDIR/{mt_name} {dataset.name}.mt')
+
+        # once the data is copied - cd into the tmpdir, then tar it up
+        job.command('cd $BATCH_TMPDIR')
         # no compression - the Hail objects are all internally gzipped so not much to gain there
         job.command(f'tar --remove-files -cf {job.output} {dataset.name}.mt')
 

@@ -268,22 +268,55 @@ def _populate_alignment_inputs(
     return None
 
 
+def get_gvcf_meta():
+    """Retrieve GVCF meta dictionary. At present, this pulls the stage name that was used
+    to derive the current gvcf. If the user doesn't specify this stage the metamist behaviour
+    will default to latest. This handles the case where we have multiple active gvcfs and need
+    to specify which should be selected."""
+    stage_name = config_retrieve(['workflow', 'gvcf_stage_name'], default=None)
+    return {'stage': stage_name} if stage_name else {}
+
+
+def get_cram_meta():
+    """Retrieve CRAM meta dictionary from user config. At present, this pulls the stage name
+    and source used to derive the current cram. If the user doesn't specify these values,
+    Metamist will default to latest. This handles the case where we have multiple active crams
+    and need to specify which should be selected."""
+
+    stage_name = config_retrieve(['workflow', 'cram_stage_name'], default=None)
+    cram_source = config_retrieve(['workflow', 'cram_source'], default=None)
+
+    # At present this allows for both fields to be specified.
+    meta = {}
+    if stage_name:
+        meta['stage'] = stage_name
+    if cram_source:
+        # Source is a bit vague, but it needs to match the meta field
+        meta['source'] = cram_source
+
+    return meta
+
+
 def _populate_analysis(cohort: Cohort) -> None:
     """
     Populate Analysis entries.
     """
+
+    gvcf_meta = get_gvcf_meta()
+    cram_meta = get_cram_meta()
     for dataset in cohort.get_datasets():
         gvcf_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.GVCF,
             dataset=dataset.name,
+            meta=gvcf_meta,
         )
         cram_by_sgid = get_metamist().get_analyses_by_sgid(
             dataset.get_sequencing_group_ids(),
             analysis_type=AnalysisType.CRAM,
             dataset=dataset.name,
+            meta=cram_meta,
         )
-
         for sequencing_group in dataset.get_sequencing_groups():
             if (analysis := gvcf_by_sgid.get(sequencing_group.id)) and analysis.output:
                 # assert file exists
@@ -292,6 +325,8 @@ def _populate_analysis(cohort: Cohort) -> None:
                     analysis.output,
                 )
                 sequencing_group.gvcf = GvcfPath(path=analysis.output)
+                if gvcf_meta:
+                    sequencing_group.gvcf_stage_name = gvcf_meta.get('gvcf_stage_name')
             elif exists(sequencing_group.make_gvcf_path()):
                 logging.warning(
                     f'We found a gvcf file in the expected location {sequencing_group.make_gvcf_path()},'
@@ -307,6 +342,8 @@ def _populate_analysis(cohort: Cohort) -> None:
                 if not exists(crai_path):
                     crai_path = None
                 sequencing_group.cram = CramPath(analysis.output, crai_path)
+                if cram_meta:
+                    sequencing_group.cram_stage_name = cram_meta.get('cram_stage_name')
 
             elif exists(sequencing_group.make_cram_path()):
                 logging.warning(

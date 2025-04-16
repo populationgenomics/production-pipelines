@@ -782,10 +782,18 @@ class SplitAnnotatedCnvVcfByDataset(DatasetStage):
             name=f'SplitAnnotatedCnvVcfByDataset: {dataset}',
             attributes=self.get_job_attrs() | {'tool': 'bcftools'},
         )
-        job.image(image_path('bctools_120'))
+        job.image(image_path('bcftools_120'))
         job.cpu(1).memory('highmem').storage('10Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-        job.command(f'bcftools view {input_vcf} -S {sgids_list_path} -Oz -o {job.output["vcf.bgz"]} --write-index=tbi')
+
+        local_sgid_file = get_batch().read_input(sgids_list_path)
+        job.command(
+            f'bcftools view {input_vcf} '
+            f'--force-samples '
+            f'-S {local_sgid_file} '
+            f'-Oz -o {job.output["vcf.bgz"]} '
+            f'--write-index=tbi',
+        )
 
         get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
 
