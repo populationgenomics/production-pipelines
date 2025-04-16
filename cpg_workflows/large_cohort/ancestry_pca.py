@@ -68,7 +68,6 @@ def add_background(
                 logging.info(f'Adding metadata table to background dataset: {path}')
                 sample_qc_background = hl.read_table(path)
                 metadata_tables.append(sample_qc_background)
-                logging.info(f'metadata table appended to metadata_tables: {sample_qc_background.show()}')
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
@@ -86,7 +85,6 @@ def add_background(
                     f'Removing related samples from background dataset {dataset}. Background relateds to drop: {background_relateds_to_drop}',
                 )
                 background_relateds_to_drop_ht = hl.read_table(background_relateds_to_drop)
-                logging.info(f'background_relateds_to_drop: {background_relateds_to_drop_ht.show()}')
                 background_mt = background_mt.filter_cols(
                     ~hl.is_defined(background_relateds_to_drop_ht[background_mt.col_key]),
                 )
@@ -339,9 +337,7 @@ def _infer_pop_labels(
     pop_ht, pops_rf_model, n_mislabeled_samples = _run_assign_population_pcs(scores_ht, min_prob)
     while n_mislabeled_samples > max_mislabeled_training_samples:
         logging.info(
-            f'Found {n_mislabeled_samples} samples '
-            f'labeled differently from their known pop. '
-            f'Re-running without them.',
+            f'Found {n_mislabeled_samples} samples labeled differently from their known pop. Re-running without them.',
         )
 
         pop_ht = pop_ht[scores_ht.key]
