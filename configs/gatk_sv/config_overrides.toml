@@ -16,6 +16,3 @@ disk_gb = 40
 
 [resource_overrides.EvidenceQC.runtime_attr_mediancov]
 disk_gb = 200
-
-[resource_overrides.MakeCohortVcf]
-run_qc = false
