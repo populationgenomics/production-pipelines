@@ -89,6 +89,8 @@ def frequency_annotations(
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
 
+    mt = mt.checkpoint(output_path('filtered_checkpoint.mt', category='tmp'), overwrite=True)
+
     # Annotate variant QC metrics.
     logging.info('Annotating variant QC metrics...')
     logging.info('Base variant QC...')
@@ -111,6 +113,8 @@ def frequency_annotations(
         ),
     )
 
+    mt = mt.checkpoint(output_path('variant_qc_checkpoint.mt', category='tmp'), overwrite=True)
+
     # Compute allele frequencies, stratified by genetic ancestry, sex, and data subset (if applicable).
     logging.info('Computing stratified allele frequencies...')
     mt = annotate_freq(
@@ -123,7 +127,7 @@ def frequency_annotations(
             {'subset': mt.subset, 'pop': mt.gen_anc, 'sex': mt.sex},
         ],
     )
-    mt = mt.checkpoint(output_path('mt_stratified_frequencies.mt', category='tmp'), overwrite=True)
+    mt = mt.checkpoint(output_path('stratified_frequencies.mt', category='tmp'), overwrite=True)
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
     mt = _compute_filtering_af_and_popmax(mt)
     mt = mt.annotate_rows(monoallelic=(mt.freq[0].AC > 0) & (mt.freq[1].AF == 1))
