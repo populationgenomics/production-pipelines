@@ -833,7 +833,6 @@ class MakeCohortVcf(MultiCohortStage):
             'rf_cutoff_files': filter_batch_cutoffs,
             'track_names': track_names,
             'track_bed_files': track_bed_files,
-
         }
 
         input_dict |= get_references(
