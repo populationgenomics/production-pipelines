@@ -833,17 +833,24 @@ class MakeCohortVcf(MultiCohortStage):
             'rf_cutoff_files': filter_batch_cutoffs,
             'track_names': track_names,
             'track_bed_files': track_bed_files,
+
         }
 
         input_dict |= get_references(
             [
                 'bin_exclude',
+                'clustering_config_part1',
+                'clustering_config_part2',
                 'mei_bed',
+                'stratification_config_part1',
+                'stratification_config_part2',
                 # same attr, two names
                 'primary_contigs_list',
-                {'contig_list': 'primary_contigs_list'},
                 {'allosome_fai': 'allosome_file'},
+                {'contig_list': 'primary_contigs_list'},
                 {'cytobands': 'cytoband'},
+                {'HERVK_reference': 'hervk_reference'},
+                {'LINE1_reference': 'line1_reference'},
                 {'pe_exclude_list': 'pesr_exclude_list'},
             ],
         )
