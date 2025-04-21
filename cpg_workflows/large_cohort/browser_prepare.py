@@ -347,7 +347,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str, exome_or_genome: str) -> hl.
     flags = [
         hl.or_missing(ds.region_flags.lcr, "lcr"),
         hl.or_missing(ds.region_flags.segdup, "segdup"),
-        hl.or_missing(ds.region_flags.non_par, "segdup"),
+        hl.or_missing(ds.region_flags.non_par, "non_par"),
         hl.or_missing(
             ((ds.locus.contig == "chrX") & ds.locus.in_x_par()) | ((ds.locus.contig == "chrY") & ds.locus.in_y_par()),
             "par",
