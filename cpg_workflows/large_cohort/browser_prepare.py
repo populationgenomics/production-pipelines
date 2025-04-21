@@ -133,7 +133,7 @@ array<
 
 
 def _nullify_nan(value):
-    return hl.if_else(hl.is_nan(value), hl.null(value.dtype), value)
+    return hl.if_else(hl.is_nan(value), hl.missing(value.dtype), value)
 
 
 def _normalized_contig(contig: hl.expr.StringExpression) -> hl.expr.StringExpression:
