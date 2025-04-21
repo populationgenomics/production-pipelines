@@ -286,7 +286,6 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
         relateds_to_drop_ht_path=str(tmp_path / 'relateds_to_drop.ht'),
         out_vcf_path=str(siteonly_vcf_path),
         out_ht_path=str(tmp_path / 'siteonly.ht'),
-        tmp_prefix=str(tmp_path / 'tmp'),
     )
 
     # do some testing here
