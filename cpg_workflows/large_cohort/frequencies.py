@@ -6,7 +6,6 @@ from cpg_utils import Path
 from cpg_utils.config import config_retrieve, output_path
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
-from gnomad.resources.grch38.gnomad import POPS_TO_REMOVE_FOR_POPMAX
 from gnomad.resources.grch38.reference_data import (
     lcr_intervals,
     seg_dup_intervals,
@@ -14,7 +13,6 @@ from gnomad.resources.grch38.reference_data import (
 from gnomad.sample_qc.sex import adjusted_sex_ploidy_expr
 from gnomad.utils.annotations import (
     age_hists_expr,
-    annotate_adj,
     annotate_freq,
     bi_allelic_site_inbreeding_expr,
     faf_expr,
@@ -24,14 +22,15 @@ from gnomad.utils.annotations import (
     qual_hist_expr,
     region_flag_expr,
 )
-from gnomad.utils.release import make_faf_index_dict, make_freq_index_dict, make_freq_index_dict_from_meta
+from gnomad.utils.release import make_faf_index_dict, make_freq_index_dict_from_meta
+
+POPS_TO_REMOVE_FOR_POPMAX = {'Unclassified'}
 
 
 def run(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
-    infer_pop_ht_path: str,
     site_only_ht_path: str,
     vqsr_ht_path: str,
     out_ht_path: str,
@@ -45,20 +44,11 @@ def run(
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
-    inferred_pop_ht = hl.read_table(str(infer_pop_ht_path))
     site_only_ht = hl.read_table(str(site_only_ht_path))
     vqsr_ht = hl.read_table(str(vqsr_ht_path))
 
     logging.info('Generating frequency annotations...')
-    freq_ht = frequency_annotations(
-        vds,
-        sample_qc_ht,
-        relateds_to_drop_ht,
-        inferred_pop_ht,
-        site_only_ht,
-        vqsr_ht,
-        out_ht_path,
-    )
+    freq_ht = frequency_annotations(vds, sample_qc_ht, relateds_to_drop_ht, site_only_ht, vqsr_ht)
     logging.info(f'Writing out frequency data to {out_ht_path}...')
     freq_ht.write(str(out_ht_path), overwrite=True)
 
@@ -67,78 +57,87 @@ def frequency_annotations(
     vds: hl.vds.VariantDataset,
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
-    inferred_pop_ht: hl.Table,
     site_only_ht: hl.Table,
     vqsr_ht: hl.Table,
-    out_ht_path: str,
 ) -> hl.Table:
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
     """
 
-    logging.info('Reading full sparse MT and metadata table...')
-
-    logging.info('Splitting multiallelics')
+    # Prepare the dense matrix table.
+    logging.info('Splitting multiallelics...')
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
 
     logging.info('Densifying...')
-    # The reason is that sparse matrix table has got NA records representing
-    # the reference blocks, which affects the calculation of frequencies.
-    # That's why we need to convert it to a "dense" representation, effectively
-    # dropping reference blocks.
     mt = hl.vds.to_dense_mt(vds)
 
-    mt = mt.filter_rows(hl.len(mt.alleles) > 1)
-
-    # Filter samples
+    # Filter and annotate samples.
+    logging.info('Removing filtered samples...')
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
 
-    logging.info('Computing adj and sex adjusted genotypes...')
+    logging.info('Annotating sample metadata...')
+    mt = mt.annotate_cols(
+        gen_anc=sample_qc_ht[mt.s].population,
+        sex=sample_qc_ht[mt.s].sex_karyotype,
+        subset=sample_qc_ht[mt.s].subset if "subset" in list(sample_qc_ht.row) else hl.missing('str'),
+    )
+
+    logging.info('Computing quality and sex adjusted genotypes...')
     mt = mt.annotate_entries(
         GT=adjusted_sex_ploidy_expr(mt.locus, mt.GT, sample_qc_ht[mt.col_key].sex_karyotype),
         adj=get_adj_expr(mt.GT, mt.GQ, mt.DP, mt.AD),
     )
-    logging.info('Computing adj call rates...')
-    mt_adj = mt.filter_entries(mt.adj)
-    info_ht = mt_adj.annotate_rows(adj_gt_stats=hl.agg.call_stats(mt_adj.GT, mt_adj.alleles)).rows()
 
-    logging.info('Generating frequency data...')
+    mt = mt.checkpoint(output_path('filtered_checkpoint.mt', category='tmp'), overwrite=True)
+
+    # Annotate variant QC metrics.
+    logging.info('Annotating variant QC metrics...')
+    logging.info('Base variant QC...')
     mt = hl.variant_qc(mt)
 
-    logging.info('Calculating InbreedingCoeff...')
-    # NOTE: This is not the ideal location to calculate this, but added here
-    # to avoid another densify.
-    # The algorithm assumes all samples are unrelated:
+    logging.info('Allele-specific statistics...')
+    # PLACEHOLDER UNTIL VQSR STAGE IS FIXED
+    # Because the site_only_ht is not split, this info will not be correctly populated for multiallelic
+    # variants until this is resolved.
+    mt = mt.annotate_rows(info=site_only_ht[mt.row_key].info)
+
+    logging.info('Inbreeding coefficient...')
     mt = mt.annotate_rows(InbreedingCoeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
 
-    # Annotate pop and sex labels
-    mt = mt.annotate_cols(gen_anc=inferred_pop_ht[mt.s].pop)
+    logging.info('VQSR filters...')
+    mt = mt.annotate_rows(vqsr_filters=vqsr_ht[mt.row_key].filters)
 
-    mt = mt.annotate_cols(sex=sample_qc_ht[mt.s].sex_karyotype)
+    logging.info('Region flags...')
+    mt = mt.annotate_rows(
+        region_flags=region_flag_expr(
+            mt,
+            prob_regions={'lcr': lcr_intervals.ht(), 'segdup': seg_dup_intervals.ht()},
+        ),
+    )
 
-    # Annotate frequency strata
-    # Forcing annotate_freq to use 'gen_anc' as the pop label here
-    # The ordering of freq_meta is important for the downstream faf and popmax code and
-    # could be a potential source of bugs if the ordering of additional_strata_expr is changed
+    mt = mt.checkpoint(output_path('variant_qc_checkpoint.mt', category='tmp'), overwrite=True)
+
+    # Compute allele frequencies, stratified by genetic ancestry, sex, and data subset (if applicable).
+    logging.info('Computing stratified allele frequencies...')
     mt = annotate_freq(
         mt,
         sex_expr=mt.sex,
+        pop_expr=mt.gen_anc,
         additional_strata_expr=[
-            {'gen_anc': mt.gen_anc},
-            {'gen_anc': mt.gen_anc, 'sex': mt.sex},
+            {'subset': mt.subset},
+            {'subset': mt.subset, 'pop': mt.gen_anc},
+            {'subset': mt.subset, 'pop': mt.gen_anc, 'sex': mt.sex},
         ],
     )
-
-    mt = _compute_filtering_af_and_popmax(mt)
-
-    mt = mt.checkpoint(output_path('mt_faf_popmax.mt', category='tmp'), overwrite=True)
-
-    # Currently have no Hail Tables with age data annotated on them, so unable to calculate age histograms
-    # mt = _compute_age_hists(mt, sample_qc_ht) # <-- Discuss
+    mt = mt.checkpoint(output_path('stratified_frequencies.mt', category='tmp'), overwrite=True)
     mt = mt.annotate_globals(freq_index_dict=make_freq_index_dict_from_meta(mt.freq_meta))
+    mt = _compute_filtering_af_and_popmax(mt)
+    mt = mt.annotate_rows(monoallelic=(mt.freq[0].AC > 0) & (mt.freq[1].AF == 1))
 
-    # Annotate quality metrics histograms
+    # Compute variant histograms.
+    logging.info('Computing variant histograms...')
+    mt = _compute_age_hists(mt, sample_qc_ht)
     qual_hist_ht = _annotate_quality_metrics_hist(mt)
     mt = mt.annotate_rows(
         histograms=hl.struct(
@@ -147,36 +146,11 @@ def frequency_annotations(
         ),
     )
 
-    freq_ht = mt.rows()
-
-    # Annotate freq_ht with the 'filters' field from VQSR
-    freq_ht = freq_ht.annotate(filters=vqsr_ht[freq_ht.key].filters)
-
-    freq_ht = freq_ht.annotate(info=site_only_ht[freq_ht.key].info)
-
-    freq_ht = freq_ht.annotate(
-        info=freq_ht.info.annotate(InbreedingCoeff=freq_ht.InbreedingCoeff),
-    )
-
-    freq_ht = freq_ht.annotate(
-        region_flags=region_flag_expr(
-            freq_ht,
-            prob_regions={'lcr': lcr_intervals.ht(), 'segdup': seg_dup_intervals.ht()},
-        ),
-    )
-
-    mono_allelic_flag_expr = (freq_ht.freq[0].AC > 0) & (freq_ht.freq[1].AF == 1)
-    freq_ht = freq_ht.annotate(info=freq_ht.info.annotate(monoallelic=mono_allelic_flag_expr))
-
-    freq_ht = freq_ht.annotate(**freq_ht.variant_qc)
-
-    freq_ht = freq_ht.annotate(**info_ht[freq_ht.locus, freq_ht.alleles].select('adj_gt_stats'))
-
-    return freq_ht
+    return mt.rows()
 
 
 def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixTable:
-    logging.info('Computing age histograms for each variant...')
+    logging.info('Computing carrier age histograms for each variant...')
     try:
         mt = mt.annotate_cols(age=hl.float64(sample_qc_ht[mt.col_key].age))
     except AttributeError:
@@ -205,15 +179,13 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
 
 def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     logging.info('Computing filtering allele frequencies and popmax...')
-    faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX, pop_label='gen_anc')
-    mt = mt.select_rows(
-        'InbreedingCoeff',
-        'freq',
-        'rsid',
-        'variant_qc',
+    faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX, pop_label='pop')
+    popmax = pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX, pop_label='pop')
+    mt = mt.annotate_rows(
         faf=faf,
-        popmax=pop_max_expr(mt.freq, mt.freq_meta, POPS_TO_REMOVE_FOR_POPMAX, pop_label='gen_anc'),
+        popmax=popmax,
     )
+
     mt = mt.annotate_globals(
         faf_meta=faf_meta,
         faf_index_dict=make_faf_index_dict(
@@ -221,19 +193,25 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
             pops=list(mt.aggregate_cols(hl.agg.collect_as_set(mt.gen_anc))),  # unique pop labels,
         ),
     )
+
     mt = mt.annotate_rows(
+        fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='pop'),
         popmax=mt.popmax.annotate(
-            # Order of strata dictionaries in faf_meta affects data returned by lambda function
-            faf95=mt.faf[mt.faf_meta.index(lambda x: x.values() == [mt.popmax.gen_anc, 'adj'])].faf95,
+            faf95=mt.faf[
+                mt.faf_meta.index(
+                    lambda x: (
+                        (x.key_set() == hl.set(['group', 'pop'])) & (x['group'] == 'adj') & (x['pop'] == mt.popmax.pop)
+                    ),
+                )
+            ].faf95,
         ),
     )
-    mt = mt.annotate_rows(fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='gen_anc'))
 
     return mt
 
 
 def _annotate_quality_metrics_hist(mt: hl.MatrixTable) -> hl.Table:
-    logging.info('Annotating quality metrics histograms...')
+    logging.info('Computing variant quality metrics histograms...')
     # NOTE: these are performed here as the quality metrics histograms
     # also require densifying
     mt = mt.annotate_rows(qual_hists=qual_hist_expr(mt.GT, mt.GQ, mt.DP, mt.AD, mt.adj))
