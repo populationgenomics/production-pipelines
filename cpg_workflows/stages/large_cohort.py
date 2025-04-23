@@ -517,11 +517,9 @@ class PrepareBrowserTable(CohortStage):
             query_command(
                 browser_prepare,
                 browser_prepare.prepare_v4_variants.__name__,
-                # hard-coding frequencies for now
-                exome_freq_ht_path,
-                genome_freq_ht_path,
-                # str(inputs.as_path(cohort, Frequencies)),
-                # str(config_retrieve(['workflow', 'sequencing_type']) + 's'),
+                # hard-coding Frequencies tables for now
+                str(exome_freq_ht_path),
+                str(genome_freq_ht_path),
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
