@@ -99,7 +99,7 @@ def frequency_annotations(
     logging.info('Allele-specific statistics...')
     # PLACEHOLDER UNTIL VQSR STAGE IS FIXED
     # Because the site_only_ht is not split, this info will not be correctly populated for multiallelic
-    # variants until this is resolved. 
+    # variants until this is resolved.
     mt = mt.annotate_rows(info=site_only_ht[mt.row_key].info)
 
     logging.info('Inbreeding coefficient...')
