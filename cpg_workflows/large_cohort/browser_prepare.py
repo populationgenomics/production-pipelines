@@ -166,7 +166,7 @@ def _freq_index_key(subset=None, pop=None, sex=None, raw=False):
 
 
 def _freq(ds, *args, **kwargs):
-    return ds.freq[g.freq_index_dict[_freq_index_key(*args, **kwargs)]]
+    return ds.freq[ds.freq_index_dict[_freq_index_key(*args, **kwargs)]]
 
 
 def _subset_filter(subset):
