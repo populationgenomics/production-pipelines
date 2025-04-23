@@ -29,12 +29,11 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    site_only_ht_path = to_path(out_ht_path) / 'siteonly.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
-        out_ht_path=site_only_ht_path,
+        out_ht_path=out_ht_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
