@@ -12,6 +12,10 @@ from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs.seqr_loader_sv import annotate_cohort_jobs_sv, annotate_dataset_jobs_sv
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import queue_annotate_strvctvre_job, queue_annotate_sv_jobs
 from cpg_workflows.stages.seqr_loader import es_password
+from cpg_workflows.stages.seqr_loader_long_read.long_read_snps_indels_annotation import (
+    find_sgs_to_skip,
+    query_for_lrs_sg_id_and_sex_mapping,
+)
 from cpg_workflows.targets import Dataset, MultiCohort, SequencingGroup
 from cpg_workflows.utils import get_logger
 from cpg_workflows.workflow import (
@@ -43,7 +47,11 @@ VCF_QUERY = gql(
 
 
 @cache
-def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
+def query_for_sv_vcfs(
+    dataset_name: str,
+    pipeface_versions: tuple[str] | None,
+    sv_callers: tuple[str] | None,
+) -> dict[str, dict]:
     """
     query metamist for the PacBio SV VCFs
     return a dictionary of each CPG ID and its corresponding VCF
@@ -51,22 +59,100 @@ def query_for_sv_vcfs(dataset_name: str) -> dict[str, str]:
 
     Args:
         dataset_name (str):
+        pipeface_versions (tuple[str] | None): a tuple of pipeface versions to filter on (hashable, so can be cached)
+        sv_callers (tuple[str] | None): a tuple of SV callers to filter on (hashable, so can be cached)
 
     Returns:
-        a dictionary of the SG IDs and their phased SV VCF
+        a dictionary of the SG IDs and their phased SNPs Indels VCF
     """
-    return_dict: dict[str, str] = {}
-    get_logger().info(f'Querying for SV VCFs for {dataset_name}')
+    single_sample_vcfs: dict[str, dict] = {}
+    joint_called_vcfs: dict[str, dict] = {}
     analysis_results = query(VCF_QUERY, variables={'dataset': dataset_name})
     for sg in analysis_results['project']['sequencingGroups']:
         for analysis in sg['analyses']:
-            if analysis['meta'].get('variant_type') == 'SV':
-                return_dict[sg['id']] = analysis['output']
+            if analysis['meta'].get('variant_type') != 'SV':
+                continue
+            if sv_callers and analysis['meta'].get('caller', 'unkown') not in sv_callers:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed SV caller: {sv_callers}',
+                )
+                continue
+            if pipeface_versions and analysis['meta'].get('pipeface_version', 'unkown') not in pipeface_versions:
+                get_logger().info(
+                    f'Skipping {analysis["output"]} for {sg["id"]} as it is not an allowed pipeface version: {pipeface_versions}',
+                )
+                continue
+            if analysis['meta'].get('joint_called', False):
+                joint_called_vcfs[sg['id']] = {
+                    'output': analysis['output'],
+                    'meta': analysis['meta'],
+                }
+            else:
+                single_sample_vcfs[sg['id']] = {
+                    'output': analysis['output'],
+                    'meta': analysis['meta'],
+                }
+
+    # Prefer the joint-called VCFs over the single-sample VCFs
+    sg_vcfs = {}
+    for sg_id, single_sample_vcf in single_sample_vcfs.items():
+        if sg_id not in joint_called_vcfs:
+            sg_vcfs[sg_id] = single_sample_vcf
+            continue
+        sg_vcfs[sg_id] = joint_called_vcfs[sg_id]
+    for sg_id, joint_called_vcf in joint_called_vcfs.items():
+        if sg_id not in sg_vcfs:
+            sg_vcfs[sg_id] = joint_called_vcf
+
+    # Remove the parents entries if their family has a joint-called VCF
+    sgs_to_skip = find_sgs_to_skip(sg_vcfs)
+    return_dict = {}
+    for sg_id, vcf_analysis in sg_vcfs.items():
+        if sg_id in sgs_to_skip:
+            get_logger().info(f'Skipping {sg_id} as it is a parent in a joint-called VCF')
+            continue
+        return_dict[sg_id] = vcf_analysis
 
     return return_dict
 
 
 @stage
+class WriteSVLRSIDtoSGIDandSexMappingFiles(MultiCohortStage):
+    """
+    Write the LRS ID to SG ID mapping to a file
+    """
+
+    def expected_outputs(self, multicohort: MultiCohort) -> dict[str, Path]:
+        return {
+            'lrs_sgid_mapping': self.prefix / 'lrs_sgid_mapping.txt',
+            'lrs_id_sex_mapping': self.prefix / 'lrs_id_sex_mapping.txt',
+        }
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
+        """
+        Write the LRS ID to SG ID mapping to a file
+        This is used by bcftools reheader to update the sample IDs in the VCFs
+        """
+        output = self.expected_outputs(multicohort)
+
+        lrs_sgid_mapping, lrs_id_sex_mapping = query_for_lrs_sg_id_and_sex_mapping(
+            [d.name for d in multicohort.get_datasets()],
+        )
+        sgid_mapping_file_path = self.prefix / 'lrs_sgid_mapping.txt'
+        sex_mapping_file_path = self.prefix / 'lrs_id_sex_mapping.txt'
+        get_logger().info(f'Writing LRS ID to SG ID mapping to {sgid_mapping_file_path}')
+        with sgid_mapping_file_path.open('w') as f:
+            for lrs_id, sg_id in lrs_sgid_mapping.items():
+                f.write(f'{lrs_id} {sg_id}\n')
+        get_logger().info(f'Writing LRS ID to participant sex mapping to {sex_mapping_file_path}')
+        with sex_mapping_file_path.open('w') as f:
+            for lrs_id, sex_val in lrs_id_sex_mapping.items():
+                f.write(f'{lrs_id} {sex_val}\n')
+
+        return self.make_outputs(multicohort, data=output)
+
+
+@stage(required_stages=[WriteSVLRSIDtoSGIDandSexMappingFiles])
 class ReFormatPacBioSVs(SequencingGroupStage):
     """
     take each of the long-read SV VCFs, and re-format the contents
@@ -82,26 +168,54 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             'index': sgid_prefix / f'{sequencing_group.id}_reformatted_renamed_lr_svs.vcf.bgz.tbi',
         }
 
-    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput:
+    def queue_jobs(self, sg: SequencingGroup, inputs: StageInput) -> StageOutput | None:
         """
         a python job to change the VCF contents
         - use a python job to modify all VCF lines, in-line
-        - use a follow-up job to block-gzip and index
+        - a bcftools job to reheader the VCF with the replacement sample IDs, and then sort
+        - use a follow-up job to block-gzip
+        - this is skipped for the parents in trio joint-called VCFs
         """
+        # find the VCFs for this dataset
+        dataset_name = (
+            sg.dataset.name + '-test' if config_retrieve(['workflow', 'access_level']) == 'test' else sg.dataset.name
+        )
+        pipeface_versions = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'pipeface_versions'],
+            default=None,
+        )
+        if pipeface_versions:
+            pipeface_versions = tuple(pipeface_versions)
+        sv_callers = config_retrieve(
+            ['workflow', 'long_read_vcf_annotation', 'sv_callers'],
+            default=None,
+        )
+        if sv_callers:
+            sv_callers = tuple(sv_callers)
 
-        # find the vcf for this SG
-        query_result = query_for_sv_vcfs(dataset_name=sg.dataset.name)
+        sg_vcfs = query_for_sv_vcfs(
+            dataset_name=dataset_name,
+            pipeface_versions=pipeface_versions,
+            sv_callers=sv_callers,
+        )
+        if sg.id not in sg_vcfs:
+            return None
 
         expected_outputs = self.expected_outputs(sg)
 
-        # instead of handling, we should probably just exclude this and run again
-        if sg.id not in query_result:
-            raise ValueError(f'No SV VCFs recorded for {sg.id}')
-
-        lr_sv_vcf: str = query_result[sg.id]
+        lr_sv_vcf: str = sg_vcfs[sg.id]['output']
         local_vcf = get_batch().read_input(lr_sv_vcf)
 
-        mod_job = get_batch().new_bash_job(f'Convert {lr_sv_vcf} prior to annotation')
+        lrs_sg_id_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDandSexMappingFiles, 'lrs_sgid_mapping')
+        local_id_mapping = get_batch().read_input(lrs_sg_id_map)
+
+        lrs_id_sex_map = inputs.as_path(get_multicohort(), WriteSVLRSIDtoSGIDandSexMappingFiles, 'lrs_id_sex_mapping')
+        local_sex_mapping = get_batch().read_input(lrs_id_sex_map)
+
+        joint_called = sg_vcfs[sg.id]['meta'].get('joint_called', False)
+        mod_job = get_batch().new_bash_job(
+            f'Convert {"joint-called " if joint_called else ""}{lr_sv_vcf} prior to annotation',
+        )
         mod_job.storage('10Gi')
         mod_job.image(config_retrieve(['workflow', 'driver_image']))
 
@@ -110,23 +224,28 @@ class ReFormatPacBioSVs(SequencingGroupStage):
         fasta = get_batch().read_input_group(**{'fa': ref_fasta, 'fa.fai': f'{ref_fasta}.fai'})['fa']
 
         # the console entrypoint for the sniffles modifier script has only existed since 1.25.13, requires >=1.25.13
-        sex = sg.pedigree.sex.value if sg.pedigree.sex else 0
         mod_job.command(
             'modify_sniffles '
             f'--vcf_in {local_vcf} '
             f'--vcf_out {mod_job.output} '
-            f'--new_id {sg.id} '
             f'--fa {fasta} '
-            f'--sex {sex} '
-            f'--sv',
+            f'--sex_mapping_file {local_sex_mapping}',
         )
 
-        # block-gzip and index that result
-        tabix_job = get_batch().new_job(f'BGZipping and Indexing for {sg.id}', {'tool': 'bcftools'})
+        # normalise, reheader, then block-gzip and index that result
+        tabix_job = get_batch().new_job(
+            f'Normalising, Reheadering, BGZipping, and Indexing for {sg.id}',
+            {'tool': 'bcftools'},
+        )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         tabix_job.image(image=image_path('bcftools'))
         tabix_job.storage('10Gi')
-        tabix_job.command(f'bcftools view {mod_job.output} | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}')
+        tabix_job.command(
+            f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',
+        )
+        tabix_job.command(
+            f'bcftools norm -m -any -f {fasta} -c s {tabix_job.reheadered} | bcftools sort | bgzip -c > {tabix_job.vcf_out["vcf.bgz"]}',
+        )
         tabix_job.command(f'tabix {tabix_job.vcf_out["vcf.bgz"]}')
 
         # write from temp storage into GCP
@@ -149,7 +268,7 @@ class MergeLongReadSVs(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        reuse the gVCF method which does the same? FastCombineVcfs. Nah, not yet - that contains other modifications
+        Use bcftools to merge all the VCFs, and then fill in the tags (requires bcftools 1.12+)
         """
 
         outputs = self.expected_outputs(multicohort)
@@ -159,11 +278,15 @@ class MergeLongReadSVs(MultiCohortStage):
 
         batch_vcfs = [
             get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz']
-            for each_vcf in [str(modified_vcfs[sgid]['vcf']) for sgid in multicohort.get_sequencing_group_ids()]
+            for each_vcf in [
+                str(modified_vcfs.get(sgid, {}).get('vcf'))
+                for sgid in multicohort.get_sequencing_group_ids()
+                if sgid in modified_vcfs
+            ]
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
-        merge_job.image(image=image_path('bcftools'))
+        merge_job.image(image=image_path('bcftools_120'))
 
         # guessing at resource requirements
         merge_job.cpu(4)
@@ -178,10 +301,11 @@ class MergeLongReadSVs(MultiCohortStage):
         # -m: merge strategy
         # -0: compression level
         merge_job.command(
-            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o '
-            f'{merge_job.output["vcf.bgz"]} --threads 4 -m none -0',  # type: ignore
+            f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
-        merge_job.command(f'tabix {merge_job.output["vcf.bgz"]}')  # type: ignore
+        merge_job.command(
+            f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
+        )
 
         # write the result out
         get_batch().write_output(merge_job.output, str(outputs['vcf']).removesuffix('.vcf.bgz'))  # type: ignore

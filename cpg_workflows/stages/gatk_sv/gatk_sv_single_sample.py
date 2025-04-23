@@ -80,6 +80,8 @@ class GatherSampleEvidence(SequencingGroupStage):
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
 
+        # TODO This selection process may need to adapt to a new condition...
+        # TODO If Scramble is being run, but Manta is now, manta_vcf and index becomes a required input
         if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
             # remove the expected outputs for the jobs that are not in only_jobs
             new_expected = {}
@@ -106,11 +108,15 @@ class GatherSampleEvidence(SequencingGroupStage):
             reference_index=str(get_fasta()) + '.fai',
             reference_dict=str(get_fasta().with_suffix('.dict')),
             reference_version='38',
+            # a cost-improvement in cloud environments
+            move_bam_or_cram_files=True,
         )
+
+        # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
+        # then some parameters need to be added to the input_dict to enable BWA to be run
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'samtools_cloud_docker',
@@ -129,6 +135,8 @@ class GatherSampleEvidence(SequencingGroupStage):
                 'primary_contigs_list',
                 'preprocessed_intervals',
                 'manta_region_bed',
+                'manta_region_bed_index',
+                'mei_bed',
                 'wham_include_list_bed_file',
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ],

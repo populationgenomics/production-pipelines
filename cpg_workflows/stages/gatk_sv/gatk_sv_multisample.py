@@ -301,7 +301,6 @@ class GatherBatchEvidence(CohortStage):
             [
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_pipeline_qc_docker',
                 'linux_docker',
@@ -376,7 +375,6 @@ class ClusterBatch(CohortStage):
         input_dict |= get_images(
             [
                 'linux_docker',
-                'sv_pipeline_base_docker',
                 'gatk_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
@@ -450,10 +448,8 @@ class GenerateBatchMetrics(CohortStage):
         input_dict |= get_images(
             [
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_base_mini_docker',
                 'sv_base_docker',
-                'sv_pipeline_base_docker',
                 'linux_docker',
             ],
         )
@@ -543,7 +539,7 @@ class FilterBatch(CohortStage):
             input_dict[f'{caller}_vcf'] = clusterbatch_d[f'clustered_{caller}_vcf']
 
         input_dict |= get_images(
-            ['sv_pipeline_base_docker', 'sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker'],
+            ['sv_pipeline_docker', 'sv_base_mini_docker', 'linux_docker'],
         )
 
         input_dict |= get_references(['primary_contigs_list'])
@@ -567,8 +563,6 @@ class FilterBatch(CohortStage):
 @stage(required_stages=FilterBatch)
 class MergeBatchSites(MultiCohortStage):
     """
-    OMG, my first true MultiCohortStage!
-
     This Stage runs between GenerateBatchMetrics and FilterBatch
     This takes the component VCFs from individual batches and merges them into
     a single VCF (one for PESR and one for depth-only calls).
@@ -731,10 +725,8 @@ class GenotypeBatch(CohortStage):
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_base_mini_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_rdtest_docker',
                 'linux_docker',
             ],
         )
@@ -782,6 +774,8 @@ class MakeCohortVcf(MultiCohortStage):
         """
         Instead of taking a direct dependency on the previous stage,
         we use the output hash to find all the previous batches
+
+        TODO by default we want do_per_sample_qc to be disabled
         """
         gatherbatchevidence_outputs = inputs.as_dict_by_target(GatherBatchEvidence)
         genotypebatch_outputs = inputs.as_dict_by_target(GenotypeBatch)
@@ -803,11 +797,20 @@ class MakeCohortVcf(MultiCohortStage):
         disc_files = [gatherbatchevidence_outputs[cohort]['merged_PE'] for cohort in all_batch_names]
         median_cov_files = [gatherbatchevidence_outputs[cohort]['median_cov'] for cohort in all_batch_names]
 
+        track_names = config_retrieve(['references', 'gatk_sv', 'clustering_track_names'])
+        track_bed_files = [
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_sr']),
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_sd']),
+            config_retrieve(['references', 'gatk_sv', 'clustering_track_rm']),
+        ]
+
         input_dict: dict[str, Any] = {
             'cohort_name': multicohort.name,
             'batches': all_batch_names,
             'ped_file': str(pedigree_input),
-            'ref_dict': str(get_fasta().with_suffix('.dict')),
+            'reference_fasta': get_fasta(),
+            'reference_fasta_fai': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
             'chr_x': 'chrX',
             'chr_y': 'chrY',
             'min_sr_background_fail_batches': 0.5,
@@ -828,19 +831,25 @@ class MakeCohortVcf(MultiCohortStage):
             'depth_gt_rd_sep_files': depth_depth_cutoff,
             'median_coverage_files': median_cov_files,
             'rf_cutoff_files': filter_batch_cutoffs,
+            'track_names': track_names,
+            'track_bed_files': track_bed_files,
         }
 
         input_dict |= get_references(
             [
                 'bin_exclude',
+                'clustering_config_part1',
+                'clustering_config_part2',
                 'mei_bed',
-                'depth_exclude_list',
-                'empty_file',
+                'stratification_config_part1',
+                'stratification_config_part2',
                 # same attr, two names
                 'primary_contigs_list',
-                {'contig_list': 'primary_contigs_list'},
                 {'allosome_fai': 'allosome_file'},
+                {'contig_list': 'primary_contigs_list'},
                 {'cytobands': 'cytoband'},
+                {'HERVK_reference': 'hervk_reference'},
+                {'LINE1_reference': 'line1_reference'},
                 {'pe_exclude_list': 'pesr_exclude_list'},
             ],
         )
@@ -848,11 +857,8 @@ class MakeCohortVcf(MultiCohortStage):
         # images!
         input_dict |= get_images(
             [
+                'gatk_docker',
                 'sv_pipeline_docker',
-                'sv_pipeline_base_docker',
-                'sv_pipeline_hail_docker',
-                'sv_pipeline_updates_docker',
-                'sv_pipeline_rdtest_docker',
                 'sv_pipeline_qc_docker',
                 'sv_base_mini_docker',
                 'linux_docker',
@@ -1054,7 +1060,7 @@ class FilterGenotypes(MultiCohortStage):
             'vcf': inputs.as_dict(multicohort, SVConcordance)['concordance_vcf'],
             'ploidy_table': inputs.as_dict(multicohort, GeneratePloidyTable)['ploidy_table'],
             'ped_file': str(pedigree_input),
-            'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.3),
+            'fmax_beta': config_retrieve(['references', 'gatk_sv', 'fmax_beta'], 0.4),
             'recalibrate_gq_args': config_retrieve(['references', 'gatk_sv', 'recalibrate_gq_args']),
             'sl_filter_args': config_retrieve(['references', 'gatk_sv', 'sl_filter_args']),
         }

@@ -386,9 +386,13 @@ class MakeSiteOnlyVcf(CohortStage):
 @stage(required_stages=MakeSiteOnlyVcf)
 class Vqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'vqsr'], default=None):
+            vqsr_version = slugify(vqsr_version)
+
+        vqsr_version = vqsr_version or get_workflow().output_version
         return {
-            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
-            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
+            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
+            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -411,7 +415,11 @@ class Vqsr(CohortStage):
 @stage(required_stages=Vqsr)
 class LoadVqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'vqsr.ht'
+        if load_vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'loadvqsr'], default=None):
+            load_vqsr_version = slugify(load_vqsr_version)
+
+        load_vqsr_version = load_vqsr_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / load_vqsr_version / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import load_vqsr
