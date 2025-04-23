@@ -1,8 +1,5 @@
 import logging
-from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
-
-from numpy import require
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
