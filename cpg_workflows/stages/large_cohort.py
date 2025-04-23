@@ -130,12 +130,18 @@ class Combiner(CohortStage):
 @stage(required_stages=[Combiner])
 class SampleQC(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if sample_qc_version := config_retrieve(['large_cohort', 'output_versions', 'sample_qc'], default=None):
+        if sample_qc_version := config_retrieve(['large_cohort', 'output_versions', 'sample_qc']):
             sample_qc_version = slugify(sample_qc_version)
+        if sample_qc_version is None:
+            raise ValueError('Sample QC version is None. Please provide a valid version.')
 
-        sample_qc_version = sample_qc_version or get_workflow().output_version
-        sample_qc_path = cohort.analysis_dataset.prefix() / get_workflow().name / sample_qc_version / 'sample_qc.ht'
-        return sample_qc_path
+        return (
+            cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / get_workflow().output_version
+            / 'SampleQC'
+            / f'sample_qc_{sample_qc_version}.ht'
+        )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import sample_qc
@@ -174,12 +180,17 @@ class SampleQC(CohortStage):
 @stage(required_stages=[Combiner])
 class DenseSubset(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
-        if dense_subset_version := config_retrieve(['large_cohort', 'output_versions', 'dense_subset'], default=None):
+        if dense_subset_version := config_retrieve(['large_cohort', 'output_versions', 'dense_subset']):
             dense_subset_version = slugify(dense_subset_version)
+        if dense_subset_version is None:
+            raise ValueError('Dense subset version is None. Please provide a valid version.')
 
-        dense_subset_version = dense_subset_version or get_workflow().output_version
         dense_subset_path = (
-            cohort.analysis_dataset.prefix() / get_workflow().name / dense_subset_version / 'dense_subset.mt'
+            cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / get_workflow().output_version
+            / 'DenseSubset'
+            / f'dense_subset_{dense_subset_version}.mt'
         )
         return dense_subset_path
 
@@ -342,15 +353,27 @@ class AncestryPlots(CohortStage):
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if site_only_version := config_retrieve(['large_cohort', 'output_versions', 'makesiteonly'], default=None):
+        if site_only_version := config_retrieve(['large_cohort', 'output_versions', 'makesiteonly']):
             site_only_version = slugify(site_only_version)
-
-        site_only_version = site_only_version or get_workflow().output_version
+        if site_only_version is None:
+            raise ValueError('Site only version is None. Please provide a valid version.')
 
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
-            'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            'vcf': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / get_workflow().output_version
+            / 'MakeSiteOnly'
+            / f'siteonly_{site_only_version}.vcf.bgz',
+            'tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / get_workflow().output_version
+            / 'MakeSiteOnly'
+            / f'siteonly_{site_only_version}.vcf.bgz.tbi',
+            'ht': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / get_workflow().output_version
+            / 'MakeSiteOnly'
+            / f'siteonly_{site_only_version}.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
