@@ -38,8 +38,6 @@ def run(
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
     hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
-    logging.info(f'Writing site-only HT to {out_ht_path}')
-    site_only_ht.write(str(out_ht_path), overwrite=True)
 
 
 def vds_to_site_only_ht(
@@ -70,6 +68,8 @@ def vds_to_site_only_ht(
         # an IndexOutOfBound exception when trying to access value for second allele)
         pipe_delimited_annotations=[],
     )
+
+    logging.info(f'Writing site-only HT to {out_ht_path}')
     var_ht.write(str(out_ht_path), overwrite=True)
     return var_ht
 
