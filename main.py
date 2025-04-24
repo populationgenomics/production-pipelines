@@ -97,6 +97,8 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         AncestryPlots,
         GvcfMultiQC,
         CramMultiQC,
+    ],
+    'prepare_browser_table': [
         PrepareBrowserTable,
     ],
     'gatk_sv_singlesample': [CreateSampleBatches],
