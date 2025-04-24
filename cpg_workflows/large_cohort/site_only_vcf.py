@@ -53,8 +53,10 @@ def vds_to_site_only_ht(
         return hl.read_table(str(out_ht_path))
 
     mt = hl.vds.to_dense_mt(vds)
+
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+
     mt = _filter_rows_and_add_tags(mt)
     var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
     var_ht = adjust_vcf_incompatible_types(
@@ -66,6 +68,8 @@ def vds_to_site_only_ht(
         # an IndexOutOfBound exception when trying to access value for second allele)
         pipe_delimited_annotations=[],
     )
+
+    logging.info(f'Writing site-only HT to {out_ht_path}')
     var_ht.write(str(out_ht_path), overwrite=True)
     return var_ht
 
