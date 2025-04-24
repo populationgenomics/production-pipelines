@@ -194,6 +194,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
         ),
     )
 
+    # TO DO: adjust fafmax expression to correctly handle the case when AF != MAF.
     mt = mt.annotate_rows(
         fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='pop'),
         popmax=mt.popmax.annotate(
