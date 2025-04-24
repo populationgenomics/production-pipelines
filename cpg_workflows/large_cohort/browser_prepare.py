@@ -173,7 +173,7 @@ def _subset_filter(subset):
     return lambda variant: variant.ac_adj[subset] > 0
 
 
-def prepare_gnomad_v4_variants_helper(ds_path: str, exome_or_genome: str) -> hl.Table:
+def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str) -> hl.Table:
 
     if ds_path is None:
         ds = hl.Table.parallelize(hl.literal([], "".join(EMPTY_TABLE_CONFIG.split()))).key_by('locus', 'alleles')
@@ -393,8 +393,8 @@ def prepare_v4_variants(
     exome_ds_path: str,
     genome_ds_path: str,
     browser_outpath: str,
-    exome_variants_outpath: str,
-    genome_variants_outpath: str,
+    exome_variants_outpath: str | None,
+    genome_variants_outpath: str | None,
 ) -> hl.Table:
 
     # Generate the browser output tables for each data type.
