@@ -334,9 +334,15 @@ class AncestryPlots(CohortStage):
 @stage(required_stages=[Combiner, SampleQC, Relatedness])
 class MakeSiteOnlyVcf(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if site_only_version := config_retrieve(['large_cohort', 'output_versions', 'makesiteonly'], default=None):
+            site_only_version = slugify(site_only_version)
+
+        site_only_version = site_only_version or get_workflow().output_version
+
         return {
-            'vcf': self.tmp_prefix / 'siteonly.vcf.bgz',
-            'tbi': self.tmp_prefix / 'siteonly.vcf.bgz.tbi',
+            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
+            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -368,7 +374,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
-                str(self.tmp_prefix),
+                str(self.expected_outputs(cohort)['ht']),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
@@ -380,9 +386,13 @@ class MakeSiteOnlyVcf(CohortStage):
 @stage(required_stages=MakeSiteOnlyVcf)
 class Vqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'vqsr'], default=None):
+            vqsr_version = slugify(vqsr_version)
+
+        vqsr_version = vqsr_version or get_workflow().output_version
         return {
-            'vcf': self.tmp_prefix / 'siteonly.vqsr.vcf.gz',
-            'tbi': self.tmp_prefix / 'siteonly.vqsr.vcf.gz.tbi',
+            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
+            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -405,7 +415,11 @@ class Vqsr(CohortStage):
 @stage(required_stages=Vqsr)
 class LoadVqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'vqsr.ht'
+        if load_vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'loadvqsr'], default=None):
+            load_vqsr_version = slugify(load_vqsr_version)
+
+        load_vqsr_version = load_vqsr_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / load_vqsr_version / 'vqsr.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import load_vqsr
@@ -429,10 +443,14 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, SampleQC, Relatedness])
+@stage(required_stages=[Combiner, Relatedness, Ancestry, MakeSiteOnlyVcf, LoadVqsr])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return get_workflow().prefix / 'frequencies.ht'
+        if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
+            frequencies_version = slugify(frequencies_version)
+
+        frequencies_version = frequencies_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / frequencies_version / 'frequencies.ht'
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import frequencies
@@ -458,10 +476,61 @@ class Frequencies(CohortStage):
                 frequencies,
                 frequencies.run.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(inputs.as_path(cohort, SampleQC)),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='ht')),
+                str(inputs.as_path(cohort, LoadVqsr)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+# @stage(required_stages=[Frequencies])
+@stage()
+class PrepareBrowserTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
+            browser_version = slugify(browser_version)
+
+        browser_version = browser_version or get_workflow().output_version
+        return {
+            'browser': cohort.analysis_dataset.prefix() / get_workflow().name / browser_version / 'browser.ht',
+            'exome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'exome_variants.ht',
+            'genome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'genome_variants.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import browser_prepare
+
+        j = get_batch().new_job(
+            'PrepareBrowserTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+        genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+
+        j.command(
+            query_command(
+                browser_prepare,
+                browser_prepare.prepare_v4_variants.__name__,
+                # hard-coding Frequencies tables for now
+                exome_freq_ht_path,
+                genome_freq_ht_path,
+                str(self.expected_outputs(cohort)['browser']),
+                str(self.expected_outputs(cohort)['exome_variants']),
+                str(self.expected_outputs(cohort)['genome_variants']),
                 setup_gcp=True,
             ),
         )
