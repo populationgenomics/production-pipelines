@@ -79,6 +79,9 @@ INDEL_RECALIBRATION_TRANCHE_VALUES = [
     90.0,
 ]
 
+BCFTOOLS_VERSION = '1.16-1'
+GATK_VERSION = '4.2.6.1-1'
+
 
 def make_vqsr_jobs(
     b: hb.Batch,
@@ -347,7 +350,7 @@ def add_tabix_job(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'tabix'}
     j = b.new_job('VQSR: Tabix', job_attrs)
-    j.image(image_path('bcftools'))
+    j.image(image_path('bcftools', BCFTOOLS_VERSION))
     STANDARD.set_resources(j, mem_gb=8, storage_gb=disk_size)
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     vcf_inp = b.read_input(str(vcf_path))
@@ -388,7 +391,7 @@ def indel_recalibrator_job(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: IndelsVariantRecalibrator', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     # We run it for the entire dataset in one job, so can take an entire instance.
     instance_fraction = 1
@@ -465,7 +468,7 @@ def snps_recalibrator_create_model_job(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibratorCreateModel', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     # We run it for the entire dataset in one job, so can take an entire instance.
     instance_fraction = 1
@@ -545,7 +548,7 @@ def snps_recalibrator_scattered(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibratorScattered', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     if is_small_callset:
         res = STANDARD.set_resources(j, ncpu=4, storage_gb=disk_size)
@@ -604,7 +607,7 @@ def snps_recalibrator_job(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk VariantRecalibrator'}
     j = b.new_job('VQSR: SNPsVariantRecalibrator', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     # We run it for the entire dataset in one job, so can take an entire instance.
     instance_fraction = 1
@@ -670,7 +673,7 @@ def snps_gather_tranches_job(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk GatherTranches'}
     j = b.new_job('VQSR: SNPGatherTranches', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     inputs_cmdl = ' '.join([f'--input {t}' for t in tranches])
@@ -718,7 +721,7 @@ def apply_recalibration_snps(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk ApplyVQSR'}
     j = b.new_job('VQSR: ApplyVQSR SNPs', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     cmd = f"""
@@ -777,7 +780,7 @@ def apply_recalibration_indels(
     """
     job_attrs = (job_attrs or {}) | {'tool': 'gatk ApplyVQSR'}
     j = b.new_job('VQSR: ApplyVQSR INDEL', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(j, ncpu=2, storage_gb=disk_size)
 
     j.declare_resource_group(

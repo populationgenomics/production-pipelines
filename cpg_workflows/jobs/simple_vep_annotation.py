@@ -76,7 +76,7 @@ def split_vcf_by_chromosome(
     bcftools_job = get_batch().new_bash_job('Subset VCF with bcftools')
 
     # set some resources
-    bcftools_job.image(image_path('bcftools')).cpu(1).memory('8G')
+    bcftools_job.image(image_path('bcftools', '1.16-1')).cpu(1).memory('8G')
 
     # only attach further storage if requested
     if storage:

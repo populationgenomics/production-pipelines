@@ -188,7 +188,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
         gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar_gnomad']))
 
         job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name}')
-        job.image(image_path('echtvar'))
+        job.image(image_path('echtvar', '0.2.1-1'))
         job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
         job.storage('20Gi')
         job.memory('highmem')

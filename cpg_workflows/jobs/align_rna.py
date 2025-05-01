@@ -263,7 +263,7 @@ def align_fq_pair(
     align_tool = 'STAR'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=align_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('star'))
+    j.image(image_path('star', '2.7.10b-1'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
@@ -306,7 +306,7 @@ def merge_bams(
     merge_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=merge_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
@@ -338,7 +338,7 @@ def sort_index_bam(
     sort_tool = 'samtools'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=sort_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8

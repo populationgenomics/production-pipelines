@@ -79,6 +79,8 @@ MTA_QUERY = gql(
 SEQR_KEYS: list[str] = ['seqr_project', 'seqr_instance', 'seqr_lookup']
 TALOS_PREP_TYPE = 'talos_prep'
 
+TALOS_VERSION = '6.4.0-1'
+
 
 @lru_cache(maxsize=1)
 def get_date_string() -> str:
@@ -313,7 +315,7 @@ class MakePhenopackets(DatasetStage):
         script to generate an extended pedigree format - additional columns for Ext. ID and HPO terms
         """
         job = get_batch().new_job('Generate Phenopackets from Metamist')
-        job.cpu(1).image(image_path('talos'))
+        job.cpu(1).image(image_path('talos', TALOS_VERSION))
 
         expected_out = self.expected_outputs(dataset)
         query_dataset = dataset.name
@@ -355,7 +357,7 @@ class GeneratePanelData(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Find HPO-matched Panels: {dataset.name}')
-        job.cpu(1).image(image_path('talos'))
+        job.cpu(1).image(image_path('talos', TALOS_VERSION))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
@@ -387,7 +389,7 @@ class QueryPanelapp(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Query PanelApp: {dataset.name}')
-        job.cpu(1).image(image_path('talos'))
+        job.cpu(1).image(image_path('talos', TALOS_VERSION))
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
@@ -425,7 +427,7 @@ class RunHailFiltering(DatasetStage):
             )
 
         job = get_batch().new_job(f'Run hail labelling: {dataset.name}')
-        job.image(image_path('talos'))
+        job.image(image_path('talos', TALOS_VERSION))
         job.command('set -eux pipefail')
 
         # time in seconds before this jobs self-destructs
@@ -539,7 +541,7 @@ class RunHailFilteringSV(DatasetStage):
                 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi',
             },
         )
-        job.image(image_path('talos'))
+        job.image(image_path('talos', TALOS_VERSION))
         # generally runtime under 10 minutes
         job.timeout(config_retrieve(['RunHailFiltering', 'timeouts', 'sv'], 3600))
 
@@ -592,7 +594,8 @@ class ValidateMOI(DatasetStage):
         job = get_batch().new_job(f'Talos summary: {dataset.name}')
         job.cpu(config_retrieve(['talos_stages', 'ValidateMOI', 'cpu'], 2.0)).memory(
             config_retrieve(['talos_stages', 'ValidateMOI', 'memory'], 'highmem'),
-        ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi')).image(image_path('talos'))
+        ).storage(config_retrieve(['talos_stages', 'ValidateMOI', 'storage'], '10Gi'))
+        job.image(image_path('talos', TALOS_VERSION))
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
         conf_in_batch = get_batch().read_input(runtime_config)
@@ -656,7 +659,7 @@ class HPOFlagging(DatasetStage):
         gene_to_phenotype = get_batch().read_input(config_retrieve(['HPOFlagging', 'gene_to_phenotype']))
 
         job = get_batch().new_job(f'Label phenotype matches: {dataset.name}')
-        job.cpu(2.0).memory('highmem').image(image_path('talos')).storage('20Gi')
+        job.cpu(2.0).memory('highmem').image(image_path('talos', TALOS_VERSION)).storage('20Gi')
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
@@ -696,7 +699,7 @@ class CreateTalosHtml(DatasetStage):
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         job = get_batch().new_job(f'Talos HTML: {dataset.name}')
-        job.image(image_path('talos')).memory('standard').cpu(1.0)
+        job.image(image_path('talos', TALOS_VERSION)).memory('standard').cpu(1.0)
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))
@@ -796,7 +799,7 @@ class MinimiseOutputForSeqr(DatasetStage):
 
         # create a job to run the minimisation script
         job = get_batch().new_job(f'Talos Prep for Seqr: {dataset.name}')
-        job.image(image_path('talos')).cpu(1.0).memory('lowmem')
+        job.image(image_path('talos', TALOS_VERSION)).cpu(1.0).memory('lowmem')
 
         # use the new config file
         runtime_config = str(inputs.as_path(dataset, MakeRuntimeConfig))

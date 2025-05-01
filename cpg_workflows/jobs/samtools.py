@@ -28,7 +28,7 @@ def samtools_stats(
     job_attrs = (job_attrs or {}) | {'tool': 'samtools'}
     j = b.new_job('samtools stats', job_attrs)
 
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
     res = STANDARD.set_resources(j, fraction=1)
     reference = fasta_res_group(b)
 

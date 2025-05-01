@@ -17,6 +17,9 @@ from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import SequencingGroup
 
+GATK_VERSION = '4.2.6.1-1'
+PICARD_VERSION = '2.27.4-1'
+
 
 def subset_cram_to_chrM(
     b,
@@ -43,7 +46,7 @@ def subset_cram_to_chrM(
 
     job_attrs = (job_attrs or {}) | dict(tool='gatk_PrintReads')
     j = b.new_job('subset_cram_to_chrM', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -103,7 +106,7 @@ def mito_realign(
     """
     job_attrs = job_attrs or {} | dict(tool='bwa')
     j = b.new_job('mito_realign', job_attrs)
-    j.image(image_path('bwa'))
+    j.image(image_path('bwa', '0.7.17-1'))
 
     nthreads = STANDARD.set_resources(j, ncpu=4).get_nthreads()
 
@@ -150,7 +153,7 @@ def collect_coverage_metrics(
     """
     job_attrs = (job_attrs or {}) | dict(tool='picard_CollectWgsMetrics')
     j = b.new_job('collect_coverage_metrics', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -199,7 +202,7 @@ def extract_coverage_mean(
     """
     job_attrs = job_attrs or {} | dict(tool='R')
     j = b.new_job('extract_coverage_mean', job_attrs)
-    j.image(image_path('peer'))
+    j.image(image_path('peer', '1.3-1'))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -250,7 +253,7 @@ def coverage_at_every_base(
     """
     job_attrs = job_attrs or {} | dict(tool='picard_CollectHsMetrics')
     j = b.new_job('coverage_at_every_base', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -294,7 +297,7 @@ def merge_coverage(
     """
     job_attrs = job_attrs or {} | dict(tool='R')
     j = b.new_job('merge_coverage', job_attrs)
-    j.image(image_path('peer'))
+    j.image(image_path('peer', '1.3-1'))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -353,7 +356,7 @@ def mito_mutect2(
     """
     job_attrs = job_attrs or {} | dict(tool='Mutect2')
     j = b.new_job('mito_mutect2', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     res = STANDARD.set_resources(j, ncpu=4)
 
@@ -409,7 +412,7 @@ def liftover_and_combine_vcfs(
     """
     job_attrs = job_attrs or {} | dict(tool='picard_LiftoverVcf')
     j = b.new_job('liftover_and_combine_vcfs', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
 
     STANDARD.set_resources(j, ncpu=4)
 
@@ -456,7 +459,7 @@ def merge_mutect_stats(
     """
     job_attrs = job_attrs or {} | dict(tool='gatk_MergeMutectStats')
     j = b.new_job('merge_stats', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     STANDARD.set_resources(j, ncpu=4)
 
@@ -512,7 +515,7 @@ def filter_variants(
     """
     job_attrs = job_attrs or {} | dict(tool='gatk_FilterMutectCalls')
     j = b.new_job('filter_variants', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     STANDARD.set_resources(j, ncpu=4)
 
@@ -573,7 +576,7 @@ def split_multi_allelics(
     """
     job_attrs = job_attrs or {} | dict(tool='gatk_SelectVariants')
     j = b.new_job('split_multi_allelics', job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     STANDARD.set_resources(j, ncpu=4)
 
@@ -630,7 +633,7 @@ def get_contamination(
     """
     job_attrs = job_attrs or {} | dict(tool='haplocheckcli')
     j = b.new_job('get_contamination', job_attrs)
-    j.image(image_path('haplocheckcli'))
+    j.image(image_path('haplocheckcli', '64293b34-1'))
 
     STANDARD.set_resources(j, ncpu=2)
 
@@ -733,7 +736,7 @@ def mitoreport(
     """
     job_attrs = (job_attrs or {}) | dict(tool='mitoreport')
     j = b.new_job('mitoreport', job_attrs)
-    j.image(image_path('mitoreport'))
+    j.image(image_path('mitoreport', '1.1.0-1'))
 
     res = STANDARD.request_resources(ncpu=2)
     res.set_to_job(j)

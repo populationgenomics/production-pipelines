@@ -414,7 +414,7 @@ class Vqsr(CohortStage):
 
         reheader_job.depends_on(*jobs)
 
-        reheader_job.image(image_path('bcftools'))
+        reheader_job.image(image_path('bcftools', '1.16-1'))
         reheader_job.storage(config_retrieve(['vqsr_reheader', 'storage'], default='16Gi'))
 
         vqsr_vcf = b.read_input(outputs['vcf'])

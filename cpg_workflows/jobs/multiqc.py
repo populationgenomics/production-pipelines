@@ -59,7 +59,7 @@ def multiqc(
         title += f' [{label}]'
 
     mqc_j = b.new_job(title, (job_attrs or {}) | dict(tool='MultiQC'))
-    mqc_j.image(image_path('multiqc'))
+    mqc_j.image(image_path('multiqc', '1.14-1'))
     STANDARD.set_resources(mqc_j, ncpu=16)
 
     file_list_path = tmp_prefix / f'{dataset.get_alignment_inputs_hash()}_multiqc-file-list.txt'

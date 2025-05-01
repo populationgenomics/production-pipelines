@@ -22,6 +22,8 @@ from cpg_workflows.utils import can_reuse, get_intervals_from_bed
 from .picard import get_intervals
 from .vcf import gather_vcfs
 
+GATK_VERSION = '4.2.6.1-1'
+
 
 class JointGenotyperTool(Enum):
     """
@@ -239,7 +241,7 @@ def genomicsdb(
             tool='gatk GenomicsDBImport',
         ),
     )
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
 
     sample_map = b.read_input(str(sample_map_bucket_path))
 
@@ -357,7 +359,7 @@ def _add_joint_genotyper_job(
     job_name = f'{tool.name}'
     job_attrs = (job_attrs or {}) | {'tool': f'gatk {tool.name}'}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     # Standard 375/4 = 93G storage should be enough, based on the following estimations:
     # For example, for 1359 samples, and scatter_count=200,
     # * all of 200 GenomicsDBs tarballs = 1.09 TB
@@ -467,7 +469,7 @@ def _add_excess_het_filter(
 
     job_name = 'ExcessHet filter'
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(j, ncpu=2)
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
@@ -522,7 +524,7 @@ def add_make_sitesonly_job(
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
         j.storage(f'{storage_gb}G')
