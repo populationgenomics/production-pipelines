@@ -238,7 +238,7 @@ class ReFormatPacBioSVs(SequencingGroupStage):
             {'tool': 'bcftools'},
         )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-        tabix_job.image(image=image_path('bcftools'))
+        tabix_job.image(image=image_path('bcftools', '1.16-1'))
         tabix_job.storage('10Gi')
         tabix_job.command(
             f'bcftools view -Ov {mod_job.output} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',

@@ -32,7 +32,7 @@ def bam_to_cram(
     convert_tool = 'samtools_view'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=convert_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
 
     # Get fasta file
     fasta = b.read_input_group(
@@ -82,7 +82,7 @@ def cram_to_bam(
     convert_tool = 'samtools_view_cram_to_bam'
     j_attrs = (job_attrs or {}) | dict(label=job_name, tool=convert_tool)
     j = b.new_job(name=job_name, attributes=j_attrs)
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
