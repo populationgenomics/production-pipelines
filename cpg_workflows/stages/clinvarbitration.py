@@ -75,7 +75,7 @@ class GenerateNewClinvarSummary(MultiCohortStage):
     def queue_jobs(self, mc: MultiCohort, inputs: StageInput) -> StageOutput:
         # relatively RAM intensive, short running task
         clinvarbitrate = get_batch().new_job('Run ClinvArbitration Summary')
-        clinvarbitrate.image(image_path('clinvarbitration')).memory('highmem').cpu('2')
+        clinvarbitrate.image(image_path('clinvarbitration', '1.5.1-1')).memory('highmem').cpu('2')
         authenticate_cloud_credentials_in_job(clinvarbitrate)
 
         # declare a resource group, leave the HT path implicit
@@ -146,7 +146,7 @@ class PM5TableGeneration(MultiCohortStage):
 
         # declare a resouce group, but don't copy the whole thing back
         clinvarbitrate_pm5 = get_batch().new_job('Run ClinvArbitration PM5')
-        clinvarbitrate_pm5.image(image_path('clinvarbitration'))
+        clinvarbitrate_pm5.image(image_path('clinvarbitration', '1.5.1-1'))
         authenticate_cloud_credentials_in_job(clinvarbitrate_pm5)
 
         # get the expected outputs
