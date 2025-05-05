@@ -21,6 +21,7 @@ def run(
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
     out_ht_path: str,
+    out_ht_pre_vcf_adjusted_path: str,
 ):
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
@@ -34,6 +35,7 @@ def run(
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
         out_ht_path=out_ht_path,
+        out_ht_pre_vcf_adjusted_path=out_ht_pre_vcf_adjusted_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
@@ -44,7 +46,8 @@ def vds_to_site_only_ht(
     vds: hl.vds.VariantDataset,
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
-    out_ht_path: Path,
+    out_ht_path: str,
+    out_ht_pre_vcf_adjusted_path: str,
 ) -> hl.Table:
     """
     Convert VDS into sites-only VCF-ready table.
@@ -59,6 +62,7 @@ def vds_to_site_only_ht(
 
     mt = _filter_rows_and_add_tags(mt)
     var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
+    var_ht = var_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
     var_ht = adjust_vcf_incompatible_types(
         var_ht,
         # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted

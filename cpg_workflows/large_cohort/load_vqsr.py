@@ -4,16 +4,49 @@ import hail as hl
 
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse
+from gnomad.utils.annotations import annotate_allele_info
+from gnomad.utils.sparse_mt import split_info_annotation
 
 
 def run(
+    pre_vcf_adjusted_ht_path: str,
     site_only_vcf_path: str,
     out_ht_path: str,
 ):
-    load_vqsr(site_only_vcf_path, out_ht_path)
+    load_vqsr(pre_vcf_adjusted_ht_path, site_only_vcf_path, out_ht_path)
+
+
+def split_info(info_ht: hl.Table) -> hl.Table:
+    """
+    Generate an info Table with split multi-allelic sites from the multi-allelic info Table.
+
+    .. note::
+
+        gnomad_methods' `annotate_allele_info` splits multi-allelic sites before the
+        `info` annotation is split to ensure that all sites in the returned Table are
+        annotated with allele info.
+
+    :param info_ht: Info Table with unsplit multi-allelics.
+    :return: Info Table with split multi-allelics.
+    """
+    info_ht = annotate_allele_info(info_ht)
+    info_annotations_to_split = ['info']
+    info_ht = info_ht.annotate(
+        **{
+            a: info_ht[a].annotate(
+                **split_info_annotation(info_ht[a], info_ht.a_index),
+            )
+            for a in info_annotations_to_split
+        },
+        # Vqsr info_ht has no field AS_lowqual
+        # AS_lowqual=split_lowqual_annotation(info_ht.AS_lowqual, info_ht.a_index),
+    )
+
+    return info_ht
 
 
 def load_vqsr(
+    pre_vcf_adjusted_ht_path: str,
     site_only_vcf_path: str,
     out_ht_path: str | None = None,
 ) -> hl.Table:
@@ -23,8 +56,10 @@ def load_vqsr(
     if can_reuse(out_ht_path):
         return hl.read_table(str(out_ht_path))
 
+    pre_vcf_adjusted_ht = hl.read_table(str(pre_vcf_adjusted_ht_path))
+
     logging.info(f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}')
-    ht = hl.import_vcf(
+    ht_unsplit = hl.import_vcf(
         str(site_only_vcf_path),
         reference_genome=genome_build(),
         force_bgz=True,
@@ -38,8 +73,22 @@ def load_vqsr(
     # To mitigate this, we can drop the SB field before the HT is (lazily) parsed.
     # In order words, dropping it before calling ht.write() makes sure that Hail would
     # never attempt to actually parse it.
-    if 'SB' in ht.info:
-        ht = ht.annotate(info=ht.info.drop('SB'))
+    if 'SB' in ht_unsplit.info:
+        ht_unsplit = ht_unsplit.annotate(info=ht_unsplit.info.drop('SB'))
+
+    # Replace AS_SB_TABLE field in vqsr vcf with correctly formatted array<array<int32>> dtype
+    ht_unsplit = ht_unsplit.annotate(
+        info=ht_unsplit.info.annotate(
+            as_sb_table_original=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
+            AS_SB_TABLE=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
+        ),
+    )
+
+    unsplit_count = ht_unsplit.count()
+
+    ht_split = split_info(ht_unsplit)
+
+    split_count = ht_split.count()
 
     # Dropping also all INFO/AS* annotations as well as InbreedingCoeff, as they are
     # causing problems splitting multiallelics after parsing by Hail, when Hail attempts
@@ -50,14 +99,11 @@ def load_vqsr(
     # one, with one AS_FilterStatus value. So for the first one indexing by allele
     # index would work, but for the second one it would throw an index out of bounds:
     # `HailException: array index out of bounds: index=1, length=1`
-    ht = ht.annotate(info=ht.info.drop(*[f for f in ht.info if f.startswith('AS_')]))
+    # ht = ht.annotate(info=ht.info.drop(*[f for f in ht.info if f.startswith('AS_')]))
 
-    unsplit_count = ht.count()
-    ht = hl.split_multi_hts(ht)
     if out_ht_path:
-        ht.write(str(out_ht_path), overwrite=True)
-        ht = hl.read_table(str(out_ht_path))
+        ht_split.write(str(out_ht_path), overwrite=True)
+        ht_split = hl.read_table(str(out_ht_path))
         logging.info(f'Wrote split HT to {out_ht_path}')
-    split_count = ht.count()
     logging.info(f'Found {unsplit_count} unsplit and {split_count} split variants with VQSR annotations')
-    return ht
+    return ht_split

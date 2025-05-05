@@ -343,6 +343,10 @@ class MakeSiteOnlyVcf(CohortStage):
             'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
             'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            'pre_adjusted': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'siteonly_pre_vcf_adjusted.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -375,6 +379,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.expected_outputs(cohort)['ht']),
+                str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
@@ -412,7 +417,7 @@ class Vqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-@stage(required_stages=Vqsr)
+@stage(required_stages=[MakeSiteOnlyVcf, Vqsr])
 class LoadVqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if load_vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'loadvqsr'], default=None):
@@ -434,6 +439,7 @@ class LoadVqsr(CohortStage):
             query_command(
                 load_vqsr,
                 load_vqsr.run.__name__,
+                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='pre_adjusted')),
                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
