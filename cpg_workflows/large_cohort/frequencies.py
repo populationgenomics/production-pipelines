@@ -72,6 +72,7 @@ def frequency_annotations(
     mt = hl.vds.to_dense_mt(vds)
 
     # Filter and annotate samples.
+    # Note: removing samples here may leave an otherwise dense MT with hom-ref genotypes
     logging.info('Removing filtered samples...')
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
