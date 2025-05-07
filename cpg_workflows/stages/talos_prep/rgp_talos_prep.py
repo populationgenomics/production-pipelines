@@ -65,7 +65,12 @@ class CleanUpVcf(DatasetStage):
         output = self.expected_outputs(dataset)
 
         input_vcf = config_retrieve(['workflow', 'input_vcf'])
-        local_input = get_batch().read_input(input_vcf)
+        local_input = get_batch().read_input_group(
+            **{
+                'vcf.gz': input_vcf,
+                'vcf.gz.tbi': f'{input_vcf}.tbi',
+            },
+        )
 
         bed = reference_path(f'ensembl_113/merged_bed')
         local_bed = get_batch().read_input(bed)
@@ -86,7 +91,7 @@ class CleanUpVcf(DatasetStage):
             --write-index=tbi \
             -R {local_bed} \
             -Oz -o {job.output["vcf.gz"]} \
-            {local_input}"""
+            {local_input['vcf.gz']}"""
         )
 
         get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
