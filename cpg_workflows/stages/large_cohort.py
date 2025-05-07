@@ -648,6 +648,7 @@ class MergeCoverageTables(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+# @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
