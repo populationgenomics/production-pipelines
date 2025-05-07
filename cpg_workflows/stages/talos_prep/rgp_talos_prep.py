@@ -109,7 +109,7 @@ class MakeSitesOnlyVersion(DatasetStage):
 
         output = self.expected_outputs(dataset)
 
-        input_vcf = inputs.as_path(dataset, CleanUpVcf)
+        input_vcf = get_batch().read_input(inputs.as_path(dataset, CleanUpVcf))
 
         job = get_batch().new_job(f'MakeSitesOnlyVersion')
         job.image(image_path('bcftools_120'))
