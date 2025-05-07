@@ -55,7 +55,7 @@ class CleanUpVcf(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.prefix / f'{dataset.name}_cleaned.vcf.bgz'
+        return self.prefix / f'{dataset.name}_cleaned.vcf.gz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -94,7 +94,7 @@ class CleanUpVcf(DatasetStage):
             {local_input['vcf.gz']}"""
         )
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
 
         return self.make_outputs(dataset, data=output, jobs=job)
 
@@ -103,7 +103,7 @@ class CleanUpVcf(DatasetStage):
 class MakeSitesOnlyVersion(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.prefix / f'{dataset.name}_cleaned_sitesonly.vcf.bgz'
+        return self.prefix / f'{dataset.name}_cleaned_sitesonly.vcf.gz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
@@ -117,7 +117,7 @@ class MakeSitesOnlyVersion(DatasetStage):
         job.memory('highmem')
         job.command(f'bcftools view -Oz -o {job.output} -G {input_vcf}')
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
 
         return self.make_outputs(dataset, data=output, jobs=job)
 
@@ -129,10 +129,10 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_gnomad_frequency_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_gnomad_frequency_annotated.vcf.gz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
-        outputs = self.expected_outputs(dataset)
+        output = self.expected_outputs(dataset)
 
         sites_vcf = get_batch().read_input(inputs.as_path(dataset, MakeSitesOnlyVersion))
 
@@ -146,7 +146,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
         job.memory('highmem')
         job.cpu(4)
 
-        get_batch().write_output(job.output, str(outputs))
+        get_batch().write_output(job.output, output)
 
         return self.make_outputs(dataset, data=outputs, jobs=job)
 
@@ -159,7 +159,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_consequence_annotated.vcf.bgz'
+        return self.tmp_prefix / f'{dataset.name}_consequence_annotated.vcf.gz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
@@ -179,7 +179,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
         job.cpu(4)
         job.storage('20G')
 
-        job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+        job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
         # the echtvar image doesn't have a tool to index, so first add that
         # then run the csq command:
@@ -194,13 +194,13 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
                 --threads 4 \
                 -g {gff3_file} \
                 -B 10 \
-                -Oz -o {job.output["vcf.bgz"]} \
+                -Oz -o {job.output["vcf.gz"]} \
                 --write-index=tbi \
                 {gnomad_annotated_vcf}
             """,
         )
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.bgz'))
+        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
 
         return self.make_outputs(dataset, data=output, jobs=job)
 
