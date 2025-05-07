@@ -32,6 +32,7 @@ from cpg_workflows.stages.large_cohort import (
     Frequencies,
     LoadVqsr,
     MergeCoverageTables,
+    PrepareBrowserTable,
 )
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
@@ -92,6 +93,9 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     ],
     'validation': [ValidationMtToVcf, ValidationHappyOnVcf],
     'large_cohort': [LoadVqsr, Frequencies, AncestryPlots, GvcfMultiQC, CramMultiQC, MergeCoverageTables],
+    'prepare_browser_table': [
+        PrepareBrowserTable,
+    ],
     'gatk_sv_singlesample': [CreateSampleBatches],
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv, SplitAnnotatedSvVcfByDataset],
     'rare_disease_rnaseq': [Outrider, Fraser],

@@ -646,3 +646,51 @@ class MergeCoverageTables(CohortStage):
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class PrepareBrowserTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
+            browser_version = slugify(browser_version)
+
+        browser_version = browser_version or get_workflow().output_version
+        return {
+            'browser': cohort.analysis_dataset.prefix() / get_workflow().name / browser_version / 'browser.ht',
+            'exome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'exome_variants.ht',
+            'genome_variants': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'genome_variants.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import browser_prepare
+
+        j = get_batch().new_job(
+            'PrepareBrowserTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+        genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+
+        j.command(
+            query_command(
+                browser_prepare,
+                browser_prepare.prepare_v4_variants.__name__,
+                # hard-coding Frequencies tables for now
+                exome_freq_ht_path,
+                genome_freq_ht_path,
+                str(self.expected_outputs(cohort)['browser']),
+                str(self.expected_outputs(cohort)['exome_variants']),
+                str(self.expected_outputs(cohort)['genome_variants']),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
