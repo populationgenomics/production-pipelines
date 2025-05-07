@@ -146,9 +146,9 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
         job.memory('highmem')
         job.cpu(4)
 
-        get_batch().write_output(job.output, output)
+        get_batch().write_output(job.output, str(output))
 
-        return self.make_outputs(dataset, data=outputs, jobs=job)
+        return self.make_outputs(dataset, data=output, jobs=job)
 
 
 @stage(required_stages=AnnotateGnomadFrequenciesWithEchtvar)
