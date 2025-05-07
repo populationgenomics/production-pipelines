@@ -80,7 +80,6 @@ def load_vqsr(
     # Replace AS_SB_TABLE field in vqsr vcf with correctly formatted array<array<int32>> dtype
     ht_unsplit = ht_unsplit.annotate(
         info=ht_unsplit.info.annotate(
-            as_sb_table_original=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
             AS_SB_TABLE=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
         ),
     )
@@ -88,6 +87,12 @@ def load_vqsr(
     unsplit_count = ht_unsplit.count()
 
     ht_split = split_info(ht_unsplit)
+
+    ht_split = ht_split.annotate(
+        info=ht_split.info.annotate(
+            AS_VQSLOD=hl.float64(ht_split.info.AS_VQSLOD),
+        ),
+    )
 
     split_count = ht_split.count()
 
