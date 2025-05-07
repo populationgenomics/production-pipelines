@@ -25,10 +25,10 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 #aneuploid_samples = []
 
 [images]
-gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2023-07-13-4.4.0.0-43-gd79823f9c-NIGHTLY-SNAPSHOT"
+gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2024-12-05-4.6.1.0-6-gfc248dfc1-NIGHTLY-SNAPSHOT"
 gatk_gcnv = 'australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432'
-sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:5994670"
-sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images-dev/gatk-sv_issue_661:n_a"
+sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:2024-10-25-v0.29-beta-5ea22a52"
+sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/gatk-sv_issue_661:n_a"
 
 [references.gatk_sv]
 # a couple of annotation arguments are not files

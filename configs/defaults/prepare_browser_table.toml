@@ -1,0 +1,16 @@
+
+[workflow]
+name = 'large_cohort'
+status_reporter = 'metamist'
+highmem_workers = true
+
+
+[large_cohort.output_versions]
+# If left empty, pipeline will default to building empty genome/exome variants browser table
+# frequencies_genome = ""
+# frequencies_exome = ""
+
+
+[hail]
+pool_label = 'large-cohort'
+delete_scratch_on_exit = false

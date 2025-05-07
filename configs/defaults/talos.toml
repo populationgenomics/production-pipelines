@@ -74,11 +74,7 @@ small_variants = 'highmem'
 
 [RunHailFiltering.storage]
 sv = 10
-
-[RunHailFiltering.timeouts]
-# timeouts for the Hail Batch jobs, cancels the job if it hangs
-small_variants = 15000
-sv = 3600
+small_variants = 50
 
 [categories]
 1 = 'ClinVar Pathogenic'

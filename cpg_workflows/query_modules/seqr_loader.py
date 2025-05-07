@@ -58,21 +58,25 @@ def annotate_cohort(
     )
     mt = mt.annotate_rows(vep=vep_ht[mt.locus].vep)
 
+    # 2025-04-02:
+    # The INFO fields AC/AN/AF are now computed with bcftools +fill-tags -t AF,AN,AC
+    # So no need to use hl.variant_qc here
+    #
     # in our long-read VCFs, AF is present as an Entry field, so we need to drop it from entries,
     # and then recompute AC/AF/AN correctly from the variant QC table
     # do this prior to splitting multiallelics, as the AF/AC needs to be generated per-original ALT allele
     # currently not an issue, as our long-read VCFs are not multiallelic, but they could be in future
-    if long_read:
-        mt = mt.drop('AF')
-        mt = hl.variant_qc(mt)
-        mt = mt.annotate_rows(
-            info=mt.info.annotate(
-                AF=mt.variant_qc.AF,
-                AN=mt.variant_qc.AN,
-                AC=mt.variant_qc.AC,
-            ),
-        )
-        mt = mt.drop('variant_qc')
+    # if long_read:
+    #     mt = mt.drop('AF', )
+    #     mt = hl.variant_qc(mt)
+    #     mt = mt.annotate_rows(
+    #         info=mt.info.annotate(
+    #             AF=mt.variant_qc.AF,
+    #             AN=mt.variant_qc.AN,
+    #             AC=mt.variant_qc.AC,
+    #         ),
+    #     )
+    #     mt = mt.drop('variant_qc')
 
     # Remove any contigs not in the 22 autosomes, X, Y, M
     if remove_invalid_contigs:
@@ -111,17 +115,22 @@ def annotate_cohort(
 
     logging.info('Annotating with seqr-loader fields: round 1')
 
+    # 2024-04-02:
+    # The INFO fields AC/AN/AF are now computed with bcftools +fill-tags -t AF,AN,AC
+    # So no need to modify them here
+    #
     # split the AC/AF attributes into separate entries, overwriting the array in INFO
     # these elements become a 1-element array
     # the index_correction is required to align the AC/AF with the correct allele
     # in the split multi-allelics
-    index_correction = 0 if long_read else 1
-    mt = mt.annotate_rows(
-        info=mt.info.annotate(
-            AF=[mt.info.AF[mt.a_index - index_correction]],
-            AC=[mt.info.AC[mt.a_index - index_correction]],
-        ),
-    )
+    # index_correction = 0 if long_read else 1
+    # index_correction = 1
+    # mt = mt.annotate_rows(
+    #     info=mt.info.annotate(
+    #         AF=[mt.info.AF[mt.a_index - index_correction]],
+    #         AC=[mt.info.AC[mt.a_index - index_correction]],
+    #     ),
+    # )
 
     logging.info('Annotating with clinvar and munging annotation fields')
     mt = mt.annotate_rows(
@@ -324,6 +333,19 @@ def annotate_dataset_mt(mt_path: str, out_mt_path: str):
     def _genotype_filter_samples(fn):
         # Filter on the genotypes.
         return hl.set(mt.genotypes.filter(fn).map(lambda g: g.sample_id))
+
+    # Colocated variants are represented as a semicolon-separated list of rsids.
+    # We only want the first one, and we want to truncate it to 512 characters.
+    # This is to ensure that the rsid field is not too long for the es export.
+    mt = mt.annotate_rows(
+        rsid=hl.str(
+            hl.if_else(
+                hl.str(mt.rsid).contains(';'),
+                hl.str(mt.rsid).split(';')[0],
+                mt.rsid,
+            )[:512],
+        ),
+    )
 
     # 2022-07-28 mfranklin: Initially the code looked like:
     #           {**_genotype_filter_samples(lambda g: g.num_alt == i) for i in ...}
