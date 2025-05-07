@@ -98,7 +98,7 @@ def annotate_cohort(
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
-        vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
+        vqsr_ht = load_vqsr('', site_only_vqsr_vcf_path)
         vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
         logging.info('Adding VQSR annotations into the Matrix Table')
