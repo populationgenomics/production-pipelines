@@ -98,6 +98,13 @@ def annotate_cohort(
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
+        # NOTE: The load_vqsr() function from cpg_workflows.large_cohort.load_vqsr.py has been updated
+        # to handle splitting of multi-allelic sites in the info Table. However, the function now requires
+        # a pre-adjusted site-only Hail Table (pre_vcf_adjusted_ht_path) to be passed as a parameter.
+        #
+        # This script cannot generate the required pre_vcf_adjusted_ht_path (as it is checkpointed
+        # prior to running gnomad.utils.vcf.adjust_vcf_incompatible_types within LC), so a placeholder empty string
+        # is being passed below. As a result, the function call will not work as intended.
         vqsr_ht = load_vqsr('', site_only_vqsr_vcf_path)
         vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
