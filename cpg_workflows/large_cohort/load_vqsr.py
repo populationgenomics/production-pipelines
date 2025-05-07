@@ -10,10 +10,10 @@ from gnomad.utils.sparse_mt import split_info_annotation
 
 def run(
     pre_vcf_adjusted_ht_path: str,
-    site_only_vcf_path: str,
+    vqsr_siteonly_vcf_path: str,
     out_ht_path: str,
 ):
-    load_vqsr(pre_vcf_adjusted_ht_path, site_only_vcf_path, out_ht_path)
+    load_vqsr(pre_vcf_adjusted_ht_path, vqsr_siteonly_vcf_path, out_ht_path)
 
 
 def split_info(info_ht: hl.Table) -> hl.Table:
@@ -57,7 +57,7 @@ def split_info(info_ht: hl.Table) -> hl.Table:
 
 def load_vqsr(
     pre_vcf_adjusted_ht_path: str,
-    site_only_vcf_path: str,
+    vqsr_siteonly_vcf_path: str,
     out_ht_path: str | None = None,
 ) -> hl.Table:
     """
@@ -68,9 +68,9 @@ def load_vqsr(
 
     pre_vcf_adjusted_ht = hl.read_table(str(pre_vcf_adjusted_ht_path))
 
-    logging.info(f'AS-VQSR: importing annotations from a site-only VCF {site_only_vcf_path}')
+    logging.info(f'AS-VQSR: importing annotations from a site-only VCF {vqsr_siteonly_vcf_path}')
     ht_unsplit = hl.import_vcf(
-        str(site_only_vcf_path),
+        str(vqsr_siteonly_vcf_path),
         reference_genome=genome_build(),
         force_bgz=True,
         array_elements_required=False,
