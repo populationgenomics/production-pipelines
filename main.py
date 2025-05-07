@@ -55,12 +55,14 @@ from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import M
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.talos import MakePhenopackets, MinimiseOutputForSeqr, UploadTalosHtml, ValidateMOI
 from cpg_workflows.stages.talos_prep.talos_prep import SquashMtIntoTarball
+from cpg_workflows.stages.talos_prep.rgp_talos_prep import SquashMtIntoTarball_rgp
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, UploadTalosHtml, MinimiseOutputForSeqr],
     'talos_prep': [SquashMtIntoTarball],
+    'talos_prep_rgp': [SquashMtIntoTarball_rgp],
     'exomiser': [ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults],
     'long_read_snps_indels_annotation': [MtToEsLrSNPsIndels],
     'long_read_sv_annotation': [MtToEsLrSv],
