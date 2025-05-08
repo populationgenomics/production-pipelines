@@ -318,7 +318,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
         # local file parsed into a dict
         gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
 
-        all_ordered_vcfs = [input_dict[chrom] for chrom in ORDERED_ALLELES]
+        all_ordered_vcfs = " ".join(str(input_dict[chrom]) for chrom in ORDERED_ALLELES)
 
         job = get_batch().new_job(f'ProcessAnnotatedSitesOnlyVcfIntoHt: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -327,7 +327,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
         job.memory('highmem')
         job.command(
             'convert_annotated_vcf_to_ht '
-            f'--input {" ".join(all_ordered_vcfs)} '
+            f'--input {all_ordered_vcfs} '
             f'--output {str(output)} '
             f'--gene_bed {gene_roi} '
             f'--am {alphamissense} '
@@ -354,7 +354,7 @@ class TransferAnnotationsToMt(DatasetStage):
 
         # get the region-limited MT
         input_dict = inputs.as_dict(dataset, CleanUpVcf)
-        all_ordered_vcfs = [input_dict[chrom] for chrom in ORDERED_ALLELES]
+        all_ordered_vcfs = " ".join(str(input_dict[chrom]) for chrom in ORDERED_ALLELES)
 
         # get the table of compressed annotations
         annotations = str(inputs.as_path(dataset, ProcessAnnotatedSitesOnlyVcfIntoHt))
@@ -366,7 +366,7 @@ class TransferAnnotationsToMt(DatasetStage):
         job.storage('250Gi')
         job.command(
             f'TransferAnnotationsToMatrixTable '
-            f'--input {" ".join(all_ordered_vcfs)} '
+            f'--input {all_ordered_vcfs} '
             f'--annotations {annotations} '
             f'--output {str(output)}',
         )
