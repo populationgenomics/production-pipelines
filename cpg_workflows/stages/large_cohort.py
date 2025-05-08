@@ -242,10 +242,6 @@ class Relatedness(CohortStage):
 @stage(required_stages=[SampleQC, DenseSubset, Relatedness])
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if ancestry_version := config_retrieve(['large_cohort', 'output_versions', 'ancestry'], default=None):
-            ancestry_version = slugify(ancestry_version)
-
-        ancestry_version = ancestry_version or get_workflow().output_version
         return dict(
             scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
             eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
