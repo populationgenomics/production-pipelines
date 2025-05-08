@@ -187,7 +187,9 @@ class MakeSitesOnlyVersion(DatasetStage):
             job.cpu(4)
             job.command(f'bcftools view -Oz -o {job.output} -G {input_vcf}')
 
+            # TODO swap these again
             get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+            # get_batch().write_output(job.output, str(output[chrom]))
 
             jobs.append(job)
 
@@ -216,7 +218,8 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
 
         for chrom in ORDERED_ALLELES:
 
-            sites_vcf = get_batch().read_input(input_dict[chrom])
+            # todo scrub this rmsuffix
+            sites_vcf = get_batch().read_input(str(input_dict[chrom]).removesuffix('.vcf.gz'))
 
             job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name} {chrom}')
             job.image(image_path('echtvar'))
@@ -225,7 +228,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
             job.memory('highmem')
             job.cpu(4)
 
-            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+            get_batch().write_output(job.output, str(output[chrom]))
 
             jobs.append(job)
 
