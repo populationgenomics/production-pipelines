@@ -467,7 +467,7 @@ class Vqsr(CohortStage):
 
         b.write_output(
             reheader_job.output['vcf.gz'],
-            outputs['reheadered_header'],
+            str(outputs['reheadered_header']),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
