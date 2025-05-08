@@ -9,21 +9,6 @@ from gnomad.utils.annotations import annotate_allele_info
 from gnomad.utils.sparse_mt import split_info_annotation
 
 
-def reheader_vcf(vcf_path: str, out_vcf_header_path: str) -> str:
-    logging.info('Reheadering VQSR site-only VCF')
-    with gzip.open(vcf_path, 'r') as vcf_file:
-        with gzip.open(out_vcf_header_path, 'w') as out_file:
-            for line in vcf_file:
-                if not line.startswith(b'#'):
-                    break
-                if line.startswith(b'##INFO=<ID=SB'):
-                    # rewrite the line with the correct type
-                    line = line.replace(b'Number=1', b'Number=.')
-                    line = line.replace(b'Type=Float', b'Type=Integer')
-                out_file.write(line)
-    return out_vcf_header_path
-
-
 def run(
     pre_vcf_adjusted_ht_path: str,
     vqsr_siteonly_vcf_path: str,
@@ -86,11 +71,6 @@ def load_vqsr(
 
     pre_vcf_adjusted_ht = hl.read_table(str(pre_vcf_adjusted_ht_path))
 
-    # reheadered_header_path: str = reheader_vcf(
-    #     vqsr_siteonly_vcf_path,
-    #     'tmp.vcf.gz',
-    # )
-
     logging.info(f'AS-VQSR: importing annotations from a site-only VCF {vqsr_siteonly_vcf_path}')
     ht_unsplit = hl.import_vcf(
         str(vqsr_siteonly_vcf_path),
@@ -99,17 +79,6 @@ def load_vqsr(
         header_file=reheadered_header,
         array_elements_required=False,
     ).rows()
-
-    # VCF has SB fields as float in header:
-    # > ##INFO=<ID=SB,Number=1,Type=Float,Description="Strand Bias">
-    # Even though they are lists of ints, e.g. SB=6,11,2,0
-    # Hail would fail to parse it, throwing:
-    # > java.lang.NumberFormatException: For input string: "6,11,2,0"
-    # To mitigate this, we can drop the SB field before the HT is (lazily) parsed.
-    # In order words, dropping it before calling ht.write() makes sure that Hail would
-    # never attempt to actually parse it.
-    # if 'SB' in ht_unsplit.info:
-    #     ht_unsplit = ht_unsplit.annotate(info=ht_unsplit.info.drop('SB'))
 
     # Replace AS_SB_TABLE field in vqsr vcf with correctly formatted array<array<int32>> dtype
     # This field then gets flattened during splitting, eg:
