@@ -22,7 +22,7 @@ def cli_main():
     """
 
     parser = ArgumentParser(description='Takes a HT of annotations, and a callset VCF, and combines into a MT')
-    parser.add_argument('--input', help='Path to the annotated sites-only VCF', required=True)
+    parser.add_argument('--input', help='Path to the annotated sites-only VCF', required=True, nargs='+')
     parser.add_argument('--annotations', help='Path to the annotated sites-only VCF', required=True)
     parser.add_argument('--output', help='output Table path, must have a ".ht" extension', required=True)
     args = parser.parse_args()
@@ -41,7 +41,7 @@ def cli_main():
 
 
 def main(
-    vcf_path: str,
+    vcf_path: list[str],
     output_path: str,
     annotations: str,
 ):

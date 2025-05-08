@@ -244,7 +244,7 @@ def cli_main():
     """
 
     parser = ArgumentParser(description='Takes a BCSQ annotated VCF and makes it a HT')
-    parser.add_argument('--input', help='Path to the annotated sites-only VCF', required=True)
+    parser.add_argument('--input', help='Path to the annotated sites-only VCF', required=True, nargs='+')
     parser.add_argument('--output', help='output Table path, must have a ".ht" extension', required=True)
     parser.add_argument('--gene_bed', help='BED file containing gene mapping')
     parser.add_argument('--am', help='Hail Table containing AlphaMissense annotations', required=True)
@@ -265,7 +265,7 @@ def cli_main():
 
 
 def main(
-    vcf_path: str,
+    vcf_path: list[str],
     output_path: str,
     gene_bed: str,
     alpha_m: str,
@@ -289,7 +289,7 @@ def main(
     # hl.context.init_spark(master='local[4]', default_reference='GRCh38')
 
     # pull and split the CSQ header line
-    csq_fields = extract_and_split_csq_string(vcf_path=vcf_path)
+    csq_fields = extract_and_split_csq_string(vcf_path=vcf_path[0])
 
     # read the VCF into a MatrixTable
     mt = hl.import_vcf(vcf_path, array_elements_required=False, force_bgz=True)

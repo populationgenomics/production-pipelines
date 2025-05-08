@@ -46,7 +46,6 @@ from cpg_workflows.targets import Dataset
 from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, get_batch, stage
 
 
-
 ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
 
 
@@ -315,14 +314,11 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
 
         # ensembl version used to generate region of interest
         ensembl_version = config_retrieve(['workflow', 'ensembl_version'], 113)
+
         # local file parsed into a dict
         gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
 
-        # get the annotated VCF & index
-        chr1_vcf = input_dict['chr1']
-
-        # replace the chrom name with a wildcard
-        vcf = str(chr1_vcf).replace('chr1', '*')
+        all_ordered_vcfs = [input_dict[chrom] for chrom in ORDERED_ALLELES]
 
         job = get_batch().new_job(f'ProcessAnnotatedSitesOnlyVcfIntoHt: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -331,7 +327,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
         job.memory('highmem')
         job.command(
             'convert_annotated_vcf_to_ht '
-            f'--input {vcf} '
+            f'--input {" ".join(all_ordered_vcfs)} '
             f'--output {str(output)} '
             f'--gene_bed {gene_roi} '
             f'--am {alphamissense} '
@@ -357,7 +353,8 @@ class TransferAnnotationsToMt(DatasetStage):
         output = self.expected_outputs(dataset)
 
         # get the region-limited MT
-        vcf = str(inputs.as_dict(dataset, CleanUpVcf)['chr1']).replace('chr1', '*')
+        input_dict = inputs.as_dict(dataset, CleanUpVcf)
+        all_ordered_vcfs = [input_dict[chrom] for chrom in ORDERED_ALLELES]
 
         # get the table of compressed annotations
         annotations = str(inputs.as_path(dataset, ProcessAnnotatedSitesOnlyVcfIntoHt))
@@ -369,7 +366,7 @@ class TransferAnnotationsToMt(DatasetStage):
         job.storage('250Gi')
         job.command(
             f'TransferAnnotationsToMatrixTable '
-            f'--input_path {vcf} '
+            f'--input {" ".join(all_ordered_vcfs)} '
             f'--annotations {annotations} '
             f'--output {str(output)}',
         )
