@@ -27,9 +27,10 @@ def reheader_vcf(vcf_path: str, out_vcf_header_path: str) -> str:
 def run(
     pre_vcf_adjusted_ht_path: str,
     vqsr_siteonly_vcf_path: str,
+    reheadered_header: str,
     out_ht_path: str,
 ):
-    load_vqsr(pre_vcf_adjusted_ht_path, vqsr_siteonly_vcf_path, out_ht_path)
+    load_vqsr(pre_vcf_adjusted_ht_path, vqsr_siteonly_vcf_path, reheadered_header, out_ht_path)
 
 
 def split_info(info_ht: hl.Table) -> hl.Table:
@@ -74,6 +75,7 @@ def split_info(info_ht: hl.Table) -> hl.Table:
 def load_vqsr(
     pre_vcf_adjusted_ht_path: str,
     vqsr_siteonly_vcf_path: str,
+    reheadered_header: str,
     out_ht_path: str | None = None,
 ) -> hl.Table:
     """
@@ -84,17 +86,17 @@ def load_vqsr(
 
     pre_vcf_adjusted_ht = hl.read_table(str(pre_vcf_adjusted_ht_path))
 
-    reheadered_header_path: str = reheader_vcf(
-        vqsr_siteonly_vcf_path,
-        'tmp.vcf.gz',
-    )
+    # reheadered_header_path: str = reheader_vcf(
+    #     vqsr_siteonly_vcf_path,
+    #     'tmp.vcf.gz',
+    # )
 
     logging.info(f'AS-VQSR: importing annotations from a site-only VCF {vqsr_siteonly_vcf_path}')
     ht_unsplit = hl.import_vcf(
         str(vqsr_siteonly_vcf_path),
         reference_genome=genome_build(),
         force_bgz=True,
-        header_file=reheadered_header_path,
+        header_file=reheadered_header,
         array_elements_required=False,
     ).rows()
 

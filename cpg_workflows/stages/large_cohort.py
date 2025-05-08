@@ -418,6 +418,10 @@ class Vqsr(CohortStage):
         return {
             'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
             'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
+            'reheadered_header': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / 'header_siteonly.vqsr.vcf.gz.',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -434,6 +438,40 @@ class Vqsr(CohortStage):
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
+
+        # Edit 'SB' INFO field in VCF header to avoid parsing errors
+        # Adapted from https://github.com/populationgenomics/production-pipelines/blob/e944d7d730be606ab255587a0e02d6c0831361b8/cpg_workflows/jobs/gcnv.py#L364-L373
+        outputs = self.expected_outputs(cohort)
+        b = get_batch()
+
+        reheader_job = b.new_job(
+            'ReheaderVcf',
+            (self.get_job_attrs() or {}) | {'tool': 'bcftools'},
+        )
+
+        reheader_job.image(image_path('bcftools'))
+
+        reheader_job.depends_on(jobs)
+
+        vqsr_vcf = b.read_input(outputs['vcf'])
+
+        reheader_job.declare_resource_group(
+            output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
+        )
+
+        # pull the header into a temp file
+        reheader_job.command(f'bcftools view -h {vqsr_vcf} > header')
+
+        # sed command to swap Integer SB to String in-place
+        reheader_job.command(
+            fr"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Integer/' {reheader_job.output['vcf.gz']}",
+        )
+
+        b.write_output(
+            reheader_job.output['vcf.gz'],
+            outputs['reheadered_header'],
+        )
+
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
