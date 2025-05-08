@@ -421,7 +421,7 @@ class Vqsr(CohortStage):
             'reheadered_header': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / vqsr_version
-            / 'header_siteonly.vqsr.vcf.gz.',
+            / 'header_siteonly.vqsr.vcf.gz',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
