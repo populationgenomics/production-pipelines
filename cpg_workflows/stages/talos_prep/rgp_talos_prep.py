@@ -78,6 +78,7 @@ class CleanUpVcf(DatasetStage):
         job = get_batch().new_job(f'CleanUpRgpVcf')
         job.storage('150GB')
         job.memory('highmem')
+        job.cpu(4)
         job.image(image_path('bcftools_120'))
 
         job.declare_resource_group(
@@ -113,8 +114,9 @@ class MakeSitesOnlyVersion(DatasetStage):
 
         job = get_batch().new_job(f'MakeSitesOnlyVersion')
         job.image(image_path('bcftools_120'))
-        job.storage('50Gi')
+        job.storage('100Gi')
         job.memory('highmem')
+        job.cpu(4)
         job.command(f'bcftools view -Oz -o {job.output} -G {input_vcf}')
 
         get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
@@ -178,6 +180,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
         job.image(image_path('bcftools_120'))
         job.cpu(4)
         job.storage('20G')
+        job.memory('highmem')
 
         job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
 
