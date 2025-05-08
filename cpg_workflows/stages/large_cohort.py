@@ -464,7 +464,7 @@ class Vqsr(CohortStage):
         # )
 
         # pull the header into a temp file
-        reheader_job.command(f'bcftools view -h {vqsr_vcf} > {reheader_job.output["vcf.gz"]}')
+        reheader_job.command(f'bcftools view -h {vqsr_vcf} > {reheader_job.ofile}')
 
         # sed command to swap Integer SB to String in-place
         reheader_job.command(
