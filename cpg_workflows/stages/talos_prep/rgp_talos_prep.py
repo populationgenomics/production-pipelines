@@ -166,7 +166,7 @@ class MakeSitesOnlyVersion(DatasetStage):
 
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
 
-        return {chrom: self.prefix / f'{dataset.name}_cleaned_sitesonly_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
+        return {chrom: self.prefix / f'{dataset.name}_cleaned_sitesonly_{chrom}' for chrom in ORDERED_ALLELES}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
