@@ -439,7 +439,11 @@ class Vqsr(CohortStage):
             job_attrs=self.get_job_attrs(),
         )
 
-        # Edit 'SB' INFO field in VCF header to avoid parsing errors
+        # Edit 'SB' INFO field in VCF header to avoid parsing errors like this one:
+        # > ##INFO=<ID=SB,Number=1,Type=Float,Description="Strand Bias">
+        # Even though they are lists of ints, e.g. SB=6,11,2,0
+        # Hail would fail to parse it, throwing:
+        # > java.lang.NumberFormatException: For input string: "6,11,2,0"
         # Adapted from https://github.com/populationgenomics/production-pipelines/blob/e944d7d730be606ab255587a0e02d6c0831361b8/cpg_workflows/jobs/gcnv.py#L364-L373
         outputs = self.expected_outputs(cohort)
         b = get_batch()
@@ -455,16 +459,21 @@ class Vqsr(CohortStage):
 
         vqsr_vcf = b.read_input(outputs['vcf'])
 
-        reheader_job.declare_resource_group(
-            output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
-        )
+        # reheader_job.declare_resource_group(
+        #     output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
+        # )
 
         # pull the header into a temp file
         reheader_job.command(f'bcftools view -h {vqsr_vcf} > {reheader_job.output["vcf.gz"]}')
 
         # sed command to swap Integer SB to String in-place
         reheader_job.command(
-            fr"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Integer/' {reheader_job.output['vcf.gz']}",
+            fr"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Integer/' {reheader_job.ofile}",
+        )
+
+        b.write_output(
+            reheader_job.ofile,
+            str(outputs['reheadered_header']),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
