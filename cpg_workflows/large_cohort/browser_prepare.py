@@ -323,7 +323,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
                 hl.struct(
                     metric=metric,
                     value=hl.float(
-                        _nullify_nan(ds.info[metric][0]),
+                        _nullify_nan(ds.info[metric]),
                     ),  # default_compute_info() annotates below fields as hl.array(hl.float64) so need to get value in array
                 )
                 for metric in [
@@ -336,7 +336,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
                     "AS_ReadPosRankSum",
                     "AS_SOR",
                     "AS_VarDP",
-                    # "AS_VQSLOD", AS_VQSLOD is not annotated
+                    "AS_VQSLOD",
                 ]
             ],
         ),
