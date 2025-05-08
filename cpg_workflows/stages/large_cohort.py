@@ -247,27 +247,11 @@ class Ancestry(CohortStage):
 
         ancestry_version = ancestry_version or get_workflow().output_version
         return dict(
-            scores=cohort.analysis_dataset.prefix() / get_workflow().name / ancestry_version / 'ancestry' / 'scores.ht',
-            eigenvalues=cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / ancestry_version
-            / 'ancestry'
-            / 'eigenvalues.ht',
-            loadings=cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / ancestry_version
-            / 'ancestry'
-            / 'loadings.ht',
-            inferred_pop=cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / ancestry_version
-            / 'ancestry'
-            / 'inferred_pop.ht',
-            sample_qc_ht=cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / ancestry_version
-            / 'ancestry'
-            / 'sample_qc_ht.ht',
+            scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
+            eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
+            loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
+            inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
+            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
