@@ -451,8 +451,6 @@ class Vqsr(CohortStage):
 
         reheader_job.image(image_path('bcftools'))
 
-        reheader_job.depends_on(jobs)
-
         vqsr_vcf = b.read_input(outputs['vcf'])
 
         reheader_job.declare_resource_group(
@@ -499,6 +497,7 @@ class LoadVqsr(CohortStage):
                 load_vqsr.run.__name__,
                 str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='pre_adjusted')),
                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(inputs.as_path(cohort, Vqsr, key='reheadered_header')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
