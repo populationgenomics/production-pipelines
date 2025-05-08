@@ -29,10 +29,6 @@ def cli_main():
 
     assert args.output.endswith('.mt'), 'Output path must end in .mt'
 
-    # check specifically for a SUCCESS file, marking a completed hail write
-    # will fail if we accidentally pass the compressed Tarball path
-    assert (Path(args.annotations) / '_SUCCESS').exists(), 'Annotations Table does not exist'
-
     main(
         vcf_path=args.input,
         output_path=args.output,
