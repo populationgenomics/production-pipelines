@@ -39,7 +39,7 @@ def stripy(
 
     job_attrs = (job_attrs or {}) | {'tool': 'stripy'}
     j = b.new_job('STRipy', job_attrs)
-    j.image(image_path('stripy'))
+    j.image(image_path('stripy', 'v2.5'))
 
     reference = fasta_res_group(b)
 
