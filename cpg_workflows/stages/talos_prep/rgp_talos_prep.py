@@ -48,14 +48,17 @@ from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, get_ba
 from cpg_workflows.scripts.talos_prep import convert_annotated_vcf_to_ht, TransferAnnotationsToMatrixTable
 
 
+ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
+
+
 @stage
-class CleanUpVcf(DatasetStage):
+class SplitVcf(DatasetStage):
     """
-    rub subsetting and normalisation on the input VCF
+    breaks up the whole VCF by chromosome
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.prefix / f'{dataset.name}_cleaned.vcf.gz'
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {chrom: self.prefix / f'{dataset.name}_split_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         """
@@ -72,56 +75,123 @@ class CleanUpVcf(DatasetStage):
             },
         )
 
+        jobs = []
+        for chrom in ORDERED_ALLELES:
+            job = get_batch().new_job(f'SplitVcf: {dataset.name} {chrom}')
+            job.storage('100GB')
+            job.memory('highmem')
+            job.cpu(4)
+            job.image(image_path('bcftools_120'))
+
+            job.declare_resource_group(
+                output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
+            )
+
+            job.command(
+                f"""
+                bcftools view \
+                --write-index=tbi \
+                -Oz -o {job.output["vcf.gz"]} \
+                {local_input['vcf.gz']} {chrom}
+                """
+            )
+
+            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+
+            jobs.append(job)
+
+        return self.make_outputs(dataset, data=output, jobs=jobs)
+
+
+@stage(required_stages=[SplitVcf])
+class CleanUpVcf(DatasetStage):
+    """
+    rub subsetting and normalisation on the input VCF
+    """
+
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+        return {chrom: self.prefix / f'{dataset.name}_cleaned_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
+        """
+        trigger a rolling merge using gcloud compose, gluing all the individual files together
+        """
+
+        output = self.expected_outputs(dataset)
+
         bed = reference_path(f'ensembl_113/merged_bed')
         local_bed = get_batch().read_input(bed)
 
-        job = get_batch().new_job(f'CleanUpRgpVcf')
-        job.storage('150GB')
-        job.memory('highmem')
-        job.cpu(4)
-        job.image(image_path('bcftools_120'))
+        input_dict = inputs.as_dict(dataset, SplitVcf)
 
-        job.declare_resource_group(
-            output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
-        )
+        jobs = []
 
-        job.command(
-            f"""
-            bcftools norm \
-            -m -any \
-            --write-index=tbi \
-            -R {local_bed} \
-            -Oz -o {job.output["vcf.gz"]} \
-            {local_input['vcf.gz']}"""
-        )
+        for chrom in ORDERED_ALLELES:
+            local_input = get_batch().read_input_group(
+                **{
+                    'vcf.gz': input_dict[chrom],
+                    'vcf.gz.tbi': f'{input_dict[chrom]}.tbi',
+                },
+            )
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
+            job = get_batch().new_job(f'CleanUpVcf: {dataset.name} {chrom}')
+            job.storage('100GB')
+            job.memory('highmem')
+            job.cpu(4)
+            job.image(image_path('bcftools_120'))
 
-        return self.make_outputs(dataset, data=output, jobs=job)
+            job.declare_resource_group(
+                output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
+            )
+
+            job.command(
+                f"""
+                bcftools norm \
+                -m -any \
+                --write-index=tbi \
+                -R {local_bed} \
+                -Oz -o {job.output["vcf.gz"]} \
+                {local_input['vcf.gz']}"""
+            )
+
+            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+
+            jobs.append(job)
+
+        return self.make_outputs(dataset, data=output, jobs=jobs)
 
 
 @stage(required_stages=CleanUpVcf)
 class MakeSitesOnlyVersion(DatasetStage):
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.prefix / f'{dataset.name}_cleaned_sitesonly.vcf.gz'
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+
+        return {chrom: self.prefix / f'{dataset.name}_cleaned_sitesonly_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
 
         output = self.expected_outputs(dataset)
 
-        input_vcf = get_batch().read_input(inputs.as_path(dataset, CleanUpVcf))
+        input_dict = inputs.as_dict(dataset, CleanUpVcf)
 
-        job = get_batch().new_job(f'MakeSitesOnlyVersion')
-        job.image(image_path('bcftools_120'))
-        job.storage('100Gi')
-        job.memory('highmem')
-        job.cpu(4)
-        job.command(f'bcftools view -Oz -o {job.output} -G {input_vcf}')
+        jobs = []
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
+        for chrom in ORDERED_ALLELES:
 
-        return self.make_outputs(dataset, data=output, jobs=job)
+            input_vcf = get_batch().read_input(input_dict[chrom])
+
+            job = get_batch().new_job(f'MakeSitesOnlyVersion: {chrom}')
+            job.image(image_path('bcftools_120'))
+            job.storage('50Gi')
+            job.memory('highmem')
+            job.cpu(4)
+            job.command(f'bcftools view -Oz -o {job.output} -G {input_vcf}')
+
+            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+
+            jobs.append(job)
+
+        return self.make_outputs(dataset, data=output, jobs=jobs)
 
 
 @stage(required_stages=MakeSitesOnlyVersion)
@@ -130,27 +200,36 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
     Annotate this cohort joint-call VCF with gnomad frequencies, write to tmp storage
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_gnomad_frequency_annotated.vcf.gz'
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+
+        return {chrom: self.prefix / f'{dataset.name}_gnomad_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
 
-        sites_vcf = get_batch().read_input(inputs.as_path(dataset, MakeSitesOnlyVersion))
-
         # this is a single whole-genome file, generated by the echtvar workflow
         gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar_gnomad']))
 
-        job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name}')
-        job.image(image_path('echtvar'))
-        job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
-        job.storage('20Gi')
-        job.memory('highmem')
-        job.cpu(4)
+        input_dict = inputs.as_dict(dataset, MakeSitesOnlyVersion)
 
-        get_batch().write_output(job.output, str(output))
+        jobs = []
 
-        return self.make_outputs(dataset, data=output, jobs=job)
+        for chrom in ORDERED_ALLELES:
+
+            sites_vcf = get_batch().read_input(input_dict[chrom])
+
+            job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name} {chrom}')
+            job.image(image_path('echtvar'))
+            job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
+            job.storage('20Gi')
+            job.memory('highmem')
+            job.cpu(4)
+
+            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
+
+            jobs.append(job)
+
+        return self.make_outputs(dataset, data=output, jobs=jobs)
 
 
 @stage(required_stages=AnnotateGnomadFrequenciesWithEchtvar)
@@ -160,15 +239,16 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
     Writes into a cohort-specific permanent folder
     """
 
-    def expected_outputs(self, dataset: Dataset) -> Path:
-        return self.tmp_prefix / f'{dataset.name}_consequence_annotated.vcf.gz'
+    def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
+
+        return {chrom: self.prefix / f'{dataset.name}_csq_{chrom}.vcf.gz' for chrom in ORDERED_ALLELES}
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
 
-        gnomad_annotated_vcf = get_batch().read_input(
-            inputs.as_path(dataset, AnnotateGnomadFrequenciesWithEchtvar),
-        )
+        input_dict = inputs.as_dict(dataset, AnnotateGnomadFrequenciesWithEchtvar)
+
+        jobs = []
 
         # get the GFF3 file required to generate consequences
         gff3_file = get_batch().read_input(reference_path(f'ensembl_113/gff3'))
@@ -176,36 +256,36 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
         # get the fasta
         fasta = get_batch().read_input(reference_path('broad/ref_fasta'))
 
-        job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {dataset.name}')
-        job.image(image_path('bcftools_120'))
-        job.cpu(4)
-        job.storage('20G')
-        job.memory('highmem')
+        for chrom in ORDERED_ALLELES:
+            sites_vcf = get_batch().read_input(input_dict[chrom])
 
-        job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+            job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {dataset.name} {chrom}')
 
-        # the echtvar image doesn't have a tool to index, so first add that
-        # then run the csq command:
-        # -g is the GFF3 file
-        # -B 10 is where to truncate long protein changes
-        # --local-csq indicates we want each variant annotated independently (haplotype unaware)
-        job.command(
-            f"""
-            bcftools index -t {gnomad_annotated_vcf}
-            bcftools csq --force -f {fasta} \
+            job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+
+            job.image(image_path('bcftools_120'))
+            job.command(f'bcftools index -t {sites_vcf}')
+            job.command(
+                f"""
+                bcftools csq --force -f {fasta} \
                 --local-csq \
                 --threads 4 \
                 -g {gff3_file} \
                 -B 10 \
                 -Oz -o {job.output["vcf.gz"]} \
                 --write-index=tbi \
-                {gnomad_annotated_vcf}
-            """,
-        )
+                {sites_vcf}
+                """
+            )
+            job.storage('20Gi')
+            job.memory('highmem')
+            job.cpu(4)
 
-        get_batch().write_output(job.output, str(output).removesuffix('.vcf.gz'))
+            get_batch().write_output(job.output, str(output[chrom]).removesuffix('.vcf.gz'))
 
-        return self.make_outputs(dataset, data=output, jobs=job)
+            jobs.append(job)
+
+        return self.make_outputs(dataset, data=output, jobs=jobs)
 
 
 @stage(required_stages=AnnotateConsequenceWithBcftools)
@@ -223,6 +303,8 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
 
         output = self.expected_outputs(dataset)
 
+        input_dict = inputs.as_dict(dataset, AnnotateConsequenceWithBcftools)
+
         # pull the alphamissense TarBall location from config, and localise it
         alphamissense = reference_path('alphamissense/ht')
 
@@ -235,7 +317,10 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
         gene_roi = get_batch().read_input(reference_path(f'ensembl_{ensembl_version}/bed'))
 
         # get the annotated VCF & index
-        vcf = str(inputs.as_path(dataset, AnnotateConsequenceWithBcftools))
+        chr1_vcf = input_dict['chr1']
+
+        # replace the chrom name with a wildcard
+        vcf = str(chr1_vcf).replace('chr1', '*')
 
         job = get_batch().new_job(f'ProcessAnnotatedSitesOnlyVcfIntoHt: {dataset.name}')
         job.image(config_retrieve(['workflow', 'driver_image']))
@@ -270,7 +355,7 @@ class TransferAnnotationsToMt(DatasetStage):
         output = self.expected_outputs(dataset)
 
         # get the region-limited MT
-        vcf = str(inputs.as_path(dataset, CleanUpVcf))
+        vcf = str(inputs.as_dict(dataset, CleanUpVcf)['chr1']).replace('chr1', '*')
 
         # get the table of compressed annotations
         annotations = str(inputs.as_path(dataset, ProcessAnnotatedSitesOnlyVcfIntoHt))
