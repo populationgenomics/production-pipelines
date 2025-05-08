@@ -805,6 +805,7 @@ class ExportMtAsEsIndex(DatasetStage):
         flag_name = str(outputs['done_flag'])
 
         job = get_batch().new_bash_job(f'Generate {index_name} from {mt_path}')
+        job._dirname = f'{index_name}-{job._token}'
         if config_retrieve(['workflow', 'es_index', 'spot_instance'], default=True) is False:
             # Use a non-preemptible instance if spot_instance is False in the config
             job = job.spot(is_spot=False)
