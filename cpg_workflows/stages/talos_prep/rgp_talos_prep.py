@@ -45,7 +45,6 @@ from cpg_utils.config import config_retrieve, image_path, reference_path
 from cpg_workflows.targets import Dataset
 from cpg_workflows.workflow import DatasetStage, StageInput, StageOutput, get_batch, stage
 
-from cpg_workflows.scripts.talos_prep import convert_annotated_vcf_to_ht, TransferAnnotationsToMatrixTable
 
 
 ORDERED_ALLELES: list[str] = [f'chr{x}' for x in list(range(1, 23))] + ['chrX', 'chrY', 'chrM']
@@ -331,7 +330,7 @@ class ProcessAnnotatedSitesOnlyVcfIntoHt(DatasetStage):
         job.storage('20Gi')
         job.memory('highmem')
         job.command(
-            f'{convert_annotated_vcf_to_ht.__file__} '
+            'convert_annotated_vcf_to_ht '
             f'--input {vcf} '
             f'--output {str(output)} '
             f'--gene_bed {gene_roi} '
@@ -369,7 +368,7 @@ class TransferAnnotationsToMt(DatasetStage):
         job.memory('highmem')
         job.storage('250Gi')
         job.command(
-            f'{TransferAnnotationsToMatrixTable.__file__} '
+            f'TransferAnnotationsToMatrixTable '
             f'--input_path {vcf} '
             f'--annotations {annotations} '
             f'--output {str(output)}',

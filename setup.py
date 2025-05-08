@@ -90,6 +90,7 @@ setup(
             'extract_vcf_from_mt = cpg_workflows.scripts.talos_prep.extract_fragmented_vcf_from_mt:cli_main',
             # parse the annotated VCF into a HT
             'convert_annotated_vcf_to_ht = cpg_workflows.scripts.talos_prep.convert_annotated_vcf_to_ht:cli_main',
+            'TransferAnnotationsToMatrixTable = cpg_workflows.scripts.talos_prep.TransferAnnotationsToMatrixTable:cli_main',
             # hop the annotations from a Hail Table to a MatrixTable
             'transfer_annotations_to_vcf = cpg_workflows.scripts.talos_prep.transfer_annotations_to_vcf:cli_main',
         ],
