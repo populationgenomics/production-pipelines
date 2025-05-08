@@ -449,6 +449,8 @@ class Vqsr(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': 'bcftools'},
         )
 
+        reheader_job.depends_on(*jobs)
+
         reheader_job.image(image_path('bcftools'))
 
         vqsr_vcf = b.read_input(outputs['vcf'])
