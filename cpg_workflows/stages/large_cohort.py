@@ -467,11 +467,6 @@ class Vqsr(CohortStage):
             fr"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Integer/' {reheader_job.output['vcf.gz']}",
         )
 
-        b.write_output(
-            reheader_job.output['vcf.gz'],
-            str(outputs['reheadered_header']),
-        )
-
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
