@@ -13,6 +13,28 @@ from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse
 
 
+def update_stripy_config(config_updates: dict):
+    """
+    Update the STRipy config to set the log level to max verbosity and output json results.
+    """
+    import json
+    import os
+
+    config_json = os.path.join(os.getenv('BATCH_TMPDIR', ''), 'config.json')
+    with open(config_json, 'r') as f:
+        config = json.load(f)
+
+    # Update the config with the provided updates
+    for key, value in config_updates.items():
+        if key in config:
+            config[key] = value
+        else:
+            raise KeyError(f"Key '{key}' not found in STRipy config")
+    # Write the updated config back to the file
+    with open(config_json, 'w') as f:
+        json.dump(config, f, indent=4)
+
+
 def stripy(
     b,
     sequencing_group: SequencingGroup,
@@ -23,6 +45,7 @@ def stripy(
     json_path: Path,
     custom_loci_path: str = '',
     analysis_type: str = 'standard',
+    stripy_config: dict | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
 ) -> Job | None:
@@ -40,6 +63,9 @@ def stripy(
     job_attrs = (job_attrs or {}) | {'tool': 'stripy'}
     j = b.new_job('STRipy', job_attrs)
     j.image(image_path('stripy'))
+
+    if stripy_config:
+        update_stripy_config(stripy_config)
 
     reference = fasta_res_group(b)
 
@@ -68,12 +94,6 @@ def stripy(
         custom_loci_argument = ''
 
     cmd = f"""\
-    # Increase logging to max verbosity and output json results. Needs to be passed as a config file so doing a
-    # quick an dirty edit of the default config on the fly and cat to the job log.
-    sed 's/"log_flag_threshold": 1/"log_flag_threshold": -1/' config.json \
-        | sed 's/"output_json": false/"output_json": true/' \
-        | sed 's/]/], "verbose": true/' \
-        > $BATCH_TMPDIR/config.json
     cat $BATCH_TMPDIR/config.json
 
     ln -s {mounted_cram_path} {sequencing_group.id}__{sequencing_group.external_id}.cram
