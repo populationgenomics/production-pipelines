@@ -2,7 +2,7 @@
 Create Hail Batch jobs to run STRipy
 """
 
-from hailtop.batch.job import Job
+import hailtop.batch as hb
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import image_path
@@ -13,30 +13,8 @@ from cpg_workflows.targets import SequencingGroup
 from cpg_workflows.utils import can_reuse
 
 
-def update_stripy_config(config_updates: dict):
-    """
-    Update the STRipy config to set the log level to max verbosity and output json results.
-    """
-    import json
-    import os
-
-    config_json = os.path.join(os.getenv('BATCH_TMPDIR', ''), 'config.json')
-    with open(config_json, 'r') as f:
-        config = json.load(f)
-
-    # Update the config with the provided updates
-    for key, value in config_updates.items():
-        if key in config:
-            config[key] = value
-        else:
-            raise KeyError(f"Key '{key}' not found in STRipy config")
-    # Write the updated config back to the file
-    with open(config_json, 'w') as f:
-        json.dump(config, f, indent=4)
-
-
 def stripy(
-    b,
+    b: hb.batch.Batch,
     sequencing_group: SequencingGroup,
     cram_path: CramPath,
     target_loci: str,
@@ -48,7 +26,7 @@ def stripy(
     stripy_config: dict | None = None,
     job_attrs: dict | None = None,
     overwrite: bool = False,
-) -> Job | None:
+) -> hb.batch.job.Job | None:
     """
     Run STRipy
     """
@@ -65,7 +43,7 @@ def stripy(
     j.image(image_path('stripy'))
 
     if stripy_config:
-        update_stripy_config(stripy_config)
+        j.command(f"jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{stripy_config}' > $BATCH_TMPDIR/config.json")
 
     reference = fasta_res_group(b)
 
