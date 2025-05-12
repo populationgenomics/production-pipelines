@@ -1,6 +1,7 @@
 """
 Create Hail Batch jobs to run STRipy
 """
+import json
 
 import hailtop.batch as hb
 
@@ -43,7 +44,7 @@ def stripy(
     j.image(image_path('stripy'))
 
     if stripy_config:
-        j.command(f"jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{stripy_config}' > $BATCH_TMPDIR/config.json")
+        j.command(f"jq '. * $p' $BATCH_TMPDIR/config.json --argjson p {json.dumps(stripy_config)} > $BATCH_TMPDIR/config.json")
 
     reference = fasta_res_group(b)
 
