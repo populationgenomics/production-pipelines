@@ -72,6 +72,7 @@ def frequency_annotations(
     mt = hl.vds.to_dense_mt(vds)
 
     # Filter and annotate samples.
+    # Note: removing samples here may leave an otherwise dense MT with hom-ref genotypes
     logging.info('Removing filtered samples...')
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
@@ -100,7 +101,7 @@ def frequency_annotations(
     # PLACEHOLDER UNTIL VQSR STAGE IS FIXED
     # Because the site_only_ht is not split, this info will not be correctly populated for multiallelic
     # variants until this is resolved.
-    mt = mt.annotate_rows(info=site_only_ht[mt.row_key].info)
+    mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
 
     logging.info('Inbreeding coefficient...')
     mt = mt.annotate_rows(InbreedingCoeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
