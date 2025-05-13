@@ -46,6 +46,7 @@ def stripy(
 
     config_path = '$BATCH_TMPDIR/config.json'
     if stripy_config:
+        j.command(f"cat {config_path}")
         config_path = '$BATCH_TMPDIR/config_updated.json'
         j.command(
             f"echo $(cat $BATCH_TMPDIR/config.json | jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config_updated.json",
