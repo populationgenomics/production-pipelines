@@ -46,7 +46,7 @@ def stripy(
 
     if stripy_config:
         j.command(
-            f"jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}'",
+            f"echo $(cat $BATCH_TMPDIR/config.json | jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config.json",
         )
 
     reference = fasta_res_group(b)
