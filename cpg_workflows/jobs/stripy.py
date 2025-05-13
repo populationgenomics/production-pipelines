@@ -46,6 +46,7 @@ def stripy(
 
     config_path = '$BATCH_TMPDIR/config.json'
     if stripy_config:
+        j.command("ls $BATCH_TMPDIR")
         j.command(f"cat {config_path}")
         config_path = '$BATCH_TMPDIR/config_updated.json'
         j.command(
