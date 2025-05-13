@@ -44,9 +44,11 @@ def stripy(
     j = b.new_job('STRipy', job_attrs)
     j.image(image_path('stripy'))
 
+    config_path = '$BATCH_TMPDIR/config.json'
     if stripy_config:
+        config_path = '$BATCH_TMPDIR/config_updated.json'
         j.command(
-            f"echo $(cat $BATCH_TMPDIR/config.json | jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config.json",
+            f"echo $(cat $BATCH_TMPDIR/config.json | jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config_updated.json",
         )
 
     reference = fasta_res_group(b)
@@ -76,7 +78,7 @@ def stripy(
         custom_loci_argument = ''
 
     cmd = f"""\
-    cat $BATCH_TMPDIR/config.json
+    cat {config_path}
 
     ln -s {mounted_cram_path} {sequencing_group.id}__{sequencing_group.external_id}.cram
     ln -s {mounted_cram_index_path} {sequencing_group.id}__{sequencing_group.external_id}.crai
@@ -88,7 +90,7 @@ def stripy(
         --output $BATCH_TMPDIR/ \\
         --input {sequencing_group.id}__{sequencing_group.external_id}.cram  \\
         --logflags {j.log_path} \\
-        --config $BATCH_TMPDIR/config.json \\
+        --config {config_path} \\
         --analysis {analysis_type} \\
         --locus {target_loci} \\
         {custom_loci_argument}
