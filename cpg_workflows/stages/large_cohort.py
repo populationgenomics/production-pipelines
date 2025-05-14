@@ -631,7 +631,7 @@ class GenerateCoverageTable(CohortStage):
                 query_command(
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
-                    str(shard_results[contig]),
+                    str(shard_results[contig].as_str()),
                     str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
                     str(out_path),
                     setup_gcp=True,
