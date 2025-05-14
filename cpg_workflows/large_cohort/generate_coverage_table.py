@@ -52,6 +52,7 @@ def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
     init_batch()
     with open(vds_path, "r") as python_result:
         vds_path = python_result.readline().strip()
+        print(f"VDS path: {vds_path}")
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
 
