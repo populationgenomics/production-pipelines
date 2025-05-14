@@ -37,6 +37,9 @@ def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDatase
     """
     Shard a VDS file.
     """
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     vds = hl.vds.read_vds(vds_path)
     sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig, reference_genome='GRCh38')])
     sharded_vds.write(out_path, overwrite=True)
@@ -44,6 +47,9 @@ def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDatase
 
 
 def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     with open(vds_path, "r") as python_result:
         vds_path = python_result.readline().strip()
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
