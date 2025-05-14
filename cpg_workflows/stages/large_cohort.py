@@ -1,4 +1,5 @@
 import logging
+from inspect import getblock
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path
@@ -18,7 +19,7 @@ from metamist.graphql import gql, query
 if TYPE_CHECKING:
     from graphql import DocumentNode
 
-    from hailtop.batch.job import PythonJob
+    from hailtop.batch.job import PythonJob, PythonResult
 
 
 HAIL_QUERY: Final = 'hail query'
@@ -603,6 +604,23 @@ class GenerateCoverageTable(CohortStage):
         from cpg_workflows.large_cohort import generate_coverage_table
 
         converage_jobs = []
+        shard_results: dict[str, PythonResult] = {}
+        # vds_shard_length = config_retrieve(['large_cohort', 'shard_length'], default=500_000)
+        for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']:
+            shard_job = get_batch().new_python_job(
+                f'ShardVds_{contig}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            shard_job.image(image_path('cpg_workflows'))
+
+            shard_result: PythonResult = shard_job.call(
+                generate_coverage_table.shard_vds,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(contig),
+                str(shard_job.output),
+            )
+            shard_results[contig] = shard_result
+
         for contig, out_path in self.expected_outputs(cohort).items():
             j = get_batch().new_job(
                 f'GenerateCoverageTable_{contig}',
@@ -613,7 +631,7 @@ class GenerateCoverageTable(CohortStage):
                 query_command(
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
-                    str(inputs.as_path(cohort, ShardVds, key=contig)),
+                    str(shard_results[contig]),
                     str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
                     str(out_path),
                     setup_gcp=True,

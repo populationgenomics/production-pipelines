@@ -33,15 +33,14 @@ def merge_coverage_tables(
     return merged_coverage_table.checkpoint(out_path, overwrite=True)
 
 
-def shard_vds(vds_path: str, output_dict: dict[str, str]) -> hl.vds.VariantDataset:
+def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDataset:
     """
     Shard a VDS file.
     """
     vds = hl.vds.read_vds(vds_path)
-    for contig, out_path in output_dict.items():
-        sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig, reference_genome='GRCh38')])
-        sharded_vds.write(out_path, overwrite=True)
-    return sharded_vds
+    sharded_vds = hl.vds.filter_intervals(vds, [hl.parse_locus_interval(contig, reference_genome='GRCh38')])
+    sharded_vds.write(out_path, overwrite=True)
+    return out_path
 
 
 def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
