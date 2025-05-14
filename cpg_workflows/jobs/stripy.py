@@ -44,14 +44,14 @@ def stripy(
     j = b.new_job('STRipy', job_attrs)
     j.image(image_path('stripy'))
 
-    config_path = '$BATCH_TMPDIR/config.json'
+    config_path = 'config.json'
     if stripy_config:
-        j.command("ls $BATCH_TMPDIR")
+        j.command("echo original config:")
         j.command(f"cat {config_path}")
-        config_path = '$BATCH_TMPDIR/config_updated.json'
         j.command(
-            f"echo $(cat $BATCH_TMPDIR/config.json | jq '. * $p' $BATCH_TMPDIR/config.json --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config_updated.json",
+            f"echo $(cat {config_path} | jq '. * $p' {config_path} --argjson p '{json.dumps(stripy_config)}') > $BATCH_TMPDIR/config_updated.json",
         )
+        config_path = '$BATCH_TMPDIR/config_updated.json'
 
     reference = fasta_res_group(b)
 
