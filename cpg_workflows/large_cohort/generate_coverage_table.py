@@ -44,6 +44,8 @@ def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDatase
 
 
 def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
+    with open(vds_path, "r") as python_result:
+        vds_path = python_result.readline().strip()
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
 
