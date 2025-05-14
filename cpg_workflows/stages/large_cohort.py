@@ -536,12 +536,25 @@ class GenerateReferenceCoverageTable(CohortStage):
     """
 
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if ref_cov_version := config_retrieve(['large_cohort', 'output_versions', 'reference_coverage'], default=None):
-            ref_cov_version = slugify(ref_cov_version)
+        """
+        Reference coverage tables are created for each base in the region sequenced. This is an expensive operation
+        and need only be done once per sequencing type (e.g. exome, genome) and exome capture method.
+        Therefore, outputs are stored as a CPG-wide resource.
+        """
+        if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
+            ref_cov_version = config_retrieve(
+                ['large_cohort', 'output_versions', 'exome_reference_coverage'],
+                default=None,
+            )
+        else:
+            ref_cov_version = config_retrieve(
+                ['large_cohort', 'output_versions', 'genome_reference_coverage'],
+                default=None,
+            )
 
         ref_cov_version = ref_cov_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix()
+            f'{contig}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
             / get_workflow().name
             / ref_cov_version
             / 'reference_coverage'
