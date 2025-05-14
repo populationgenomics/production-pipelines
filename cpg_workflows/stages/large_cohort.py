@@ -584,7 +584,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-@stage(required_stages=[ShardVds, GenerateReferenceCoverageTable])
+@stage(required_stages=[Combiner, ShardVds, GenerateReferenceCoverageTable])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
