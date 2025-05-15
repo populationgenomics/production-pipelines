@@ -47,6 +47,9 @@ def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDatase
 
 
 def generate_intervals(chrom: str, interval_size: int) -> list[hl.Interval]:
+    from cpg_utils.hail_batch import init_batch
+
+    init_batch()
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
 
     intervals = []
