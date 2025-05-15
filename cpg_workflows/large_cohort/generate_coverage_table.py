@@ -46,14 +46,34 @@ def shard_vds(vds_path: str, contig: str, out_path: str) -> hl.vds.VariantDatase
     return out_path
 
 
-def run(vds_path: str, reference_ht_path: str, out_path: str) -> hl.Table:
+def generate_intervals(chrom: str, interval_size: int) -> list[hl.Interval]:
+    chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
+
+    intervals = []
+    includes_end = False
+    for start in range(1, chrom_length, interval_size):
+        end = min(start + interval_size, chrom_length)
+        if end == chrom_length:
+            includes_end = True
+        intervals.append(
+            hl.Interval(
+                hl.Locus(chrom, start, reference_genome='GRCh38'),
+                hl.Locus(chrom, end, reference_genome='GRCh38'),
+                includes_end=includes_end,
+            ),
+        )
+    return intervals
+
+
+def run(vds_path: str, reference_ht_path: str, interval: str, out_path: str) -> hl.Table:
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
-    with open(vds_path, "r") as python_result:
-        vds_path = python_result.readline().strip()
-        print(f"VDS path: {vds_path}")
-    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
+
+    vds: hl.vds.VariantDataset = hl.vds.read_vds(
+        vds_path,
+        intervals=[hl.parse_locus_interval(interval, reference_genome='GRCh38')],
+    )
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
 
     coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, reference_ht)

@@ -19,6 +19,7 @@ from metamist.graphql import gql, query
 if TYPE_CHECKING:
     from graphql import DocumentNode
 
+    import hail as hl
     from hailtop.batch.job import PythonJob, PythonResult
 
 
@@ -602,42 +603,35 @@ class GenerateCoverageTable(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
+        from cpg_workflows.large_cohort.generate_coverage_table import generate_intervals
 
         converage_jobs = []
-        shard_results: dict[str, PythonResult] = {}
-        # vds_shard_length = config_retrieve(['large_cohort', 'shard_length'], default=500_000)
-        for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']:
-            shard_job = get_batch().new_python_job(
-                f'ShardVds_{contig}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-            )
-            shard_job.image(image_path('cpg_workflows'))
 
-            shard_result: PythonResult = shard_job.call(
-                generate_coverage_table.shard_vds,
-                str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(contig),
-                str(shard_job.output),
-            )
-            shard_results[contig] = shard_result
+        interval_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
 
         for contig, out_path in self.expected_outputs(cohort).items():
-            j = get_batch().new_job(
-                f'GenerateCoverageTable_{contig}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            intervals: list[hl.Interval] = generate_intervals(
+                contig,
+                interval_size=interval_size,
             )
-            j.image(image_path('cpg_workflows'))
-            j.command(
-                query_command(
-                    generate_coverage_table,
-                    generate_coverage_table.run.__name__,
-                    str(shard_results[contig].as_str()),
-                    str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
-                    str(out_path),
-                    setup_gcp=True,
-                ),
-            )
-            converage_jobs.append(j)
+            for interval in intervals:
+                j = get_batch().new_job(
+                    f'GenerateCoverageTable_{contig}_{interval.start.position}_{interval.end.position}',
+                    (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+                )
+                j.image(config_retrieve(['workflow', 'driver_image']))
+                j.command(
+                    query_command(
+                        generate_coverage_table,
+                        generate_coverage_table.run.__name__,
+                        str(inputs.as_path(cohort, Combiner, key='vds')),
+                        str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
+                        f'{contig}:{interval.start.position}-{interval.end.position}',
+                        str(out_path),
+                        setup_gcp=True,
+                    ),
+                )
+                converage_jobs.append(j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=converage_jobs)
 
