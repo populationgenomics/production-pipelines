@@ -28,8 +28,10 @@ jobs:
       - name: Run unit tests
         id: runtests
         timeout-minutes: 20
+        env:
+          PYTHONPATH: ${{ github.workspace }}/gnomad_methods:${{ github.workspace }}/seqr-loading-pipelines
+          SPARK_LOCAL_IP: localhost
         run: |
-          PYTHONPATH=$PWD/gnomad_methods:$PWD/seqr-loading-pipelines \
           coverage run -m pytest -n auto test --junitxml=test-execution.xml
 
           rc=$?
