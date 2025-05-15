@@ -386,6 +386,10 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     ds = ds.select('variant_id', 'rsids', 'summary')
     ds = ds.rename({'summary': exome_or_genome})
 
+    globals_dict = ds.globals.collect()[0]
+    ds = ds.select_globals()
+    ds = ds.annotate_globals(**{f"{exome_or_genome}_{k}": v for k, v in globals_dict.items()})
+
     return ds
 
 
