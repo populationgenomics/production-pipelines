@@ -22,7 +22,7 @@ def default_config() -> PipelineConfig:
             check_inputs=False,
         ),
         images={
-            'somalier': 'test_image',
+            'somalier': 'test_image/somalier@version',
             'cpg_workflows': 'test_image',
         },
         other={
@@ -131,7 +131,7 @@ class TestSomalierExtract:
         )
 
         assert j is not None
-        assert j._image == config.images['somalier']
+        assert "/somalier@" in j._image
 
     def test_sets_sites_location_with_name_of_sites_file_in_config(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
