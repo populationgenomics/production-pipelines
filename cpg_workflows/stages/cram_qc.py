@@ -324,9 +324,9 @@ class CohortCramMultiQC(CohortStage):
         # get the unique hash for these Sequencing Groups
         sg_hash = cohort.get_alignment_inputs_hash()
         return {
-            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
-            'json': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
-            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / '.checks',
+            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'cohort_multiqc.html',
+            'json': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / 'cohort_multiqc_data.json',
+            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / '.cohort_checks',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
