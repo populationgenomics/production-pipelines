@@ -129,7 +129,7 @@ def gcloud_compose_vcf_from_manifest(
     # one final job - read the final vcf in, index it, move the index, and write it out
     input_vcf = get_batch().read_input(fragment_files[0])
     final_job = get_batch().new_bash_job(name='index_final_vcf')
-    final_job.image(image_path('bcftools'))
+    final_job.image(image_path('bcftools', '1.16-1'))
     final_job.storage(config_retrieve(['gcloud_condense', 'storage'], final_size))
 
     # if there were no jobs, there's no composing...

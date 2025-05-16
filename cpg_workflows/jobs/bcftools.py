@@ -43,7 +43,7 @@ def naive_concat_vcfs(
         ]
 
     concat = get_batch().new_job('Concat VCFs', attributes={'tool': 'bcftools'})
-    concat.image(image=image_path('bcftools'))
+    concat.image(image=image_path('bcftools', '1.16-1'))
 
     # guessing at resource requirements
     concat.cpu(cpu)
@@ -102,7 +102,7 @@ def naive_merge_vcfs(
         ]
 
     merge_job = get_batch().new_job('Merge VCFs', attributes={'tool': 'bcftools'})
-    merge_job.image(image=image_path('bcftools'))
+    merge_job.image(image=image_path('bcftools', '1.16-1'))
 
     # guessing at resource requirements
     merge_job.cpu(cpu)
