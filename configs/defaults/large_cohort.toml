@@ -111,6 +111,9 @@ max_n_singletons = 800000  # maximum number of unique SNPs for a sample
 max_r_duplication = 0.3  # maximum rate of duplicated reads (from picard metrics)
 max_r_het_hom = 3.3  # maximum rate of heterozygous to homozygous SNPs
 
+[large_cohort.references]
+contig_lengths = "gs://cpg-bioheart-test/GRCh38_contig_lengths.json"
+
 [hail]
 pool_label = 'large-cohort'
 delete_scratch_on_exit = false

@@ -1,6 +1,8 @@
+import json
 import logging
-from inspect import getblock
 from typing import TYPE_CHECKING, Any, Final, Tuple
+
+import coverage
 
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
@@ -553,31 +555,50 @@ class GenerateReferenceCoverageTable(CohortStage):
                 ['large_cohort', 'output_versions', 'genome_reference_coverage'],
                 default=None,
             )
+        contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
+        shard_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
+
+        with open(contig_lengths_file) as f:
+            contig_lengths: dict[str, int] = json.load(f)
+
+        contigs = contig_lengths.keys()
 
         ref_cov_version = ref_cov_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
+            f'{contig}_{start}_{end}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
             / get_workflow().name
             / ref_cov_version
             / 'reference_coverage'
-            / f'{contig}_coverage_reference.ht'
-            for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+            / f'{contig}_coverage_reference_{start}_{end}'
+            for contig in contigs
+            for start in range(1, contig_lengths[contig], shard_size)
+            for end in [min(start + shard_size, contig_lengths[contig])]
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
 
         jobs = []
-        for contig, out_path in self.expected_outputs(cohort).items():
+        shard_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
+        congtig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
+
+        outputs = self.expected_outputs(cohort)
+        # TODO: detect when end of chromosome is reached and need to pass includes_end=True
+        for shard, out_path in outputs.items():
+            chrom, start, end = shard.split('_')
             j = get_batch().new_python_job(
-                f'GenerateReferenceTable_{contig}',
+                f'GenerateReferenceTable_{shard}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
             j.image(image_path('cpg_workflows'))
             j.call(
                 generate_coverage_table.generate_reference_coverage_ht,
                 ref='GRCh38',
-                contig=contig,
+                chrom=chrom,
+                start=int(start),
+                end=int(end),
+                shard=shard,
+                shard_size=shard_size,
                 out_path=str(out_path),
             )
             jobs.append(j)
@@ -585,20 +606,30 @@ class GenerateReferenceCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-@stage(required_stages=[Combiner, ShardVds, GenerateReferenceCoverageTable])
+@stage(required_stages=[Combiner, GenerateReferenceCoverageTable])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
+        contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
+        shard_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
+
+        with open(contig_lengths_file) as f:
+            contig_lengths: dict[str, int] = json.load(f)
+
+        contigs = contig_lengths.keys()
+
         coverage_version = coverage_version or get_workflow().output_version
         return {
-            f'{contig}': cohort.analysis_dataset.prefix()
+            f'{contig}_{start}_{end}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
             / get_workflow().name
             / coverage_version
             / 'split_coverage'
-            / f'{contig}_coverage.ht'
-            for contig in [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
+            / f'{contig}_coverage_{start}_{end}'
+            for contig in contigs
+            for start in range(1, contig_lengths[contig], shard_size)
+            for end in [min(start + shard_size, contig_lengths[contig])]
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -609,29 +640,33 @@ class GenerateCoverageTable(CohortStage):
 
         interval_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
 
-        for contig, out_path in self.expected_outputs(cohort).items():
-            intervals: list[hl.Interval] = generate_intervals(
-                contig,
-                interval_size=interval_size,
+        refernce_table_paths = inputs.as_dict(cohort, GenerateReferenceCoverageTable)
+
+        coverage_table_paths = self.expected_outputs(cohort)
+        for shard, coverage_output_path in coverage_table_paths.items():
+            if shard not in refernce_table_paths:
+                raise ValueError(f'Expected reference coverage table for {shard} not found in inputs.')
+
+            chrom, start, end = shard.split('_')
+            j = get_batch().new_job(
+                f'GenerateCoverageTable_{shard}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
-            for interval in intervals:
-                j = get_batch().new_job(
-                    f'GenerateCoverageTable_{contig}_{interval.start.position}_{interval.end.position}',
-                    (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-                )
-                j.image(config_retrieve(['workflow', 'driver_image']))
-                j.command(
-                    query_command(
-                        generate_coverage_table,
-                        generate_coverage_table.run.__name__,
-                        str(inputs.as_path(cohort, Combiner, key='vds')),
-                        str(inputs.as_path(cohort, GenerateReferenceCoverageTable, key=contig)),
-                        f'{contig}:{interval.start.position}-{interval.end.position}',
-                        str(out_path),
-                        setup_gcp=True,
-                    ),
-                )
-                converage_jobs.append(j)
+            j.image(config_retrieve(['workflow', 'driver_image']))
+            j.command(
+                query_command(
+                    generate_coverage_table,
+                    generate_coverage_table.run.__name__,
+                    str(inputs.as_path(cohort, Combiner, key='vds')),
+                    chrom,
+                    start,
+                    end,
+                    str(refernce_table_paths[shard]),
+                    str(coverage_output_path),
+                    setup_gcp=True,
+                ),
+            )
+            converage_jobs.append(j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=converage_jobs)
 

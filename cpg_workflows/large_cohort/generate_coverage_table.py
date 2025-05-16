@@ -68,14 +68,32 @@ def generate_intervals(chrom: str, interval_size: int) -> list[hl.Interval]:
     return intervals
 
 
-def run(vds_path: str, reference_ht_path: str, interval: str, out_path: str) -> hl.Table:
+def run(
+    vds_path: str,
+    chrom: str,
+    start: str,
+    end: str,
+    reference_ht_path: str,
+    interval: str,
+    out_path: str,
+) -> hl.Table:
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
+    includes_end = False
 
+    chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
+    if end == chrom_length:
+        includes_end = True
+
+    interval = hl.Interval(
+        hl.Locus(chrom, int(start), reference_genome='GRCh38'),
+        hl.Locus(chrom, int(end), reference_genome='GRCh38'),
+        includes_end=includes_end,
+    )
     vds: hl.vds.VariantDataset = hl.vds.read_vds(
         vds_path,
-        intervals=[hl.parse_locus_interval(interval, reference_genome='GRCh38')],
+        intervals=[interval],
     )
     reference_ht: hl.Table = hl.read_table(reference_ht_path)
 
@@ -84,10 +102,35 @@ def run(vds_path: str, reference_ht_path: str, interval: str, out_path: str) -> 
     return coverage_ht.checkpoint(out_path, overwrite=True)
 
 
-def generate_reference_coverage_ht(ref: str, contig: str, out_path: str) -> hl.ReferenceGenome:
+def generate_reference_coverage_ht(
+    ref: str,
+    chrom: str,
+    start: int,
+    end: int,
+    shard_size: int,
+    out_path: str,
+) -> hl.ReferenceGenome:
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
+    out_path = to_path(out_path)
     rg = hl.get_reference(ref)
-    ht: hl.Table = reference_genome.get_reference_ht(rg, [contig])
-    return ht.checkpoint(out_path, overwrite=True)
+
+    # TODO: detect when end of chromosome is reached and need to pass includes_end=True
+    interval = hl.Interval(
+        hl.Locus(chrom, start, reference_genome=rg),
+        hl.Locus(chrom, end, reference_genome=rg),
+        # includes_end=includes_end,
+    )
+
+    logging.info(f'Generating reference coverage for {chrom} interval {interval}')
+    ref_ht = hl.utils.range_table(
+        (interval.end.position - interval.start.position),
+    )
+    locus_expr = hl.locus(contig=chrom, pos=ref_ht.idx + 1, reference_genome=rg)
+    ref_allele_expr = locus_expr.sequence_context().lower()
+    alleles_expr = [ref_allele_expr]
+    ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
+    ref_ht = ref_ht.filter(ref_ht.alleles[0] == "n", keep=False)
+
+    return ref_ht.checkpoint(str(out_path), overwrite=True)
