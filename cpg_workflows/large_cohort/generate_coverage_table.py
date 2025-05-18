@@ -73,31 +73,42 @@ def run(
     chrom: str,
     start: str,
     end: str,
-    reference_ht_path: str,
-    interval: str,
     out_path: str,
 ) -> hl.Table:
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
-    includes_end = False
+    rg = hl.get_reference('GRCh38')
 
+    # Generate reference coverage table
+    includes_end = False
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
     if end == chrom_length:
         includes_end = True
 
     interval = hl.Interval(
-        hl.Locus(chrom, int(start), reference_genome='GRCh38'),
-        hl.Locus(chrom, int(end), reference_genome='GRCh38'),
+        hl.Locus(chrom, start, reference_genome=rg),
+        hl.Locus(chrom, end, reference_genome=rg),
         includes_end=includes_end,
     )
+
+    logging.info(f'Generating reference coverage for {chrom} interval {interval}')
+    ref_ht = hl.utils.range_table(
+        (interval.end.position - interval.start.position),
+    )
+    locus_expr = hl.locus(contig=chrom, pos=ref_ht.idx + 1, reference_genome=rg)
+    ref_allele_expr = locus_expr.sequence_context().lower()
+    alleles_expr = [ref_allele_expr]
+    ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
+    ref_ht = ref_ht.filter(ref_ht.alleles[0] == "n", keep=False)
+
     vds: hl.vds.VariantDataset = hl.vds.read_vds(
         vds_path,
         intervals=[interval],
     )
-    reference_ht: hl.Table = hl.read_table(reference_ht_path)
 
-    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, reference_ht)
+    # Generate coverage table
+    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, ref_ht)
 
     return coverage_ht.checkpoint(out_path, overwrite=True)
 

@@ -603,7 +603,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-@stage(required_stages=[Combiner, GenerateReferenceCoverageTable])
+@stage(required_stages=[Combiner])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
@@ -637,13 +637,9 @@ class GenerateCoverageTable(CohortStage):
 
         interval_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
 
-        refernce_table_paths = inputs.as_dict(cohort, GenerateReferenceCoverageTable)
-
         coverage_table_paths = self.expected_outputs(cohort)
-        for shard, coverage_output_path in coverage_table_paths.items():
-            if shard not in refernce_table_paths:
-                raise ValueError(f'Expected reference coverage table for {shard} not found in inputs.')
 
+        for shard, coverage_output_path in coverage_table_paths.items():
             chrom, start, end = shard.split('_')
             j = get_batch().new_job(
                 f'GenerateCoverageTable_{shard}',
@@ -658,7 +654,6 @@ class GenerateCoverageTable(CohortStage):
                     chrom,
                     start,
                     end,
-                    str(refernce_table_paths[shard]),
                     str(coverage_output_path),
                     setup_gcp=True,
                 ),
