@@ -2,8 +2,6 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
-import coverage
-
 from cpg_utils import Path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
