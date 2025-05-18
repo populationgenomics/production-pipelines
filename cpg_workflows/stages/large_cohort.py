@@ -531,7 +531,7 @@ class ShardVds(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[ShardVds])  # maybe not required?
+@stage()  # maybe not required?
 class GenerateReferenceCoverageTable(CohortStage):
     """
     The `reference_ht` is a Table that contains a row for each locus coverage that should be
