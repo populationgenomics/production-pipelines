@@ -2,7 +2,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.targets import Cohort, SequencingGroup
@@ -556,7 +556,7 @@ class GenerateReferenceCoverageTable(CohortStage):
         contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
         shard_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
 
-        with open(contig_lengths_file) as f:
+        with open(to_path(contig_lengths_file)) as f:
             contig_lengths: dict[str, int] = json.load(f)
 
         contigs = contig_lengths.keys()
