@@ -567,7 +567,7 @@ class GenerateReferenceCoverageTable(CohortStage):
             / get_workflow().name
             / ref_cov_version
             / 'reference_coverage'
-            / f'{contig}_coverage_reference_{start}_{end}'
+            / f'{contig}_reference_coverage_{start}_{end}.ht'
             for contig in contigs
             for start in range(1, contig_lengths[contig], shard_size)
             for end in [min(start + shard_size, contig_lengths[contig])]
@@ -623,7 +623,7 @@ class GenerateCoverageTable(CohortStage):
             / get_workflow().name
             / coverage_version
             / 'split_coverage'
-            / f'{contig}_coverage_{start}_{end}'
+            / f'{contig}_coverage_{start}_{end}.ht'
             for contig in contigs
             for start in range(1, contig_lengths[contig], shard_size)
             for end in [min(start + shard_size, contig_lengths[contig])]
