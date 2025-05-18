@@ -612,7 +612,7 @@ class GenerateCoverageTable(CohortStage):
         contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
         shard_size = config_retrieve(['large_cohort', 'interval_size'], default=500_000)
 
-        with open(contig_lengths_file) as f:
+        with open(to_path(contig_lengths_file)) as f:
             contig_lengths: dict[str, int] = json.load(f)
 
         contigs = contig_lengths.keys()
