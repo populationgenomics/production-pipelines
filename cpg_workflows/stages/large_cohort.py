@@ -595,7 +595,6 @@ class GenerateReferenceCoverageTable(CohortStage):
                 chrom=chrom,
                 start=int(start),
                 end=int(end),
-                shard=shard,
                 shard_size=shard_size,
                 out_path=str(out_path),
             )
