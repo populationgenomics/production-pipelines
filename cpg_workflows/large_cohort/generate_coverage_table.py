@@ -71,15 +71,15 @@ def generate_intervals(chrom: str, interval_size: int) -> list[hl.Interval]:
 def run(
     vds_path: str,
     chrom: str,
-    start: str,
-    end: str,
+    start: int,
+    end: int,
     out_path: str,
 ) -> hl.Table:
     from cpg_utils.hail_batch import init_batch
 
     init_batch()
-    rg = hl.get_reference('GRCh38')
-
+    rg: hl.ReferenceGenome = hl.get_reference('GRCh38')
+    rg.add_sequence(rg)
     # Generate reference coverage table
     includes_end = False
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
