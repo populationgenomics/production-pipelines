@@ -80,6 +80,9 @@ def run(
             vds.write(output_vds_path)
             return
 
+        # we've changed the VDS base, so we need to force a new combiner plan
+        force_new_combiner = True
+
         # 1b. if there are samples to add, write this to a temporary path, set force to true, and then run the combiner
         vds_path = f'{tmp_prefix}/combiner_removal_temp.vds'
         logging.info(f'Writing with removed SGs to {vds_path}')
