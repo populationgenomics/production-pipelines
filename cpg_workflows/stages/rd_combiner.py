@@ -204,13 +204,13 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         # check for existing VDS by getting all and fetching latest
         elif config_retrieve(['workflow', 'check_for_existing_vds']):
-            get_logger(__file__).info('Checking for existing VDS')
+            get_logger().info('Checking for existing VDS')
             if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
                 vds_path = existing_vds_analysis_entry['output']
                 sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
 
         else:
-            get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
+            get_logger().info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
 
         # quick check - if we found a VDS, guarantee it exists
         if vds_path and not exists(vds_path):
@@ -244,8 +244,8 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
                 get_logger().info(f'SGs to remove: {sgs_to_remove}')
 
         if not (new_sg_gvcfs or sgs_to_remove):
-            get_logger(__file__).info('No GVCFs to add to, or remove from, existing VDS')
-            get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')
+            get_logger().info('No GVCFs to add to, or remove from, existing VDS')
+            get_logger().info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
