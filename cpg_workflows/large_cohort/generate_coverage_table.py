@@ -76,10 +76,11 @@ def run(
     out_path: str,
 ) -> hl.Table:
     from cpg_utils.hail_batch import init_batch
+    from gnomad.utils.reference_genome import add_reference_sequence
 
     init_batch()
     rg: hl.ReferenceGenome = hl.get_reference('GRCh38')
-    rg.add_sequence(rg)
+    add_reference_sequence(rg)
     # Generate reference coverage table
     includes_end = False
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
