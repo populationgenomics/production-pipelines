@@ -159,6 +159,13 @@ STARD7,TBP,TBX1,TCF4,TNRC6A,VWA1,XYLT1,YEATS2,ZFHX3,ZIC2,ZIC3"""
 custom_loci_path = ""
 # Change the path the stripy report is saved to, useful when testing novel loci
 output_prefix = "stripy"
+# Update the stripy config.json file, default found here:
+# https://gitlab.com/andreassh/stripy-pipeline/-/blob/main/config.json?ref_type=heads
+[stripy.config]
+log_flag_threshold = -1
+output_json = true
+verbose = true
+
 
 # Add in specific multiQC report config options
 # See https://multiqc.info/docs/getting_started/config for more details
