@@ -194,7 +194,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         sgs_to_remove: set[str] = set()
 
         # check for a VDS by ID
-        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
+        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], None):
             vds_result_or_none = query_for_specific_vds(vds_id)
             if vds_result_or_none is None:
                 raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
@@ -203,7 +203,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             vds_path, sg_ids_in_vds = vds_result_or_none
 
         # check for existing VDS by getting all and fetching latest
-        elif config_retrieve(['workflow', 'check_for_existing_vds'], True):
+        elif config_retrieve(['workflow', 'check_for_existing_vds']):
             get_logger(__file__).info('Checking for existing VDS')
             if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
                 vds_path = existing_vds_analysis_entry['output']
@@ -250,13 +250,13 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         combiner_job.image(config_retrieve(['workflow', 'driver_image']))
-        combiner_job.memory(config_retrieve(['combiner', 'driver_memory'], 'highmem'))
+        combiner_job.memory(config_retrieve(['combiner', 'driver_memory']))
         combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
-        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
+        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores']))
 
         # set this job to be non-spot (i.e. non-preemptible)
         # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
-        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
+        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms']))
 
         # Default to GRCh38 for reference if not specified
         combiner_job.call(
