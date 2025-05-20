@@ -84,29 +84,20 @@ def run(
     # Generate reference coverage table
     includes_end = False
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
-    print(
-        f'end is typed as {type(end)} and start is typed as {type(start)}, while chrom_length is {type(chrom_length)}',
-    )
     if end == chrom_length:
-        print(f'chrom_length is {chrom_length} and end is {end}')
         includes_end = True
-        print(f'includes_end is {includes_end}')
-    if int(end) == chrom_length:
-        print(f'chrom_length is {chrom_length} and end is {end}')
-        includes_end = True
-        print(f'includes_end is {includes_end}')
 
     interval = hl.Interval(
         hl.Locus(chrom, start, reference_genome=rg),
         hl.Locus(chrom, end, reference_genome=rg),
         includes_end=includes_end,
     )
-    print(f'interval is {interval}')
+
     logging.info(f'Generating reference coverage for {chrom} interval {interval}')
     ref_ht = hl.utils.range_table(
         (interval.end.position - interval.start.position),
     )
-    locus_expr = hl.locus(contig=chrom, pos=ref_ht.idx + 1, reference_genome=rg)
+    locus_expr = hl.locus(contig=chrom, pos=ref_ht.idx + interval.start.position, reference_genome=rg)
     ref_allele_expr = locus_expr.sequence_context().lower()
     alleles_expr = [ref_allele_expr]
     ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
