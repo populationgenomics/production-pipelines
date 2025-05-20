@@ -101,7 +101,7 @@ def run(
         hl.Locus(chrom, end, reference_genome=rg),
         includes_end=includes_end,
     )
-
+    print(f'interval is {interval}')
     logging.info(f'Generating reference coverage for {chrom} interval {interval}')
     ref_ht = hl.utils.range_table(
         (interval.end.position - interval.start.position),
