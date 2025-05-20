@@ -120,7 +120,7 @@ def _run(
     tmp_prefix: str,
     genome_build: str,
     save_path: str | None,
-    sgs_for_withdrawl: list[str] | None,
+    sgs_for_withdrawal: list[str] | None,
     tmp_prefix_for_withdrawals: str,
     force_new_combiner: bool = False,
     sequencing_group_names: list[str] | None = None,
@@ -150,7 +150,7 @@ def _run(
     # set up a quick logger inside the job
     logging.basicConfig(level=logging.INFO)
 
-    if not can_reuse(to_path(output_vds_path)) or sgs_for_withdrawl:
+    if not can_reuse(to_path(output_vds_path)) or sgs_for_withdrawal:
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
 
         if specific_intervals:
@@ -163,7 +163,7 @@ def _run(
         else:
             intervals = None
 
-        if not sgs_for_withdrawl:
+        if not sgs_for_withdrawal:
             # Load from save, if supplied
             if save_path:
                 if force_new_combiner:
@@ -199,8 +199,8 @@ def _run(
 
             combiner.run()
         else:
-            logging.info(f'There are {len(sgs_for_withdrawl)} sequencing groups to remove.')
-            logging.info(f'Removing: {" ".join(sgs_for_withdrawl)}')
+            logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
+            logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
             combiner = new_combiner(
                 output_path=tmp_prefix_for_withdrawals,
                 save_path=save_path,
@@ -231,7 +231,7 @@ def _run(
 
             filtered_vds: VariantDataset = hl.vds.filter_samples(
                 vds=tmp_prefix_for_withdrawals,
-                samples=sgs_for_withdrawl,
+                samples=sgs_for_withdrawal,
                 keep=False,
                 remove_dead_alleles=True,
             )
