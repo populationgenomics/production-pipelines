@@ -199,6 +199,8 @@ def _run(
 
             combiner.run()
         else:
+            logging.info(f'There are {len(sgs_for_withdrawl)} sequencing groups to remove.')
+            logging.info(f'Removing: {" ".join(sgs_for_withdrawl)}')
             combiner = new_combiner(
                 output_path=tmp_prefix_for_withdrawals,
                 save_path=save_path,
