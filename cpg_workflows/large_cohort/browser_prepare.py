@@ -318,12 +318,12 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
                 alt_raw=ds.histograms.raw_qual_hists.gq_hist_alt,
             ),
             site_quality_metrics=[hl.struct(metric="SiteQuality", value=hl.float(_nullify_nan(ds.info.QUALapprox)))]
-            + [hl.struct(metric="InbreedingCoeff", value=hl.float(_nullify_nan(ds.InbreedingCoeff[0])))]
+            + [hl.struct(metric="inbreeding_coeff", value=hl.float(_nullify_nan(ds.inbreeding_coeff[0])))]
             + [
                 hl.struct(
                     metric=metric,
                     value=hl.float(
-                        _nullify_nan(ds.info[metric][0]),
+                        _nullify_nan(ds.info[metric]),
                     ),  # default_compute_info() annotates below fields as hl.array(hl.float64) so need to get value in array
                 )
                 for metric in [
@@ -336,7 +336,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
                     "AS_ReadPosRankSum",
                     "AS_SOR",
                     "AS_VarDP",
-                    # "AS_VQSLOD", AS_VQSLOD is not annotated
+                    "AS_VQSLOD",
                 ]
             ],
         ),
@@ -361,7 +361,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
 
     inbreeding_coeff_cutoff = -0.3
     filters = {
-        "InbreedingCoeff": ds.InbreedingCoeff[0] < inbreeding_coeff_cutoff,
+        "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_VQSR": hl.len(ds.vqsr_filters) > 0,
     }
@@ -385,6 +385,10 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     ds = ds.annotate(variant_id=ds.variant_id, rsids=ds.rsids, summary=hl.struct(**summary_dict))
     ds = ds.select('variant_id', 'rsids', 'summary')
     ds = ds.rename({'summary': exome_or_genome})
+
+    globals_dict = ds.globals.collect()[0]
+    ds = ds.select_globals()
+    ds = ds.annotate_globals(**{f"{exome_or_genome}_{k}": v for k, v in globals_dict.items()})
 
     return ds
 
