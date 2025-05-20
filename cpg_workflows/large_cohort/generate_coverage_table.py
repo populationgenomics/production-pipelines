@@ -84,8 +84,17 @@ def run(
     # Generate reference coverage table
     includes_end = False
     chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
+    print(
+        f'end is typed as {type(end)} and start is typed as {type(start)}, while chrom_length is {type(chrom_length)}',
+    )
     if end == chrom_length:
+        print(f'chrom_length is {chrom_length} and end is {end}')
         includes_end = True
+        print(f'includes_end is {includes_end}')
+    if int(end) == chrom_length:
+        print(f'chrom_length is {chrom_length} and end is {end}')
+        includes_end = True
+        print(f'includes_end is {includes_end}')
 
     interval = hl.Interval(
         hl.Locus(chrom, start, reference_genome=rg),
