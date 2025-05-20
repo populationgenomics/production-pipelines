@@ -191,9 +191,9 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         # we only ever build on top of a single VDS, or start from scratch
         vds_path: str | None = None
 
-        # create these as empty sets
+        # create these as empty iterables
         sg_ids_in_vds: set[str] = set()
-        sgs_to_remove: set[str] = set()
+        sgs_to_remove: list[str] = []
 
         # check for a VDS by ID
         if vds_id := config_retrieve(['workflow', 'use_specific_vds'], None):
@@ -239,7 +239,7 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             get_logger().info(f'Found {len(sg_ids_in_vds)} SG IDs in VDS {vds_path}')
             get_logger().info(f'Total {len(sgs_in_mc)} SGs in this MultiCohort')
 
-            sgs_to_remove = set(sg_ids_in_vds) - set(sgs_in_mc)
+            sgs_to_remove = sorted(set(sg_ids_in_vds) - set(sgs_in_mc))
 
             if sgs_to_remove:
                 get_logger().info(f'Removing {len(sgs_to_remove)} SGs from VDS {vds_path}')
