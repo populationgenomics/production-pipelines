@@ -18,7 +18,14 @@ def run(
     sgs_to_remove: list[str] | None = None,
 ) -> None:
     """
-    Runs the combiner
+    Runs the combiner -
+
+    1. this method receives an existing VDS path or None - if None, combine from scratch. If populated, the combiner
+       run will use that as a base, and add additional samples to it
+    2. if this method receives sgs_to_remove and a vds_path, the first step is to create a new VDS from temp with the
+       samples removed. This is then used as the base for the combiner run
+    3. if this method receives gvcf_paths, the combiner will run with those as the input paths to add
+    4. if there are no gVCFs, the VDS with samples removed is written to the output path directly
 
     Args:
         output_vds_path (str): eventual output path for the VDS
@@ -38,6 +45,7 @@ def run(
 
     from cpg_utils.config import config_retrieve
     from cpg_utils.hail_batch import init_batch
+    from cpg_workflows.utils import exists
 
     # set up a quick logger inside the job
     logging.basicConfig(level=logging.INFO)
@@ -51,6 +59,7 @@ def run(
     # Load from save, if supplied (log correctly depending on force_new_combiner)
     if save_path and force_new_combiner:
         logging.info(f'Combiner plan {save_path} will be ignored/written new')
+
     elif save_path:
         logging.info(f'Resuming combiner plan from {save_path}')
 
@@ -62,6 +71,9 @@ def run(
     else:
         intervals = None
 
+    if not (sgs_to_remove or gvcf_paths):
+        raise ValueError('No samples to remove or gVCFs to add - please provide at least one of these')
+
     # logical steps -
     # 1. if there are samples to remove, do that first
     #   a. if there are no samples to add, just remove the samples and write to eventual output path
@@ -71,22 +83,32 @@ def run(
     # 1 - do we need to do removal?
     if vds_path and sgs_to_remove:
         logging.info(f'Removing sample groups {sgs_to_remove} from {vds_path}')
-        vds = hl.vds.read_vds(vds_path)
-        vds = hl.vds.filter_samples(vds, samples=sgs_to_remove, keep=False, remove_dead_alleles=True)
 
-        # 1a. if there are no samples to add, just remove the samples and write to eventual output path
-        if not gvcf_paths:
-            logging.info(f'Writing to {output_vds_path}')
-            vds.write(output_vds_path)
-            return
+        temp_path = f'{tmp_prefix}/combiner_removal_temp.vds'
 
-        # we've changed the VDS base, so we need to force a new combiner plan
-        force_new_combiner = True
+        # this will only exist if the previous removal was successful, AND we have additional gVCFs to add
+        if exists(temp_path):
+            logging.info(f'Found existing VDS at {temp_path}, skipping removal step')
+            vds_path = temp_path
 
-        # 1b. if there are samples to add, write this to a temporary path, set force to true, and then run the combiner
-        vds_path = f'{tmp_prefix}/combiner_removal_temp.vds'
-        logging.info(f'Writing with removed SGs to {vds_path}')
-        vds.write(output_vds_path)
+        else:
+            vds = hl.vds.read_vds(vds_path)
+            vds = hl.vds.filter_samples(vds, samples=sgs_to_remove, keep=False, remove_dead_alleles=True)
+
+            # 1a. if there are no samples to add, just remove the samples and write to eventual output path
+            if not gvcf_paths:
+                logging.info(f'Writing to {output_vds_path}')
+                vds.write(output_vds_path)
+                return
+
+            # 1b. if there are samples to add, write this to a temporary path, set force to true, then run the combiner
+            else:
+                # we've changed the VDS base, so we need to force a new combiner plan
+                force_new_combiner = True
+
+                logging.info(f'Writing with removed SGs to {temp_path}')
+                vds.write(temp_path)
+                vds_path = temp_path
 
     # 2 - do we need to run the combiner?
     combiner = hl.vds.new_combiner(

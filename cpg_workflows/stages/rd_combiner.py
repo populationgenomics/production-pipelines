@@ -188,8 +188,10 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
         outputs = self.expected_outputs(multicohort)
 
-        # create these as empty lists instead of None, they have the same truthiness
+        # we only ever build on top of a single VDS, or start from scratch
         vds_path: str | None = None
+
+        # create these as empty sets
         sg_ids_in_vds: set[str] = set()
         sgs_to_remove: set[str] = set()
 
