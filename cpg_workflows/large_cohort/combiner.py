@@ -210,6 +210,7 @@ def _run(
         combiner.run()
 
         if sgs_for_withdrawal:
+            logging.info('Removing samples from VDS')
             filtered_vds: VariantDataset = hl.vds.filter_samples(
                 vds=tmp_prefix_for_withdrawals,
                 samples=sgs_for_withdrawal,
