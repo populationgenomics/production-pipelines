@@ -64,7 +64,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     combiner_config = config_retrieve('combiner')
 
     tmp_prefix_for_withdrawals: str = slugify(
-        f'{cohort.analysis_dataset.tmp_prefix()}/{cohort.name}-{workflow_config["sequencing_type"]}-{combiner_config["vds_version"]}',
+        f'{cohort.analysis_dataset.tmp_prefix()}{cohort.name}-{workflow_config["sequencing_type"]}-{combiner_config["vds_version"]}',
     )
 
     vds_paths: list[str] = []
