@@ -404,7 +404,7 @@ class Vqsr(CohortStage):
       > java.lang.NumberFormatException: For input string: "6,11,2,0"
 
     - To avoid this issue, the header is extracted and modified to correct the `SB` field metadata:
-      > ##INFO=<ID=SB,Number=.,Type=Integer,Description="Strand Bias">
+      > ##INFO=<ID=SB,Number=.,Type=Float,Description="Strand Bias">
 
     - The corrected header is saved as a separate file (`header_siteonly.vqsr.vcf.gz`) so that it can be
       used in the subsequent `LoadVqsr` stage to overwrite the original header when importing the VCF into Hail.
