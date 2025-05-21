@@ -86,10 +86,11 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
-        gvcf_external_header = new_sg_gvcfs[0]
+        if new_sg_gvcfs:
+            gvcf_external_header = new_sg_gvcfs[0]
 
-    if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
-        raise Exception
+    # if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
+    #     raise Exception
 
     sequencing_group_names: list[str] = [
         str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
