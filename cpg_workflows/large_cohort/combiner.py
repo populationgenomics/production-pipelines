@@ -76,12 +76,12 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     gvcf_external_header: str | None = None
     sequencing_group_names: list[str] | None = None
 
-    if combiner_config.get('vds_analysis_ids', None) is not None:
-        for vds_id in combiner_config['vds_analysis_ids']:
-            tmp_query_res, tmp_sg_ids_in_vds = get_vds_ids_output(vds_id)
-            vds_paths.append(tmp_query_res)
-            sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
-            sgs_for_withdrawal = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
+    for vds_id in config_retrieve(['combiner', 'vds_analysis_ids'], []):
+        tmp_query_res, tmp_sg_ids_in_vds = get_vds_ids_output(vds_id)
+        vds_paths.append(tmp_query_res)
+        sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
+    
+    sgs_for_withdrawal = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
 
     if combiner_config.get('merge_only_vds', False) is not True:
         # Get SG IDs from the cohort object itself, rather than call Metamist.
