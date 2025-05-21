@@ -103,7 +103,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         _run,
         output_vds_path=output_vds_path,
         sequencing_type=workflow_config['sequencing_type'],
-        tmp_prefix=f'{cohort.analysis_dataset.tmp_prefix()}/combiner_temp_dir',
+        tmp_prefix=f'{cohort.analysis_dataset.tmp_prefix()}combiner_temp_dir',
         genome_build=genome_build(),
         save_path=save_path,
         force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
