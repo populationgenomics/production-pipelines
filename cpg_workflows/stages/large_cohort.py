@@ -392,7 +392,7 @@ class Vqsr(CohortStage):
 
         # sed command to swap Float SB to Integer in-place and allow any length
         reheader_job.command(
-            rf"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Integer/' {reheader_job.ofile}",
+            rf"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Float/' {reheader_job.ofile}",
         )
 
         b.write_output(
