@@ -99,7 +99,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         _run,
         output_vds_path=output_vds_path,
         sequencing_type=workflow_config['sequencing_type'],
-        tmp_prefix=f'{cohort.analysis_dataset.tmp_prefix}/combiner_temp_dir',
+        tmp_prefix=f'{cohort.analysis_dataset.tmp_prefix()}/combiner_temp_dir',
         genome_build=genome_build(),
         save_path=save_path,
         force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
@@ -164,71 +164,48 @@ def _run(
             intervals = None
 
         if not sgs_for_withdrawal:
+            combiner_vds_output_path: str = output_vds_path
             # Load from save, if supplied
             if save_path:
                 if force_new_combiner:
                     logging.info(f'Combiner plan {save_path} will be ignored/written new')
                 else:
                     logging.info(f'Resuming combiner plan from {save_path}')
-
-            combiner: VariantDatasetCombiner = new_combiner(
-                output_path=output_vds_path,
-                save_path=save_path,
-                gvcf_paths=gvcf_paths,
-                gvcf_sample_names=sequencing_group_names,
-                # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
-                # will be ignored. The first gvcf path works fine as a header because it will
-                # be only read until the last line that begins with "#":
-                gvcf_external_header=gvcf_external_header,
-                vds_paths=vds_paths,
-                reference_genome=genome_build,
-                temp_path=tmp_prefix,
-                use_exome_default_intervals=sequencing_type == 'exome',
-                use_genome_default_intervals=sequencing_type == 'genome',
-                intervals=intervals,
-                force=force_new_combiner,
-                branch_factor=config_retrieve(
-                    ['combiner', 'branch_factor'],
-                    100,
-                ),
-                gvcf_batch_size=config_retrieve(
-                    ['combiner', 'gvcf_batch_size'],
-                    None,
-                ),
-            )
-
-            combiner.run()
+        # We have some SGs to withdrawal
         else:
+            combiner_vds_output_path = tmp_prefix_for_withdrawals
             logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
             logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
-            combiner = new_combiner(
-                output_path=tmp_prefix_for_withdrawals,
-                save_path=save_path,
-                gvcf_paths=gvcf_paths,
-                gvcf_sample_names=sequencing_group_names,
-                # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
-                # will be ignored. The first gvcf path works fine as a header because it will
-                # be only read until the last line that begins with "#":
-                gvcf_external_header=gvcf_external_header,
-                vds_paths=vds_paths,
-                reference_genome=genome_build,
-                temp_path=tmp_prefix,
-                use_exome_default_intervals=sequencing_type == 'exome',
-                use_genome_default_intervals=sequencing_type == 'genome',
-                intervals=intervals,
-                force=force_new_combiner,
-                branch_factor=config_retrieve(
-                    ['combiner', 'branch_factor'],
-                    100,
-                ),
-                gvcf_batch_size=config_retrieve(
-                    ['combiner', 'gvcf_batch_size'],
-                    None,
-                ),
-            )
 
-            combiner.run()
+        combiner = new_combiner(
+            output_path=combiner_vds_output_path,
+            save_path=save_path,
+            gvcf_paths=gvcf_paths,
+            gvcf_sample_names=sequencing_group_names,
+            # Header must be used with gvcf_sample_names, otherwise gvcf_sample_names
+            # will be ignored. The first gvcf path works fine as a header because it will
+            # be only read until the last line that begins with "#":
+            gvcf_external_header=gvcf_external_header,
+            vds_paths=vds_paths,
+            reference_genome=genome_build,
+            temp_path=tmp_prefix,
+            use_exome_default_intervals=sequencing_type == 'exome',
+            use_genome_default_intervals=sequencing_type == 'genome',
+            intervals=intervals,
+            force=force_new_combiner,
+            branch_factor=config_retrieve(
+                ['combiner', 'branch_factor'],
+                100,
+            ),
+            gvcf_batch_size=config_retrieve(
+                ['combiner', 'gvcf_batch_size'],
+                None,
+            ),
+        )
 
+        combiner.run()
+
+        if sgs_for_withdrawal:
             filtered_vds: VariantDataset = hl.vds.filter_samples(
                 vds=tmp_prefix_for_withdrawals,
                 samples=sgs_for_withdrawal,
