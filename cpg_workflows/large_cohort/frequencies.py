@@ -98,16 +98,14 @@ def frequency_annotations(
     mt = hl.variant_qc(mt)
 
     logging.info('Allele-specific statistics...')
-    # PLACEHOLDER UNTIL VQSR STAGE IS FIXED
-    # Because the site_only_ht is not split, this info will not be correctly populated for multiallelic
-    # variants until this is resolved.
     mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
 
     logging.info('Inbreeding coefficient...')
     mt = mt.annotate_rows(inbreeding_coeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
 
     logging.info('VQSR filters...')
-    mt = mt.annotate_rows(vqsr_filters=vqsr_ht[mt.row_key].filters)
+    mt = mt.annotate_rows(site_vqsr_filters=vqsr_ht[mt.row_key].filters)
+    mt = mt.annotate_rows(as_vqsr_filters=vqsr_ht[mt.row_key].info.AS_FilterStatus)
 
     logging.info('Region flags...')
     mt = mt.annotate_rows(
