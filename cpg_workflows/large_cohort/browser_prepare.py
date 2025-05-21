@@ -363,6 +363,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     filters = {
         "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
+        "AS_lowqual": ds.AS_lowqual,
         "AS_VQSR": ds.as_vqsr_filters != "PASS",
     }
     ds = ds.annotate(filters=add_filters_expr(filters=filters))

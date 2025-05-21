@@ -96,6 +96,7 @@ def frequency_annotations(
 
     logging.info('Allele-specific statistics...')
     mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
+    mt = mt.annotate_rows(AS_lowqual=vqsr_ht[mt.row_key].AS_lowqual)
 
     logging.info('Inbreeding coefficient...')
     mt = mt.annotate_rows(inbreeding_coeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
