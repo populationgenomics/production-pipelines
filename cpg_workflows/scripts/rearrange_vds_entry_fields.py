@@ -2,6 +2,19 @@
 
 """
 This script rearranges the fields in a VDS entry to match the order of the fields in the VDS schema.
+
+example invocation, resolving our current problem VDSs:
+analysis-runner \
+    --dataset seqr \
+    --description 'overwrite reference VDS schema' \
+    -o schema_correction \
+    --access-level full \
+    python3 cpg_workflows/scripts/rearrange_vds_entry_fields.py \
+        --modify gs://cpg-seqr-main-tmp/rd_combiner/fa55fe991ca12256081ef2a9cf3a1218720db9_5734/CreateVdsFromGvcfsWithHailCombiner/temp_dir/combiner_removal_temp.vds \
+        --match gs://cpg-seqr-main-tmp/rd_combiner/fa55fe991ca12256081ef2a9cf3a1218720db9_5734/CreateVdsFromGvcfsWithHailCombiner/temp_dir/combiner-intermediates/cdbe20b6-a1b
+c-45f4-b80a-ff44578f8236_gvcf-combine_job1/dataset_0.vds \
+        --temp gs://cpg-seqr-main-tmp/oneshot_patch/fa55fe991ca12256081ef2a9cf3a1218720db9_5734.mt
+
 """
 
 import argparse
