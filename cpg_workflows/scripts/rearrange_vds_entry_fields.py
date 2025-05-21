@@ -22,6 +22,8 @@ import logging
 
 import hail as hl
 
+from cpg_utils.hail_batch import init_batch
+
 
 def main(modify_vds: str, match_vds: str, temp_mt: str) -> None:
     """
@@ -37,6 +39,8 @@ def main(modify_vds: str, match_vds: str, temp_mt: str) -> None:
     Returns:
         None
     """
+
+    init_batch()
 
     # set as a variable, we'll use this a couple of times
     modify_ref_data = f'{modify_vds}/reference_data'
