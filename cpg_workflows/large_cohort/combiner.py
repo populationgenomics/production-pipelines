@@ -74,6 +74,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
     cohort_sg_ids: list[str] = cohort.get_sequencing_group_ids(only_active=True)
     gvcf_external_header: str | None = None
+    sequencing_group_names: list[str] | None = None
 
     if combiner_config.get('vds_analysis_ids', None) is not None:
         for vds_id in combiner_config['vds_analysis_ids']:
@@ -88,13 +89,12 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
         if new_sg_gvcfs:
             gvcf_external_header = new_sg_gvcfs[0]
+            sequencing_group_names = [
+                str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
+            ]
 
     # if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
     #     raise Exception
-
-    sequencing_group_names: list[str] = [
-        str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
-    ]
 
     combiner_job: PythonJob = _initalise_combiner_job(cohort=cohort)
 
