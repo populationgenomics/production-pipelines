@@ -506,7 +506,7 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, MakeSiteOnlyVcf, LoadVqsr])
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
@@ -541,7 +541,6 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='ht')),
                 str(inputs.as_path(cohort, LoadVqsr)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
