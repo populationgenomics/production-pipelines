@@ -212,7 +212,7 @@ def _run(
         if sgs_for_withdrawal:
             logging.info('Removing samples from VDS')
             filtered_vds: VariantDataset = hl.vds.filter_samples(
-                vds=tmp_prefix_for_withdrawals,
+                vds=hl.vds.read_vds(tmp_prefix_for_withdrawals),
                 samples=sgs_for_withdrawal,
                 keep=False,
                 remove_dead_alleles=True,
