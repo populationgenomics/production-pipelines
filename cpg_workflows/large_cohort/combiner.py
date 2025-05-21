@@ -178,8 +178,6 @@ def _run(
         # We have some SGs to withdrawal
         else:
             combiner_vds_output_path = tmp_prefix_for_withdrawals
-            logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
-            logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
 
         combiner: VariantDatasetCombiner = new_combiner(
             output_path=combiner_vds_output_path,
@@ -210,6 +208,8 @@ def _run(
         combiner.run()
 
         if sgs_for_withdrawal:
+            logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
+            logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
             logging.info('Removing samples from VDS')
             filtered_vds: VariantDataset = hl.vds.filter_samples(
                 vds=hl.vds.read_vds(tmp_prefix_for_withdrawals),
