@@ -12,6 +12,7 @@ Inputs:
 from typing import TYPE_CHECKING, Any
 
 from hail.vds import new_combiner
+from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
 from hailtop.batch.job import PythonJob
 
 from cpg_utils.config import config_retrieve, genome_build
@@ -72,6 +73,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     new_sg_gvcfs: list[str] = []
     cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
     cohort_sg_ids: list[str] = cohort.get_sequencing_group_ids(only_active=True)
+    gvcf_external_header: str | None = None
 
     if combiner_config.get('vds_analysis_ids', None) is not None:
         for vds_id in combiner_config['vds_analysis_ids']:
@@ -84,6 +86,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
+        gvcf_external_header = new_sg_gvcfs[0]
 
     if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
         raise Exception
@@ -104,7 +107,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         save_path=save_path,
         force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
         sequencing_group_names=sequencing_group_names,
-        gvcf_external_header=new_sg_gvcfs[0],
+        gvcf_external_header=gvcf_external_header,
         gvcf_paths=new_sg_gvcfs,
         vds_paths=vds_paths,
         sgs_for_withdrawal=sgs_for_withdrawal,
@@ -177,7 +180,7 @@ def _run(
             logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
             logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
 
-        combiner = new_combiner(
+        combiner: VariantDatasetCombiner = new_combiner(
             output_path=combiner_vds_output_path,
             save_path=save_path,
             gvcf_paths=gvcf_paths,
