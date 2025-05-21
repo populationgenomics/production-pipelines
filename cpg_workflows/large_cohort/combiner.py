@@ -83,7 +83,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     
     sgs_for_withdrawal = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
 
-    if combiner_config.get('merge_only_vds', False) is not True:
+    if not config_retrieve(['combiner', 'merge_only_vds'], False):
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
