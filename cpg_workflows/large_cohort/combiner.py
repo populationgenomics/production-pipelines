@@ -161,11 +161,8 @@ def _run(
     if vds_paths is None:
         vds_paths = []
 
-    if sgs_for_withdrawal:
-        if not isinstance(sgs_for_withdrawal, list):
-            raise TypeError('sgs_for_withdrawal must be a list of sequencing group IDs')
-        if tmp_prefix_for_withdrawals is None:
-            raise ValueError('tmp_prefix_for_withdrawals must be set if sgs_for_withdrawal is set')
+    if sgs_for_withdrawal and tmp_prefix_for_withdrawals is None:
+        raise ValueError('tmp_prefix_for_withdrawals must be set if sgs_for_withdrawal is set')
 
     import logging
 
