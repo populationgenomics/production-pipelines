@@ -169,7 +169,7 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
     vds_path = str(tmp_path / 'v01.vds')
 
     # we're passing a specific minority of intervals here, to test that the combiner works on a timely test case
-    combiner.run(
+    combiner._run(
         output_vds_path=vds_path,
         sequencing_type=conf['workflow']['sequencing_type'],
         tmp_prefix=str(tmp_path / 'tmp'),
