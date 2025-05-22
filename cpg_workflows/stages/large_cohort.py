@@ -27,7 +27,7 @@ class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f'{cohort.name}-{combiner_config["vds_version"]}',
+            f'{cohort.id}-{cohort.name}-{combiner_config["vds_version"]}',
         )
 
         # include the list of all VDS IDs in the plan name
