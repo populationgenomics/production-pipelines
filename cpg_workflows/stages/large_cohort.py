@@ -25,10 +25,9 @@ HAIL_QUERY: Final = 'hail query'
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
-        workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f'{cohort.name}-{workflow_config["sequencing_type"]}-{combiner_config["vds_version"]}',
+            f'{cohort.name}-{combiner_config["vds_version"]}',
         )
 
         # include the list of all VDS IDs in the plan name

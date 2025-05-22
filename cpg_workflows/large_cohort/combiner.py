@@ -64,7 +64,7 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     combiner_config = config_retrieve('combiner')
 
     tmp_prefix_for_withdrawals: str = slugify(
-        f'{cohort.analysis_dataset.tmp_prefix()}{cohort.name}-{workflow_config["sequencing_type"]}-{combiner_config["vds_version"]}',
+        f'{cohort.analysis_dataset.tmp_prefix()}{cohort.name}-{combiner_config["vds_version"]}',
     )
 
     vds_paths: list[str] = []
@@ -227,7 +227,6 @@ def _run(
 
     # do we need to run filter_samples?
     if sgs_for_withdrawal:
-
         # select which path to filter samples from - either the temp path if combining has occurred, or the only VDS
         path_to_read_from = tmp_prefix_for_withdrawals if combining_to_do else vds_paths[0]
 
