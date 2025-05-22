@@ -4,6 +4,9 @@ ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapie
 status_reporter = 'metamist'
 vep_version = '110'
 
+[workflow.annotate_cohort]
+workers_use_highmem = false
+
 [elasticsearch]
 # Configure access to ElasticSearch server
 port = '9243'

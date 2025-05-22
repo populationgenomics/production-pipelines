@@ -25,8 +25,11 @@ def annotate_cohort_jobs_snps_indels(
     """
     Annotate cohort VCF for seqr loader, SNPs and Indels.
     """
-
-    j = get_batch().new_job('Annotate cohort', job_attrs)
+    if config_retrieve(['workflow', 'annotate_cohort', 'workers_use_highmem'], False):
+        b = get_batch(worker_memory='highmem')
+    else:
+        b = get_batch()
+    j = b.new_job('Annotate cohort', job_attrs)
     j.image(config_retrieve(['workflow', 'driver_image']))
     j.command(
         query_command(
