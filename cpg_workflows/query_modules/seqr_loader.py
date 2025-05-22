@@ -48,7 +48,7 @@ def annotate_cohort(
         force_bgz=True,
         array_elements_required=False,
     )
-    mt = checkpoint_hail(mt, 'mt-imported-vcf.mt', checkpoint_prefix)
+    mt.checkpoint(output=str(checkpoint_prefix) + 'mt-imported.mt', overwrite=True)
     logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
     # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
