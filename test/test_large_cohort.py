@@ -179,6 +179,8 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
         save_path=None,
         specific_intervals=conf['large_cohort']['combiner']['intervals'],
         force_new_combiner=conf['large_cohort']['combiner']['force_new_combiner'],
+        tmp_prefix_for_withdrawals=str(tmp_path / 'tmp_withdrawals'),
+        sgs_for_withdrawal=None,
     )
 
     # do some testing here

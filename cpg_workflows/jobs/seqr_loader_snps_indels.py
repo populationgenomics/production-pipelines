@@ -98,13 +98,17 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     ]
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
-    split_vcf_j = add_split_vcf_job(
-        b=b,
-        input_vcf=merged_vcf,
-        intervals=intervals,
-        output_vcf_paths=split_vcfs_paths,
-        job_attrs=(job_attrs or {}) | dict(part='all'),
-    )
+    # Only create the split VCF job if we are not reusing the output paths
+    if can_reuse(split_vcfs_paths + [to_path(f'{p}.tbi') for p in split_vcfs_paths]):
+        split_vcf_j = None
+    else:
+        split_vcf_j = add_split_vcf_job(
+            b=b,
+            input_vcf=merged_vcf,
+            intervals=intervals,
+            output_vcf_paths=split_vcfs_paths,
+            job_attrs=(job_attrs or {}) | dict(part='all'),
+        )
 
     for idx in range(scatter_count):
         if out_siteonly_vcf_part_paths:

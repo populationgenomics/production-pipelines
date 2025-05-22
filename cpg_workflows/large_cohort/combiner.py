@@ -69,21 +69,20 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
 
     vds_paths: list[str] = []
     sg_ids_in_vds: list[str] = []
-    sgs_for_withdrawal: list[str] = []
     new_sg_gvcfs: list[str] = []
     cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
     cohort_sg_ids: list[str] = cohort.get_sequencing_group_ids(only_active=True)
     gvcf_external_header: str | None = None
     sequencing_group_names: list[str] | None = None
 
-    if combiner_config.get('vds_analysis_ids', None) is not None:
-        for vds_id in combiner_config['vds_analysis_ids']:
-            tmp_query_res, tmp_sg_ids_in_vds = get_vds_ids_output(vds_id)
-            vds_paths.append(tmp_query_res)
-            sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
-            sgs_for_withdrawal = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
+    for vds_id in config_retrieve(['combiner', 'vds_analysis_ids'], []):
+        tmp_query_res, tmp_sg_ids_in_vds = get_vds_ids_output(vds_id)
+        vds_paths.append(tmp_query_res)
+        sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
 
-    if combiner_config.get('merge_only_vds', False) is not True:
+    sgs_for_withdrawal: list[str] = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
+
+    if not config_retrieve(['combiner', 'merge_only_vds'], False):
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
         new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
@@ -93,8 +92,8 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
                 str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
             ]
 
-    # if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
-    #     raise Exception
+    if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1 and not sgs_for_withdrawal:
+        raise Exception
 
     combiner_job: PythonJob = _initalise_combiner_job(cohort=cohort)
 
