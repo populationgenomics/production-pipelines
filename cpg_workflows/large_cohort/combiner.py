@@ -123,8 +123,8 @@ def _run(
     tmp_prefix: str,
     genome_build: str,
     save_path: str | None,
-    sgs_for_withdrawal: list[str] | None,
-    tmp_prefix_for_withdrawals: str,
+    sgs_for_withdrawal: list[str] | None = None,
+    tmp_prefix_for_withdrawals: str | None = None,
     force_new_combiner: bool = False,
     sequencing_group_names: list[str] | None = None,
     gvcf_external_header: str | None = None,
@@ -134,6 +134,16 @@ def _run(
 ) -> None:
     """
     Runs the combiner
+
+    Scenarios, all predicated on output_vds_path not existing (otherwise this stage won't be scheduled) -
+    1. no SGs to withdraw, combining to do
+        - create a new combiner result, writing to the main output path
+    2. SGs to withdraw, and combining to do
+        - create a new combiner result, writing to the temporary output path
+        - remove the withdrawn SGs from the temp VDS
+    3. SGs to withdraw, no combining to do
+        - don't run the combiner... this assumes vds_paths has only one element
+        - filter samples from the result, then write to the main output path
 
     Args:
         output_vds_path (str): eventual output path for the VDS
@@ -146,6 +156,13 @@ def _run(
         vds_paths (list[str] | None): list of paths to VDSs
         specific_intervals (list[str] | None): list of intervals to use for the combiner, if using non-standard
     """
+
+    if vds_paths is None:
+        vds_paths = []
+
+    if sgs_for_withdrawal and tmp_prefix_for_withdrawals is None:
+        raise ValueError('tmp_prefix_for_withdrawals must be set if sgs_for_withdrawal is set')
+
     import logging
 
     import hail as hl
@@ -153,12 +170,16 @@ def _run(
     # set up a quick logger inside the job
     logging.basicConfig(level=logging.INFO)
 
-    if not can_reuse(to_path(output_vds_path)):
-        init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+    # init batch early, this method won't run if output_vds_path exists, so we have some work to do
+    init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
 
+    # do we need to do any combining?
+    combining_to_do: bool = bool(gvcf_paths or len(vds_paths) > 1)
+
+    # if we're going to do some combining, we need to set up the combiner instance
+    if combining_to_do:
         if specific_intervals:
             logging.info(f'Using specific intervals: {specific_intervals}')
-
             intervals = hl.eval(
                 [hl.parse_locus_interval(interval, reference_genome=genome_build) for interval in specific_intervals],
             )
@@ -166,19 +187,17 @@ def _run(
         else:
             intervals = None
 
-        if not sgs_for_withdrawal:
-            combiner_vds_output_path: str = output_vds_path
-            # Load from save, if supplied
-            if save_path:
-                if force_new_combiner:
-                    logging.info(f'Combiner plan {save_path} will be ignored/written new')
-                else:
-                    logging.info(f'Resuming combiner plan from {save_path}')
-        # We have some SGs to withdrawal
-        else:
-            combiner_vds_output_path = tmp_prefix_for_withdrawals
+        # If we have SGs to withdraw, we write to a temp location, otherwise write straight out
+        combiner_vds_output_path = tmp_prefix_for_withdrawals if sgs_for_withdrawal else output_vds_path
 
-        combiner: VariantDatasetCombiner = new_combiner(
+        # Load from save, if supplied
+        if save_path:
+            if force_new_combiner:
+                logging.info(f'Combiner plan {save_path} will be ignored/written new')
+            else:
+                logging.info(f'Resuming combiner plan from {save_path}')
+
+        combiner_instance: VariantDatasetCombiner = new_combiner(
             output_path=combiner_vds_output_path,
             save_path=save_path,
             gvcf_paths=gvcf_paths,
@@ -204,16 +223,20 @@ def _run(
             ),
         )
 
-        combiner.run()
+        combiner_instance.run()
 
-        if sgs_for_withdrawal:
-            logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
-            logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
-            logging.info('Removing samples from VDS')
-            filtered_vds: VariantDataset = hl.vds.filter_samples(
-                vds=hl.vds.read_vds(tmp_prefix_for_withdrawals),
-                samples=sgs_for_withdrawal,
-                keep=False,
-                remove_dead_alleles=True,
-            )
-            filtered_vds.write(output_vds_path)
+    # do we need to run filter_samples?
+    if sgs_for_withdrawal:
+
+        # select which path to filter samples from - either the temp path if combining has occurred, or the only VDS
+        path_to_read_from = tmp_prefix_for_withdrawals if combining_to_do else vds_paths[0]
+
+        logging.info(f'There are {len(sgs_for_withdrawal)} sequencing groups to remove.')
+        logging.info(f'Removing: {" ".join(sgs_for_withdrawal)}')
+        filtered_vds: VariantDataset = hl.vds.filter_samples(
+            vds=hl.vds.read_vds(path_to_read_from),
+            samples=sgs_for_withdrawal,
+            keep=False,
+            remove_dead_alleles=True,
+        )
+        filtered_vds.write(output_vds_path)
