@@ -5,7 +5,10 @@ status_reporter = 'metamist'
 vep_version = '110'
 
 [workflow.annotate_cohort]
-workers_use_highmem = false
+highmem_drivers = false
+highmem_workers = false
+# driver_cores = 2
+# worker_cores = 2
 
 [elasticsearch]
 # Configure access to ElasticSearch server
