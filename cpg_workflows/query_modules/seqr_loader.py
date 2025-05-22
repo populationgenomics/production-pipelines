@@ -20,7 +20,6 @@ def annotate_cohort(
     vep_ht_path: str,
     site_only_vqsr_vcf_path: str | None = None,
     checkpoint_prefix: str | None = None,
-    long_read: bool = False,
     remove_invalid_contigs: bool = False,
 ):
     """
