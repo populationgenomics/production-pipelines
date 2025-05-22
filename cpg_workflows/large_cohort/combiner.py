@@ -153,7 +153,7 @@ def _run(
     # set up a quick logger inside the job
     logging.basicConfig(level=logging.INFO)
 
-    if not can_reuse(to_path(output_vds_path)) or sgs_for_withdrawal:
+    if not can_reuse(to_path(output_vds_path)):
         init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
 
         if specific_intervals:
