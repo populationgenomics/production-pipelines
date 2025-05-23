@@ -14,3 +14,8 @@ snps_indels_callers = ['deeptrio', 'deepvariant']
 [resource_overrides.bam_to_cram]
 nthreads = 1
 storage_gb = 50
+
+[resource_overrides.merge_vcfs]
+ncpu = 4
+mem_gb = 16
+storage_gb = 50
