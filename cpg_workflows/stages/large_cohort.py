@@ -1,11 +1,10 @@
-import logging
-from typing import TYPE_CHECKING, Any, Final, Tuple
+from typing import TYPE_CHECKING, Any, Final
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.large_cohort.combiner import combiner
-from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
@@ -27,7 +26,7 @@ class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f'{cohort.id}-{cohort.name}-{combiner_config["vds_version"]}',
+            f'{cohort.id}-{combiner_config["vds_version"]}',
         )
 
         # include the list of all VDS IDs in the plan name
@@ -37,7 +36,7 @@ class Combiner(CohortStage):
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
         return {
-            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
+            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds',
             'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
         }
 

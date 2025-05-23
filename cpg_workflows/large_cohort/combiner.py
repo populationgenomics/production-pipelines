@@ -27,6 +27,8 @@ if TYPE_CHECKING:
     from hail.vds.combiner.variant_dataset_combiner import VariantDatasetCombiner
     from hail.vds.variant_dataset import VariantDataset
 
+    import cpg_utils
+
 
 def _initalise_combiner_job(cohort: Cohort) -> PythonJob:
     j: PythonJob = get_batch().new_python_job('Combiner', (cohort.get_job_attrs() or {}) | {'tool': 'hail query'})  # type: ignore[reportUnknownArgumentType]
@@ -63,9 +65,14 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
     workflow_config = config_retrieve('workflow')
     combiner_config = config_retrieve('combiner')
 
-    tmp_prefix_for_withdrawals: str = slugify(
-        f'{cohort.analysis_dataset.tmp_prefix()}{cohort.id}-{cohort.name}-{combiner_config["vds_version"]}',
+    combiner_tmp_path: cpg_utils.Path = (
+        cohort.analysis_dataset.tmp_prefix()
+        / 'vds'
+        / f'{cohort.name}'
+        / f'{cohort.id}-{combiner_config["vds_version"]}'
     )
+
+    tmp_prefix_for_withdrawals: str = slugify(str(combiner_tmp_path))
 
     vds_paths: list[str] = []
     sg_ids_in_vds: list[str] = []
