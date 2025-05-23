@@ -31,7 +31,7 @@ def verifybamid(
 
     job_attrs = (job_attrs or {}) | {'tool': 'VerifyBamID'}
     j = b.new_job('VerifyBamID', job_attrs)
-    j.image(image_path('verifybamid'))
+    j.image(image_path('verifybamid', '2.0.1-1'))
     res = STANDARD.request_resources(ncpu=4)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)

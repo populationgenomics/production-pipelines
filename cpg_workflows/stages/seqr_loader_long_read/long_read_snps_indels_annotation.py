@@ -275,7 +275,7 @@ class ReFormatPacBioSNPsIndels(SequencingGroupStage):
             {'tool': 'bcftools'},
         )
         tabix_job.declare_resource_group(vcf_out={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-        tabix_job.image(image=image_path('bcftools'))
+        tabix_job.image(image=image_path('bcftools', '1.16-1'))
         tabix_job.storage('10Gi')
         tabix_job.command(
             f'bcftools view -Ov {local_vcf} | bcftools reheader --samples {local_id_mapping} -o {tabix_job.reheadered}',
@@ -326,7 +326,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
-        merge_job.image(image=image_path('bcftools_120'))
+        merge_job.image(image=image_path('bcftools_120', '1.20-1'))
 
         # guessing at resource requirements
         merge_job.cpu(4)
