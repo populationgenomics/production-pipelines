@@ -331,7 +331,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         # guessing at resource requirements
         merge_job.cpu(config_retrieve(['resource_overrides', 'merge_vcfs', 'ncpu'], 4))
         merge_job.memory(str(config_retrieve(['resource_overrides', 'merge_vcfs', 'mem_gb'], '16')) + 'Gi')
-        merge_job.storage(str(config_retrieve(['resource_overrides', 'storage_gb'], '50')) + 'Gi')
+        merge_job.storage(str(config_retrieve(['resource_overrides', 'merge_vcfs', 'storage_gb'], '50')) + 'Gi')
         merge_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
         # option breakdown:
