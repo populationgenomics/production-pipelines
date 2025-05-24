@@ -332,7 +332,7 @@ class Vqsr(CohortStage):
       > java.lang.NumberFormatException: For input string: "6,11,2,0"
 
     - To avoid this issue, the header is extracted and modified to correct the `SB` field metadata:
-      > ##INFO=<ID=SB,Number=.,Type=Integer,Description="Strand Bias">
+      > ##INFO=<ID=SB,Number=.,Type=Float,Description="Strand Bias">
 
     - The corrected header is saved as a separate file (`header_siteonly.vqsr.vcf.gz`) so that it can be
       used in the subsequent `LoadVqsr` stage to overwrite the original header when importing the VCF into Hail.
@@ -434,7 +434,7 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, MakeSiteOnlyVcf, LoadVqsr])
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
@@ -469,7 +469,6 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='ht')),
                 str(inputs.as_path(cohort, LoadVqsr)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
