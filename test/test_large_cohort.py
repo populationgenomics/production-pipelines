@@ -169,7 +169,7 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
     vds_path = str(tmp_path / 'v01.vds')
 
     # we're passing a specific minority of intervals here, to test that the combiner works on a timely test case
-    combiner.run(
+    combiner._run(
         output_vds_path=vds_path,
         sequencing_type=conf['workflow']['sequencing_type'],
         tmp_prefix=str(tmp_path / 'tmp'),
@@ -179,6 +179,8 @@ def test_combiner(mocker: MockFixture, tmp_path: Path):
         save_path=None,
         specific_intervals=conf['large_cohort']['combiner']['intervals'],
         force_new_combiner=conf['large_cohort']['combiner']['force_new_combiner'],
+        tmp_prefix_for_withdrawals=str(tmp_path / 'tmp_withdrawals'),
+        sgs_for_withdrawal=None,
     )
 
     # do some testing here
@@ -286,6 +288,7 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
         relateds_to_drop_ht_path=str(tmp_path / 'relateds_to_drop.ht'),
         out_vcf_path=str(siteonly_vcf_path),
         out_ht_path=str(tmp_path / 'siteonly.ht'),
+        out_ht_pre_vcf_adjusted_path=str(tmp_path / 'siteonly_pre_vcf_adjusted.ht'),
     )
 
     # do some testing here

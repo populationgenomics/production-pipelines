@@ -1,10 +1,10 @@
-import logging
-from typing import TYPE_CHECKING, Any, Final, Tuple
+from typing import TYPE_CHECKING, Any, Final
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
-from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.large_cohort.combiner import combiner
+from cpg_workflows.targets import Cohort
 from cpg_workflows.utils import slugify
 from cpg_workflows.workflow import (
     CohortStage,
@@ -13,13 +13,9 @@ from cpg_workflows.workflow import (
     get_workflow,
     stage,
 )
-from metamist.graphql import gql, query
 
 if TYPE_CHECKING:
-    from graphql import DocumentNode
-
     from hailtop.batch.job import PythonJob
-
 
 HAIL_QUERY: Final = 'hail query'
 
@@ -28,10 +24,9 @@ HAIL_QUERY: Final = 'hail query'
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
-        workflow_config = config_retrieve('workflow')
         combiner_config = config_retrieve('combiner')
         output_vds_name: str = slugify(
-            f"{cohort.name}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
+            f'{cohort.id}-{combiner_config["vds_version"]}',
         )
 
         # include the list of all VDS IDs in the plan name
@@ -41,84 +36,17 @@ class Combiner(CohortStage):
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
         return {
-            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{output_vds_name}.vds',
+            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds',
             'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
         }
 
-    def get_vds_ids_output(self, vds_id: int) -> Tuple[str, list[str]]:
-        get_vds_analysis_query: DocumentNode = gql(
-            """
-            query getVDSByAnalysisIds($vds_id: Int!) {
-                analyses(id: {eq: $vds_id}) {
-                    output
-                    sequencingGroups {
-                        id
-                    }
-                }
-            }
-        """,
-        )
-        query_results: dict[str, Any] = query(get_vds_analysis_query, variables={'vds_id': vds_id})
-        vds_path: str = query_results['analyses'][0]['output']
-        vds_sgids: list[str] = [sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']]
-        return (vds_path, vds_sgids)
-
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        # Can't import it before all configs are set:
-        from cpg_workflows.large_cohort import combiner
-
-        workflow_config = config_retrieve('workflow')
-        combiner_config = config_retrieve('combiner')
-
         output_paths = self.expected_outputs(cohort)
-        tmp_prefix = slugify(
-            f"{self.tmp_prefix}/{workflow_config['cohort']}-{workflow_config['sequencing_type']}-{combiner_config['vds_version']}",
-        )
 
-        # create these as empty lists instead of None, they have the same truthiness
-        vds_paths: list[str] = []
-        sg_ids_in_vds: list[str] = []
-        new_sg_gvcfs: list[str] = []
-
-        if combiner_config.get('vds_analysis_ids', None) is not None:
-            for vds_id in combiner_config['vds_analysis_ids']:
-                tmp_query_res, tmp_sg_ids_in_vds = self.get_vds_ids_output(vds_id)
-                vds_paths.append(tmp_query_res)
-                sg_ids_in_vds = sg_ids_in_vds + tmp_sg_ids_in_vds
-
-        if combiner_config.get('merge_only_vds', False) is not True:
-            # Get SG IDs from the cohort object itself, rather than call Metamist.
-            # Get VDS IDs first and filter out from this list
-            cohort_sgs: list[SequencingGroup] = cohort.get_sequencing_groups(only_active=True)
-            new_sg_gvcfs = [str(sg.gvcf) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds]
-
-        if new_sg_gvcfs and len(new_sg_gvcfs) == 0 and len(vds_paths) <= 1:
-            return self.make_outputs(cohort, output_paths)
-
-        j: PythonJob = get_batch().new_python_job('Combiner', (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY})
-        j.image(config_retrieve(['workflow', 'driver_image']))
-        j.memory(combiner_config.get('memory'))
-        j.storage(combiner_config.get('storage'))
-
-        # set this job to be non-spot (i.e. non-preemptible)
-        # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
-        j.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
-
-        # Default to GRCh38 for reference if not specified
-        j.call(
-            combiner.run,
+        j: PythonJob = combiner(
+            cohort=cohort,
             output_vds_path=str(output_paths['vds']),
-            sequencing_type=workflow_config['sequencing_type'],
-            tmp_prefix=tmp_prefix,
-            genome_build=genome_build(),
             save_path=output_paths['combiner_plan'],
-            force_new_combiner=config_retrieve(['combiner', 'force_new_combiner']),
-            sequencing_group_names=[
-                str(sg.id) for sg in cohort_sgs if sg.gvcf is not None and sg.id not in sg_ids_in_vds
-            ],
-            gvcf_external_header=new_sg_gvcfs[0],
-            gvcf_paths=new_sg_gvcfs,
-            vds_paths=vds_paths,
         )
 
         return self.make_outputs(cohort, output_paths, [j])
@@ -343,6 +271,10 @@ class MakeSiteOnlyVcf(CohortStage):
             'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
             'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            'pre_adjusted': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'siteonly_pre_vcf_adjusted.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -375,6 +307,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['vcf']),
                 str(self.expected_outputs(cohort)['ht']),
+                str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
             ),
@@ -385,6 +318,29 @@ class MakeSiteOnlyVcf(CohortStage):
 
 @stage(required_stages=MakeSiteOnlyVcf)
 class Vqsr(CohortStage):
+    """
+    The Vqsr stage performs Variant Quality Score Recalibration (VQSR) and generates a site-only VCF file.
+    Additionally, it extracts, edits, and saves the VCF header as a separate file to address parsing issues
+    in subsequent stages.
+
+    Why this is necessary:
+    -----------------------
+    - The VCF file generated by the VQSR process contains an `SB` INFO field with incorrect metadata:
+      > ##INFO=<ID=SB,Number=1,Type=Float,Description="Strand Bias">
+      Even though the `SB` field contains lists of integers (e.g., `SB=6,11,2,0`), the metadata incorrectly
+      specifies it as a single float. This causes Hail to throw a parsing error:
+      > java.lang.NumberFormatException: For input string: "6,11,2,0"
+
+    - To avoid this issue, the header is extracted and modified to correct the `SB` field metadata:
+      > ##INFO=<ID=SB,Number=.,Type=Integer,Description="Strand Bias">
+
+    - The corrected header is saved as a separate file (`header_siteonly.vqsr.vcf.gz`) so that it can be
+      used in the subsequent `LoadVqsr` stage to overwrite the original header when importing the VCF into Hail.
+
+    This ensures that the VCF file can be successfully parsed by Hail without errors, enabling downstream
+    processing of the recalibrated variants.
+    """
+
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'vqsr'], default=None):
             vqsr_version = slugify(vqsr_version)
@@ -393,6 +349,10 @@ class Vqsr(CohortStage):
         return {
             'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
             'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
+            'reheadered_header': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / 'header_siteonly.vqsr.txt',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -409,10 +369,39 @@ class Vqsr(CohortStage):
             intervals_path=get_config()['workflow'].get('intervals_path'),
             job_attrs=self.get_job_attrs(),
         )
+
+        # Adapted from https://github.com/populationgenomics/production-pipelines/blob/e944d7d730be606ab255587a0e02d6c0831361b8/cpg_workflows/jobs/gcnv.py#L364-L373
+        outputs = self.expected_outputs(cohort)
+        b = get_batch()
+
+        reheader_job = b.new_job(
+            'ReheaderVcf',
+            (self.get_job_attrs() or {}) | {'tool': 'bcftools'},
+        )
+
+        reheader_job.depends_on(*jobs)
+
+        reheader_job.image(image_path('bcftools'))
+
+        vqsr_vcf = b.read_input(outputs['vcf'])
+
+        # pull the header into a temp file
+        reheader_job.command(f'bcftools view -h {vqsr_vcf} > {reheader_job.ofile}')
+
+        # sed command to swap Float SB to Integer in-place and allow any length
+        reheader_job.command(
+            rf"sed -i 's/<ID=SB,Number=1,Type=Float/<ID=SB,Number=.,Type=Float/' {reheader_job.ofile}",
+        )
+
+        b.write_output(
+            reheader_job.ofile,
+            str(outputs['reheadered_header']),
+        )
+
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
 
 
-@stage(required_stages=Vqsr)
+@stage(required_stages=[MakeSiteOnlyVcf, Vqsr])
 class LoadVqsr(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if load_vqsr_version := config_retrieve(['large_cohort', 'output_versions', 'loadvqsr'], default=None):
@@ -434,7 +423,9 @@ class LoadVqsr(CohortStage):
             query_command(
                 load_vqsr,
                 load_vqsr.run.__name__,
+                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='pre_adjusted')),
                 str(inputs.as_path(cohort, Vqsr, key='vcf')),
+                str(inputs.as_path(cohort, Vqsr, key='reheadered_header')),
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),

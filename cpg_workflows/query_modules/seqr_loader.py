@@ -20,7 +20,6 @@ def annotate_cohort(
     vep_ht_path: str,
     site_only_vqsr_vcf_path: str | None = None,
     checkpoint_prefix: str | None = None,
-    long_read: bool = False,
     remove_invalid_contigs: bool = False,
 ):
     """
@@ -48,6 +47,7 @@ def annotate_cohort(
         force_bgz=True,
         array_elements_required=False,
     )
+    mt.checkpoint(output=str(checkpoint_prefix) + 'mt-imported.mt', overwrite=True)
     logging.info(f'Imported VCF {vcf_path} as {mt.n_partitions()} partitions')
 
     # Annotate VEP. Do it before splitting multi, because we run VEP on unsplit VCF,
@@ -98,7 +98,14 @@ def annotate_cohort(
     mt = checkpoint_hail(mt, 'mt-vep-split.mt', checkpoint_prefix)
 
     if site_only_vqsr_vcf_path:
-        vqsr_ht = load_vqsr(site_only_vqsr_vcf_path)
+        # NOTE: The load_vqsr() function from cpg_workflows.large_cohort.load_vqsr.py has been updated
+        # to handle splitting of multi-allelic sites in the info Table. However, the function now requires
+        # a pre-adjusted site-only Hail Table (pre_vcf_adjusted_ht_path) as well as a separate, fixed, header file to be passed as a parameter.
+        #
+        # This script cannot generate the required pre_vcf_adjusted_ht_path (as it is checkpointed
+        # prior to running gnomad.utils.vcf.adjust_vcf_incompatible_types within LC) nor does it produce a separate header file
+        # so a placeholder empty string is being passed below. As a result, the function call will not work as intended.
+        vqsr_ht = load_vqsr('', site_only_vqsr_vcf_path, '')
         vqsr_ht = checkpoint_hail(vqsr_ht, 'vqsr.ht', checkpoint_prefix)
 
         logging.info('Adding VQSR annotations into the Matrix Table')

@@ -13,7 +13,7 @@ from cpg_utils import to_path
 from cpg_utils.config import set_config_paths
 from cpg_workflows import defaults_config_path
 from cpg_workflows.stages.clinvarbitration import PackageForRelease
-from cpg_workflows.stages.cram_qc import CramMultiQC
+from cpg_workflows.stages.cram_qc import CohortCramMultiQC, CramMultiQC
 from cpg_workflows.stages.exomiser import ExomiserSeqrTSV, ExomiserVariantsTSV, RegisterSingleSampleExomiserResults
 from cpg_workflows.stages.fastqc import FastQCMultiQC
 from cpg_workflows.stages.fraser import Fraser
@@ -97,6 +97,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         AncestryPlots,
         GvcfMultiQC,
         CramMultiQC,
+        CohortCramMultiQC,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,

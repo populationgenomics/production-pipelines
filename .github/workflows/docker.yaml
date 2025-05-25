@@ -15,14 +15,11 @@ permissions:
   contents: read
 
 env:
-  VERSION: 1.36.25
+  VERSION: 1.36.35
 
 jobs:
   docker:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash -l {0}
     env:
       DOCKER_BUILDKIT: 1
       BUILDKIT_PROGRESS: plain
@@ -30,6 +27,7 @@ jobs:
       IMAGE_NAME: cpg_workflows
       DOCKER_DEV: australia-southeast1-docker.pkg.dev/cpg-common/images-dev
       DOCKER_MAIN: australia-southeast1-docker.pkg.dev/cpg-common/images
+      CONFIG_DESTINATION: gs://cpg-config/templates/images/images.toml
     steps:
       - uses: actions/checkout@v4
         with:
@@ -62,6 +60,19 @@ jobs:
           docker tag $IMAGE_NAME:${{ github.sha }} $DOCKER_MAIN/$IMAGE_NAME:latest
           docker push $DOCKER_MAIN/$IMAGE_NAME:$VERSION
           docker push $DOCKER_MAIN/$IMAGE_NAME:latest
+
+      - name: update ${{ env.IMAGE_NAME }} version in cloud images.toml
+        if: ${{ github.ref_name == 'main' }}
+        run: |
+          gcloud storage cp $CONFIG_DESTINATION images.orig.toml
+          sed "/^$IMAGE_NAME *=/s/:[^:\"]*/:$VERSION/" images.orig.toml > images.toml
+          diff -u images.orig.toml images.toml || true
+
+      # The images repo no longer updates images.toml, so it is safe to do it directly here
+      - name: deploy cloud images.toml
+        if: ${{ github.ref_name == 'main' }}
+        run: |
+          gcloud storage cp images.toml $CONFIG_DESTINATION
 
       - name: manually triggered build
         if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name != 'main' }}

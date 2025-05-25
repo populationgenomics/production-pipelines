@@ -125,7 +125,7 @@ class Target:
 
     def rich_id_map(self) -> dict[str, str]:
         """
-        Map if internal IDs to participant or external IDs, if the latter is provided.
+        Map of internal IDs to participant or external IDs, if the latter is provided.
         """
         return {s.id: s.rich_id for s in self.get_sequencing_groups() if s.participant_id != s.id}
 
