@@ -326,7 +326,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SNPs Indels calls', attributes={'tool': 'bcftools'})
-        merge_job.image(image=image_path('bcftools_120'))
+        merge_job.image(image=image_path(config_retrieve(['workflow', 'merge_vcfs', 'bcftools_image'], 'bcftools_121')))
 
         # guessing at resource requirements
         merge_job.cpu(4)
@@ -344,7 +344,10 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(
-            f'bcftools +fill-tags temp.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
+            "bcftools view -i '(ILEN >= -5 && ILEN <= 5) || TYPE!=\"INDEL\"' -Oz -o short_indels_and_snps.vcf.bgz temp.vcf.bgz",
+        )
+        merge_job.command(
+            f'bcftools +fill-tags short_indels_and_snps.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
         )
 
         # write the result out
