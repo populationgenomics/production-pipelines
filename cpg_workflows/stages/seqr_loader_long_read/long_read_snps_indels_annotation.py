@@ -344,7 +344,7 @@ class MergeLongReadSNPsIndels(MultiCohortStage):
             f'bcftools merge {" ".join(batch_vcfs)} -Oz -o temp.vcf.bgz --threads 4 -m none -0',  # type: ignore
         )
         merge_job.command(
-            "bcftools view -i '(ILEN >= -5 && ILEN <= 5) || TYPE!=\"INDEL\"' -Oz -o short_indels_and_snps.vcf.bgz temp.vcf.bgz",
+            "bcftools view -i '(ILEN >= -50 && ILEN <= 50) || TYPE!=\"INDEL\"' -Oz -o short_indels_and_snps.vcf.bgz temp.vcf.bgz",
         )
         merge_job.command(
             f'bcftools +fill-tags short_indels_and_snps.vcf.bgz -Oz -o {merge_job.output["vcf.bgz"]} --write-index=tbi -- -t AF,AN,AC',
