@@ -205,7 +205,7 @@ class SomalierPedigree(DatasetStage):
                 out_html_url=html_url,
                 out_checks_path=self.expected_outputs(dataset)['checks'],
                 job_attrs=self.get_job_attrs(dataset),
-                send_to_slack=True,
+                send_to_slack=config_retrieve(['workflow', 'somalier_pedigree', 'send_to_slack'], default=True),
             )
             return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
         else:
