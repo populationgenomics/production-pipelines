@@ -12,6 +12,9 @@ jobs:
   package:
     runs-on: ubuntu-latest
     environment: pypi
+    permissions:
+      id-token: write
+      contents: read
     defaults:
       run:
         shell: bash -l {0}
