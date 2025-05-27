@@ -195,9 +195,13 @@ def vds_to_site_only_ht(
     if can_reuse(out_ht_path):
         return hl.read_table(str(out_ht_path))
 
-    # passing un-densified MatrixTable to default_compute_info
+    # Passing un-densified MatrixTable to default_compute_info
     mt = vds.variant_data
 
+    # Compute and checkpoint the allele specific info annotations after recomputing
+    # AS_QUALapprox from LPL, and fixing the length of AS_SB_TABLE, AS_RAW_MQ,
+    # AS_RAW_ReadPosRankSum and AS_RAW_MQRankSum.
+    mt = mt.annotate_rows(alt_alleles_range_array=hl.range(1, hl.len(mt.alleles)))
     correct_mt = mt.annotate_entries(
         gvcf_info=mt.gvcf_info.annotate(
             AS_QUALapprox=recompute_as_qualapprox_from_lpl(mt),
@@ -214,10 +218,10 @@ def vds_to_site_only_ht(
         dataset_path('corrected.mt', category='tmp'),
         overwrite=True,
     )
-    var_ht: hl.Table = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
-    var_ht = var_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
-    var_ht = adjust_vcf_incompatible_types(
-        var_ht,
+    info_ht: hl.Table = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
+    info_ht = info_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
+    info_ht = adjust_vcf_incompatible_types(
+        info_ht,
         # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
         # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
         # which breaks VQSR parser (it doesn't recognise the delimiter and treats
@@ -227,8 +231,8 @@ def vds_to_site_only_ht(
     )
 
     logging.info(f'Writing site-only HT to {out_ht_path}')
-    var_ht.write(str(out_ht_path), overwrite=True)
-    return var_ht
+    info_ht.write(str(out_ht_path), overwrite=True)
+    return info_ht
 
 
 def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
@@ -251,25 +255,13 @@ def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
 
 def _create_info_ht(correct_mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
     """Create info table from vcf matrix table"""
-    # Using corrected_mt for all instances of info_ht in this function
-    # Do we want to keep the quasi annotations? We still need to run default_compute_info
-    # to generate site_annotations (are they already in gvcf_info?) and gnomAD's run_compute_info
-    # already generates AS_ annotations separately via `get_as_info_expr`.
-    ht: hl.Table = default_compute_info(correct_mt, site_annotations=True, n_partitions=n_partitions)
 
-    # TODO: Check output_path is correct
-    # quasi_info_ht = ht.checkpoint(output_path('quasi_info_ht.ht', category='tmp'), overwrite=True)
+    info_ht: hl.Table = default_compute_info(
+        correct_mt,
+        as_annotations=True,
+        site_annotations=True,
+        n_partitions=n_partitions,
+    )
 
-    ht = correct_mt.select_rows(
-        **get_as_info_expr(
-            correct_mt,
-            # Use global AS_INFO_AGG_FIELDS for sum_agg_fields, int32_sum_agg_fields,
-            # median_agg_fields, and array_sum_agg_fields parameters.
-            **AS_INFO_AGG_FIELDS,
-            treat_fields_as_allele_specific=True,
-        ),
-    ).rows()
-
-    info_ht = ht.checkpoint()
     info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=correct_mt.rows()[info_ht.key].site_dp))
     return info_ht
