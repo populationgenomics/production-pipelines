@@ -215,7 +215,7 @@ def vds_to_site_only_ht(
     correct_mt = _filter_rows_and_add_tags(correct_mt)
     # TODO: Figure out the right output pathing function for this checkpoint
     correct_mt = correct_mt.checkpoint(
-        dataset_path('corrected.mt', category='tmp'),
+        dataset_path('MakeSiteOnly/corrected.mt', category='tmp'),
         overwrite=True,
     )
     info_ht: hl.Table = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
