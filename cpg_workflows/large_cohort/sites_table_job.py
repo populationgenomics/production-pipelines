@@ -18,8 +18,20 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
     help='Path to the VDS file',
     type=str,
 )
+@click.option(
+    '--exomes',
+    help='Whether to process exomes. If true, will read in capture region bed files.',
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    '--capture-region-bed-files',
+    help='Names of capture region bed files to use for exomes. Names must be keys in references dictionary.',
+    type=str,
+    multiple=True,
+)
 @click.command()
-def main(vds_path):
+def main(vds_path: str, exomes: bool, bed_files: list[str]):
     print(f'Input vds_path: {vds_path}')
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
@@ -29,7 +41,25 @@ def main(vds_path):
         driver_memory='highmem',
         driver_cores=4,
     )
+    # exomes
+    if exomes:
+        if not bed_files:
+            raise ValueError('If --exomes is set, you must provide at least one --capture-region-bed-files')
 
+        # Read in capture region bed files
+        intervals = []
+        for bed_file in bed_files:
+            bed_path = reference_path(f'{bed_file}')
+            if not os.path.exists(bed_path):
+                raise FileNotFoundError(f'Capture region bed file {bed_path} does not exist')
+            intervals.append(hl.import_bed(str(bed_path), reference_genome='GRCh38'))
+
+        # Intersect the intervals
+        intervals = hl.intersection(*intervals)
+    # if exomes read in capture region bed files
+    # generate hl.Interval objects for each capture region in bed files
+    # pass list of hl.Interval objects to hl.vds.read_vds(vds_path, intervals=intervals)
+    # the intervals need to be the INTERSECTION not the UNION of the capture regions
     vds = hl.vds.read_vds(str(vds_path))
 
     print('Splitting multi-allelic sites')
@@ -63,7 +93,7 @@ def main(vds_path):
         & (hgdp_1kg.locus.in_autosome())
         & (hgdp_1kg.variant_qc.AF[1] > 0.01)
         & (hgdp_1kg.variant_qc.call_rate > 0.99)
-        & (hgdp_1kg.IB.f_stat > -0.8),
+        & (hgdp_1kg.IB.f_stat > -0.25),
     )
     print('Done filtering using gnomAD v3 parameters')
 
