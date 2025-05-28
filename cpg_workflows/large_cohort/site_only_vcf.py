@@ -231,6 +231,10 @@ def vds_to_site_only_ht(
     )
 
     logging.info(f'Writing site-only HT to {out_ht_path}')
+    # write out one quasi vcf file and one AS vcf then have a Hail table with both fields
+    # TODO: use the correct_mt to pass to default_compute_info (the quasi calculation of default_compute_info does not use AS fields)
+    # but also pass as_annotations=True to get the true AS annotations. Then we just write out two VCFs:
+    # one with the true AS annotations and one with the quasi annotations, but both have the site-level annotations.
     info_ht.write(str(out_ht_path), overwrite=True)
     return info_ht
 
