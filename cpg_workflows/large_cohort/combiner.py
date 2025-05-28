@@ -62,8 +62,8 @@ def get_vds_ids_output(vds_id: int) -> tuple[str, list[str]]:
 
 
 def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
-    workflow_config = config_retrieve('workflow')
-    combiner_config = config_retrieve('combiner')
+    workflow_config: dict[str, Any] = config_retrieve('workflow')
+    combiner_config: dict[str, Any] = config_retrieve('combiner')
 
     combiner_tmp_path: cpg_utils.Path = (
         cohort.analysis_dataset.tmp_prefix()
@@ -119,6 +119,10 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
         vds_paths=vds_paths,
         sgs_for_withdrawal=sgs_for_withdrawal,
         tmp_prefix_for_withdrawals=tmp_prefix_for_withdrawals,
+        worker_memory=combiner_config.get('worker_memory', 'highmem'),
+        worker_cores=combiner_config.get('worker_cores', 1),
+        driver_memory=combiner_config.get('driver_memory', 'highmem'),
+        driver_cores=combiner_config.get('driver_cores', 1),
     )
 
     return combiner_job
@@ -138,6 +142,10 @@ def _run(
     gvcf_paths: list[str] | None = None,
     vds_paths: list[str] | None = None,
     specific_intervals: list[str] | None = None,
+    worker_memory: str = 'highmem',
+    worker_cores: int = 1,
+    driver_memory: str = 'highmem',
+    driver_cores: int = 1,
 ) -> None:
     """
     Runs the combiner
@@ -178,7 +186,12 @@ def _run(
     logging.basicConfig(level=logging.INFO)
 
     # init batch early, this method won't run if output_vds_path exists, so we have some work to do
-    init_batch(worker_memory='highmem', driver_memory='highmem', driver_cores=4)
+    init_batch(
+        worker_memory=worker_memory,
+        driver_memory=driver_memory,
+        driver_cores=driver_cores,
+        worker_cores=worker_cores,
+    )
 
     # do we need to do any combining?
     combining_to_do: bool = bool(gvcf_paths or len(vds_paths) > 1)
