@@ -52,6 +52,7 @@ def run(
 
     init_batch(
         worker_memory=config_retrieve(['combiner', 'worker_memory']),
+        worker_cores=config_retrieve(['combiner', 'worker_cores']),
         driver_memory=config_retrieve(['combiner', 'driver_memory']),
         driver_cores=config_retrieve(['combiner', 'driver_cores']),
     )
