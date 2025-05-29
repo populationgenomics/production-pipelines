@@ -170,7 +170,7 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    site_only_ht = vds_to_site_only_ht(
+    as_info_ht, quasi_info_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
@@ -179,7 +179,20 @@ def run(
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
-    hl.export_vcf(site_only_ht, str(out_vcf_path), tabix=True)
+    hl.export_vcf(as_info_ht, str(out_vcf_path), tabix=True)
+    hl.export_vcf(quasi_info_ht, str(out_vcf_path), tabix=True)
+
+
+def build_info_ht(ht: hl.Table, extra_field: str) -> hl.Table:
+    ht = ht.select('AC_info', extra_field, 'site_info', 'lowqual', 'AS_lowqual')
+    ht = ht.annotate(
+        info=hl.struct(**ht.AC_info, **ht[extra_field], **ht.site_info),
+    )
+    return ht.drop(
+        'AC_info',
+        extra_field,
+        'site_info',
+    )
 
 
 def vds_to_site_only_ht(
@@ -220,23 +233,52 @@ def vds_to_site_only_ht(
     )
     info_ht: hl.Table = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
     info_ht = info_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
-    info_ht = adjust_vcf_incompatible_types(
-        info_ht,
-        # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
-        # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
-        # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-        # it as an array with a single string value "|132.1|140.2", leading to
-        # an IndexOutOfBound exception when trying to access value for second allele)
+
+    # AS_info and site_info are stored in the info_ht.info struct.
+    # Separate info_ht.info fields into AC_info, AS_info, quasi_info, and site_info.
+    AS_info = info_ht.info
+    AS_keys = hl.eval(
+        hl.array(list(AS_info.keys())).group_by(
+            lambda x: (hl.switch(x[:2]).when("AS", "AS_info").when("AC", "AC_info").default("site_info")),
+        ),
+    )
+    AS_info = {k: AS_info.select(*v) for k, v in AS_keys.items()}
+
+    info_ht = info_ht.select(
+        AC_info=AS_info["AC_info"],
+        AS_info=AS_info["AS_info"],
+        site_info=AS_info["site_info"],
+        quasi_info=info_ht["quasi_info"],
+        lowqual=info_ht.lowqual,
+        AS_lowqual=info_ht.AS_lowqual,
+    )
+
+    # Combine AC_info, site_info, and either AS_info or quasi_info into a single 'info' struct.
+    # This is required because downstream, adjust_vcf_incompatible_types() expects all VCF INFO fields
+    # to be present inside ht.info. If fields are left in separate structs (like ht.AS_info or ht.quasi_info),
+    # they will not be exported to the VCF INFO column. By merging them into ht.info, we ensure all
+    # relevant annotations are included in the VCF output.
+    as_info_ht = build_info_ht(info_ht, 'AS_info')
+    quasi_info_ht = build_info_ht(info_ht, 'quasi_info')
+
+    # With default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
+    # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
+    # which breaks VQSR parser (it doesn't recognise the delimiter and treats
+    # it as an array with a single string value "|132.1|140.2", leading to
+    # an IndexOutOfBound exception when trying to access value for second allele)
+    as_info_ht = adjust_vcf_incompatible_types(
+        as_info_ht,
         pipe_delimited_annotations=[],
     )
 
-    logging.info(f'Writing site-only HT to {out_ht_path}')
-    # write out one quasi vcf file and one AS vcf then have a Hail table with both fields
-    # TODO: use the correct_mt to pass to default_compute_info (the quasi calculation of default_compute_info does not use AS fields)
-    # but also pass as_annotations=True to get the true AS annotations. Then we just write out two VCFs:
-    # one with the true AS annotations and one with the quasi annotations, but both have the site-level annotations.
+    quasi_info_ht = adjust_vcf_incompatible_types(
+        quasi_info_ht,
+        pipe_delimited_annotations=[],
+    )
+
+    logging.info(f'Writing combined AS, quasi-AS, and site-level HT to {out_ht_path}')
     info_ht.write(str(out_ht_path), overwrite=True)
-    return info_ht
+    return as_info_ht, quasi_info_ht
 
 
 def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
