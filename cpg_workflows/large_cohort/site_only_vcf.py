@@ -188,11 +188,22 @@ def build_info_ht(ht: hl.Table, extra_field: str) -> hl.Table:
     ht = ht.annotate(
         info=hl.struct(**ht.AC_info, **ht[extra_field], **ht.site_info),
     )
-    return ht.drop(
+    ht = ht.drop(
         'AC_info',
         extra_field,
         'site_info',
     )
+
+    ht = adjust_vcf_incompatible_types(
+        ht,
+        # With default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
+        # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
+        # which breaks VQSR parser (it doesn't recognise the delimiter and treats
+        # it as an array with a single string value "|132.1|140.2", leading to
+        # an IndexOutOfBound exception when trying to access value for second allele)
+        pipe_delimited_annotations=[],
+    )
+    return ht
 
 
 def vds_to_site_only_ht(
@@ -260,21 +271,6 @@ def vds_to_site_only_ht(
     # relevant annotations are included in the VCF output.
     as_info_ht = build_info_ht(info_ht, 'AS_info')
     quasi_info_ht = build_info_ht(info_ht, 'quasi_info')
-
-    # With default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
-    # into a pipe-delimited value e.g.: VarDP=|132.1|140.2
-    # which breaks VQSR parser (it doesn't recognise the delimiter and treats
-    # it as an array with a single string value "|132.1|140.2", leading to
-    # an IndexOutOfBound exception when trying to access value for second allele)
-    as_info_ht = adjust_vcf_incompatible_types(
-        as_info_ht,
-        pipe_delimited_annotations=[],
-    )
-
-    quasi_info_ht = adjust_vcf_incompatible_types(
-        quasi_info_ht,
-        pipe_delimited_annotations=[],
-    )
 
     logging.info(f'Writing combined AS, quasi-AS, and site-level HT to {out_ht_path}')
     info_ht.write(str(out_ht_path), overwrite=True)
