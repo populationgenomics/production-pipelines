@@ -12,6 +12,9 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 # Create Seqr ElasticSearch indices for these datasets. Required for the MtToEsSv stage.
 # create_es_index_for_datasets = []
 
+# number of Model Tar files expected/generated in TrainGCNV
+model_tar_count = 290
+
 # switches to deactivate all Metrics workflows. We ran into some resourcing issues when our total
 # cohort size approached ~1600. Response when raised with GATK team:
 #
@@ -22,6 +25,7 @@ gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
 # on each output of the stage, producing output files containing a count/distribution of different variants
 # and sizes. The workflow files we are using as Stages do not always capture these results as top-level outputs,
 # so we have no reliable method to extract these files into permanent storage.
+
 [resource_overrides.GatherBatchEvidence]
 run_matrix_qc = false
 run_module_metrics = false
@@ -44,6 +48,10 @@ n_RD_genotype_bins = 100000
 
 [resource_overrides.MakeCohortVcf]
 run_module_metrics = false
+
+[resource_overrides.MakeCohortVcf.runtime_override_plot_qc_per_family]
+mem_gb = 32
+disk_gb = 250
 
 [resource_overrides.FilterGenotypes]
 run_qc = false

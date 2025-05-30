@@ -6,11 +6,12 @@ from collections import defaultdict
 from functools import cache
 from itertools import combinations
 from typing import Any
+from random import sample
 
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid, reference_path
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.gatk_sv import rename_sv_ids
@@ -21,7 +22,6 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
-    get_ref_panel,
     get_references,
     make_combined_ped,
     queue_annotate_strvctvre_job,
@@ -173,19 +173,80 @@ class MakeMultiCohortCombinedPed(MultiCohortStage):
 
 
 @stage(required_stages=[MakeCohortCombinedPed])
+class TrainGCNV(CohortStage):
+    """
+    Runs TrainGCNV to generate a model trained on a selection of samples within this Cohort, used in GatherBatchEvidence
+    run https://github.com/broadinstitute/gatk-sv/blob/main/wdl/TrainGCNV.wdl
+    config: https://github.com/broadinstitute/gatk-sv/blob/main/inputs/templates/terra_workspaces/cohort_mode/workflow_configurations/TrainGCNV.json.tmpl
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {
+            'cohort_contig_ploidy_model_tar': self.get_stage_cohort_prefix(cohort)
+            / 'cohort_contig_ploidy_model.tar.gz',
+            'cohort_contig_ploidy_calls_tar': self.get_stage_cohort_prefix(cohort)
+            / 'cohort_contig_ploidy_calls.tar.gz',
+            'cohort_gcnv_model_tars': [
+                self.get_stage_cohort_prefix(cohort) / f'cohort_gcnv_model_{idx}.tar.gz'
+                for idx in range(config_retrieve(['workflow', 'model_tar_count']))
+            ],
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
+
+        # optionally do sample subsetting
+        sample_n = config_retrieve(['train_gcnv', 'sample_n'], 100)
+        all_sgids = cohort.get_sequencing_groups()
+
+        sgs_sampled_from_cohort = sample(all_sgids, sample_n)
+
+        # pull in the basic input dict
+        cromwell_input_dict: dict[str, Any] = {
+            'cohort': cohort.id,
+            'samples': [sg.id for sg in sgs_sampled_from_cohort],
+            'count_files': [
+                str(sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.coverage_counts.tsv.gz')
+                for sequencing_group in sgs_sampled_from_cohort
+            ],
+            'ref_copy_number_autosomal_contigs': 2,
+            'allosomal_contigs': ['chrX', 'chrY'],
+            'reference_fasta': str(get_fasta()),
+            'reference_index': str(get_fasta()) + '.fai',
+            'reference_dict': str(get_fasta().with_suffix('.dict')),
+            'contig_ploidy_priors': reference_path('gatk_sv/contig_ploidy_priors'),
+            'num_intervals_per_scatter': 5000,
+        }
+
+        # add the images required for this step
+        cromwell_input_dict |= {
+            key: config_retrieve(['images', key])
+            for key in [
+                'sv_base_mini_docker',
+                'linux_docker',
+                'gatk_docker',
+                'condense_counts_docker',
+                'sv_pipeline_docker',
+            ]
+        }
+
+        # billing labels must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
+        # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
+        jobs = add_gatk_sv_jobs(
+            dataset=cohort.analysis_dataset,
+            wfl_name=self.name,
+            input_dict=cromwell_input_dict,
+            expected_out_dict=outputs,
+            labels={'stage': 'traingcnv', AR_GUID_NAME: try_get_ar_guid()},
+            job_size=CromwellJobSizes.MEDIUM,
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=jobs)
+
+
+@stage(required_stages=[MakeCohortCombinedPed, TrainGCNV])
 class GatherBatchEvidence(CohortStage):
     """
-    This is the first Stage in the multisample GATK-SV workflow, running on a
-    controlled subset of SGs as determined by the output of CreateSampleBatches.
-
-    Using Analysis-Runner, include three additional config files:
-
-    - configs/gatk_sv/stop_at_filter_batch.toml
-        - this contains the instruction to stop prior to FilterBatch
-    - configs/gatk_sv/use_for_all_workflows.toml
-        - contains all required images and references
-    - A custom config with the specific cohort in workflow.only_sgs
-
     https://github.com/broadinstitute/gatk-sv#gather-batch-evidence
     https://github.com/broadinstitute/gatk-sv/blob/master/wdl/GatherBatchEvidence.wdl
 
@@ -243,6 +304,7 @@ class GatherBatchEvidence(CohortStage):
         """Add jobs to Batch"""
         sequencing_groups = cohort.get_sequencing_groups(only_active=True)
         pedigree_input = inputs.as_path(target=cohort, stage=MakeCohortCombinedPed, key='cohort_ped')
+        train_gcnv_outputs = inputs.as_dict(target=cohort, stage=TrainGCNV)
 
         input_dict: dict[str, Any] = {
             'batch': cohort.id,
@@ -294,8 +356,23 @@ class GatherBatchEvidence(CohortStage):
             ],
         )
 
-        # reference panel gCNV models
-        input_dict |= get_ref_panel()
+        # reference panel gCNV models - incorporating data from TrainGCNV instead of a canonical reference panel
+        ref_panel_samples = config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
+        input_dict |= {
+            'ref_panel_samples': ref_panel_samples,
+            'ref_panel_bincov_matrix': reference_path('broad/ref_panel_bincov_matrix'),
+            'ref_panel_PE_files': [
+                reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s) for s in ref_panel_samples
+            ],
+            'ref_panel_SR_files': [
+                reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s) for s in ref_panel_samples
+            ],
+            'ref_panel_SD_files': [
+                reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s) for s in ref_panel_samples
+            ],
+            'contig_ploidy_model_tar': str(train_gcnv_outputs['cohort_contig_ploidy_model_tar']),
+            'gcnv_model_tars': [str(x) for x in train_gcnv_outputs['cohort_gcnv_model_tars']],
+        }
 
         input_dict |= get_images(
             [

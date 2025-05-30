@@ -14,13 +14,11 @@ This removes any Filtered variants, due to an issue between the header and conte
  - this means that the MT contains rows which aren't explained in the header, causing some tools to fail
  - for now it's easier to just remove these rows - reconsider if we use this properly
 """
-
-from argparse import ArgumentParser
+import argparse
 
 import hail as hl
 
-from cpg_utils.config import config_retrieve, genome_build
-from cpg_utils.hail_batch import init_batch
+from cpg_utils import config, hail_batch
 from cpg_workflows.utils import get_logger
 
 # VQSR filters are added to the VQSR VCF, but we don't retain these header lines when we copy the VQSR info over
@@ -74,10 +72,10 @@ def main(
         bed (str): Region BED file
     """
 
-    init_batch(
-        worker_memory=config_retrieve(['combiner', 'worker_memory'], 'highmem'),
-        driver_memory=config_retrieve(['combiner', 'driver_memory'], 'highmem'),
-        driver_cores=config_retrieve(['combiner', 'driver_cores'], 2),
+    hail_batch.init_batch(
+        worker_memory=config.config_retrieve(['combiner', 'worker_memory'], 'highmem'),
+        driver_memory=config.config_retrieve(['combiner', 'driver_memory'], 'highmem'),
+        driver_cores=config.config_retrieve(['combiner', 'driver_cores'], 2),
     )
 
     # read the dense MT and obtain the sites-only HT
@@ -86,7 +84,7 @@ def main(
     if bed:
         # remote-read of the BED file, skipping any contigs not in the reference genome
         # the Ensembl data wasn't filtered to remove non-standard contigs
-        limited_region = hl.import_bed(bed, reference_genome=genome_build(), skip_invalid_intervals=True)
+        limited_region = hl.import_bed(bed, reference_genome=config.genome_build(), skip_invalid_intervals=True)
         # filter to overlaps with the BED file
         mt = mt.filter_rows(hl.is_defined(limited_region[mt.locus]))
 
@@ -116,11 +114,11 @@ def main(
     sites_only_ht = hl.read_matrix_table(output_mt).rows()
 
     get_logger().info('Writing sites-only VCF in fragments, header-per-shard')
-    hl.export_vcf(sites_only_ht, output_sites_only, tabix=True, parallel='separate_header', metadata=VQSR_FILTERS)
+    hl.export_vcf(sites_only_ht, output_sites_only, tabix=True, parallel='separate_header', metadata=VQSR_FILTERS,)
 
 
 def cli_main():
-    parser = ArgumentParser()
+    parser = argparse.ArgumentParser()
     parser.add_argument(
         '--input',
         help='Path to the input MT',
