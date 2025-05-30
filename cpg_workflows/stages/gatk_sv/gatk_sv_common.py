@@ -208,33 +208,6 @@ def add_gatk_sv_jobs(
     return [submit_j, copy_j]
 
 
-def get_ref_panel(keys: list[str] | None = None) -> dict:
-    # mandatory config entry
-    ref_panel_samples = config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
-    return {
-        k: v
-        for k, v in {
-            'ref_panel_samples': ref_panel_samples,
-            'ref_panel_bincov_matrix': reference_path('broad/ref_panel_bincov_matrix'),
-            'contig_ploidy_model_tar': reference_path('gatk_sv/contig_ploidy_model_tar'),
-            'gcnv_model_tars': [
-                str(reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
-                for i in range(config_retrieve(['sv_ref_panel', 'model_tar_cnt']))
-            ],
-            'ref_panel_PE_files': [
-                reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SR_files': [
-                reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-            'ref_panel_SD_files': [
-                reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s) for s in ref_panel_samples
-            ],
-        }.items()
-        if not keys or k in keys
-    }
-
-
 def clean_ped_family_ids(ped_line: str) -> str:
     """
     Takes each line in the pedigree and cleans it up
