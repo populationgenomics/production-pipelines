@@ -114,7 +114,13 @@ def main(
     sites_only_ht = hl.read_matrix_table(output_mt).rows()
 
     get_logger().info('Writing sites-only VCF in fragments, header-per-shard')
-    hl.export_vcf(sites_only_ht, output_sites_only, tabix=True, parallel='separate_header', metadata=VQSR_FILTERS,)
+    hl.export_vcf(
+        sites_only_ht,
+        output_sites_only,
+        tabix=True,
+        parallel='separate_header',
+        metadata=VQSR_FILTERS,
+    )
 
 
 def cli_main():
