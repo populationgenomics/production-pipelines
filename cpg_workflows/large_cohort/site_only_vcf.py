@@ -20,7 +20,8 @@ def run(
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
     out_vcf_path: str,
-    tmp_prefix: str,
+    out_ht_path: str,
+    out_ht_pre_vcf_adjusted_path: str,
 ):
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
         override_jar_spec(jar_spec)
@@ -29,12 +30,12 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
 
-    site_only_ht_path = to_path(tmp_prefix) / 'siteonly.ht'
     site_only_ht = vds_to_site_only_ht(
         vds=vds,
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
-        out_ht_path=site_only_ht_path,
+        out_ht_path=out_ht_path,
+        out_ht_pre_vcf_adjusted_path=out_ht_pre_vcf_adjusted_path,
     )
     logging.info(f'Writing site-only VCF to {out_vcf_path}')
     assert to_path(out_vcf_path).suffix == '.bgz'
@@ -45,7 +46,8 @@ def vds_to_site_only_ht(
     vds: hl.vds.VariantDataset,
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
-    out_ht_path: Path,
+    out_ht_path: str,
+    out_ht_pre_vcf_adjusted_path: str,
 ) -> hl.Table:
     """
     Convert VDS into sites-only VCF-ready table.
@@ -54,10 +56,13 @@ def vds_to_site_only_ht(
         return hl.read_table(str(out_ht_path))
 
     mt = hl.vds.to_dense_mt(vds)
+
     mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
     mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+
     mt = _filter_rows_and_add_tags(mt)
     var_ht = _create_info_ht(mt, n_partitions=mt.n_partitions())
+    var_ht = var_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
     var_ht = adjust_vcf_incompatible_types(
         var_ht,
         # with default INFO_VCF_AS_PIPE_DELIMITED_FIELDS, AS_VarDP will be converted
@@ -67,6 +72,8 @@ def vds_to_site_only_ht(
         # an IndexOutOfBound exception when trying to access value for second allele)
         pipe_delimited_annotations=[],
     )
+
+    logging.info(f'Writing site-only HT to {out_ht_path}')
     var_ht.write(str(out_ht_path), overwrite=True)
     return var_ht
 
