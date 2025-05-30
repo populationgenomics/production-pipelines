@@ -5,13 +5,13 @@ All post-batching stages of the GATK-SV workflow
 from collections import defaultdict
 from functools import cache
 from itertools import combinations
-from typing import Any
 from random import sample
+from typing import Any
 
 from google.api_core.exceptions import PermissionDenied
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, try_get_ar_guid, reference_path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, image_path, reference_path, try_get_ar_guid
 from cpg_utils.hail_batch import authenticate_cloud_credentials_in_job, get_batch
 from cpg_workflows.jobs import ploidy_table_from_ped
 from cpg_workflows.jobs.gatk_sv import rename_sv_ids
