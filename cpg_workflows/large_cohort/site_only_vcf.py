@@ -159,7 +159,8 @@ def run(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
-    out_vcf_path: str,
+    out_as_vcf_path: str,
+    out_quasi_vcf_path: str,
     out_ht_path: str,
     out_ht_pre_vcf_adjusted_path: str,
 ):
@@ -177,10 +178,11 @@ def run(
         out_ht_path=out_ht_path,
         out_ht_pre_vcf_adjusted_path=out_ht_pre_vcf_adjusted_path,
     )
-    logging.info(f'Writing site-only VCF to {out_vcf_path}')
-    assert to_path(out_vcf_path).suffix == '.bgz'
-    hl.export_vcf(as_info_ht, str(out_vcf_path), tabix=True)
-    hl.export_vcf(quasi_info_ht, str(out_vcf_path), tabix=True)
+    logging.info(f'Writing AS VCF to {out_as_vcf_path} and quasi-AS VCF to {out_quasi_vcf_path}')
+    assert to_path(out_as_vcf_path).suffix == '.bgz'
+    assert to_path(out_quasi_vcf_path).suffix == '.bgz'
+    hl.export_vcf(as_info_ht, str(out_as_vcf_path), tabix=True)
+    hl.export_vcf(quasi_info_ht, str(out_quasi_vcf_path), tabix=True)
 
 
 def build_info_ht(ht: hl.Table, extra_field: str) -> hl.Table:
