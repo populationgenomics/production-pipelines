@@ -268,8 +268,19 @@ class MakeSiteOnlyVcf(CohortStage):
         site_only_version = site_only_version or get_workflow().output_version
 
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'as': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'as_siteonly.vcf.bgz',
+            'as_tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'as_siteonly.vcf.bgz.tbi',
+            'quasi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'quasi_siteonly.vcf.bgz',
+            'quasi_tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'quasi_siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
             'pre_adjusted': cohort.analysis_dataset.prefix()
             / get_workflow().name
@@ -305,7 +316,8 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(self.expected_outputs(cohort)['vcf']),
+                str(self.expected_outputs(cohort)['as']),
+                str(self.expected_outputs(cohort)['quasi']),
                 str(self.expected_outputs(cohort)['ht']),
                 str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
@@ -346,9 +358,19 @@ class Vqsr(CohortStage):
             vqsr_version = slugify(vqsr_version)
 
         vqsr_version = vqsr_version or get_workflow().output_version
+        as_or_quasi = config_retrieve(
+            ['large_cohort', 'vqsr_input_vcf'],
+            default='as',
+        )
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
+            'vcf': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / f'{as_or_quasi}_siteonly.vqsr.vcf.gz',
+            'tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / f'{as_or_quasi}_siteonly.vqsr.vcf.gz.tbi',
             'reheadered_header': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / vqsr_version
@@ -358,7 +380,11 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import vqsr
 
-        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
+        vcf_path = inputs.as_path(
+            cohort,
+            MakeSiteOnlyVcf,
+            key=config_retrieve(['large_cohort', 'vqsr_input_vcf'], default='as'),
+        )
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=vcf_path,
