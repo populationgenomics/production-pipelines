@@ -29,7 +29,7 @@ def fastqc(
     Adds FastQC jobs. If the input is a set of fqs, runs FastQC on each fq file.
     """
     j = b.new_job('FASTQC', (job_attrs or {}) | {'tool': 'fastqc'})
-    j.image(image_path('fastqc'))
+    j.image(image_path('fastqc', '0.11.9-1'))
     threads = STANDARD.set_resources(j, ncpu=16).get_nthreads()
 
     cmd = ''
