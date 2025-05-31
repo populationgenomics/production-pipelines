@@ -325,7 +325,7 @@ class CreateDenseMtFromVdsWithHail(MultiCohortStage):
         return self.make_outputs(multicohort, output, densify_job)
 
 
-@stage(analysis_keys=['vcf'], required_stages=[CreateDenseMtFromVdsWithHail])
+@stage(required_stages=[CreateDenseMtFromVdsWithHail])
 class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
     """
     Takes a manifest of VCF fragments, and produces a single VCF file
@@ -338,7 +338,10 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
         """
-        Submit jobs to take a manifest of VCF fragments, and produce a single VCF file
+        2-step process to concatenate a series of individual fragments:
+            1. read the manifest file, and write a bash script containing a series of gcloud compose commands
+            2. run the script to concatenate the files
+
         The VCF being composed here has a single header in a separate file, the first entry in the manifest
         This means we can combine the VCF header and data fragments through concatenation
         and the result will be a spec-compliant VCF
@@ -348,22 +351,32 @@ class ConcatenateVcfFragmentsWithGcloud(MultiCohortStage):
             stage=CreateDenseMtFromVdsWithHail,
             key='separate_header_manifest',
         )
-        if not manifest_file.exists():
-            raise ValueError(
-                f'Manifest file {str(manifest_file)} does not exist, '
-                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
-            )
-
-        outputs = self.expected_outputs(multicohort)
-
-        jobs = gcloud_compose_vcf_from_manifest(
-            manifest_path=manifest_file,
-            intermediates_path=str(self.tmp_prefix / 'temporary_compose_intermediates'),
-            output_path=str(outputs),
-            job_attrs={'stage': self.name},
+        fragment_directory = inputs.as_str(
+            target=multicohort,
+            stage=CreateDenseMtFromVdsWithHail,
+            key='separate_header_vcf_dir',
         )
 
-        return self.make_outputs(multicohort, data=outputs, jobs=jobs)
+        output = self.expected_outputs(multicohort)
+
+        localised_manifest = get_batch().read_input(str(manifest_file))
+
+        job_1 = get_batch().new_bash_job('Create bash script from manifest')
+        job_1.image(config_retrieve(['workflow', 'driver_image']))
+        job_1.command(f"""
+            python3 -m cpg_workflows.scripts.write_gcloud_compose_script \\ 
+            --input {localised_manifest} \\
+            --vcf_dir {fragment_directory} \\
+            --output {output!s} \\
+            --script {job_1.script} \\
+            --tmp {self.tmp_prefix / 'temporary_compose_intermediates'!s}
+        """)
+
+        job_2 = get_batch().new_bash_job('Run compose script')
+        job_2.image(config_retrieve(['workflow', 'driver_image']))
+        job_2.command(f'bash {job_1.script}')
+
+        return self.make_outputs(multicohort, data=output, jobs=[job_1, job_2])
 
 
 @stage(required_stages=[ConcatenateVcfFragmentsWithGcloud])
@@ -437,6 +450,8 @@ class TrainVqsrSnpTranches(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput:
         manifest_file = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_shard_manifest')
+        vcf_dir = inputs.as_path(target=multicohort, stage=CreateDenseMtFromVdsWithHail, key='hps_vcf_dir')
+
         if not manifest_file.exists():
             raise ValueError(
                 f'Manifest file {str(manifest_file)} does not exist, '
