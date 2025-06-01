@@ -288,7 +288,8 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
         [compressed_sample_qc_ht_path, compressed_vds_path, compressed_relateds_to_drop_ht_path],
     )
 
-    siteonly_vcf_path = tmp_path / 'siteonly.vcf.bgz'
+    as_siteonly_vcf_path = tmp_path / 'as_siteonly.vcf.bgz'
+    quasi_siteonly_vcf_path = tmp_path / 'quasi_siteonly.vcf.bgz'
     site_only_vcf.run(
         vds_path=str(tmp_path / 'v01.vds'),
         sample_qc_ht_path=str(tmp_path / 'sample_qc.ht'),
@@ -300,7 +301,8 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
     )
 
     # do some testing here
-    assert exists_not_cached(siteonly_vcf_path)
+    assert exists_not_cached(as_siteonly_vcf_path)
+    assert exists_not_cached(quasi_siteonly_vcf_path)
 
 
 def test_ancestry(tmp_path: Path):
