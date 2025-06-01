@@ -272,6 +272,13 @@ def test_relatedness(mocker: MockFixture, tmp_path: Path):
 
 
 def test_site_only(mocker: MockFixture, tmp_path: Path):
+    conf = create_config(tmp_path)
+    set_config(
+        conf,
+        tmp_path / 'config.toml',
+        merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+    )
+
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
 
