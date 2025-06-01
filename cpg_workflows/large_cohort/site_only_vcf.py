@@ -11,7 +11,7 @@ from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, dataset_path, output_path
 from cpg_workflows.batch import override_jar_spec
 from cpg_workflows.utils import can_reuse
-from gnomad.utils.sparse_mt import AS_INFO_AGG_FIELDS, default_compute_info, get_as_info_expr, split_lowqual_annotation
+from gnomad.utils.sparse_mt import default_compute_info
 from gnomad.utils.vcf import adjust_vcf_incompatible_types
 
 
@@ -20,6 +20,10 @@ def extract_as_pls(
     allele_idx: hl.expr.Int32Expression,
 ) -> hl.expr.ArrayExpression:
     """
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
+        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
+        and thus cannot import it directly.
+
     Extract PLs for a specific allele from an LPL array expression.
 
     PL/LPL represents the normalized Phred-scaled likelihoods of the possible
@@ -49,6 +53,10 @@ def extract_as_pls(
 
 def recompute_as_qualapprox_from_lpl(mt: hl.MatrixTable) -> hl.expr.ArrayExpression:
     """
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
+        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
+        and thus cannot import it directly.
+
     Recompute AS_QUALapprox from LPL.
 
     QUALapprox is the (Phred-scaled) probability that all reads at the site are hom-ref,
@@ -109,6 +117,10 @@ def correct_as_annotations(
     set_to_missing: bool = False,
 ) -> hl.expr.StructExpression:
     """
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
+        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
+        and thus cannot import it directly.
+
     Correct allele specific annotations that are longer than the length of LA.
 
     For some entries in the MatrixTable, the following annotations are longer than LA,
@@ -224,6 +236,9 @@ def vds_to_site_only_ht(
     # Passing un-densified MatrixTable to default_compute_info
     mt = vds.variant_data
 
+    mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
+    mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+
     # Compute and checkpoint the allele specific info annotations after recomputing
     # AS_QUALapprox from LPL, and fixing the length of AS_SB_TABLE, AS_RAW_MQ,
     # AS_RAW_ReadPosRankSum and AS_RAW_MQRankSum.
@@ -234,9 +249,6 @@ def vds_to_site_only_ht(
             **correct_as_annotations(mt),
         ),
     )
-
-    correct_mt = correct_mt.filter_cols(hl.len(sample_qc_ht[correct_mt.col_key].filters) > 0, keep=False)
-    correct_mt = correct_mt.filter_cols(hl.is_defined(relateds_to_drop_ht[correct_mt.col_key]), keep=False)
 
     correct_mt = _filter_rows_and_add_tags(correct_mt)
     # TODO: Figure out the right output pathing function for this checkpoint
@@ -297,15 +309,15 @@ def _filter_rows_and_add_tags(mt: hl.MatrixTable) -> hl.MatrixTable:
     return mt.annotate_rows(ANS=hl.agg.count_where(hl.is_defined(mt.LGT)) * 2)
 
 
-def _create_info_ht(correct_mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
+def _create_info_ht(mt: hl.MatrixTable, n_partitions: int) -> hl.Table:
     """Create info table from vcf matrix table"""
 
     info_ht: hl.Table = default_compute_info(
-        correct_mt,
+        mt,
         as_annotations=True,
         site_annotations=True,
         n_partitions=n_partitions,
     )
 
-    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=correct_mt.rows()[info_ht.key].site_dp))
+    info_ht = info_ht.annotate(info=info_ht.info.annotate(DP=mt.rows()[info_ht.key].site_dp))
     return info_ht

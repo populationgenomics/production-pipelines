@@ -360,7 +360,7 @@ class Vqsr(CohortStage):
         vqsr_version = vqsr_version or get_workflow().output_version
         as_or_quasi = config_retrieve(
             ['large_cohort', 'vqsr_input_vcf'],
-            default='as',
+            default='quasi',
         )
         return {
             'vcf': cohort.analysis_dataset.prefix()
@@ -383,7 +383,7 @@ class Vqsr(CohortStage):
         vcf_path = inputs.as_path(
             cohort,
             MakeSiteOnlyVcf,
-            key=config_retrieve(['large_cohort', 'vqsr_input_vcf'], default='as'),
+            key=config_retrieve(['large_cohort', 'vqsr_input_vcf'], default='quasi'),
         )
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
