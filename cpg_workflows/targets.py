@@ -428,6 +428,9 @@ class Dataset(Target):
         self.name = name
         self.cohort = cohort
         self.active = True
+        self.rich_family_information: dict[str, dict] = (
+            {}
+        )  # Extensive family, participant, SG, and pedigree information
 
     @staticmethod
     def create(name: str) -> 'Dataset':

@@ -73,6 +73,7 @@ def create_multicohort() -> MultiCohort:
     datasets_by_cohort = get_metamist().get_sgs_for_cohorts(custom_cohort_ids_unique)
 
     read_pedigree = config.get('read_pedigree', True)
+    get_rich_info = config.get('get_rich_info', True)
     for cohort_id in custom_cohort_ids_unique:
         data = datasets_by_cohort[cohort_id]
         sgs_by_dataset_for_cohort = data['sequencing_groups']
@@ -81,7 +82,7 @@ def create_multicohort() -> MultiCohort:
         # TODO (mwelland): future optimisation following closure of #860
         # TODO (mwelland): this should be done one Dataset at a time, not per Cohort
         # TODO (mwelland): ensures the get-analyses-in-dataset query is only made once per Dataset
-        _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree)
+        _populate_cohort(cohort, sgs_by_dataset_for_cohort, read_pedigree=read_pedigree, get_rich_info=get_rich_info)
 
     # now populate the datasets uniquely in the multicohort, each containing all sequencing groups in this dataset
     # the MultiCohort has a dictionary of {dataset_name: Dataset} objects
@@ -97,7 +98,12 @@ def create_multicohort() -> MultiCohort:
     return multicohort
 
 
-def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: bool = True):
+def _populate_cohort(
+    cohort: Cohort,
+    sgs_by_dataset_for_cohort,
+    read_pedigree: bool = True,
+    get_rich_info: bool = True,
+) -> None:
     """
     Add datasets in the cohort.
     TODO (mwelland): future optimisation following closure of #860
@@ -139,6 +145,8 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
     _populate_analysis(cohort)
     if read_pedigree:
         _populate_pedigree(cohort)
+    if get_rich_info:
+        _populate_rich_family_information(cohort)
     assert cohort.get_sequencing_groups()
 
 
@@ -390,3 +398,50 @@ def _populate_pedigree(cohort: Cohort) -> None:
                 f'No pedigree data found for '
                 f'{len(sgids_wo_ped)}/{len(dataset.get_sequencing_groups())} sequencing groups',
             )
+
+
+def _populate_rich_family_information(cohort: Cohort) -> None:
+    """
+    For each dataset in a cohort, get a comprehensive mapping of family and participant
+    internal and external IDs, alongside their corresponding sequencing groups and
+    pedigree information.
+
+    This is used for pedigree analysis to link participants to their sequencing groups.
+
+    :param cohort: The Cohort object containing datasets and sequencing groups.
+
+    Sets the dataset.rich_family_information as a dictionary containing:
+     - family IDs to external IDs,
+     - participant IDs to external IDs,
+     - sequencing group IDs to participant IDs,
+     - and pedigree information including internal family IDs and participant IDs
+    """
+    for dataset in cohort.get_datasets():
+        family_id_mapping = {}
+        participant_id_mapping = {}
+        sg_participant_mapping = {}
+
+        family_data = get_metamist().get_rich_family_data(dataset=dataset.name)
+        # parse the family data to create a mapping
+        for family in family_data:
+            family_id_mapping[family['id']] = family['externalId']
+            for participant in family['participants']:
+                participant_id_mapping[participant['id']] = participant['externalId']
+                for sample in participant['samples']:
+                    for sg in sample['sequencingGroups']:
+                        sg_participant_mapping[sg['id']] = participant['id']
+
+        pedigree_mapping = {}
+        pedigree = get_metamist().get_ped_entries(dataset=dataset.name, use_participant_external_ids=False)
+        for ped_entry in pedigree:
+            part_id = str(ped_entry['individual_id'])
+            pedigree_mapping[part_id] = ped_entry
+
+        rich_family_information = {
+            'family_ids': family_id_mapping,
+            'participant_ids': participant_id_mapping,
+            'sg_participants': sg_participant_mapping,
+            'ped_rows': pedigree_mapping,
+        }
+
+        dataset.rich_family_information = rich_family_information

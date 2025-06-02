@@ -18,7 +18,7 @@ from tenacity import (
 )
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_workflows.filetypes import (
     AlignmentInput,
     BamPath,
@@ -120,14 +120,41 @@ GET_ANALYSES_QUERY = gql(
 
 GET_PEDIGREE_QUERY = gql(
     """
-        query PedigreeQuery($metamist_proj: String!){
+        query PedigreeQuery($metamist_proj: String!, $use_participant_external_ids: Boolean = true) {
             project(name: $metamist_proj) {
-                pedigree(replaceWithFamilyExternalIds: false)
+                pedigree(
+                    replaceWithFamilyExternalIds: false
+                    replaceWithParticipantExternalIds: $use_participant_external_ids
+                )
             }
         }
     """,
 )
 
+# The pedigree query returns the pedigree with family IDs and participant
+# external IDs. But we also want to retrieve the family external IDs
+# and the participant IDs, so we can use either of them in the workflow.
+GET_RICH_FAMILY_DATA = gql(
+    """
+        query RichFamilyDataQuery($metamist_proj: String!, $sequencing_type: String!) {
+            project(name: $metamist_proj) {
+                families {
+                    id
+                    externalId
+                    participants {
+                        id
+                        externalId
+                        samples {
+                            sequencingGroups(type: {eq: $sequencing_type}) {
+                                id
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    """,
+)
 
 _metamist: Optional['Metamist'] = None
 
@@ -600,16 +627,40 @@ class Metamist:
             )
             return None
 
-    def get_ped_entries(self, dataset: str | None = None) -> list[dict[str, str]]:
+    def get_ped_entries(
+        self,
+        dataset: str | None = None,
+        use_participant_external_ids: bool = True,
+    ) -> list[dict[str, str]]:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
         metamist_proj = self.get_metamist_proj(dataset)
-        entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
+        entries = query(
+            GET_PEDIGREE_QUERY,
+            variables={'metamist_proj': metamist_proj, 'use_participant_external_ids': use_participant_external_ids},
+        )
 
         pedigree_entries = entries['project']['pedigree']
 
         return pedigree_entries
+
+    def get_rich_family_data(self, dataset: str | None = None) -> list[dict[str, Any]]:
+        """
+        Retrieve rich family data for a specified Metamist project.
+        This includes family and participant IDs and external IDs, and sequencing group IDs.
+        """
+        metamist_proj = self.get_metamist_proj(dataset)
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        entries = query(
+            GET_RICH_FAMILY_DATA,
+            variables={'metamist_proj': metamist_proj, 'sequencing_type': sequencing_type},
+        )
+
+        if len(entries['project']['families']) < 1:
+            raise MetamistError(f'No families found in project {metamist_proj}')
+
+        return entries['project']['families']
 
     def get_metamist_proj(self, dataset: str | None = None) -> str:
         """
