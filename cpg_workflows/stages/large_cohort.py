@@ -583,7 +583,7 @@ class GenerateCoverageTable(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
 
-        converage_jobs = []
+        coverage_jobs = []
 
         coverage_table_paths = self.expected_outputs(cohort)
 
@@ -606,9 +606,9 @@ class GenerateCoverageTable(CohortStage):
                     setup_gcp=True,
                 ),
             )
-            converage_jobs.append(j)
+            coverage_jobs.append(j)
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=converage_jobs)
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
 
 
 @stage(required_stages=[GenerateCoverageTable])
