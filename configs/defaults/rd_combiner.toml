@@ -52,6 +52,8 @@ driver_storage = "10Gi"
 driver_cores = 2
 # highem, standard, or a string, e.g. "4Gi"
 worker_memory = "highmem"
+# integer
+worker_cores = 2
 # if false, use non-preemptible VMs
 preemptible_vms = false
 
