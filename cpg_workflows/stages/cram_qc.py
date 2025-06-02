@@ -157,11 +157,12 @@ class SomalierPedigree(DatasetStage):
             return {}
 
         prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
+        web_prefix = dataset.web_prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.web_prefix() / 'cram-somalier-pedigree.html',
+            'html': web_prefix / 'cram-somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
@@ -204,7 +205,7 @@ class SomalierPedigree(DatasetStage):
                 out_html_url=html_url,
                 out_checks_path=self.expected_outputs(dataset)['checks'],
                 job_attrs=self.get_job_attrs(dataset),
-                send_to_slack=True,
+                send_to_slack=config_retrieve(['workflow', 'somalier_pedigree', 'send_to_slack'], default=True),
             )
             return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
         else:

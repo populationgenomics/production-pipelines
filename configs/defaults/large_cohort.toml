@@ -20,6 +20,10 @@ exome_realignment_shards = 1
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
 
+# Stage SomalierPedigree sends message to Slack by default. LC does not have Slack token setup so we set to False
+[workflow.somalier_pedigree]
+send_to_slack = false
+
 [combiner]
 force_new_combiner = false
 vds_version = "0.1"
