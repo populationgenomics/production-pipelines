@@ -2,6 +2,7 @@ import logging
 
 import hail as hl
 
+from cpg_utils.hail_batch import genome_build
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
 
@@ -48,12 +49,12 @@ def run(
     from gnomad.utils.reference_genome import add_reference_sequence
 
     init_batch()
-    rg: hl.ReferenceGenome = hl.get_reference('GRCh38')
+    rg: hl.ReferenceGenome = hl.get_reference(genome_build())
     add_reference_sequence(rg)
 
     # Generate reference coverage table
     includes_end = False
-    chrom_length = hl.eval(hl.contig_length(chrom, reference_genome='GRCh38'))
+    chrom_length = hl.eval(hl.contig_length(chrom, reference_genome=genome_build()))
     if end == chrom_length:
         includes_end = True
 
