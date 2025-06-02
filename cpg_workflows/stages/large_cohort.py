@@ -1,5 +1,4 @@
 import json
-import logging
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path, to_path
@@ -19,7 +18,6 @@ from metamist.graphql import gql, query
 if TYPE_CHECKING:
     from graphql import DocumentNode
 
-    import hail as hl
     from hailtop.batch.job import PythonJob, PythonResult
 
 
