@@ -168,6 +168,7 @@ class Relatedness(CohortStage):
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
+@stage()
 class MergeExomeCaptureRegions(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
