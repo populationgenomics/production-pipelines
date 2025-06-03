@@ -172,11 +172,11 @@ class Relatedness(CohortStage):
 class MergeExomeCaptureRegions(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
-            if exome_capture_regions := config_retrieve(
-                ['large_cohort', 'output_versions', 'exome_capture_regions'],
+            if exome_capture_sets := config_retrieve(
+                ['large_cohort', 'output_versions', 'exome_capture_sets'],
                 default=None,
             ):
-                exome_capture_version = '-'.join(exome_capture_regions)
+                exome_capture_version = '-'.join(exome_capture_sets)
             return (
                 cohort.analysis_dataset.prefix()
                 / get_workflow().name
@@ -191,26 +191,31 @@ class MergeExomeCaptureRegions(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
-        exome_capture_regions = config_retrieve(
-            ['large_cohort', 'output_versions', 'exome_capture_regions'],
+        exome_capture_set = config_retrieve(
+            ['large_cohort', 'output_versions', 'exome_capture_set'],
             default=None,
         )
 
-        if not exome_capture_regions:
+        if not exome_capture_set:
             raise ValueError(
-                'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_regions` in the config.',
+                'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_set` in the config.',
             )
         probesets: dict[str, str] = config_retrieve(['references', 'exome_probesets'], default=None)
         probsets_to_intersect: list[str] = []
-        for region in exome_capture_regions:
-            if region not in probesets:
+        for capture in exome_capture_set:
+            if capture not in probesets:
                 raise ValueError(
-                    f'Probeset for region {region} not found in references.exome_probesets.',
+                    f'Probeset for region {capture} not found in references.exome_probesets.',
                 )
             else:
-                probsets_to_intersect.append(region)
+                probsets_to_intersect.append(probesets[capture])
 
-        j = get_batch().new_job(
+        b = get_batch()
+
+        for probset in probsets_to_intersect:
+            b.read_input(probset)
+
+        j = b.new_job(
             'MergeExomeCaptureRegions',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
