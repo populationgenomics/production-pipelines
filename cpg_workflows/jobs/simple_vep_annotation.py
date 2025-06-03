@@ -43,7 +43,7 @@ def create_vep_job_and_mount_data(job_number: int = 1) -> tuple[BashJob, Path]:
     vep_job.declare_resource_group(vcf={VCF_BGZ_SUFFIX: '{root}.vcf.bgz', VCF_BGZ_TBI_SUFFIX: '{root}.vcf.bgz.tbi'})
 
     # configure the required resources
-    vep_job.image(image_path('vep_110')).cpu(4).memory('highmem')
+    vep_job.image(image_path('vep', '110.1-1')).cpu(4).memory('highmem')
 
     # gcsfuse works only with the root bucket, without prefix:
     vep_mount_path = to_path(reference_path('vep_110_mount'))
