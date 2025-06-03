@@ -96,7 +96,7 @@ def vep_one(
     """
 
     # check that the cache and image for this version exist
-    vep_image = image_path('vep_110')
+    vep_image = image_path('vep', '110.1-1')
     vep_mount_path = to_path(reference_path('vep_110_mount'))
     assert all([vep_image, vep_mount_path])
 
