@@ -191,18 +191,18 @@ class MergeExomeCaptureRegions(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
 
-        exome_capture_set = config_retrieve(
-            ['large_cohort', 'output_versions', 'exome_capture_set'],
+        exome_capture_sets = config_retrieve(
+            ['large_cohort', 'output_versions', 'exome_capture_sets'],
             default=None,
         )
 
-        if not exome_capture_set:
+        if not exome_capture_sets:
             raise ValueError(
-                'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_set` in the config.',
+                'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_sets` in the config.',
             )
         probesets: dict[str, str] = config_retrieve(['references', 'exome_probesets'], default=None)
         probsets_to_intersect: list[str] = []
-        for capture in exome_capture_set:
+        for capture in exome_capture_sets:
             if capture not in probesets:
                 raise ValueError(
                     f'Probeset for region {capture} not found in references.exome_probesets.',
