@@ -5,7 +5,7 @@ status_reporter = 'metamist'
 vep_version = '110'
 
 [workflow.merge_vcfs]
-bcftools_image = 'bcftools_121'
+bcftools_image = '1.21-1'
 
 [workflow.annotate_cohort]
 highmem_drivers = false

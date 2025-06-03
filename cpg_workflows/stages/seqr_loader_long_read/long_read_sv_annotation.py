@@ -286,7 +286,7 @@ class MergeLongReadSVs(MultiCohortStage):
         ]
 
         merge_job = get_batch().new_job('Merge Long-Read SV calls', attributes={'tool': 'bcftools'})
-        merge_job.image(image=image_path('bcftools_120'))
+        merge_job.image(image=image_path('bcftools', '1.20-1'))
 
         # guessing at resource requirements
         merge_job.cpu(4)

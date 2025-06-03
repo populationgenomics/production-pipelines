@@ -782,7 +782,7 @@ class SplitAnnotatedCnvVcfByDataset(DatasetStage):
             name=f'SplitAnnotatedCnvVcfByDataset: {dataset}',
             attributes=self.get_job_attrs() | {'tool': 'bcftools'},
         )
-        job.image(image_path('bcftools_120'))
+        job.image(image_path('bcftools', '1.20-1'))
         job.cpu(1).memory('highmem').storage('10Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 
