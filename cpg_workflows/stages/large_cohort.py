@@ -212,16 +212,13 @@ class MergeExomeCaptureRegions(CohortStage):
 
         b = get_batch()
 
-        for probset in probsets_to_intersect:
-            b.read_input(probset)
-
         j = b.new_job(
             'MergeExomeCaptureRegions',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('bedtools'))
         j.command(
-            f'bedtools intersect -a {probsets_to_intersect[0]} -b {",".join(probsets_to_intersect[1:])} > {j.ofile}',
+            f'bedtools intersect -a {b.read_input(probsets_to_intersect[0])} -b {",".join([b.read_input(bed_file) for bed_file in probsets_to_intersect[1:]])} > {j.ofile}',
         )
 
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
