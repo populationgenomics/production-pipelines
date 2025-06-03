@@ -1,3 +1,4 @@
+from logging import config
 from typing import TYPE_CHECKING, Any, Final
 
 from cpg_utils import Path
@@ -164,6 +165,54 @@ class Relatedness(CohortStage):
             ),
             depends_on=inputs.get_jobs(cohort),
         )
+        return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
+
+
+class MergeExomeCaptureRegions(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
+            if exome_capture_regions := config_retrieve(
+                ['large_cohort', 'output_versions', 'exome_capture_regions'],
+                default=None,
+            ):
+                exome_capture_version = '-'.join(exome_capture_regions)
+            exome_capture_version = exome_capture_version or get_workflow().output_version
+            return cohort.analysis_dataset.prefix() / get_workflow().name / exome_capture_version / 'exome_regions.ht'
+        else:
+            raise ValueError(
+                'Can only merge exome capture regions for exome sequencing cohorts.',
+            )
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+
+        exome_capture_regions = config_retrieve(
+            ['large_cohort', 'output_versions', 'exome_capture_regions'],
+            default=None,
+        )
+
+        if not exome_capture_regions:
+            raise ValueError(
+                'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_regions` in the config.',
+            )
+        probesets: dict[str, str] = config_retrieve(['references', 'exome_probesets'], default=None)
+        probsets_to_intersect: list[str] = []
+        for region in exome_capture_regions:
+            if region not in probesets:
+                raise ValueError(
+                    f'Probeset for region {region} not found in references.exome_probesets.',
+                )
+            else:
+                probsets_to_intersect.append(region)
+
+        j = get_batch().new_job(
+            'MergeExomeCaptureRegions',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('bedtools'))
+        j.command(
+            f'bedtools intersect -a {probsets_to_intersect[0]} -b {",".join(probsets_to_intersect[1:])} > {j.ofile}',
+        )
+
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
