@@ -182,7 +182,7 @@ class MergeExomeCaptureRegions(CohortStage):
                 / get_workflow().name
                 / get_workflow().output_version
                 / exome_capture_version
-                / 'exome_regions.ht'
+                / 'exome_regions.bed'
             )
         else:
             raise ValueError(
