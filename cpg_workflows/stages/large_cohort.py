@@ -176,8 +176,13 @@ class MergeExomeCaptureRegions(CohortStage):
                 default=None,
             ):
                 exome_capture_version = '-'.join(exome_capture_regions)
-            exome_capture_version = exome_capture_version or get_workflow().output_version
-            return cohort.analysis_dataset.prefix() / get_workflow().name / exome_capture_version / 'exome_regions.ht'
+            return (
+                cohort.analysis_dataset.prefix()
+                / get_workflow().name
+                / get_workflow().output_version
+                / exome_capture_version
+                / 'exome_regions.ht'
+            )
         else:
             raise ValueError(
                 'Can only merge exome capture regions for exome sequencing cohorts.',
