@@ -31,6 +31,7 @@ from cpg_workflows.stages.large_cohort import (
     AncestryPlots,
     Frequencies,
     LoadVqsr,
+    MergeExomeCaptureRegions,
     PrepareBrowserTable,
 )
 from cpg_workflows.stages.mito import MitoReport
@@ -98,6 +99,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         CohortCramMultiQC,
+        MergeExomeCaptureRegions,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,
