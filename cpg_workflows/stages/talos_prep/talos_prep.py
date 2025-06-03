@@ -230,7 +230,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
         fasta = get_batch().read_input(reference_path('broad/ref_fasta'))
 
         job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {dataset.name}')
-        job.image(image_path('bcftools_120'))
+        job.image(image_path('bcftools', '1.20-1'))
         job.cpu(4)
         job.storage('20G')
 
