@@ -172,9 +172,6 @@ def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
 
     gnomad4_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
 
-    # an expression to match data across
-    gnomad4_row = gnomad4_ht[mt.row_key]
-
     # the index of the target populations in the joint.freq array, as an expression
     target_index = gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_TARGET_POP]
     target_xy_index = gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_XY_TARGET_POP]
@@ -182,15 +179,15 @@ def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
     return mt.annotate_rows(
         gnomad4=hl.struct(
             # these are taken explicitly from the adj population (across all of gnomAD)
-            AC=gnomad4_row.joint.freq[target_index].AC,
-            AN=gnomad4_row.joint.freq[target_index].AN,
-            AF=gnomad4_row.joint.freq[target_index].AF,
-            Hom=gnomad4_row.joint.freq[target_index].homozygote_count,
+            AC=gnomad4_ht[mt.row_key].joint.freq[target_index].AC,
+            AN=gnomad4_ht[mt.row_key].joint.freq[target_index].AN,
+            AF=gnomad4_ht[mt.row_key].joint.freq[target_index].AF,
+            Hom=gnomad4_ht[mt.row_key].joint.freq[target_index].homozygote_count,
             # a couple of max-value entries
-            FAF_AF=gnomad4_row.joint.fafmax.faf95_max,
-            AF_POPMAX_OR_GLOBAL=gnomad4_row.joint.grpmax.AF,
+            FAF_AF=gnomad4_ht[mt.row_key].joint.fafmax.faf95_max,
+            AF_POPMAX_OR_GLOBAL=gnomad4_ht[mt.row_key].joint.grpmax.AF,
             # not 100% sure about this one... target the `adj_XY` population
-            Hemi=gnomad4_row.joint.freq[target_xy_index].AC,
+            Hemi=gnomad4_ht[mt.row_key].joint.freq[target_xy_index].AC,
         ),
     )
 
