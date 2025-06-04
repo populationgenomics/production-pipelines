@@ -2,12 +2,13 @@ import os
 from lib2to3.pgen2 import driver
 
 import click
+from sympy import capture
 
 import hail as hl
 
 from cpg_utils import Path
 from cpg_utils.config import output_path
-from cpg_utils.hail_batch import get_batch, init_batch, reference_path
+from cpg_utils.hail_batch import genome_build, init_batch, reference_path
 from gnomad.sample_qc.pipeline import get_qc_mt
 
 NUM_ROWS_BEFORE_LD_PRUNE = 200000
@@ -25,13 +26,13 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
     default=False,
 )
 @click.option(
-    '--capture-region-bed-files',
-    help='Names of capture region bed files to use for exomes. Names must be keys in references dictionary.',
+    '--intersected-bed-file',
+    help='A bed file that contains the intersection of all capture regions. '
+    'If --exomes is set, this must be provided.',
     type=str,
-    multiple=True,
 )
 @click.command()
-def main(vds_path: str, exomes: bool, bed_files: list[str]):
+def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
     print(f'Input vds_path: {vds_path}')
     pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
     print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
@@ -43,24 +44,16 @@ def main(vds_path: str, exomes: bool, bed_files: list[str]):
     )
     # exomes
     if exomes:
-        if not bed_files:
+        if not bed_file:
             raise ValueError('If --exomes is set, you must provide at least one --capture-region-bed-files')
 
         # Read in capture region bed files
-        intervals = []
-        for bed_file in bed_files:
-            bed_path = reference_path(f'{bed_file}')
-            if not os.path.exists(bed_path):
-                raise FileNotFoundError(f'Capture region bed file {bed_path} does not exist')
-            intervals.append(hl.import_bed(str(bed_path), reference_genome='GRCh38'))
+        capture_interval_ht: hl.Table = hl.import_bed(str(bed_file), reference_genome=genome_build())
 
-        # Intersect the intervals
-        intervals = hl.intersection(*intervals)
-    # if exomes read in capture region bed files
-    # generate hl.Interval objects for each capture region in bed files
-    # pass list of hl.Interval objects to hl.vds.read_vds(vds_path, intervals=intervals)
-    # the intervals need to be the INTERSECTION not the UNION of the capture regions
-    vds = hl.vds.read_vds(str(vds_path))
+        # Generate list of intervals
+        intervals: list[hl.Interval] = capture_interval_ht.interval.collect()
+
+    vds = hl.vds.read_vds(str(vds_path), intervals=intervals if exomes else None)
 
     print('Splitting multi-allelic sites')
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
