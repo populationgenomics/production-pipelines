@@ -72,7 +72,7 @@ from hail_scripts.computed_fields import variant_id, vep
 # adj is the adjusted population, which is the default for gnomAD v4
 # all samples across all groups, adjusted for technical artifacts
 GNOMAD_TARGET_POP = 'adj'
-GNOMAD_XY_TARGET_POP = 'adj_XY'
+GNOMAD_XY_TARGET_POP = 'XY_adj'
 
 
 def checkpoint_hail(
