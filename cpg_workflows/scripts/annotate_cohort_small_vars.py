@@ -173,8 +173,8 @@ def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
     gnomad4_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
 
     # the index of the target populations in the joint.freq array, as an expression
-    target_index = gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_TARGET_POP]
-    target_xy_index = gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_XY_TARGET_POP]
+    target_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_TARGET_POP])
+    target_xy_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_XY_TARGET_POP])
 
     return mt.annotate_rows(
         gnomad4=hl.struct(
