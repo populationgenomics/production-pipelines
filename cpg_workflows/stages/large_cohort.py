@@ -221,6 +221,11 @@ class MergeExomeCaptureRegions(CohortStage):
             f'bedtools intersect -a {b.read_input(probsets_to_intersect[0])} -b {",".join([b.read_input(bed_file) for bed_file in probsets_to_intersect[1:]])} > {j.ofile}',
         )
 
+        b.write_output(
+            j.ofile,
+            str(self.expected_outputs(cohort)),
+        )
+
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
 
