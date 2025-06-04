@@ -172,12 +172,12 @@ def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
 
     gnomad4_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
 
-    # the index of the target populations in the joint.freq array, as an expression
+    # the index of the target populations in the joint.freq array
     target_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_TARGET_POP])
     target_xy_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_XY_TARGET_POP])
 
     return mt.annotate_rows(
-        gnomad4=hl.struct(
+        gnomad_genomes=hl.struct(
             # these are taken explicitly from the adj population (across all of gnomAD)
             AC=gnomad4_ht[mt.row_key].joint.freq[target_index].AC,
             AN=gnomad4_ht[mt.row_key].joint.freq[target_index].AN,
@@ -330,7 +330,6 @@ def annotate_cohort(
         geno2mp=mt.ref_data.geno2mp,
         gnomad_exomes=mt.ref_data.gnomad_exomes,
         gnomad_exome_coverage=mt.ref_data.gnomad_exome_coverage,
-        gnomad_genomes=mt.ref_data.gnomad_genomes,
         gnomad_genome_coverage=mt.ref_data.gnomad_genome_coverage,
         eigen=mt.ref_data.eigen,
         exac=mt.ref_data.exac,
