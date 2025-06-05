@@ -20,9 +20,7 @@ def extract_as_pls(
     allele_idx: hl.expr.Int32Expression,
 ) -> hl.expr.ArrayExpression:
     """
-    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
-        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
-        and thus cannot import it directly.
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`.
 
     Extract PLs for a specific allele from an LPL array expression.
 
