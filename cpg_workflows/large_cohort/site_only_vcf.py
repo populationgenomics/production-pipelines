@@ -113,9 +113,7 @@ def correct_as_annotations(
     set_to_missing: bool = False,
 ) -> hl.expr.StructExpression:
     """
-    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
-        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
-        and thus cannot import it directly.
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`.
 
     Correct allele specific annotations that are longer than the length of LA.
 
