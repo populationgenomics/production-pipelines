@@ -272,6 +272,13 @@ def test_relatedness(mocker: MockFixture, tmp_path: Path):
 
 
 def test_site_only(mocker: MockFixture, tmp_path: Path):
+    conf = create_config(tmp_path)
+    set_config(
+        conf,
+        tmp_path / 'config.toml',
+        merge_with=[DEFAULT_CONFIG, LARGE_COHORT_CONFIG],
+    )
+
     # skip can_reuse, implicit skip of existence checks
     mocker.patch('cpg_workflows.large_cohort.site_only_vcf.can_reuse', lambda x: False)
 
@@ -281,18 +288,21 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
         [compressed_sample_qc_ht_path, compressed_vds_path, compressed_relateds_to_drop_ht_path],
     )
 
-    siteonly_vcf_path = tmp_path / 'siteonly.vcf.bgz'
+    as_siteonly_vcf_path = tmp_path / 'as_siteonly.vcf.bgz'
+    quasi_siteonly_vcf_path = tmp_path / 'quasi_siteonly.vcf.bgz'
     site_only_vcf.run(
         vds_path=str(tmp_path / 'v01.vds'),
         sample_qc_ht_path=str(tmp_path / 'sample_qc.ht'),
         relateds_to_drop_ht_path=str(tmp_path / 'relateds_to_drop.ht'),
-        out_vcf_path=str(siteonly_vcf_path),
+        out_as_vcf_path=str(tmp_path / 'as_siteonly.vcf.bgz'),
+        out_quasi_vcf_path=str(tmp_path / 'quasi_siteonly.vcf.bgz'),
         out_ht_path=str(tmp_path / 'siteonly.ht'),
         out_ht_pre_vcf_adjusted_path=str(tmp_path / 'siteonly_pre_vcf_adjusted.ht'),
     )
 
     # do some testing here
-    assert exists_not_cached(siteonly_vcf_path)
+    assert exists_not_cached(as_siteonly_vcf_path)
+    assert exists_not_cached(quasi_siteonly_vcf_path)
 
 
 def test_ancestry(tmp_path: Path):
