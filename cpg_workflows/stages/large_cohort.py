@@ -1,7 +1,9 @@
-from typing import TYPE_CHECKING, Any, Final
+import json
+from typing import TYPE_CHECKING, Any, Final, Tuple
 
-from cpg_utils import Path
-from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils import Path, to_path
+from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
+
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.large_cohort.combiner import combiner
 from cpg_workflows.targets import Cohort
@@ -15,6 +17,8 @@ from cpg_workflows.workflow import (
 )
 
 if TYPE_CHECKING:
+    from graphql import DocumentNode
+
     from hailtop.batch.job import PythonJob
 
 HAIL_QUERY: Final = 'hail query'
@@ -498,6 +502,100 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, LoadVqsr)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[Combiner])
+class GenerateCoverageTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
+            coverage_version = slugify(coverage_version)
+
+        contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
+        shard_size = config_retrieve(['large_cohort', 'interval_size'], default=50_000_000)
+
+        with open(to_path(contig_lengths_file)) as f:
+            contig_lengths: dict[str, int] = json.load(f)
+
+        contigs = contig_lengths.keys()
+
+        coverage_version = coverage_version or get_workflow().output_version
+        return {
+            f'{contig}_{start}_{end}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
+            / get_workflow().name
+            / coverage_version
+            / 'split_coverage'
+            / f'{contig}_coverage_{start}_{end}.ht'
+            for contig in contigs
+            for start in range(1, contig_lengths[contig], shard_size)
+            for end in [min(start + shard_size, contig_lengths[contig])]
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_coverage_table
+
+        coverage_jobs = []
+
+        coverage_table_paths = self.expected_outputs(cohort)
+
+        for shard, coverage_output_path in coverage_table_paths.items():
+            chrom, start, end = shard.split('_')
+            j = get_batch().new_job(
+                f'GenerateCoverageTable_{shard}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(config_retrieve(['workflow', 'driver_image']))
+            j.command(
+                query_command(
+                    generate_coverage_table,
+                    generate_coverage_table.run.__name__,
+                    str(inputs.as_path(cohort, Combiner, key='vds')),
+                    chrom,
+                    int(start),
+                    int(end),
+                    str(coverage_output_path),
+                    setup_gcp=True,
+                ),
+            )
+            coverage_jobs.append(j)
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
+
+
+@stage(required_stages=[GenerateCoverageTable])
+class MergeCoverageTables(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
+            coverage_version = slugify(coverage_version)
+
+        coverage_version = coverage_version or get_workflow().output_version
+        return (
+            cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / coverage_version
+            / 'merged_coverage'
+            / 'merged_coverage.ht'
+        )
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_coverage_table
+
+        j = get_batch().new_job(
+            'MergeCoverageTables',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                generate_coverage_table,
+                generate_coverage_table.merge_coverage_tables.__name__,
+                [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
+                str(self.expected_outputs(cohort)),
                 setup_gcp=True,
             ),
         )
