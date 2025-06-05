@@ -51,9 +51,7 @@ def extract_as_pls(
 
 def recompute_as_qualapprox_from_lpl(mt: hl.MatrixTable) -> hl.expr.ArrayExpression:
     """
-    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`:
-        - CPG's `gnomad_methods` submodule is pinned to a commit that pre-dates this function
-        and thus cannot import it directly.
+    Function pulled from `gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`.
 
     Recompute AS_QUALapprox from LPL.
 
