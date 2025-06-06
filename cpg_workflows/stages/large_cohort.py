@@ -27,7 +27,7 @@ class Combiner(CohortStage):
         combiner_config: dict[str, str] = config_retrieve('combiner')
 
         # Allow user to specify a custom VDS path
-        vds_path = combiner_config.get('vds_path', '')
+        vds_path = combiner_config.get('vds_path', False)
         if not vds_path:
             output_vds_name: str = slugify(
                 f'{cohort.id}-{combiner_config["vds_version"]}',
