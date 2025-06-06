@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Any, Final
 
-from cpg_utils import Path
+from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.large_cohort.combiner import combiner
@@ -33,6 +33,8 @@ class Combiner(CohortStage):
                 f'{cohort.id}-{combiner_config["vds_version"]}',
             )
             vds_path = cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds'
+        else:
+            vds_path = to_path(vds_path)
 
         return {'vds': vds_path}
 
