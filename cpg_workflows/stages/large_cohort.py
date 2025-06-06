@@ -24,10 +24,15 @@ HAIL_QUERY: Final = 'hail query'
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
-        combiner_config = config_retrieve('combiner')
-        output_vds_name: str = slugify(
-            f'{cohort.id}-{combiner_config["vds_version"]}',
-        )
+        combiner_config: dict[str, str] = config_retrieve('combiner')
+
+        # Allow user to specify a custom VDS path
+        vds_path = combiner_config.get('vds_path', False)
+        if not vds_path:
+            output_vds_name: str = slugify(
+                f'{cohort.id}-{combiner_config["vds_version"]}',
+            )
+            vds_path = cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds'
 
         # include the list of all VDS IDs in the plan name
         if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
@@ -36,7 +41,7 @@ class Combiner(CohortStage):
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
         return {
-            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds',
+            'vds': vds_path,
             'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
         }
 
