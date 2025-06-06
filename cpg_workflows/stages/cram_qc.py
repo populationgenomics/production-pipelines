@@ -158,13 +158,16 @@ class SomalierPedigree(DatasetStage):
 
         prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
         web_prefix = dataset.web_prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
-        return {
+        outputs_dict = {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
             'html': web_prefix / 'cram-somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
+        if config_retrieve(['workflow', 'get_rich_info'], False):
+            outputs_dict['rich_info'] = prefix / f'{dataset.name}.rich_info.json'
+        return outputs_dict
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
         """
@@ -197,6 +200,7 @@ class SomalierPedigree(DatasetStage):
                 b=get_batch(),
                 dataset=dataset,
                 expected_ped_path=expected_ped_path,
+                rich_info_path=self.expected_outputs(dataset).get('rich_info'),
                 somalier_path_by_sgid=somalier_path_by_sgid,
                 verifybamid_by_sgid=verifybamid_by_sgid,
                 out_samples_path=self.expected_outputs(dataset)['samples'],

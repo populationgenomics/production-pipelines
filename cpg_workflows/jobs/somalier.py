@@ -33,6 +33,7 @@ def pedigree(
     b,
     dataset: Dataset,
     expected_ped_path: Path,
+    rich_info_path: Path | None,
     somalier_path_by_sgid: dict[str, Path],
     out_samples_path: Path,
     out_pairs_path: Path,
@@ -74,6 +75,8 @@ def pedigree(
         samples_file=relate_j.output_samples,
         pairs_file=relate_j.output_pairs,
         expected_ped=b.read_input(str(expected_ped_path)),
+        # If rich_info_path is provided, we can use it to remap IDs in the output files
+        rich_info=b.read_input(str(rich_info_path)) if rich_info_path else None,
         somalier_html_url=out_html_url,
         rich_id_map=dataset.rich_id_map(),
         dataset_name=dataset.name,
@@ -105,6 +108,7 @@ def _check_pedigree(
     samples_file: Resource,
     pairs_file: Resource,
     expected_ped: Resource,
+    rich_info: Resource | None,
     dataset_name: str,
     somalier_html_url: str | None = None,
     rich_id_map: dict[str, str] | None = None,
@@ -134,6 +138,7 @@ def _check_pedigree(
     --somalier-samples {samples_file} \\
     --somalier-pairs {pairs_file} \\
     --expected-ped {expected_ped} \\
+    {f"--rich-info {rich_info}" if rich_info else ""} \\
     {f"--html-url {somalier_html_url}" if somalier_html_url else ""} \\
     --dataset {dataset_name} \\
     --title "{title}" \\
@@ -144,7 +149,7 @@ def _check_pedigree(
     if somalier_html_url:
         cmd += f'echo "HTML URL: {somalier_html_url}"'
 
-    copy_common_env(cast(Job, check_j))
+    copy_common_env(cast('Job', check_j))
     check_j.command(
         command(
             cmd,

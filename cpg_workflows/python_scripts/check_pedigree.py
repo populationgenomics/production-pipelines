@@ -12,6 +12,7 @@ a channel with:
 """
 
 import contextlib
+import json
 import logging
 import os
 from typing import Optional
@@ -46,6 +47,7 @@ logging.getLogger().setLevel(logging.DEBUG)
     required=True,
     help='Path to PED file with expected pedigree',
 )
+@click.option('--rich-info', 'rich_info', help='Path to rich info json file')
 @click.option('--html-url', 'html_url', help='Somalier HTML URL')
 @click.option('--dataset', 'dataset', help='Dataset name')
 @click.option('--title', 'title', help='Report title')
@@ -58,6 +60,7 @@ def main(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
+    rich_info: Optional[str] = None,
     html_url: Optional[str] = None,
     dataset: Optional[str] = None,
     title: Optional[str] = None,
@@ -108,6 +111,7 @@ def run(
     somalier_samples_fpath: str,
     somalier_pairs_fpath: str,
     expected_ped_fpath: str,
+    rich_info_fpath: Optional[str] = None,
     html_url: Optional[str] = None,
     dataset: Optional[str] = None,
     title: Optional[str] = None,
@@ -124,6 +128,9 @@ def run(
         inferred_ped = Ped(f)
     with to_path(expected_ped_fpath).open() as f:
         expected_ped = Ped(f)
+    if rich_info_fpath:
+        with to_path(rich_info_fpath).open() as f:
+            rich_info = json.load(f)
 
     bad = df.gt_depth_mean == 0.0
     if bad.any():
@@ -174,7 +181,11 @@ def run(
     info('')
 
     info('*Relatedness:*')
-    expected_ped_sample_by_id = {s.sample_id: s for s in expected_ped.samples()}
+    expected_ped_sample_by_id: dict[str, dict] = {s.sample_id: s for s in expected_ped.samples()}
+    if rich_info_fpath:
+        # If rich info is provided, we can backfill the expected PED with any missing parent IDs
+        expected_ped_sample_by_id = update_ped(expected_ped_sample_by_id, rich_info)
+
     inferred_ped_sample_by_id = {s.sample_id: s for s in inferred_ped.samples()}
 
     mismatching_unrelated_to_related = []
@@ -270,6 +281,28 @@ def run(
 
     if send_to_slack:
         send_message(text)
+
+
+def update_ped(ped_by_sg_id: dict[str, dict] , rich_info: dict[str, dict]) -> dict[str, dict]:
+    """
+    Update the provided PED sample with any missing parent IDs from rich info.
+
+    The expected PED file is generated based one which samples are present in the dataset.
+    If a parent exists in the rich info, but not in the PED file, it will have
+    a placeholder ID of 0. This function will update the PED sample with the
+    parent ID from the rich info, if it exists.
+    """
+    sg_participant_id_map = rich_info['sg_participants']
+    ped_rows_by_participant_id = rich_info['ped_rows']
+    for sg_id, sg_pedrow in ped_by_sg_id.items():
+        participant_id = sg_participant_id_map[sg_id]
+        ped_row = ped_rows_by_participant_id[participant_id]
+        # Update the PED sample with the participant ID from the rich info
+        if sg_pedrow.maternal_id == '0' and (maternal_id := ped_row['maternal_id']):
+            sg_pedrow.maternal_id = maternal_id
+        if sg_pedrow.paternal_id == '0' and (paternal_id := ped_row['paternal_id']):
+            sg_pedrow.paternal_id = paternal_id
+    return ped_by_sg_id
 
 
 def print_contents(
