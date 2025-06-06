@@ -34,24 +34,24 @@ class Combiner(CohortStage):
             )
             vds_path = cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds'
 
+        return {'vds': vds_path}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        output_paths = self.expected_outputs(cohort)
+
         # include the list of all VDS IDs in the plan name
         if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
             ids_list_as_string: str = '_'.join([str(id) for id in sorted(vds_ids)])
             combiner_plan_name: str = f'combiner_{ids_list_as_string}'
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
-        return {
-            'vds': vds_path,
-            'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
-        }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        output_paths = self.expected_outputs(cohort)
+        combiner_plan: str = str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json')
 
         j: PythonJob = combiner(
             cohort=cohort,
             output_vds_path=str(output_paths['vds']),
-            save_path=output_paths['combiner_plan'],
+            save_path=combiner_plan,
         )
 
         return self.make_outputs(cohort, output_paths, [j])
