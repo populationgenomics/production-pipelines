@@ -13,7 +13,7 @@ setup(
     license='MIT',
     packages=find_packages(),
     install_requires=[
-        'cpg-utils>=5.1.1',
+        'cpg-utils>=5.4.0',
         'cyvcf2==0.30.18',
         'analysis-runner>=2.43.3',
         'hail>=0.2.133',
