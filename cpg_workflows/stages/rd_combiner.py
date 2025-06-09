@@ -69,31 +69,6 @@ SPECIFIC_VDS_QUERY = gql(
 SHARD_MANIFEST = 'shard-manifest.txt'
 
 
-def query_for_specific_vds(vds_id: int) -> tuple[str, set[str]] | None:
-    """
-    query for a specific analysis of type entry_type for a dataset
-    if found, return the set of SG IDs in the VDS (using the metadata)
-
-    - stolen from the cpg_workflows.large_cohort.combiner Stage, but duplicated here so we can split pipelines without
-      further code changes
-
-    Args:
-        vds_id (int): analysis id to query for
-
-    Returns:
-        either None if the analysis wasn't found, or a set of SG IDs in the VDS
-    """
-
-    # query for the exact, single analysis entry
-    query_results: dict[str, dict] = query(SPECIFIC_VDS_QUERY, variables={'vds_id': vds_id})
-
-    if not query_results['analyses']:
-        return None
-    vds_path: str = query_results['analyses'][0]['output']
-    sg_ids = {sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']}
-    return vds_path, sg_ids
-
-
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
     """
     query for the latest analysis of type entry_type for a dataset
@@ -195,14 +170,9 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
         sg_ids_in_vds: set[str] = set()
         sgs_to_remove: list[str] = []
 
-        # check for a VDS by ID
-        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], None):
-            vds_result_or_none = query_for_specific_vds(vds_id)
-            if vds_result_or_none is None:
-                raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
-
-            # if not none, unpack the result
-            vds_path, sg_ids_in_vds = vds_result_or_none
+        # use a VDS path from config file, if possible
+        if vds_path := config_retrieve(['workflow', 'specific_vds'], None):
+            get_logger().info(f'Using VDS path from config: {vds_path}')
 
         # check for existing VDS by getting all and fetching latest
         elif config_retrieve(['workflow', 'check_for_existing_vds']):
