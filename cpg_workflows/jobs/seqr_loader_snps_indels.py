@@ -25,6 +25,17 @@ def annotate_cohort_jobs_snps_indels(
     """
     Annotate cohort VCF for seqr loader, SNPs and Indels.
     """
+    init_batch_args: dict[str, str | int] = {}
+    annotate_cohort_workflow = config_retrieve(['workflow', 'annotate_cohort'], {})
+
+    # Memory parameters
+    for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+        if annotate_cohort_workflow.get(config_key):
+            init_batch_args[batch_key] = 'highmem'
+    # Cores parameter
+    for key in ['driver_cores', 'worker_cores']:
+        if annotate_cohort_workflow.get(key):
+            init_batch_args[key] = annotate_cohort_workflow[key]
 
     j = get_batch().new_job('Annotate cohort', job_attrs)
     j.image(config_retrieve(['workflow', 'driver_image']))
@@ -37,8 +48,8 @@ def annotate_cohort_jobs_snps_indels(
             str(vep_ht_path),
             None,  # site_only_vqsr_vcf_path
             str(checkpoint_prefix),
-            True,  # long_read
             True,  # remove_invalid_contigs
+            init_batch_args=init_batch_args,
         ),
     )
     return j
@@ -98,13 +109,17 @@ def split_merged_vcf_and_get_sitesonly_vcfs_for_vep(
     ]
     siteonly_vcfs: list[hb.ResourceGroup] = []
 
-    split_vcf_j = add_split_vcf_job(
-        b=b,
-        input_vcf=merged_vcf,
-        intervals=intervals,
-        output_vcf_paths=split_vcfs_paths,
-        job_attrs=(job_attrs or {}) | dict(part='all'),
-    )
+    # Only create the split VCF job if we are not reusing the output paths
+    if can_reuse(split_vcfs_paths + [to_path(f'{p}.tbi') for p in split_vcfs_paths]):
+        split_vcf_j = None
+    else:
+        split_vcf_j = add_split_vcf_job(
+            b=b,
+            input_vcf=merged_vcf,
+            intervals=intervals,
+            output_vcf_paths=split_vcfs_paths,
+            job_attrs=(job_attrs or {}) | dict(part='all'),
+        )
 
     for idx in range(scatter_count):
         if out_siteonly_vcf_part_paths:

@@ -363,7 +363,8 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     filters = {
         "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
-        "AS_VQSR": hl.len(ds.vqsr_filters) > 0,
+        "AS_lowqual": ds.AS_lowqual,
+        "AS_VQSR": ds.as_vqsr_filters != "PASS",
     }
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
@@ -385,6 +386,10 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     ds = ds.annotate(variant_id=ds.variant_id, rsids=ds.rsids, summary=hl.struct(**summary_dict))
     ds = ds.select('variant_id', 'rsids', 'summary')
     ds = ds.rename({'summary': exome_or_genome})
+
+    globals_dict = ds.globals.collect()[0]
+    ds = ds.select_globals()
+    ds = ds.annotate_globals(**{f"{exome_or_genome}_{k}": v for k, v in globals_dict.items()})
 
     return ds
 

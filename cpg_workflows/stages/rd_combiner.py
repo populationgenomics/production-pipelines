@@ -69,31 +69,6 @@ SPECIFIC_VDS_QUERY = gql(
 SHARD_MANIFEST = 'shard-manifest.txt'
 
 
-def query_for_specific_vds(vds_id: int) -> tuple[str, set[str]] | None:
-    """
-    query for a specific analysis of type entry_type for a dataset
-    if found, return the set of SG IDs in the VDS (using the metadata)
-
-    - stolen from the cpg_workflows.large_cohort.combiner Stage, but duplicated here so we can split pipelines without
-      further code changes
-
-    Args:
-        vds_id (int): analysis id to query for
-
-    Returns:
-        either None if the analysis wasn't found, or a set of SG IDs in the VDS
-    """
-
-    # query for the exact, single analysis entry
-    query_results: dict[str, dict] = query(SPECIFIC_VDS_QUERY, variables={'vds_id': vds_id})
-
-    if not query_results['analyses']:
-        return None
-    vds_path: str = query_results['analyses'][0]['output']
-    sg_ids = {sg['id'] for sg in query_results['analyses'][0]['sequencingGroups']}
-    return vds_path, sg_ids
-
-
 def query_for_latest_vds(dataset: str, entry_type: str = 'combiner') -> dict | None:
     """
     query for the latest analysis of type entry_type for a dataset
@@ -186,60 +161,74 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
 
     def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
 
-        outputs: dict[str, str | Path] = self.expected_outputs(multicohort)
+        outputs = self.expected_outputs(multicohort)
 
-        # create these as empty lists instead of None, they have the same truthiness
+        # we only ever build on top of a single VDS, or start from scratch
         vds_path: str | None = None
+
+        # create these as empty iterables
         sg_ids_in_vds: set[str] = set()
+        sgs_to_remove: list[str] = []
 
-        # check for a VDS by ID
-        if vds_id := config_retrieve(['workflow', 'use_specific_vds'], False):
-            vds_result_or_none = query_for_specific_vds(vds_id)
-            if vds_result_or_none is None:
-                raise ValueError(f'Specified VDS ID {vds_id} not found in Metamist')
-
-            # if not none, unpack the result
-            vds_path, sg_ids_in_vds = vds_result_or_none
+        # use a VDS path from config file, if possible
+        if vds_path := config_retrieve(['workflow', 'specific_vds'], None):
+            get_logger().info(f'Using VDS path from config: {vds_path}')
 
         # check for existing VDS by getting all and fetching latest
-        elif config_retrieve(['workflow', 'check_for_existing_vds'], True):
-            get_logger(__file__).info('Checking for existing VDS')
+        elif config_retrieve(['workflow', 'check_for_existing_vds']):
+            get_logger().info('Checking for existing VDS')
             if existing_vds_analysis_entry := query_for_latest_vds(multicohort.analysis_dataset.name, 'combiner'):
                 vds_path = existing_vds_analysis_entry['output']
                 sg_ids_in_vds = {sg['id'] for sg in existing_vds_analysis_entry['sequencingGroups']}
 
         else:
-            get_logger(__file__).info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
+            get_logger().info('Not continuing from any previous VDS, creating new Combiner from gVCFs only')
 
         # quick check - if we found a VDS, guarantee it exists
         if vds_path and not exists(vds_path):
             raise ValueError(f'VDS {vds_path} does not exist, but has an Analysis Entry')
 
-        # this is a more computationally expensive, but much more certain check, on prior VDS contents
-        # it is not used by default, but can be enabled by setting manually_check_vds_sg_ids to true
-        if vds_path and config_retrieve(['workflow', 'manually_check_vds_sg_ids'], False):
+        # this is a quick and confident check on current VDS contents, but does require a direct connection to the VDS
+        # by default this is True, and can be deactivated in config
+        if vds_path and config_retrieve(['workflow', 'manually_check_vds_sg_ids']):
             sg_ids_in_vds = manually_find_ids_from_vds(vds_path)
 
+        # technicality; this can be empty - in a situation where we have a VDS already and the current MCohort has FEWER
+        # SG IDs in it, this stage will re-run because the specific hash will be different to the previous VDS
+        # See https://github.com/populationgenomics/production-pipelines/issues/1126
         new_sg_gvcfs: list[str] = [
             str(sg.gvcf)
             for sg in multicohort.get_sequencing_groups()
             if (sg.gvcf is not None) and (sg.id not in sg_ids_in_vds)
         ]
 
-        if not new_sg_gvcfs:
-            get_logger(__file__).info('No GVCFs to combine')
-            get_logger(__file__).info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
+        # final check - if we have a VDS, and we have a current MultiCohort
+        # detect any samples which should be _removed_ from the current VDS prior to further combining taking place
+        if sg_ids_in_vds:
+            sgs_in_mc: list[str] = multicohort.get_sequencing_group_ids()
+            get_logger().info(f'Found {len(sg_ids_in_vds)} SG IDs in VDS {vds_path}')
+            get_logger().info(f'Total {len(sgs_in_mc)} SGs in this MultiCohort')
+
+            sgs_to_remove = sorted(set(sg_ids_in_vds) - set(sgs_in_mc))
+
+            if sgs_to_remove:
+                get_logger().info(f'Removing {len(sgs_to_remove)} SGs from VDS {vds_path}')
+                get_logger().info(f'SGs to remove: {sgs_to_remove}')
+
+        if not (new_sg_gvcfs or sgs_to_remove):
+            get_logger().info('No GVCFs to add to, or remove from, existing VDS')
+            get_logger().info(f'Checking if VDS exists: {outputs["vds"]}: {outputs["vds"].exists()}')  # type: ignore
             return self.make_outputs(multicohort, outputs)
 
         combiner_job = get_batch().new_python_job('CreateVdsFromGvcfsWithHailCombiner', {'stage': self.name})
         combiner_job.image(config_retrieve(['workflow', 'driver_image']))
-        combiner_job.memory(config_retrieve(['combiner', 'driver_memory'], 'highmem'))
+        combiner_job.memory(config_retrieve(['combiner', 'driver_memory']))
         combiner_job.storage(config_retrieve(['combiner', 'driver_storage']))
-        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores'], 2))
+        combiner_job.cpu(config_retrieve(['combiner', 'driver_cores']))
 
         # set this job to be non-spot (i.e. non-preemptible)
         # previous issues with preemptible VMs led to multiple simultaneous QOB groups processing the same data
-        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms'], False))
+        combiner_job.spot(config_retrieve(['combiner', 'preemptible_vms']))
 
         # Default to GRCh38 for reference if not specified
         combiner_job.call(
@@ -250,8 +239,9 @@ class CreateVdsFromGvcfsWithHailCombiner(MultiCohortStage):
             tmp_prefix=str(self.tmp_prefix / 'temp_dir'),
             genome_build=genome_build(),
             gvcf_paths=new_sg_gvcfs,
-            vds_paths=[vds_path] if vds_path else None,
+            vds_path=vds_path,
             force_new_combiner=config_retrieve(['combiner', 'force_new_combiner'], False),
+            sgs_to_remove=sgs_to_remove,
         )
 
         return self.make_outputs(multicohort, outputs, combiner_job)

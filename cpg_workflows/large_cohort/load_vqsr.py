@@ -6,7 +6,7 @@ import hail as hl
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.annotations import annotate_allele_info
-from gnomad.utils.sparse_mt import split_info_annotation
+from gnomad.utils.sparse_mt import split_info_annotation, split_lowqual_annotation
 
 
 def run(
@@ -22,9 +22,9 @@ def split_info(info_ht: hl.Table) -> hl.Table:
     """
     Splits multi-allelic sites in the provided info Table.
 
-    This function is adapted from `gnomad_methods` (`gnomad.utils.sparse_mt`) to handle
-    multi-allelic sites in the info Table. The `AS_lowqual` annotation splitting is
-    omitted as it is not used in the VQSR pipeline.
+    This function is taken from `gnomad_qc`
+    (`gnomad_qc/v4/annotations/generate_variant_qc_annotations.py`) to handle
+    multi-allelic sites in the info Table.
 
     The `annotate_allele_info` function from `gnomad_methods` is used to split
     multi-allelic sites before splitting the `info` annotation. This ensures that
@@ -50,8 +50,7 @@ def split_info(info_ht: hl.Table) -> hl.Table:
             )
             for a in info_annotations_to_split
         },
-        # Vqsr info_ht has no field AS_lowqual
-        # AS_lowqual=split_lowqual_annotation(info_ht.AS_lowqual, info_ht.a_index),
+        AS_lowqual=split_lowqual_annotation(info_ht.AS_lowqual, info_ht.a_index),
     )
 
     return info_ht
@@ -87,6 +86,7 @@ def load_vqsr(
         info=ht_unsplit.info.annotate(
             AS_SB_TABLE=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
         ),
+        AS_lowqual=pre_vcf_adjusted_ht[ht_unsplit.key].AS_lowqual,
     )
 
     unsplit_count = ht_unsplit.count()
