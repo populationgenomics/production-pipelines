@@ -142,11 +142,11 @@ use_verifybamid = true
 analysis_type = "extended"
 # See https://gitlab.com/andreassh/stripy-pipeline#list-of-loci
 # Excluded by default: C9orf72, HTT
-target_loci = """AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
+target_loci = """ABCD3,AFF2,AR,ARX_1,ARX_2,ATN1,ATXN1,ATXN10,ATXN2,ATXN3,ATXN7,ATXN8OS,\
 BEAN1,CACNA1A,CBL,CNBP,COMP,CSTB,DAB1,DIP2B,DMD,DMPK,EIF4A3,FGF14,FMR1,FOXL2,FXN,GIPC1,\
 GLS,HOXA13_1,HOXA13_2,HOXA13_3,HOXD13,JPH3,LRP12,MARCHF6,NIPA1,NOP56,NOTCH2NLC,\
 NUTM2B-AS1,PABPN1,PHOX2B,PPP2R2B,PRDM12,PRNP,RAPGEF2,RFC1,RILPL1,RUNX2,SAMD12,SOX3,\
-STARD7,TBP,TBX1,TCF4,TNRC6A,VWA1,XYLT1,YEATS2,ZFHX3,ZIC2,ZIC3"""
+STARD7,TBP,TBX1,TCF4,THAP11,TNRC6A,VWA1,XYLT1,YEATS2,ZFHX3,ZIC2,ZIC3"""
 # Path to bed+ file containins extra loci to include in the analysis. Tab-delimited BED
 # file containing at least the following four values: chromosome, start and end position
 # of the STR locus and motif on the plus strand. Optionally, the locus name/ID can be
