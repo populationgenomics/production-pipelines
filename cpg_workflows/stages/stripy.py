@@ -77,12 +77,21 @@ class Stripy(SequencingGroupStage):
         cram_path = inputs.as_path(sequencing_group, Align, 'cram')
         crai_path = inputs.as_path(sequencing_group, Align, 'crai')
 
+        target_loci = config_retrieve(['stripy', 'target_loci'])
+        if dataset_specific_loci := config_retrieve(['stripy', sequencing_group.dataset.name, 'target_loci']):
+            if config_retrieve(['stripy', sequencing_group.dataset.name, 'target_loci_override'], default=False):
+                target_loci = dataset_specific_loci
+            else:
+                target_loci = ','.join(
+                    set(target_loci.split(',')) & set(dataset_specific_loci.split(',')),
+                )
+
         jobs = []
         j = stripy.stripy(
             b=get_batch(),
             sequencing_group=sequencing_group,
             cram_path=CramPath(cram_path, crai_path),
-            target_loci=config_retrieve(['stripy', 'target_loci']),
+            target_loci=target_loci,
             custom_loci_path=config_retrieve(['stripy', 'custom_loci_path']),
             analysis_type=config_retrieve(['stripy', 'analysis_type']),
             stripy_config=config_retrieve(['stripy', 'config']),
