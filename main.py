@@ -38,6 +38,7 @@ from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
     AnnotateCohortSmallVariantsWithHailQuery,
     AnnotateDatasetSmallVariantsWithHailQuery,
+    AnnotatedDatasetMtToVcfWithHailQuery,
     AnnotateFragmentedVcfWithVep,
     ConcatenateVcfFragmentsWithGcloud,
     CreateDenseMtFromVdsWithHail,
@@ -77,6 +78,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         AnnotateCohortSmallVariantsWithHailQuery,
         SubsetMatrixTableToDatasetUsingHailQuery,
         AnnotateDatasetSmallVariantsWithHailQuery,
+        AnnotatedDatasetMtToVcfWithHailQuery,
         ExportMtAsEsIndex,
     ],
     'seqr_loader': [
