@@ -24,6 +24,7 @@ from cpg_workflows.jobs.rd_combiner.vqsr import (
     train_vqsr_snp_tranches,
     train_vqsr_snps,
 )
+from cpg_workflows.jobs.seqr_loader import cohort_to_vcf_job
 from cpg_workflows.targets import Dataset, MultiCohort
 from cpg_workflows.utils import exists, get_all_fragments_from_manifest, get_logger, tshirt_mt_sizing
 from cpg_workflows.workflow import (
@@ -721,6 +722,59 @@ class AnnotateDatasetSmallVariantsWithHailQuery(DatasetStage):
         job.cpu(2).memory('highmem').storage('10Gi')
         job.command(f'annotate_dataset_small --input {str(input_mt)} --output {str(outputs)} ')
         return self.make_outputs(dataset, data=outputs, jobs=job)
+
+
+@stage(required_stages=[AnnotateDatasetSmallVariantsWithHailQuery], analysis_type='custom', analysis_keys=['vcf'])
+class AnnotatedDatasetMtToVcfWithHailQuery(DatasetStage):
+    """
+    Take the per-dataset annotated MT and write out as a VCF
+    Optional stage set by dataset name in the config file
+    """
+
+    def expected_outputs(self, dataset: Dataset):
+        """
+        Expected to generate a VCF from the single-dataset MT
+        """
+        if family_sgs := get_family_sequencing_groups(dataset):
+            return {
+                'vcf': (
+                    dataset.prefix()
+                    / 'vcf'
+                    / f'{get_workflow().output_version}-{dataset.name}-{family_sgs["name_suffix"]}.vcf.bgz'
+                ),
+                'index': (
+                    dataset.prefix()
+                    / 'vcf'
+                    / f'{get_workflow().output_version}-{dataset.name}-{family_sgs["name_suffix"]}.vcf.bgz.tbi'
+                ),
+            }
+        return {
+            'vcf': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz'),
+            'index': (dataset.prefix() / 'vcf' / f'{get_workflow().output_version}-{dataset.name}.vcf.bgz.tbi'),
+        }
+
+    def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput | None:
+        """
+        Run a MT -> VCF extraction on selected cohorts
+        only run this on manually defined list of cohorts
+        """
+
+        # only run this selectively, most datasets it's not required
+        eligible_datasets = config_retrieve(['workflow', 'write_vcf'])
+        if dataset.name not in eligible_datasets:
+            return None
+
+        mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSmallVariantsWithHailQuery, key='mt')
+
+        job = cohort_to_vcf_job(
+            b=get_batch(),
+            mt_path=mt_path,
+            out_vcf_path=self.expected_outputs(dataset)['vcf'],
+            job_attrs=self.get_job_attrs(dataset),
+            depends_on=inputs.get_jobs(dataset),
+        )
+
+        return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=job)
 
 
 def es_password() -> str:
