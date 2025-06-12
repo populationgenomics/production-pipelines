@@ -102,13 +102,15 @@ def stripy(
 
     cp $BATCH_TMPDIR/{sequencing_group.id}__{sequencing_group.external_id}.cram.html {j.out_path}
 
-    # only copy the json if it exists
     if [ -f $BATCH_TMPDIR/{sequencing_group.id}__{sequencing_group.external_id}.cram.json ]; then
         cp $BATCH_TMPDIR/{sequencing_group.id}__{sequencing_group.external_id}.cram.json {j.json_path}
     else
         touch {j.json_path}
     fi
 
+    if [ ! -f {log_path} ]; then
+        touch {log_path}
+    fi    
     """
 
     j.command(command(cmd))
