@@ -108,8 +108,8 @@ def stripy(
         touch {j.json_path}
     fi
 
-    if [ ! -f {log_path} ]; then
-        touch {log_path}
+    if [ ! -f {j.log_path} ]; then
+        touch {j.log_path}
     fi    
     """
 
