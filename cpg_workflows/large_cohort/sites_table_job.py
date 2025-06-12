@@ -104,7 +104,6 @@ def main(
             hgdp_1kg.variant_qc.AF[1],
         ),
     )
-    # Expecting
     hgdp_1kg = hgdp_1kg.filter_rows(
         (hl.len(hgdp_1kg.alleles) == 2)
         & (hgdp_1kg.locus.in_autosome())
