@@ -117,7 +117,7 @@ def main(
     # otherwise, persisting the pruned_variant_table will cause
     # script to fail. See https://github.com/populationgenomics/ancestry/pull/79
     print('Writing sites table pre-LD pruning')
-    checkpoint_path = output_path('hgdp1_1kg_exome_pre_pruning.mt', 'default')
+    checkpoint_path = output_path('hgdp_1kg_exome_pre_pruning.mt', 'default')
     hgdp_1kg = hgdp_1kg.checkpoint(checkpoint_path, overwrite=True)
     print('Done writing sites table pre-LD pruning')
 
