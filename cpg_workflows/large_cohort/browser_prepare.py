@@ -177,6 +177,17 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
 
     if ds_path is None:
         ds = hl.Table.parallelize(hl.literal([], "".join(EMPTY_TABLE_CONFIG.split()))).key_by('locus', 'alleles')
+
+        age_hist = hl.struct(
+            bin_edges=hl.literal([30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0, 75.0, 80.0]),
+            bin_freq=hl.literal([0] * 10),
+            n_smaller=hl.int32(0),
+            n_larger=hl.int32(0),
+        )
+
+        ds_globals = ds.globals.annotate(**{f"{exome_or_genome}_age_distribution": age_hist})
+        ds = ds.annotate_globals(**ds_globals)
+
         ds = ds.rename({'type': exome_or_genome})
         return ds
 
