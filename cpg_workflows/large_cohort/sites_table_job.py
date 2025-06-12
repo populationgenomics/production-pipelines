@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import os
 from lib2to3.pgen2 import driver
 
