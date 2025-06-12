@@ -47,7 +47,7 @@ def main(
     exomes: bool,
     vqsr_table_path: str,
     sites_table_outpath: str,
-    bed_file: list[str] | None = None,
+    intersected_bed_file: list[str] | None = None,
 ):
     print(f'Input vds_path: {vds_path}')
 
@@ -63,11 +63,11 @@ def main(
     )
     # exomes
     if exomes:
-        if not bed_file:
+        if not intersected_bed_file:
             raise ValueError('If --exomes is set, you must provide at least one --capture-region-bed-files')
 
         # Read in capture region bed files
-        capture_interval_ht: hl.Table = hl.import_bed(str(bed_file), reference_genome=genome_build())
+        capture_interval_ht: hl.Table = hl.import_bed(str(intersected_bed_file), reference_genome=genome_build())
 
         # Generate list of intervals
         intervals: list[hl.Interval] = capture_interval_ht.interval.collect()
