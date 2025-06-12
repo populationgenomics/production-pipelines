@@ -764,7 +764,7 @@ class AnnotatedDatasetMtToVcfWithHailQuery(DatasetStage):
         if dataset.name not in eligible_datasets:
             return None
 
-        mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSmallVariantsWithHailQuery, key='mt')
+        mt_path = inputs.as_path(target=dataset, stage=AnnotateDatasetSmallVariantsWithHailQuery)
 
         job = cohort_to_vcf_job(
             b=get_batch(),
