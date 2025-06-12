@@ -20,9 +20,10 @@ from cpg_workflows.workflow import (
     stage,
 )
 
+
 def _stripy_config_retrieve(key: str, dataset: str | None = None) -> Any:
     """
-    Retrieve the STRipy config for a given key. If a dataset is provided, it will first 
+    Retrieve the STRipy config for a given key. If a dataset is provided, it will first
     check for a dataset-specific config before falling back to the global config.
     (Not to be confused with the stripy config json file used by the stripy job.)
     """
@@ -30,6 +31,7 @@ def _stripy_config_retrieve(key: str, dataset: str | None = None) -> Any:
         return config_retrieve(['stripy', dataset, key], default={})
     else:
         return config_retrieve(['stripy', key], default={})
+
 
 def _get_target_loci(dataset: str) -> str:
     """
@@ -45,6 +47,7 @@ def _get_target_loci(dataset: str) -> str:
                 set(target_loci.split(',')) & set(dataset_specific_loci.split(',')),
             )
     return target_loci
+
 
 def _update_meta(output_path: str) -> dict[str, Any]:
     """
