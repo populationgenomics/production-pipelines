@@ -113,22 +113,17 @@ def main(
     )
     print('Done filtering using gnomAD v3 parameters')
 
-    print('Filtering to exome intervals')
-    exome_intervals = hl.import_locus_intervals(str(reference_path('broad/exome_calling_interval_lists')))
-    hgdp_1kg_exome = hgdp_1kg.filter_rows(hl.is_defined(exome_intervals[hgdp_1kg.locus]))
-    print('Done filtering to exome intervals')
-
     # downsize input variants for ld_prune
     # otherwise, persisting the pruned_variant_table will cause
     # script to fail. See https://github.com/populationgenomics/ancestry/pull/79
     print('Writing sites table pre-LD pruning')
     checkpoint_path = output_path('hgdp1_1kg_exome_pre_pruning.mt', 'default')
-    hgdp_1kg_exome = hgdp_1kg_exome.checkpoint(checkpoint_path, overwrite=True)
+    hgdp_1kg = hgdp_1kg.checkpoint(checkpoint_path, overwrite=True)
     print('Done writing sites table pre-LD pruning')
 
-    # nrows = hgdp_1kg_exome.count_rows()
-    # print(f'hgdp_1kg_exome.count_rows() = {nrows}')
-    # hgdp_1kg_exome = hgdp_1kg_exome.sample_rows(
+    # nrows = hgdp_1kg.count_rows()
+    # print(f'hgdp_1kg.count_rows() = {nrows}')
+    # hgdp_1kg = hgdp_1kg.sample_rows(
     #     NUM_ROWS_BEFORE_LD_PRUNE / nrows,
     #     seed=12345,
     # )
@@ -136,7 +131,7 @@ def main(
     # as per gnomAD, LD-prune variants with a cutoff of r2 = 0.1
     print('Pruning sites table')
     pruned_variant_table = hl.ld_prune(
-        hgdp_1kg_exome.GT,
+        hgdp_1kg.GT,
         r2=0.1,
         bp_window_size=500000,
     )
