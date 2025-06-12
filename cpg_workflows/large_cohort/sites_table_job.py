@@ -31,11 +31,30 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
     'If --exomes is set, this must be provided.',
     type=str,
 )
+@click.option(
+    '--vqsr-table-path',
+    help='Path to the VQSR table to use for filtering variants.',
+    type=str,
+)
+@click.option(
+    '--sites-table-outpath',
+    help='Path to write the output sites table.',
+    type=str,
+)
 @click.command()
-def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
+def main(
+    vds_path: str,
+    exomes: bool,
+    vqsr_table_path: str,
+    sites_table_outpath: str,
+    bed_file: list[str] | None = None,
+):
     print(f'Input vds_path: {vds_path}')
-    pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'default')
-    print('Will be writing to pruned_variant_table_path:', pruned_variant_table_path)
+
+    print('Will be writing to pruned_variant_table_path:', sites_table_outpath)
+
+    vqsr_table = hl.read_table(vqsr_table_path)
+
     # Initialise batch
     init_batch(
         worker_memory='highmem',
@@ -55,6 +74,10 @@ def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
 
     vds = hl.vds.read_vds(str(vds_path), intervals=intervals if exomes else None)
 
+    # Filter to variant sites that pass VQSR
+    passed_variants = vqsr_table.filter(vqsr_table.info.AS_FilterStatus == 'PASS')
+    vds = hl.vds.filter_variants(vds, passed_variants)
+
     print('Splitting multi-allelic sites')
     vds = hl.vds.split_multi(vds, filter_changed_loci=True)
     print('Done splitting multi-allelic sites')
@@ -66,7 +89,7 @@ def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
     # Run variant QC
     print('Running variant QC')
     # choose variants based off of gnomAD v3 parameters
-    # Inbreeding coefficient > -0.25 (no excess of heterozygotes)
+    # Inbreeding coefficient > -0.80 (no excess of heterozygotes)
     # Must be single nucleotide variants that are autosomal (i.e., no sex), and bi-allelic
     # Have an allele frequency above 1% (note deviation from gnomAD, which is 0.1%)
     # Have a call rate above 99%
@@ -81,12 +104,13 @@ def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
             hgdp_1kg.variant_qc.AF[1],
         ),
     )
+    # Expecting
     hgdp_1kg = hgdp_1kg.filter_rows(
         (hl.len(hgdp_1kg.alleles) == 2)
         & (hgdp_1kg.locus.in_autosome())
         & (hgdp_1kg.variant_qc.AF[1] > 0.01)
         & (hgdp_1kg.variant_qc.call_rate > 0.99)
-        & (hgdp_1kg.IB.f_stat > -0.25),
+        & (hgdp_1kg.IB.f_stat > -0.80),
     )
     print('Done filtering using gnomAD v3 parameters')
 
@@ -124,9 +148,9 @@ def main(vds_path: str, exomes: bool, bed_file: list[str] | None = None):
     pruned_variant_table = pruned_variant_table.repartition(100, shuffle=False)
     print('Number of variants in pruned_variant_table:', pruned_variant_table.count())
     print('Done repartitioning sites table')
-    # pruned_variant_table_path = output_path('pruned_variants_exome.ht', 'tmp')
-    print(f'Writing sites table to {pruned_variant_table_path}')
-    pruned_variant_table.write(pruned_variant_table_path, overwrite=True)
+
+    print(f'Writing sites table to {sites_table_outpath}')
+    pruned_variant_table.write(sites_table_outpath, overwrite=True)
     print('Done writing sites table')
 
 
