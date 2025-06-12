@@ -21,6 +21,35 @@ from cpg_workflows.workflow import (
 )
 
 
+def _stripy_config_retrieve(key: str, dataset: str | None = None) -> Any:
+    """
+    Retrieve the STRipy config for a given key. If a dataset is provided, it will first
+    check for a dataset-specific config before falling back to the global config.
+
+    **NOT to be confused with the stripy config.json file used by the stripy job**
+    """
+    if dataset and config_retrieve(['stripy', dataset, key], default=None) is not None:
+        return config_retrieve(['stripy', dataset, key], default=None)
+    else:
+        return config_retrieve(['stripy', key], default=None)
+
+
+def _get_target_loci(dataset: str) -> str:
+    """
+    Get the target loci which stripy should run on.
+    Uses defaults + dataset-specific additional loci if available.
+    """
+    target_loci = _stripy_config_retrieve('target_loci')
+    if dataset_specific_loci := _stripy_config_retrieve('target_loci', dataset):
+        if _stripy_config_retrieve('target_loci_override', dataset) is True:
+            target_loci = dataset_specific_loci
+        else:
+            target_loci = ','.join(
+                set(target_loci.split(',')) | set(dataset_specific_loci.split(',')),
+            )
+    return target_loci
+
+
 def _update_meta(output_path: str) -> dict[str, Any]:
     """
     Add the detected outlier loci to the analysis meta
@@ -82,10 +111,10 @@ class Stripy(SequencingGroupStage):
             b=get_batch(),
             sequencing_group=sequencing_group,
             cram_path=CramPath(cram_path, crai_path),
-            target_loci=config_retrieve(['stripy', 'target_loci']),
-            custom_loci_path=config_retrieve(['stripy', 'custom_loci_path']),
-            analysis_type=config_retrieve(['stripy', 'analysis_type']),
-            stripy_config=config_retrieve(['stripy', 'config']),
+            target_loci=_get_target_loci(sequencing_group.dataset.name),
+            custom_loci_path=_stripy_config_retrieve('custom_loci_path', sequencing_group.dataset.name),
+            analysis_type=_stripy_config_retrieve('analysis_type'),
+            stripy_config=_stripy_config_retrieve('config', sequencing_group.dataset.name),
             log_path=self.expected_outputs(sequencing_group)['stripy_log'],
             out_path=self.expected_outputs(sequencing_group)['stripy_html'],
             json_path=self.expected_outputs(sequencing_group)['stripy_json'],
