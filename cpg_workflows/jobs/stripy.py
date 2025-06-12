@@ -110,7 +110,7 @@ def stripy(
 
     if [ ! -f {j.log_path} ]; then
         touch {j.log_path}
-    fi    
+    fi
     """
 
     j.command(command(cmd))
