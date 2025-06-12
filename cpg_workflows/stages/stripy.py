@@ -25,12 +25,13 @@ def _stripy_config_retrieve(key: str, dataset: str | None = None) -> Any:
     """
     Retrieve the STRipy config for a given key. If a dataset is provided, it will first
     check for a dataset-specific config before falling back to the global config.
-    (Not to be confused with the stripy config json file used by the stripy job.)
+
+    **NOT to be confused with the stripy config.json file used by the stripy job**
     """
     if dataset and config_retrieve(['stripy', dataset, key], default=None) is not None:
-        return config_retrieve(['stripy', dataset, key], default={})
+        return config_retrieve(['stripy', dataset, key], default=None)
     else:
-        return config_retrieve(['stripy', key], default={})
+        return config_retrieve(['stripy', key], default=None)
 
 
 def _get_target_loci(dataset: str) -> str:
@@ -44,7 +45,7 @@ def _get_target_loci(dataset: str) -> str:
             target_loci = dataset_specific_loci
         else:
             target_loci = ','.join(
-                set(target_loci.split(',')) & set(dataset_specific_loci.split(',')),
+                set(target_loci.split(',')) | set(dataset_specific_loci.split(',')),
             )
     return target_loci
 
