@@ -6,7 +6,7 @@ import logging
 from typing import Any
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import GvcfPath
 from cpg_workflows.jobs.happy import happy
@@ -36,7 +36,7 @@ class GvcfQC(SequencingGroupStage):
         Generate a GVCF and corresponding TBI index, as well as QC.
         """
         outs: dict[str, Path] = {}
-        if get_config()['workflow'].get('skip_qc', False) is False:
+        if not config_retrieve(['workflow', 'skip_qc'], False):
             qc_prefix = sequencing_group.dataset.prefix() / 'qc' / sequencing_group.id
             outs |= {
                 'qc_summary': to_path(f'{qc_prefix}.variant_calling_summary_metrics'),
@@ -73,7 +73,7 @@ class GvcfHappy(SequencingGroupStage):
         Parsed by MultiQC: '*.summary.csv'
         https://multiqc.info/docs/#hap.py
         """
-        if sequencing_group.participant_id not in get_config().get('validation', {}).get('sample_map', {}):
+        if sequencing_group.participant_id not in config_retrieve(['validation', 'sample_map'], {}):
             return None
         return sequencing_group.dataset.prefix() / 'qc' / 'gvcf' / 'hap.py' / f'{sequencing_group.id}.summary.csv'
 
@@ -124,11 +124,11 @@ class GvcfMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
         # get the unique hash for these Sequencing Groups
-        sg_hash = dataset.alignment_inputs_hash()
+        sg_hash = dataset.get_alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'gvcf' / sg_hash / 'multiqc_data.json',
@@ -139,7 +139,7 @@ class GvcfMultiQC(DatasetStage):
         """
         Collect QC.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
         json_path = self.expected_outputs(dataset)['json']
@@ -179,6 +179,10 @@ class GvcfMultiQC(DatasetStage):
             'happy',
         }
 
+        send_to_slack = config_retrieve(['workflow', 'gvcf_multiqc', 'send_to_slack'], default=True)
+        extra_config = config_retrieve(['workflow', 'gvcf_multiqc', 'extra_config'], default={})
+        extra_config['table_columns_visible'] = {'Picard': True}
+
         jobs = multiqc(
             get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'gvcf',
@@ -192,7 +196,8 @@ class GvcfMultiQC(DatasetStage):
             out_checks_path=checks_path,
             job_attrs=self.get_job_attrs(dataset),
             sequencing_group_id_map=dataset.rich_id_map(),
-            extra_config={'table_columns_visible': {'Picard': True}},
+            extra_config=extra_config,
+            send_to_slack=send_to_slack,
             label='GVCF',
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)

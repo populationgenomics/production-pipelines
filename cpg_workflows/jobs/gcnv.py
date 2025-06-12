@@ -4,35 +4,47 @@ Jobs that implement GATK-gCNV.
 
 from collections.abc import Iterable
 
-from hailtop.batch.job import Job
-from hailtop.batch.resource import JobResourceFile, ResourceFile, ResourceGroup
+from hailtop.batch.job import BashJob, Job
+from hailtop.batch.resource import JobResourceFile, Resource, ResourceFile, ResourceGroup
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import (
-    command,
-    fasta_res_group,
-    get_batch,
-    image_path,
-    query_command,
-)
+from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils.hail_batch import command, fasta_res_group, get_batch, query_command
 from cpg_workflows.filetypes import CramPath
-from cpg_workflows.query_modules import seqr_loader, seqr_loader_cnv
+from cpg_workflows.query_modules import seqr_loader
 from cpg_workflows.resources import HIGHMEM
+from cpg_workflows.scripts import upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
-from cpg_workflows.workflow import Cohort
 
 
-def prepare_intervals(
-    job_attrs: dict[str, str],
-    output_paths: dict[str, Path],
-) -> Job:
+def upgrade_ped_file(local_ped: ResourceFile, new_output: str, aneuploidies: str, ploidy_tar: str):
+    """
+    Update the default Pedigree with the inferred ploidy information
+    update a ped file, and
+
+    Args:
+        local_ped ():
+        new_output ():
+        aneuploidies (str): where to write identified aneuploidies
+        ploidy_tar ():
+    """
+
+    j = get_batch().new_bash_job('Upgrade PED file with inferred Ploidy')
+    j.image(config_retrieve(['workflow', 'driver_image']))
+
+    # path to the python script
+    script_path = upgrade_ped_with_inferred.__file__.removeprefix('/production-pipelines')
+    j.command(f'tar -xf {ploidy_tar} -C .')  # creates the folder ploidy-calls
+    j.command(f'python3 {script_path} {local_ped} {j.output} {j.aneuploidies} ploidy-calls')
+    get_batch().write_output(j.output, new_output)
+    get_batch().write_output(j.aneuploidies, aneuploidies)
+    return j
+
+
+def prepare_intervals(job_attrs: dict[str, str], output_paths: dict[str, Path]) -> Job:
     j = get_batch().new_job(
         'Prepare intervals',
-        job_attrs
-        | {
-            'tool': 'gatk PreprocessIntervals/AnnotateIntervals',
-        },
+        job_attrs | {'tool': 'gatk PreprocessIntervals/AnnotateIntervals'},
     )
     j.image(image_path('gatk_gcnv'))
 
@@ -254,6 +266,8 @@ def shard_gcnv(
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
         job_res.set_to_job(j)
 
+        # todo think about parallelising the tar compress/extract with zstd
+        # tar -c --use-compress-program=zstdmt -f
         cmd = f"""
         tar -xzf {ploidy_calls_tarball} -C $BATCH_TMPDIR
 
@@ -294,13 +308,7 @@ def postprocess_calls(
     if any([clustered_vcf, intervals_vcf, qc_file]):
         assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
 
-    j = get_batch().new_job(
-        'Postprocess gCNV calls',
-        job_attrs
-        | {
-            'tool': 'gatk PostprocessGermlineCNVCalls',
-        },
-    )
+    j = get_batch().new_job('Postprocess gCNV calls', job_attrs | {'tool': 'gatk PostprocessGermlineCNVCalls'})
     j.image(image_path('gatk_gcnv'))
 
     # set highmem resources for this job
@@ -316,9 +324,11 @@ def postprocess_calls(
     model_shard_args = ''
     calls_shard_args = ''
 
-    # forced ordering here just in case
+    # import with hail batch instead, then unpack in the container. No need to depend on a gcloud/gsutil install
+    # https://batch.hail.populationgenomics.org.au/batches/454143/jobs/1
     for name, path in [(shard, shard_paths[shard]) for shard in shard_basenames()]:
-        gcp_related_commands.append(f'gsutil cat {path} | tar -xz -C $BATCH_TMPDIR/inputs')
+        shard_tar = get_batch().read_input(str(path))
+        gcp_related_commands.append(f'tar -xzf {shard_tar} -C $BATCH_TMPDIR/inputs')
         model_shard_args += f' --model-shard-path $BATCH_TMPDIR/inputs/{name}-model'
         calls_shard_args += f' --calls-shard-path $BATCH_TMPDIR/inputs/{name}-calls'
 
@@ -340,6 +350,7 @@ def postprocess_calls(
 
     extra_args = ''
     if clustered_vcf:
+        assert isinstance(intervals_vcf, str)
         local_clusters = get_batch().read_input_group(vcf=clustered_vcf, index=f'{clustered_vcf}.tbi').vcf
         local_intervals = get_batch().read_input_group(vcf=intervals_vcf, index=f'{intervals_vcf}.tbi').vcf
         extra_args += f"""--clustered-breakpoints {local_clusters} \\
@@ -363,20 +374,16 @@ def postprocess_calls(
     """,
     )
 
-    # index the output VCFs - GATK does this already?
-    # or maybe it only generates indexes when the clustered input is provided
-    j.command(
-        f"""
-    tabix -f {j.output['intervals.vcf.gz']}
-    tabix -f {j.output['segments.vcf.gz']}
-    """,
-    )
+    # index the output VCFs
+    j.command(f'tabix -f {j.output["intervals.vcf.gz"]}')  # type: ignore
+    j.command(f'tabix -f {j.output["segments.vcf.gz"]}')  # type: ignore
 
     if clustered_vcf:
+        assert isinstance(qc_file, str)
         max_events = get_config()['workflow']['gncv_max_events']
         max_pass_events = get_config()['workflow']['gncv_max_pass_events']
-        # do some additional stuff to determine pass/fail
-        # flake8: noqa
+
+        # do some additional QC to determine pass/fail
         j.command(
             f"""
         #use awk instead of grep - grep returning no lines causes a pipefailure
@@ -392,7 +399,7 @@ def postprocess_calls(
             echo "EXCESSIVE_NUMBER_OF_EVENTS" >> {j.qc_file}
         fi
         cat {j.qc_file}
-        """
+        """,
         )
         get_batch().write_output(j.qc_file, qc_file)
 
@@ -405,10 +412,10 @@ def joint_segment_vcfs(
     segment_vcfs: list[ResourceFile],
     pedigree: ResourceFile,
     reference: ResourceGroup,
-    intervals: ResourceFile,  # hmm,
+    intervals: ResourceFile,
     title: str,
     job_attrs: dict,
-) -> tuple[Job, ResourceGroup]:
+) -> tuple[BashJob, Resource]:
     """
     This job will run the joint segmentation step of the gCNV workflow
     Takes individual Segment VCFs and merges them into a single VCF
@@ -419,7 +426,7 @@ def joint_segment_vcfs(
     Returns:
         the job that does the work, and the resulting resource group of VCF & index
     """
-    job = get_batch().new_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
+    job = get_batch().new_bash_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
     job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
     job.image(image_path('gatk_gcnv'))
 
@@ -453,16 +460,13 @@ def run_joint_segmentation(
     tmp_prefix: str,
     output_path: Path,
     job_attrs: dict[str, str] | None = None,
-) -> list[Job]:
+) -> list[BashJob]:
     """
     This job will run the joint segmentation step of the gCNV workflow
     Takes individual Segment VCFs and merges them into a single VCF
     Depending on the config setting workflow.num_samples_per_scatter_block
     this may be conducted in hierarchical 2-step, with intermediate merges
     being conducted, then a merge of those intermediates
-
-    Returns:
-
     """
 
     if can_reuse(output_path):
@@ -495,7 +499,7 @@ def run_joint_segmentation(
                 job_attrs=job_attrs or {} | {'title': f'sub-chunk_{subchunk_index}'},
                 title=f'sub-chunk_{subchunk_index}',
             )
-            chunked_vcfs.append(vcf_group['vcf.gz'])
+            chunked_vcfs.append(vcf_group['vcf.gz'])  # type: ignore
             get_batch().write_output(vcf_group, f'{tmp_prefix}/subchunk_{subchunk_index}')
             jobs.append(job)
 
@@ -519,11 +523,40 @@ def run_joint_segmentation(
     return jobs
 
 
+def trim_sex_chromosomes(sgid: str, sg_vcf: str, no_xy_vcf: str, job_attrs: dict[str, str]) -> BashJob:
+    """
+    Create a BCFtools job to trim chrX and chrY from this VCF
+
+    Args:
+        sgid (str): the SG ID, used in naming the job
+        sg_vcf (str): the path to the input VCF
+        no_xy_vcf (str): the path to the output VCF
+        job_attrs ():
+
+    Returns:
+        the job which generates the output file
+    """
+    job = get_batch().new_bash_job(f'remove sex chromosomes from {sgid}', job_attrs | {'tool': 'bcftools'})
+    job.image(image_path('bcftools'))
+    job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
+    localised_vcf = get_batch().read_input_group(**{'vcf.gz': sg_vcf, 'vcf.gz.tbi': f'{sg_vcf}.tbi'})['vcf.gz']
+    autosomes = ' '.join([f'chr{i}' for i in range(1, 23)])
+    job.command('set -euo pipefail')
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    job.command(f'bcftools view -Oz -o {job.output["vcf.bgz"]} {localised_vcf} {autosomes}')  # type: ignore
+    job.command(f'tabix {job.output["vcf.bgz"]}')  # type: ignore
+    get_batch().write_output(job.output, no_xy_vcf.removesuffix('.vcf.bgz'))
+    return job
+
+
 def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str], output_path: Path):
     """
     This job will run a fast simple merge on per-SGID call files
     It then throws in a python script to add in two additional header lines
     and edit the SVLEN and SVTYPE attributes into each row
+
+    Escape here for single-VCF merges - the merge command is invalid, so we pass through the first step
 
     Args:
         sg_vcfs (list[str]): paths to all individual VCFs
@@ -546,24 +579,24 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     batch_vcfs = []
     for each_vcf in sg_vcfs:
         batch_vcfs.append(
-            get_batch().read_input_group(
-                **{
-                    'vcf.gz': each_vcf,
-                    'vcf.gz.tbi': f'{each_vcf}.tbi',
-                },
-            )['vcf.gz'],
+            get_batch().read_input_group(**{'vcf.gz': each_vcf, 'vcf.gz.tbi': f'{each_vcf}.tbi'})['vcf.gz'],
         )
 
-    # option breakdown:
-    # -Oz: bgzip output
-    # -o: output file
-    # --threads: number of threads to use
-    # -m: merge strategy
-    # -0: compression level
-    merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
+    if len(batch_vcfs) == 0:
+        raise ValueError('No VCFs to merge')
+    elif len(batch_vcfs) == 1:
+        merge_job.command(f'mv {batch_vcfs[0]} {merge_job.tmp_vcf}')
+    else:
+        # option breakdown:
+        # -Oz: bgzip output
+        # -o: output file
+        # --threads: number of threads to use
+        # -m: merge strategy
+        # -0: compression level
+        merge_job.command(f'bcftools merge {" ".join(batch_vcfs)} -Oz -o {merge_job.tmp_vcf} --threads 4 -m all -0')
 
     # now normlise the result, splitting multiallelics
-    merge_job.command(f'bcftools norm -m -any {merge_job.tmp_vcf} | bgzip -c > {merge_job.tmp_vcf_split}')
+    merge_job.command(f'bcftools norm -m -any -Oz -o {merge_job.tmp_vcf_split} {merge_job.tmp_vcf}')
 
     # create a python job to do the file content updates
     pyjob = get_batch().new_python_job('Update VCF content')
@@ -574,8 +607,10 @@ def merge_calls(sg_vcfs: list[str], docker_image: str, job_attrs: dict[str, str]
     third_job = get_batch().new_job('bgzip and tabix')
     third_job.image(docker_image)
     third_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    third_job.command(f'bgzip -c {pyjob.output} > {third_job.output["vcf.bgz"]}')
-    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')
+
+    # TODO when we adopt bcftools 1.20+ as standard we can drop the separate tabix step
+    third_job.command(f'bcftools view -Oz -o {third_job.output["vcf.bgz"]} {pyjob.output}')  # type: ignore
+    third_job.command(f'tabix {third_job.output["vcf.bgz"]}')  # type: ignore
 
     # dependency setting between jobs should be implicit due to temp file passing
 
@@ -594,24 +629,24 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
     - Expand the INFO in each line
     - write the file back out to the specified path
 
+    Read and write are both done compressed
+
     Args:
         input_tmp (str): path to temp file generated by merging
         output_file (str): path to write uncompressed edited version to
     """
     import gzip
 
-    headers = []
-    others = []
-
     # read the merged gVCF
     with gzip.open(input_tmp, 'rt') as f:
-        for line in f:
-            # don't alter current header lines
-            if line.startswith('#'):
-                headers.append(line)
-            # for non-header lines
-            else:
-                # split on tabs
+        with gzip.open(output_file, 'wt') as f_out:
+            for line in f:
+                # don't alter current header lines
+                if line.startswith('#'):
+                    f_out.write(line)
+                    continue
+
+                # for non-header lines, split on tabs
                 l_split = line.split('\t')
 
                 # don't bother with null/WT/missing alleles
@@ -642,20 +677,15 @@ def update_vcf_attributes(input_tmp: str, output_file: str):
 
                 # put it together and what have you got?
                 # bippidy boppidy boo
-                others.append('\t'.join(l_split))
-
-    with open(output_file, 'w') as f:
-        f.writelines(headers)
-        f.writelines(others)
+                f_out.write('\t'.join(l_split))
 
 
 def annotate_dataset_jobs_cnv(
     mt_path: Path,
     sgids: list[str],
-    out_mt_path: Path,
+    out_mt_path: str,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
 ) -> list[Job]:
     """
     Split mt by dataset and annotate dataset-specific fields (only for those datasets
@@ -671,7 +701,7 @@ def annotate_dataset_jobs_cnv(
     subset_j: Job | None = None
     if not subset_mt_path.exists():
         subset_j = get_batch().new_job('subset cohort to dataset', (job_attrs or {}) | {'tool': 'hail query'})
-        subset_j.image(image_path('cpg_workflows'))
+        subset_j.image(config_retrieve(['workflow', 'driver_image']))
         subset_j.command(
             query_command(
                 seqr_loader,
@@ -682,20 +712,19 @@ def annotate_dataset_jobs_cnv(
                 setup_gcp=True,
             ),
         )
-        if depends_on:
-            subset_j.depends_on(*depends_on)
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
-    annotate_j.image(image_path('cpg_workflows'))
+    annotate_j.image(config_retrieve(['workflow', 'driver_image']))
     annotate_j.command(
-        query_command(
-            seqr_loader_cnv,
-            seqr_loader_cnv.annotate_dataset_gcnv.__name__,
-            str(subset_mt_path),
-            str(out_mt_path),
-            setup_gcp=True,
-        ),
+        'seqr_loader_cnv '
+        f'--mt_out {out_mt_path} '
+        f'--checkpoint {str(tmp_prefix / "checkpoints")} '
+        'dataset '  # use the annotate_DATASET functionality
+        f'--mt_in {str(subset_mt_path)} ',
     )
+
     if subset_j:
         annotate_j.depends_on(subset_j)
-    return [subset_j, annotate_j]
+        return [subset_j, annotate_j]
+    else:
+        return [annotate_j]

@@ -6,8 +6,8 @@ from hailtop.batch import ResourceGroup
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import Batch, command, image_path
+from cpg_utils.config import config_retrieve, image_path
+from cpg_utils.hail_batch import Batch, command
 from cpg_workflows.resources import STANDARD
 
 
@@ -17,6 +17,7 @@ def bam_to_cram(
     extra_label: str | None = None,
     job_attrs: dict | None = None,
     requested_nthreads: int | None = None,
+    reference_fasta_path: Path | None = None,
 ) -> tuple[Job, ResourceGroup]:
     """
     Convert a BAM file to a CRAM file.
@@ -34,16 +35,18 @@ def bam_to_cram(
     j.image(image_path('samtools'))
 
     # Get fasta file
-    fasta_path = str(get_config()['references']['star']['fasta'])
     fasta = b.read_input_group(
-        fasta=fasta_path,
-        fasta_fai=f'{fasta_path}.fai',
+        fasta=reference_fasta_path,
+        fasta_fai=f'{reference_fasta_path}.fai',
     )
 
     # Set resource requirements
     nthreads = requested_nthreads or 8
-    # TODO: make storage configurable
-    res = STANDARD.set_resources(j, ncpu=nthreads, storage_gb=50)
+    res = STANDARD.set_resources(
+        j,
+        ncpu=nthreads,
+        storage_gb=config_retrieve(['resource_overrides', 'bam_to_cram', 'storage_gb'], 50),
+    )
 
     j.declare_resource_group(
         sorted_cram={

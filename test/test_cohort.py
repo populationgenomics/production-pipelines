@@ -7,6 +7,8 @@ import re
 
 from pytest_mock import MockFixture
 
+from cpg_workflows.inputs import Cohort, MultiCohort
+
 from . import set_config
 
 LOGGER = logging.getLogger(__name__)
@@ -46,6 +48,30 @@ def _cohort_config(tmp_path) -> str:
     return conf
 
 
+def _custom_cohort_config(tmp_path) -> str:
+    conf = f"""
+    [workflow]
+    dataset = 'projecta'
+    input_cohorts = ['COH1']
+
+    path_scheme = 'local'
+
+    [storage.default]
+    default = '{tmp_path}'
+
+    [storage.projecta]
+    default = '{tmp_path}'
+
+    [storage.projectb]
+    default = '{tmp_path}'
+
+    [references.broad]
+    ref_fasta = 'stub'
+    """
+
+    return conf
+
+
 def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
     return [
         {
@@ -53,6 +79,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -104,6 +131,7 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -153,6 +181,79 @@ def mock_get_sgs(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argum
     ]
 
 
+def mock_get_sgs_by_cohort(*args, **kwargs) -> list[dict]:
+    return [
+        {
+            'id': 'CPGXXXX',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'technology': 'short-read',
+            'type': 'genome',
+            'sample': {
+                'project': {
+                    'name': 'projecta',
+                },
+                'externalId': 'NA12340',
+                'participant': {
+                    'id': 1,
+                    'externalId': '8',
+                    'reportedSex': 'Male',
+                    'meta': {'participant_meta': 'is_here'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 1,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS28',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                    },
+                    'type': 'sequencing',
+                },
+            ],
+        },
+        {
+            'id': 'CPGAAAA',
+            'meta': {'sg_meta': 'is_fun'},
+            'platform': 'illumina',
+            'technology': 'short-read',
+            'type': 'genome',
+            'sample': {
+                'project': {
+                    'name': 'projectb',
+                },
+                'externalId': 'NA12489',
+                'participant': {
+                    'id': 2,
+                    'externalId': '14',
+                    'reportedSex': None,
+                    'meta': {'participant_metadata': 'number_fourteen'},
+                },
+            },
+            'assays': [
+                {
+                    'id': 2,
+                    'meta': {
+                        'platform': '30x Illumina PCR-Free',
+                        'concentration': '25',
+                        'fluid_x_tube_id': '220405_FS29',
+                        'reference_genome': 'Homo sapiens (b37d5)',
+                        'volume': '100',
+                        'reads_type': 'fastq',
+                        'batch': '1',
+                    },
+                    'type': 'sequencing',
+                },
+            ],
+        },
+    ]
+
+
 def mock_get_analysis_by_sgs(*args, **kwargs) -> dict:
     return {}
 
@@ -193,35 +294,37 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
 
     caplog.set_level(logging.WARNING)
 
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup, Sex
 
-    cohort = get_cohort()
+    multicohort = get_multicohort()
 
-    assert cohort
+    assert multicohort
+    assert isinstance(multicohort, MultiCohort)
 
     # Testing Cohort Information
-    assert len(cohort.get_sequencing_groups()) == 2
-    assert cohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
+    assert len(multicohort.get_sequencing_groups()) == 2
+    assert multicohort.get_sequencing_group_ids() == ['CPGLCL17', 'CPGLCL25']
 
-    for sg in cohort.get_sequencing_groups():
+    for sg in multicohort.get_sequencing_groups():
         assert sg.dataset.name == 'fewgenomes'
         assert not sg.forced
         assert sg.cram is None
         assert sg.gvcf is None
 
     # Test SequenceGroup Population
-    test_sg = cohort.get_sequencing_groups()[0]
-    test_sg2 = cohort.get_sequencing_groups()[1]
+    test_sg = multicohort.get_sequencing_groups()[0]
+    test_sg2 = multicohort.get_sequencing_groups()[1]
     assert test_sg.id == 'CPGLCL17'
     assert test_sg.external_id == 'NA12340'
     assert test_sg.participant_id == '8'
     assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
-    assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
-    assert test_sg.assays['sequencing'][0].id == '1'
-    assert test_sg.assays['sequencing'][0].meta['fluid_x_tube_id'] == '220405_FS28'
+    assert test_sg.assays
+    assert test_sg.assays[0].sequencing_group_id == 'CPGLCL17'
+    assert test_sg.assays[0].id == '1'
+    assert test_sg.assays[0].meta['fluid_x_tube_id'] == '220405_FS28'
 
     assert test_sg.participant_id == '8'
     # TODO/NOTE: The sex in the pedigree will overwrite the sex in the
@@ -236,12 +339,12 @@ def test_cohort(mocker: MockFixture, tmp_path, caplog):
     assert test_sg.pedigree.dad.participant_id == '14'
 
     # Test _sequencing_group_by_id attribute
-    assert cohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id.keys() == {
         'CPGLCL17',
         'CPGLCL25',
     }
-    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
-    assert cohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL17'].id == 'CPGLCL17'
+    assert multicohort.get_datasets()[0]._sequencing_group_by_id['CPGLCL25'].id == 'CPGLCL25'
 
     # Test reads
     # TODO: As above
@@ -260,6 +363,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -311,6 +415,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -360,10 +465,10 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
 
     # from cpg_workflows.filetypes import BamPath
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import Sex
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     assert cohort
 
@@ -386,9 +491,10 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     assert test_sg.meta == {'sg_meta': 'is_fun', 'participant_meta': 'is_here', 'phenotypes': {}}
 
     # Test Assay Population
-    assert test_sg.assays['sequencing'][0].sequencing_group_id == 'CPGLCL17'
-    assert test_sg.assays['sequencing'][0].id == '1'
-    assert test_sg.assays['sequencing'][0].meta['fluid_x_tube_id'] == '220405_FS28'
+    assert test_sg.assays
+    assert test_sg.assays[0].sequencing_group_id == 'CPGLCL17'
+    assert test_sg.assays[0].id == '1'
+    assert test_sg.assays[0].meta['fluid_x_tube_id'] == '220405_FS28'
 
     assert test_sg.participant_id == '8'
     assert test_sg.pedigree.sex == Sex.MALE
@@ -406,7 +512,7 @@ def test_missing_reads(mocker: MockFixture, tmp_path):
     # assert test_sg.alignment_input_by_seq_type['genome'][0].r1 == CloudPath(
     #     'gs://cpg-fewgenomes-main/HG3FMDSX3_2_220405_FS28_Homo-sapiens_AACGAGGCCG-ATCCAGGTAT_R_220208_BINKAN1_FEWGENOMES_M001_R1.fastq.gz'
     # )
-    assert test_sg2.alignment_input_by_seq_type == {}
+    assert test_sg2.alignment_input is None
 
 
 def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: disable=unused-argument
@@ -416,6 +522,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12340',
                 'participant': {
@@ -467,6 +574,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sample_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'genome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA12489',
                 'participant': {
@@ -500,6 +608,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
             'meta': {'sg_meta': 'is_fun'},
             'platform': 'illumina',
             'type': 'exome',
+            'technology': 'short-read',
             'sample': {
                 'externalId': 'NA1000',
                 'participant': {
@@ -566,9 +675,9 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
         mock_get_sgs_with_mixed_reads,
     )
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     # Testing Cohort Information
     assert len(cohort.get_sequencing_groups()) == 3
@@ -587,7 +696,7 @@ def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     #     'gs://cpg-fewgenomes-main/exomeexample_r1.fastq.gz'
     # )
 
-    assert test_none.alignment_input_by_seq_type == {}
+    assert test_none.alignment_input is None
     assert re.search(
         r'WARNING\s+root:inputs\.py:\d+\s+No reads found for sequencing group CPGbbb of type genome',
         caplog.text,
@@ -610,6 +719,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'genome',
+                'technology': 'short-read',
                 'sample': {
                     'externalId': 'NA12340',
                     'participant': {
@@ -644,6 +754,7 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
                 'meta': {'sg_meta': 'is_fun'},
                 'platform': 'illumina',
                 'type': 'exome',
+                'technology': 'short-read',
                 'sample': {
                     'externalId': 'NA1000',
                     'participant': {
@@ -702,10 +813,10 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
         mock_get_sgs_with_mixed_reads,
     )
     mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import Sex
 
-    cohort = get_cohort()
+    cohort = get_multicohort()
 
     test_female = cohort.get_sequencing_groups()[0]
 
@@ -713,3 +824,38 @@ def test_unknown_data(mocker: MockFixture, tmp_path, caplog):
 
     assert test_female.pedigree.sex == Sex.FEMALE
     assert test_unknown.pedigree.sex == Sex.UNKNOWN
+
+
+def test_custom_cohort(mocker: MockFixture, tmp_path, monkeypatch):
+    """
+    Testing creating a Cohort object from metamist mocks.
+    """
+    set_config(_custom_cohort_config(tmp_path), tmp_path / 'config.toml')
+
+    mocker.patch('cpg_workflows.utils.exists_not_cached', lambda *args: False)
+
+    mocker.patch('cpg_workflows.metamist.Metamist.get_ped_entries', mock_get_pedigree)
+    mocker.patch('cpg_workflows.metamist.Metamist.get_analyses_by_sgid', mock_get_analysis_by_sgs)
+
+    def mock_query(query, variables):
+        # Mocking the return value of the query function
+        return {'cohorts': [{'name': 'COH1', 'sequencingGroups': mock_get_sgs_by_cohort()}]}
+
+    # Patching the query function to mock the GraphQL query
+    monkeypatch.setattr('cpg_workflows.metamist.query', mock_query)
+
+    from cpg_workflows.inputs import get_multicohort
+
+    multicohort = get_multicohort()
+
+    assert multicohort
+    assert isinstance(multicohort, MultiCohort)
+
+    # Testing Cohort Information
+    assert len(multicohort.get_sequencing_groups()) == 2
+    assert sorted(multicohort.get_sequencing_group_ids()) == ['CPGAAAA', 'CPGXXXX']
+
+    # Test the projects they belong to
+    ds_map = {'CPGAAAA': 'projectb', 'CPGXXXX': 'projecta'}
+    for sg in multicohort.get_sequencing_groups():
+        assert sg.dataset.name == ds_map[sg.id]

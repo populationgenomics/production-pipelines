@@ -29,24 +29,25 @@ def complete_analysis_job(
     Args:
         output (str): path to the output file
         analysis_type (str): metamist analysis type
-        sg_ids (list[str]): all CPG IDs
+        sg_ids (list[str]): all CPG IDs relevant to this target
         project_name (str): project/dataset name
         meta (dict): any metadata to add
         update_analysis_meta (Callable | None): function to update analysis meta
         tolerate_missing (bool): if True, allow missing output
     """
-    import traceback
 
     from cpg_utils import to_path
-    from metamist.apis import AnalysisApi
-    from metamist.exceptions import ApiException
-    from metamist.models import Analysis, AnalysisStatus
+    from cpg_workflows.metamist import AnalysisStatus, get_metamist
 
     assert isinstance(output, str)
     output_cloudpath = to_path(output)
 
     if update_analysis_meta is not None:
-        meta | update_analysis_meta(output)
+        meta = meta | update_analysis_meta(output)
+
+    # if SG IDs are listed in the meta, remove them
+    # these are already captured in the sg_ids list
+    _drop_sgids = meta.pop('sequencing_groups', None)
 
     # if the meta has a remove_sgids key, we need to remove those from the list
     # this occurs when samples are soft-filtered from joint-calls in a way that
@@ -72,22 +73,20 @@ def complete_analysis_job(
         if not output_cloudpath.is_dir():
             meta |= {'size': output_cloudpath.stat().st_size}
 
-    this_analysis = Analysis(
-        type=analysis_type,
-        status=AnalysisStatus('completed'),
+    a_id = get_metamist().create_analysis(
         output=output,
+        type_=analysis_type,
+        status=AnalysisStatus('completed'),
         sequencing_group_ids=sg_ids,
+        dataset=project_name,
         meta=meta,
     )
-    aapi = AnalysisApi()
-    try:
-        a_id = aapi.create_analysis(project=project_name, analysis=this_analysis)
-    except ApiException:
-        traceback.print_exc()
+    if a_id is None:
+        print(f'Creation of Analysis failed (type={analysis_type}, output={output}) in {project_name}')
+        # What Exception should we raise here?
         raise
     else:
         print(f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}')
-        return
 
 
 class StatusReporterError(Exception):
@@ -154,7 +153,10 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
-        py_job = b.new_python_job(f'Register analysis output {output}', job_attr or {} | {'tool': 'metamist'})
+        py_job = b.new_python_job(
+            f'Register analysis output {output}',
+            job_attr or {} | {'tool': 'metamist'},
+        )
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             complete_analysis_job,

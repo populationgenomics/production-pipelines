@@ -11,17 +11,14 @@ from typing import Any
 
 from hailtop.batch.job import Job
 
-from analysis_runner.cromwell import (
-    CromwellOutputType,
-    run_cromwell_workflow_from_repo_and_get_outputs,
-)
 from cpg_utils import Path, to_path
-from cpg_utils.config import ConfigError, get_config
-from cpg_utils.hail_batch import command, get_batch, image_path, reference_path
+from cpg_utils.config import ConfigError, config_retrieve, image_path, reference_path
+from cpg_utils.cromwell import CromwellOutputType, run_cromwell_workflow_from_repo_and_get_outputs
+from cpg_utils.hail_batch import command, get_batch
 from cpg_workflows.batch import make_job_name
-from cpg_workflows.workflow import Cohort, Dataset
+from cpg_workflows.workflow import Cohort, Dataset, MultiCohort
 
-GATK_SV_COMMIT = '6d6100082297898222dfb69fcf941d373d78eede'
+GATK_SV_COMMIT = 'dc145a52f76a6f425ac3f481171040e78c0cfeea'
 SV_CALLERS = ['manta', 'wham', 'scramble']
 _FASTA = None
 PED_FAMILY_ID_REGEX = re.compile(r'(^[A-Za-z0-9_]+$)')
@@ -62,27 +59,9 @@ def create_polling_intervals() -> dict:
 
     # update if these exist in config
     for job_size in CromwellJobSizes:
-        if job_size.value in get_config().get('cromwell_polling_intervals', {}):
-            polling_interval_dict[job_size].update(get_config()['cromwell_polling_intervals'][job_size.value])
+        if val := config_retrieve(['cromwell_polling_intervals', job_size.value], False):
+            polling_interval_dict[job_size].update(val)
     return polling_interval_dict
-
-
-def _sv_batch_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-batch-calls'}
-
-
-def _sv_individual_meta(
-    output_path: str,  # pylint: disable=W0613:unused-argument
-) -> dict[str, Any]:
-    """
-    Callable, add meta[type] to custom analysis object
-    """
-    return {'type': 'gatk-sv-sequence-group-calls'}
 
 
 def get_fasta() -> Path:
@@ -91,7 +70,8 @@ def get_fasta() -> Path:
     """
     global _FASTA
     if _FASTA is None:
-        _FASTA = to_path(get_config()['workflow'].get('ref_fasta') or reference_path('broad/ref_fasta'))
+        fasta_path = config_retrieve(['workflow', 'ref_fasta'], False) or reference_path('broad/ref_fasta')
+        _FASTA = to_path(fasta_path)
     return _FASTA
 
 
@@ -107,14 +87,14 @@ def get_images(keys: list[str], allow_missing=False) -> dict[str, str]:
         dict of image keys to image paths
         or AssertionError
     """
+    image_keys = config_retrieve(['images']).keys()
 
     if not allow_missing:
-        image_keys = get_config()['images'].keys()
         query_keys = set(keys)
         if not query_keys.issubset(image_keys):
             raise KeyError(f'Unknown image keys: {query_keys - image_keys}')
 
-    return {k: image_path(k) for k in get_config()['images'].keys() if k in keys}
+    return {k: image_path(k) for k in image_keys if k in keys}
 
 
 def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str]]:
@@ -131,11 +111,11 @@ def get_references(keys: list[str | dict[str, str]]) -> dict[str, str | list[str
         # e.g. GATKSVPipelineBatch.rmsk -> rmsk
         ref_d_key = ref_d_key.split('.')[-1]
         try:
-            res[key] = str(reference_path(f'gatk_sv/{ref_d_key}'))
+            res[key] = reference_path(f'gatk_sv/{ref_d_key}')
         except KeyError:
-            res[key] = str(reference_path(f'broad/{ref_d_key}'))
+            res[key] = reference_path(f'broad/{ref_d_key}')
         except ConfigError:
-            res[key] = str(reference_path(f'broad/{ref_d_key}'))
+            res[key] = reference_path(f'broad/{ref_d_key}')
 
     return res
 
@@ -164,7 +144,7 @@ def add_gatk_sv_jobs(
     polling_maximum = randint(polling_intervals[job_size]['max'], polling_intervals[job_size]['max'] * 2)
 
     # If a config section exists for this workflow, apply overrides
-    if override := get_config()['resource_overrides'].get(wfl_name):
+    if override := config_retrieve(['resource_overrides', wfl_name], False):
         input_dict |= override
 
     # Where Cromwell writes the output.
@@ -194,13 +174,10 @@ def add_gatk_sv_jobs(
 
     job_prefix = make_job_name(wfl_name, sequencing_group=sequencing_group_id, dataset=dataset.name)
 
-    # config toggle decides if outputs are copied out
-    copy_outputs = get_config()['workflow'].get('copy_outputs', False)
-
     submit_j, output_dict = run_cromwell_workflow_from_repo_and_get_outputs(
         b=get_batch(),
         job_prefix=job_prefix,
-        dataset=get_config()['workflow']['dataset'],
+        dataset=config_retrieve(['workflow', 'dataset']),
         repo='gatk-sv',
         commit=GATK_SV_COMMIT,
         cwd='wdl',
@@ -210,10 +187,11 @@ def add_gatk_sv_jobs(
         input_dict=paths_as_strings,
         outputs_to_collect=outputs_to_collect,
         driver_image=driver_image,
-        copy_outputs_to_gcp=copy_outputs,
+        copy_outputs_to_gcp=config_retrieve(['workflow', 'copy_outputs'], False),
         labels=labels,
         min_watch_poll_interval=polling_minimum,
         max_watch_poll_interval=polling_maximum,
+        time_limit_seconds=config_retrieve(['workflow', 'time_limit_seconds'], None),
     )
 
     copy_j = get_batch().new_job(f'{job_prefix}: copy outputs')
@@ -223,35 +201,34 @@ def add_gatk_sv_jobs(
         out_path = expected_out_dict[key]
         if isinstance(resource, list):
             for source, dest in zip(resource, out_path):
-                cmds.append(f'gsutil cp "$(cat {source})" "{dest}"')
+                cmds.append(f'gcloud storage cp "$(cat {source})" "{dest}"')
         else:
-            cmds.append(f'gsutil cp "$(cat {resource})" "{out_path}"')
+            cmds.append(f'gcloud storage cp "$(cat {resource})" "{out_path}"')
     copy_j.command(command(cmds, setup_gcp=True))
     return [submit_j, copy_j]
 
 
 def get_ref_panel(keys: list[str] | None = None) -> dict:
+    # mandatory config entry
+    ref_panel_samples = config_retrieve(['sv_ref_panel', 'ref_panel_samples'])
     return {
         k: v
         for k, v in {
-            'ref_panel_samples': get_config()['sv_ref_panel']['ref_panel_samples'],
-            'ref_panel_bincov_matrix': str(reference_path('broad/ref_panel_bincov_matrix')),
-            'contig_ploidy_model_tar': str(reference_path('gatk_sv/contig_ploidy_model_tar')),
+            'ref_panel_samples': ref_panel_samples,
+            'ref_panel_bincov_matrix': reference_path('broad/ref_panel_bincov_matrix'),
+            'contig_ploidy_model_tar': reference_path('gatk_sv/contig_ploidy_model_tar'),
             'gcnv_model_tars': [
                 str(reference_path('gatk_sv/model_tar_tmpl')).format(shard=i)
-                for i in range(get_config()['sv_ref_panel']['model_tar_cnt'])
+                for i in range(config_retrieve(['sv_ref_panel', 'model_tar_cnt']))
             ],
             'ref_panel_PE_files': [
-                str(reference_path('gatk_sv/ref_panel_PE_file_tmpl')).format(sample=s)
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+                reference_path('gatk_sv/ref_panel_PE_file_tmpl').format(sample=s) for s in ref_panel_samples
             ],
             'ref_panel_SR_files': [
-                str(reference_path('gatk_sv/ref_panel_SR_file_tmpl')).format(sample=s)
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+                reference_path('gatk_sv/ref_panel_SR_file_tmpl').format(sample=s) for s in ref_panel_samples
             ],
             'ref_panel_SD_files': [
-                str(reference_path('gatk_sv/ref_panel_SD_file_tmpl')).format(sample=s)
-                for s in get_config()['sv_ref_panel']['ref_panel_samples']
+                reference_path('gatk_sv/ref_panel_SD_file_tmpl').format(sample=s) for s in ref_panel_samples
             ],
         }.items()
         if not keys or k in keys
@@ -289,7 +266,7 @@ def clean_ped_family_ids(ped_line: str) -> str:
     return '\t'.join(split_line) + '\n'
 
 
-def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
+def make_combined_ped(cohort: Cohort | MultiCohort, prefix: Path) -> Path:
     """
     Create cohort + ref panel PED.
     Concatenating all samples across all datasets with ref panel
@@ -298,6 +275,7 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
     """
     combined_ped_path = prefix / 'ped_with_ref_panel.ped'
     conf_ped_path = get_references(['ped_file'])['ped_file']
+    assert isinstance(conf_ped_path, str)
     with combined_ped_path.open('w') as out:
         with cohort.write_ped_file().open() as f:
             # layer of family ID cleaning
@@ -310,8 +288,8 @@ def make_combined_ped(cohort: Cohort, prefix: Path) -> Path:
 
 
 def queue_annotate_sv_jobs(
-    cohort,
-    cohort_prefix: Path,
+    multicohort: MultiCohort,
+    prefix: Path,
     input_vcf: Path,
     outputs: dict,
     labels: dict[str, str] | None = None,
@@ -322,11 +300,12 @@ def queue_annotate_sv_jobs(
     """
     input_dict: dict[str, Any] = {
         'vcf': input_vcf,
-        'prefix': cohort.name,
-        'ped_file': make_combined_ped(cohort, cohort_prefix),
+        'prefix': multicohort.name,
+        'ped_file': make_combined_ped(multicohort, prefix),
         'sv_per_shard': 5000,
-        'population': get_config()['references']['gatk_sv'].get('external_af_population'),
-        'ref_prefix': get_config()['references']['gatk_sv'].get('external_af_ref_bed_prefix'),
+        'external_af_population': config_retrieve(['references', 'gatk_sv', 'external_af_population']),
+        'external_af_ref_prefix': config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix']),
+        'external_af_ref_bed': config_retrieve(['references', 'gnomad_sv']),
         'use_hail': False,
     }
 
@@ -334,24 +313,59 @@ def queue_annotate_sv_jobs(
         [
             'noncoding_bed',
             'protein_coding_gtf',
-            {'ref_bed': 'external_af_ref_bed'},
             {'contig_list': 'primary_contigs_list'},
         ],
     )
 
     # images!
-    input_dict |= get_images(
-        [
-            'sv_pipeline_docker',
-            'sv_base_mini_docker',
-            'gatk_docker',
-        ],
-    )
+    input_dict |= get_images(['sv_pipeline_docker', 'sv_base_mini_docker', 'gatk_docker'])
     jobs = add_gatk_sv_jobs(
-        dataset=cohort.analysis_dataset,
+        dataset=multicohort.analysis_dataset,
         wfl_name='AnnotateVcf',
         input_dict=input_dict,
         expected_out_dict=outputs,
         labels=labels,
     )
     return jobs
+
+
+def queue_annotate_strvctvre_job(
+    input_vcf,
+    output_path: str,
+    job_attrs: dict | None = None,
+    name: str = 'AnnotateVcfWithStrvctvre',
+) -> Job:
+    """
+
+    Args:
+        input_vcf (ResourceFile): part of a resource group with the corresponding index
+        output_path ():
+        job_attrs (dict|None): job attributes
+        name (str): name of the job
+
+    Returns:
+        The Strvctvre job
+    """
+
+    job_attrs = job_attrs or {}
+    strv_job = get_batch().new_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
+
+    strv_job.image(image_path('strvctvre'))
+    strv_job.storage(config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))
+    strv_job.memory(config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
+
+    strvctvre_phylop = get_references(['strvctvre_phylop'])['strvctvre_phylop']
+    assert isinstance(strvctvre_phylop, str)
+
+    local_phylop = get_batch().read_input(strvctvre_phylop)
+
+    strv_job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
+
+    # run strvctvre
+    strv_job.command(
+        f'python StrVCTVRE.py -i {input_vcf} -o {strv_job.output["vcf.gz"]} -f vcf -p {local_phylop}',  # type: ignore
+    )
+    strv_job.command(f'tabix {strv_job.output["vcf.gz"]}')  # type: ignore
+
+    get_batch().write_output(strv_job.output, str(output_path).replace('.vcf.gz', ''))
+    return strv_job

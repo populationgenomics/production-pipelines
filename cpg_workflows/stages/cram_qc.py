@@ -4,25 +4,22 @@ Stages that generates and summarises CRAM QC.
 
 import dataclasses
 import logging
-from typing import Any, Callable, Optional
+from typing import Callable, Optional
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import somalier
 from cpg_workflows.jobs.multiqc import multiqc
-from cpg_workflows.jobs.picard import (
-    picard_collect_metrics,
-    picard_hs_metrics,
-    picard_wgs_metrics,
-)
+from cpg_workflows.jobs.picard import picard_collect_metrics, picard_hs_metrics, picard_wgs_metrics
 from cpg_workflows.jobs.samtools import samtools_stats
 from cpg_workflows.jobs.verifybamid import verifybamid
 from cpg_workflows.stages.align import Align
-from cpg_workflows.targets import Dataset, SequencingGroup
+from cpg_workflows.targets import Cohort, Dataset, SequencingGroup
 from cpg_workflows.utils import exists
 from cpg_workflows.workflow import (
+    CohortStage,
     DatasetStage,
     SequencingGroupStage,
     StageInput,
@@ -53,7 +50,7 @@ def qc_functions() -> list[Qc]:
     """
     QC functions and their outputs for MultiQC aggregation
     """
-    if get_config()['workflow'].get('skip_qc', False) is True:
+    if config_retrieve(['workflow', 'skip_qc'], False):
         return []
 
     qcs = [
@@ -81,7 +78,7 @@ def qc_functions() -> list[Qc]:
         ),
     ]
 
-    sequencing_type = get_config()['workflow']['sequencing_type']
+    sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
     if sequencing_type == 'genome':
         qcs.append(
             Qc(
@@ -156,14 +153,16 @@ class SomalierPedigree(DatasetStage):
         https://github.com/ewels/MultiQC/blob/master/multiqc/utils/search_patterns
         .yaml#L472-L481
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
-        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.alignment_inputs_hash()
+
+        prefix = dataset.prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
+        web_prefix = dataset.web_prefix() / 'somalier' / 'cram' / dataset.get_alignment_inputs_hash()
         return {
             'samples': prefix / f'{dataset.name}.samples.tsv',
             'expected_ped': prefix / f'{dataset.name}.expected.ped',
             'pairs': prefix / f'{dataset.name}.pairs.tsv',
-            'html': dataset.web_prefix() / 'cram-somalier-pedigree.html',
+            'html': web_prefix / 'cram-somalier-pedigree.html',
             'checks': prefix / f'{dataset.name}-checks.done',
         }
 
@@ -174,7 +173,7 @@ class SomalierPedigree(DatasetStage):
         verifybamid_by_sgid = {}
         somalier_path_by_sgid = {}
         for sequencing_group in dataset.get_sequencing_groups():
-            if get_config().get('somalier', {}).get('exclude_high_contamination'):
+            if config_retrieve(['somalier', 'exclude_high_contamination'], False):
                 verify_bamid_path = inputs.as_path(stage=CramQC, target=sequencing_group, key='verify_bamid')
                 if not exists(verify_bamid_path):
                     logging.warning(
@@ -206,32 +205,14 @@ class SomalierPedigree(DatasetStage):
                 out_html_url=html_url,
                 out_checks_path=self.expected_outputs(dataset)['checks'],
                 job_attrs=self.get_job_attrs(dataset),
-                send_to_slack=True,
+                send_to_slack=config_retrieve(['workflow', 'somalier_pedigree', 'send_to_slack'], default=True),
             )
             return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
         else:
             return self.make_outputs(dataset, skipped=True)
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
-    import json
-
-    from cloudpathlib import CloudPath
-
-    with CloudPath(output_path).open() as f:
-        d = json.load(f)
-    return {'multiqc': d['report_general_stats_data']}
-
-
-@stage(
-    required_stages=[
-        CramQC,
-        SomalierPedigree,
-    ],
-    analysis_type='qc',
-    analysis_keys=['json'],
-    update_analysis_meta=_update_meta,
-)
+@stage(required_stages=[CramQC, SomalierPedigree], analysis_type='qc', analysis_keys=['json'])
 class CramMultiQC(DatasetStage):
     """
     Run MultiQC to aggregate CRAM QC stats.
@@ -241,11 +222,11 @@ class CramMultiQC(DatasetStage):
         """
         Expected to produce an HTML and a corresponding JSON file.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return {}
 
         # get the unique hash for these Sequencing Groups
-        sg_hash = dataset.alignment_inputs_hash()
+        sg_hash = dataset.get_alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'cram' / sg_hash / 'multiqc_data.json',
@@ -257,7 +238,7 @@ class CramMultiQC(DatasetStage):
         Call a function from the `jobs` module using inputs from `cramqc`
         and `somalier` stages.
         """
-        if get_config()['workflow'].get('skip_qc', False) is True:
+        if config_retrieve(['workflow', 'skip_qc'], False):
             return self.make_outputs(dataset)
 
         json_path = self.expected_outputs(dataset)['json']
@@ -304,6 +285,10 @@ class CramMultiQC(DatasetStage):
             logging.warning('No CRAM QC found to aggregate with MultiQC')
             return self.make_outputs(dataset)
 
+        send_to_slack = config_retrieve(['workflow', 'cram_multiqc', 'send_to_slack'], default=True)
+        extra_config = config_retrieve(['workflow', 'cram_multiqc', 'extra_config'], default={})
+        extra_config['table_columns_visible'] = {'FastQC': False}
+
         jobs = multiqc(
             get_batch(),
             tmp_prefix=dataset.tmp_prefix() / 'multiqc' / 'cram',
@@ -318,6 +303,104 @@ class CramMultiQC(DatasetStage):
             job_attrs=self.get_job_attrs(dataset),
             sequencing_group_id_map=dataset.rich_id_map(),
             label='CRAM',
-            extra_config={'table_columns_visible': {'FastQC': False}},
+            send_to_slack=send_to_slack,
+            extra_config=extra_config,
         )
         return self.make_outputs(dataset, data=self.expected_outputs(dataset), jobs=jobs)
+
+
+@stage(required_stages=[CramQC, SomalierPedigree], analysis_type='qc', analysis_keys=['json'])
+class CohortCramMultiQC(CohortStage):
+    """
+    Run MultiQC to aggregate CRAM QC stats across a Cohort, rather than a Dataset.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        Expected to produce an HTML and a corresponding JSON file.
+        """
+        if config_retrieve(['workflow', 'skip_qc'], False):
+            return {}
+
+        # get the unique hash for these Sequencing Groups
+        sg_hash = cohort.get_alignment_inputs_hash()
+        return {
+            'html': cohort.analysis_dataset.web_prefix() / 'qc' / 'cram' / sg_hash / 'cohort_multiqc.html',
+            'json': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / 'cohort_multiqc_data.json',
+            'checks': cohort.analysis_dataset.prefix() / 'qc' / 'cram' / sg_hash / '.cohort_checks',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        """
+        Call a function from the `jobs` module using inputs from `cramqc`
+        and `somalier` stages.
+        """
+        if config_retrieve(['workflow', 'skip_qc'], False):
+            return self.make_outputs(cohort)
+
+        json_path = self.expected_outputs(cohort)['json']
+        html_path = self.expected_outputs(cohort)['html']
+        checks_path = self.expected_outputs(cohort)['checks']
+        if base_url := cohort.analysis_dataset.web_url():
+            html_url = str(html_path).replace(str(cohort.analysis_dataset.web_prefix()), base_url)
+        else:
+            html_url = None
+
+        paths = []
+        try:
+            somalier_samples = inputs.as_path(cohort, SomalierPedigree, key='samples')
+            somalier_pairs = inputs.as_path(cohort, SomalierPedigree, key='pairs')
+        except StageInputNotFoundError:
+            pass
+        else:
+            paths = [
+                somalier_samples,
+                somalier_pairs,
+            ]
+
+        ending_to_trim = set()  # endings to trim to get sample names
+        modules_to_trim_endings = set()
+
+        for sequencing_group in cohort.get_sequencing_groups():
+            for qc in qc_functions():
+                for key, out in qc.outs.items():
+                    if not out:
+                        continue
+                    try:
+                        path = inputs.as_path(sequencing_group, CramQC, key)
+                    except StageInputNotFoundError:  # allow missing inputs
+                        logging.warning(
+                            f'Output CramQc/"{key}" not found for {sequencing_group}, '
+                            f'it will be silently excluded from MultiQC',
+                        )
+                        continue
+                    modules_to_trim_endings.add(out.multiqc_key)
+                    paths.append(path)
+                    ending_to_trim.add(path.name.replace(sequencing_group.id, ''))
+
+        if not paths:
+            logging.warning('No CRAM QC found to aggregate with MultiQC')
+            return self.make_outputs(cohort)
+
+        send_to_slack = config_retrieve(['workflow', 'cram_multiqc', 'send_to_slack'], default=True)
+        extra_config = config_retrieve(['workflow', 'cram_multiqc', 'extra_config'], default={})
+        extra_config['table_columns_visible'] = {'FastQC': False}
+
+        jobs = multiqc(
+            get_batch(),
+            tmp_prefix=cohort.analysis_dataset.tmp_prefix() / 'multiqc' / 'cram',
+            paths=paths,
+            ending_to_trim=ending_to_trim,
+            modules_to_trim_endings=modules_to_trim_endings,
+            dataset=cohort.analysis_dataset,
+            out_json_path=json_path,
+            out_html_path=html_path,
+            out_html_url=html_url,
+            out_checks_path=checks_path,
+            job_attrs=self.get_job_attrs(cohort),
+            sequencing_group_id_map=cohort.analysis_dataset.rich_id_map(),
+            label='CRAM',
+            send_to_slack=send_to_slack,
+            extra_config=extra_config,
+        )
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

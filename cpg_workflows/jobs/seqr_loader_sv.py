@@ -2,12 +2,11 @@
 Hail Query Batch-Backend jobs for seqr-loader.
 """
 
-from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import get_batch, image_path, query_command
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.query_modules import seqr_loader, seqr_loader_sv
 
 
@@ -16,7 +15,6 @@ def annotate_cohort_jobs_sv(
     out_mt_path: Path,
     checkpoint_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
 ) -> Job:
     """
     Annotate cohort for seqr loader, SV style.
@@ -25,18 +23,19 @@ def annotate_cohort_jobs_sv(
 
     j = get_batch().new_job('Annotate cohort', job_attrs)
     j.image(get_config()['workflow']['driver_image'])
+    gencode_gz = get_config()['workflow']['gencode_gtf_file']
+    gencode_gtf_local = get_batch().read_input(str(gencode_gz))
     j.command(
         query_command(
             seqr_loader_sv,
             seqr_loader_sv.annotate_cohort_sv.__name__,
             str(vcf_path),
             str(out_mt_path),
+            str(gencode_gtf_local),
             str(checkpoint_prefix),
             setup_gcp=True,
         ),
     )
-    if depends_on:
-        j.depends_on(*depends_on)
     return j
 
 
@@ -46,7 +45,6 @@ def annotate_dataset_jobs_sv(
     out_mt_path: Path,
     tmp_prefix: Path,
     job_attrs: dict | None = None,
-    depends_on: list[Job] | None = None,
     exclusion_file: str | None = None,
 ) -> list[Job]:
     """
@@ -82,8 +80,6 @@ def annotate_dataset_jobs_sv(
             setup_gcp=True,
         ),
     )
-    if depends_on:
-        subset_j.depends_on(*depends_on)
 
     annotate_j = get_batch().new_job('annotate dataset', (job_attrs or {}) | {'tool': 'hail query'})
     annotate_j.image(image_path('cpg_workflows'))

@@ -1,0 +1,115 @@
+[workflow]
+name = 'Talos'
+
+# where to register outputs, if at all
+status_reporter = 'metamist'
+
+## override clinvar results
+#clinvar_decisions = "HailTable path to private ClinVar"
+#clinvar_pm5 = "HailTable path to ClinVar PM5"
+
+[GeneratePanelData]
+default_panel = 137
+obo_file = 'gs://cpg-common-test/references/aip/hpo_terms.obo'
+panelapp = 'https://panelapp-aus.org/api/v1/panels'
+require_pheno_match = ['FLG', 'GJB2', 'F2', 'F5', 'HFE']
+
+# forbidden_genes = ['a', 'b']
+# forced_panels = [1, 2]
+within_x_months = 6
+
+[ValidateMOI]
+# thresholds for different filters during the MOI checks
+gnomad_dominant = 0.001
+gnomad_max_homs_dominant = 0
+gnomad_max_homs_recessive = 1
+gnomad_max_ac_dominant = 10
+max_callset_ac_dominant = 10
+gnomad_max_hemi = 1
+callset_af_sv_dominant = 0.01
+
+# these categories don't reach the report without also having a gene-phenotype match
+# stripped down form, e.g. 'categoryboolean6' is '6'
+phenotype_match = ['6']
+
+# bin these off for now
+ignore_categories = ['exomiser', 'svdb']
+support_categories = ['5', '6']
+
+# by default, only consider the top 2 exomiser results
+exomiser_rank_threshold = 2
+
+allow_common_clinvar = true
+
+[RunHailFiltering]
+# variables for the hail operations, including CSQ sets and filter thresholds
+ac_threshold = 0.01
+# for de novo testing, use HIGH consequence terms + these terms
+additional_csq = ['missense']
+# maximum allowed population frequency - dominant variants will have a stricter threshold applied later
+af_semi_rare = 0.01
+# maximum presence in a SV callset to be considered potentially pathogenic
+callset_af_sv_recessive = 0.03
+# all consequences considered HIGH impact
+critical_csq = ['frameshift', 'splice_acceptor', 'splice_donor', 'start_lost', 'stop_gained', 'stop_lost']
+# used in de novo calculation - highest %Alt reads for a parent to be considered WT
+max_parent_ab = 0.05
+# min read depth required for variant calls
+minimum_depth = 10
+# threshold for considering SpliceAI calls to be Pathogenic
+spliceai = 0.5
+
+# for generating the VCF output - these are the fields pulled from the MT, in this order
+csq_string = [ "consequence", "gene_id", "gene", "transcript", "mane_id", "mane", "biotype", "dna_change", "amino_acid_change", "codon", "ensp", "am_class", "am_pathogenicity",]
+
+# config entries relating to size of VM provisioned for Hail
+[RunHailFiltering.cores]
+sv = 8
+small_variants = 16
+
+# total allocated RAM, String
+[RunHailFiltering.memory]
+small_variants = 'highmem'
+#sv = 2
+
+[RunHailFiltering.storage]
+sv = 10
+small_variants = 50
+
+[categories]
+1 = 'ClinVar Pathogenic'
+3 = 'High Impact Variant'
+4 = 'de Novo'
+5 = 'High SpliceAI Score'
+6 = 'AlphaMissense P/LP'
+pm5 = 'ACMG PM5 - missense in same residue as known pathogenic'
+support = 'High in Silico Scores'
+svdb = 'SpliceVarDB Predicted Splice-Altering'
+sv1 = 'Predicted LOF SV'
+exomiser = 'Variant prioritised by Exomiser'
+
+# cohort specific parts of the config are not stored in this repository due to data protection concerns.
+# Instead, AIP runs in production-pipelines should use the config from github::production-pipelines-configuration
+
+[HPOFlagging]
+# this section relates to phenotype-matching the final variant set
+
+# set this to True to do a semantic term comparison when phenotype matching
+# this does a wiggly semantic similarity test between participant and gene HPOs, through SemSimian
+# if False, we will always do a set intersection on HPO terms
+semantic_match = true
+
+# min similarity score when doing a semsimian termset similarity test
+min_similarity = 14.0
+
+# download from https://data.monarchinitiative.org/monarch-kg/latest/phenio.db.gz
+# needs to be decompressed to use
+phenio_db = 'gs://cpg-common-test/references/aip/phenotype.db'
+# download from https://hpo.jax.org/data/annotations "genes to phenotype" file
+gene_to_phenotype = 'gs://cpg-common-test/references/aip/genes_to_phenotype.txt'
+
+[talos_stages.ValidateMOI]
+# memory issues fixed, we can process 7000 samples together in undedr 1GB
+cpu = 1
+memory = 'standard'
+storage = '10Gi'

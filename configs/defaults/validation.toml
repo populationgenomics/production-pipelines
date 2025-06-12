@@ -1,5 +1,12 @@
 [workflow]
-input_datasets = ['validation']
-name = 'hap.py_validation'
-dataset = 'validation'
+name = 'validation'
 status_reporter = 'metamist'
+
+input_datasets = ['validation']
+
+# if True, the single sample VCF extracted from the MT will be filtered to PASS-only, otherwise it will be the full VCF
+vcf_pass_only = false
+
+# by default validation runs on output from the rd_combiner AnnotateDataset Stage
+# to choose output from a different Stage, use this String
+#mt_stage = "AnnotateDatasetSmallVariantsWithHailQuery"

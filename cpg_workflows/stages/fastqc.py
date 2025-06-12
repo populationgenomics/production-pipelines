@@ -37,8 +37,7 @@ def _collect_fastq_outs(sequencing_group: SequencingGroup) -> list[OneFastqc]:
     """
     Collect input and output paths for FASTQC for all paths in alignment inputs.
     """
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    if not (alignment_input := sequencing_group.alignment_input_by_seq_type.get(sequencing_type)):
+    if not (alignment_input := sequencing_group.alignment_input):
         # Only running FASTQC if sequencing inputs are available.
         return []
 
@@ -119,7 +118,7 @@ class FastQCMultiQC(DatasetStage):
     def expected_outputs(self, dataset: Dataset) -> dict[str, Path]:
         if get_config()['workflow'].get('skip_qc', False) is True:
             return {}
-        h = dataset.alignment_inputs_hash()
+        h = dataset.get_alignment_inputs_hash()
         return {
             'html': dataset.web_prefix() / 'qc' / 'fastqc' / h / 'multiqc.html',
             'json': dataset.prefix() / 'qc' / 'fastqc' / h / 'multiqc_data.json',

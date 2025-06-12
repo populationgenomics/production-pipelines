@@ -3,17 +3,17 @@ extract from Broad sample batching script for GATK-SV
 """
 
 import json
-import logging
 
 import numpy as np
 import pandas as pd
 
 from cpg_utils import to_path
+from cpg_workflows.utils import get_logger
 
 SEX_VALS = {'male', 'female'}
 
 
-def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
+def batch_sgs(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> list[dict]:
     """
     Batch sequencing groups by coverage, and chrX ploidy
 
@@ -41,10 +41,16 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         Each batch self-documents its size and male/female ratio
         {
             batch_ID: {
-                'sequencing_groups': [sample1, sample2, ...],
-                'mf_ratio': float,
                 'size': int,
+                'male_count': int,
+                'female_count': int,
+                'mf_ratio': float,
+                'batch_median_coverage': float,
+                'coverage_range': (float, float),
+                'sequencing_groups': [sample1, sample2, ...],
                 'coverage_medians': [float, float, ...],
+                'male': [sample1, sample3, ...],
+                'female': [sample1, sample3, ...],
             }
         }
     """
@@ -58,13 +64,19 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
 
     # shortcut return if the total sequencing groups is a valid batch
     if min_batch_size <= n_sg <= max_batch_size:
-        logging.info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
+        get_logger().info(f'Number of sequencing_groups ({n_sg}) is within range of batch sizes')
         return [
             {
-                'sequencing_groups': md.ID.tolist(),
-                'mf_ratio': is_male.sum() / is_female.sum(),
                 'size': n_sg,
+                'male_count': len(md[~is_female]),
+                'female_count': len(md[is_female]),
+                'mf_ratio': is_male.sum() / is_female.sum(),
+                'batch_median_coverage': md.median_coverage.median(),
+                'coverage_range': (md.median_coverage.min(), md.median_coverage.max()),
+                'sequencing_groups': md.ID.tolist(),
                 'coverage_medians': md.median_coverage.tolist(),
+                'male': md[~is_female].ID.to_list(),
+                'female': md[is_female].ID.to_list(),
             },
         ]
 
@@ -79,7 +91,7 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         n_per_batch = n_sg // cov_bins
     # endregion
 
-    logging.info(
+    get_logger().info(
         f"""
     Batching Specs:
     Total sequencing_groups: {n_sg}
@@ -94,28 +106,95 @@ def batch_sgs(md: pd.DataFrame, min_batch_size, max_batch_size) -> list[dict]:
         'female': md[is_female].sort_values(by='median_coverage'),
     }
 
+    get_logger().info('Sex distribution across all samples:')
+    for sex, entries in md_sex.items():
+        get_logger().info(f'{sex}: {len(entries)}')
+
     # array split each sex proportionally
     md_sex_cov = {sex: np.array_split(md_sex[sex], cov_bins) for sex in SEX_VALS}
 
     # create batches
     batches = []
     for cov in range(cov_bins):
-        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])
+        sample_ids = pd.concat([md_sex_cov['male'][cov], md_sex_cov['female'][cov]])  # type: ignore
+        get_logger().info(
+            f"""
+        ---
+        Batch {cov}:
+        Samples: {len(sample_ids)}
+        Males: {len(md_sex_cov['male'][cov])}
+        Females: {len(md_sex_cov['female'][cov])}
+        ---
+        """,
+        )
         batches.append(
             {
-                'sequencing_groups': sample_ids.ID.tolist(),
                 'size': len(sample_ids),
-                'mf_ratio': len(md_sex_cov['male'][cov]) or 1 / len(md_sex_cov['female'][cov]) or 1,
+                'male_count': len(md_sex_cov['male'][cov]),
+                'female_count': len(md_sex_cov['female'][cov]),
+                'mf_ratio': (len(md_sex_cov['male'][cov]) or 1) / (len(md_sex_cov['female'][cov]) or 1),
+                'batch_median_coverage': sample_ids.median_coverage.median(),
+                'coverage_range': (sample_ids.median_coverage.min(), sample_ids.median_coverage.max()),
+                'sequencing_groups': sample_ids.ID.tolist(),
                 'coverage_medians': sample_ids.median_coverage.tolist(),
+                'male': md_sex_cov['male'][cov].ID.tolist(),  # type: ignore
+                'female': md_sex_cov['female'][cov].ID.tolist(),  # type: ignore
             },
         )
 
     return batches
 
 
+def batch_sgs_by_library(md: pd.DataFrame, min_batch_size: int, max_batch_size: int) -> list[dict]:
+    """
+    Batch sequencing groups by coverage, chrX ploidy, and sequencing library
+
+    Args:
+        md (pd.DataFrame): DataFrame of metadata
+        min_batch_size (int): minimum batch size
+        max_batch_size (int): maximum batch size
+
+    Returns:
+        A list of batches, each with sequencing_groups and additional information
+    """
+    # Check that the library column exists
+    if 'library' not in md.columns:
+        return batch_sgs(md, min_batch_size, max_batch_size)
+
+    # Group SGs by library type
+    library_groups = md.groupby('library')
+
+    # Create batches from each library's DataFrame
+    batches = []
+    for _, library_df in library_groups:
+        batches.extend(batch_sgs(library_df, min_batch_size, max_batch_size))
+
+    return batches
+
+
+def add_sg_meta_fields(sg_df: pd.DataFrame, sg_meta: dict[str, dict]) -> pd.DataFrame:
+    """
+    Adds the sg meta fields 'library' and 'facility' to the DataFrame
+
+    Args:
+        sg_df (pd.DataFrame): DataFrame of sequencing groups
+        sg_meta (dict[str, dict]): meta dict keyed by SG ID
+
+    Returns:
+        pd.DataFrame: DataFrame with the sg_meta fields parsed and added
+    """
+    sg_df['library'] = sg_df['ID'].map(
+        lambda x: sg_meta[x].get('library_type', sg_meta[x].get('sequencing_library', 'unknown')),
+    )
+    sg_df['facility'] = sg_df['ID'].map(
+        lambda x: sg_meta[x].get('facility', sg_meta[x].get('sequencing_facility', 'unknown')),
+    )
+    return sg_df
+
+
 def partition_batches(
-    metadata_file: str,
-    sample_ids: list[str],
+    metadata_files: list[str],
+    sequencing_groups_json: str,
     output_json: str,
     min_batch_size: int,
     max_batch_size: int,
@@ -128,22 +207,28 @@ def partition_batches(
     - also writes out per-batch sample lists
 
     Args:
-        metadata_file (str): path to the metadata file
-        sample_ids (list[str]): sample IDs to consider
+        metadata_files (list[str]): paths to the metadata files
+        sequencing_groups_json (str): path to json of all SGs with their meta
         output_json (str): location to write the batch result
         min_batch_size (int): minimum batch size
         max_batch_size (int): maximum batch size
     """
 
     # read in the metadata contents
-    logging.basicConfig(level=logging.INFO)
+    get_logger(__file__).info('Starting the batch creation process')
 
-    # load in the metadata file
-    md = pd.read_csv(metadata_file, sep='\t', low_memory=False)
-    md.columns = [x.replace('#', '') for x in md.columns]
+    # load in the metadata files
+    md = pd.concat([pd.read_csv(md_file, sep='\t', low_memory=False) for md_file in metadata_files])
+    md.columns = [x.replace('#', '') for x in md.columns]  # type: ignore
+
+    # load the sequencing groups
+    with to_path(sequencing_groups_json).open('r') as f:
+        sequencing_groups = json.load(f)
 
     # filter to the PCR-state SGs we're interested in
+    sample_ids = list(sequencing_groups.keys())
     md = md.query('ID in @sample_ids')
+    md = add_sg_meta_fields(md, sequencing_groups)
 
     # check that we have enough samples to batch
     # should have already been checked prior to Stage starting
@@ -151,10 +236,10 @@ def partition_batches(
         raise ValueError('Insufficient Seq Groups found for batch generation')
 
     # generate the batches
-    batches = batch_sgs(md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size)
+    batches = batch_sgs_by_library(md=md, min_batch_size=min_batch_size, max_batch_size=max_batch_size)
 
     # write out the batches to GCP
-    logging.info(batches)
+    get_logger().info(batches)
 
     # write the batch JSON out to a file, inc. PCR state
     with to_path(output_json).open('w') as handle:

@@ -3,6 +3,7 @@ FASTQ/BAM/CRAM -> CRAM: create Hail Batch jobs for (re-)alignment.
 """
 
 import logging
+import os.path
 from enum import Enum
 from textwrap import dedent
 from typing import cast
@@ -11,8 +12,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import (
     AlignmentInput,
     BamPath,
@@ -75,8 +76,7 @@ class MissingAlignmentInputException(Exception):
 def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
     """Given a sequencing group, will return an AlignmentInput object that
     represents the path to a relevant input (e.g. CRAM/BAM path)"""
-    sequencing_type = get_config()['workflow']['sequencing_type']
-    alignment_input = sequencing_group.alignment_input_by_seq_type.get(sequencing_type)
+    alignment_input = sequencing_group.alignment_input
     if realign_cram_ver := get_config()['workflow'].get('realign_from_cram_version'):
         if (
             path := (sequencing_group.dataset.prefix() / 'cram' / realign_cram_ver / f'{sequencing_group.id}.cram')
@@ -104,10 +104,11 @@ def _get_alignment_input(sequencing_group: SequencingGroup) -> AlignmentInput:
 
 
 def align(
-    b,
+    b: hb.Batch,
     sequencing_group: SequencingGroup,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
+    sorted_bam_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
     aligner: Aligner = Aligner.DRAGMAP,
     markdup_tool: MarkDupTool = MarkDupTool.PICARD,
@@ -129,6 +130,8 @@ def align(
 
         - for dragmap, submit an extra job to extract a pair of fastqs from the cram/bam,
         because dragmap can't read streamed files from bazam.
+
+    - if the sorted bam can be reused, skip the alignment job(s) and go straight to markdup.
 
     - if the markdup tool:
         - is biobambam2, deduplication and alignment/merging are submitted within the same job.
@@ -153,11 +156,13 @@ def align(
     # if number of threads is not requested, using whole instance
     requested_nthreads = requested_nthreads or STANDARD.max_threads()
 
-    if get_config()['workflow']['sequencing_type'] == 'genome':
+    if sequencing_group.sequencing_type == 'genome':
         realignment_shards_num = 10
     else:
-        assert get_config()['workflow']['sequencing_type'] == 'exome'
-        realignment_shards_num = 1
+        assert sequencing_group.sequencing_type == 'exome'
+        # consider setting the shard count to at least 2 when the input is large,
+        # or else dragen-os can run out of memory and cause the VM to continually restart
+        realignment_shards_num = config_retrieve(['workflow', 'exome_realignment_shards'], 1)
 
     sharded_fq = isinstance(alignment_input, FastqPairs) and len(alignment_input) > 1
     sharded_bazam = (
@@ -169,7 +174,21 @@ def align(
     sharded_align_jobs = []
     sorted_bams = []
 
-    if not sharded:  # Just running one alignment job
+    if can_reuse(sorted_bam_path):
+        logging.info(f'{sequencing_group.id} :: Re-using sorted BAM: {sorted_bam_path}')
+        # Its necessary to create this merge_or_align_j object to pass it to finalise_alignment,
+        # and to declare the sorted_bam_path as a resource, so it can be written to the checkpoint.
+        job_attrs = (job_attrs or {}) | dict(label='Reusing sorted bam', tool='Reusing sorted bam')
+        merge_or_align_j = b.new_job('Reusing sorted bam', job_attrs or {})
+        merge_or_align_j.image(config_retrieve(['workflow', 'driver_image']))
+        merge_or_align_j.sorted_bam = b.read_input(str(sorted_bam_path))
+        jobs.append(merge_or_align_j)
+        # The align_cmd and other parameters are not used but are necessary to pass to finalise_alignment.
+        align_cmd = ''
+        stdout_is_sorted = True
+        output_fmt = 'bam'
+
+    elif not sharded:  # Just running one alignment job
         if isinstance(alignment_input, FastqPairs):
             alignment_input = alignment_input[0]
         assert isinstance(alignment_input, FastqPair | BamPath | CramPath)
@@ -262,6 +281,7 @@ def align(
         requested_nthreads=requested_nthreads,
         markdup_tool=markdup_tool,
         output_path=output_path,
+        sorted_bam_path=sorted_bam_path,
         out_markdup_metrics_path=out_markdup_metrics_path,
         align_cmd_out_fmt=output_fmt,
         overwrite=overwrite,
@@ -301,7 +321,7 @@ def storage_for_align_job(alignment_input: AlignmentInput) -> int | None:
 
 
 def _align_one(
-    b,
+    b: hb.Batch,
     job_name: str,
     alignment_input: FastqPair | CramPath | BamPath,
     requested_nthreads: int,
@@ -449,7 +469,10 @@ def _align_one(
     elif aligner == Aligner.DRAGMAP:
         j.image(image_path('dragmap'))
         dragmap_index = b.read_input_group(
-            **{k.replace('.', '_'): str(reference_path('broad/dragmap_prefix') / k) for k in DRAGMAP_INDEX_FILES},
+            **{
+                k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k)
+                for k in DRAGMAP_INDEX_FILES
+            },
         )
         if use_bazam:
             input_params = f'--interleaved=1 -b {r1_param}'
@@ -503,7 +526,7 @@ def _align_one(
 
 
 def extract_fastq(
-    b,
+    b: hb.Batch,
     bam_or_cram_group: hb.ResourceGroup,
     ext: str = 'cram',
     job_attrs: dict | None = None,
@@ -560,6 +583,7 @@ def finalise_alignment(
     markdup_tool: MarkDupTool,
     job_attrs: dict | None = None,
     output_path: CramPath | None = None,
+    sorted_bam_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
     align_cmd_out_fmt: str = 'sam',
     overwrite: bool = False,
@@ -600,7 +624,17 @@ def finalise_alignment(
             align_cmd += f' {sort_cmd(nthreads)}'
         align_cmd += f' > {j.sorted_bam}'
 
-    j.command(command(align_cmd, monitor_space=True))  # type: ignore
+    if not can_reuse(sorted_bam_path):
+        j.command(command(align_cmd, monitor_space=True))  # type: ignore
+
+    if (
+        sorted_bam_path
+        and not sorted_bam_path.exists()
+        and config_retrieve(['workflow', 'checkpoint_sorted_bam'], False)
+    ):
+        # Write the sorted BAM to the checkpoint if it doesn't already exist and the config is set
+        logging.info(f'Will write sorted bam to checkpoint: {sorted_bam_path}')
+        b.write_output(j.sorted_bam, str(sorted_bam_path))
 
     assert isinstance(j.sorted_bam, hb.ResourceFile)
     if markdup_tool == MarkDupTool.PICARD:

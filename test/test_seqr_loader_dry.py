@@ -2,6 +2,9 @@
 Test seqr-loader workflow.
 """
 
+import shutil
+import uuid
+from os import makedirs
 from pathlib import Path
 from unittest.mock import mock_open
 
@@ -24,6 +27,8 @@ check_intermediates = false
 check_expected_outputs = false
 path_scheme = "local"
 local_dir = "{directory}"
+write_mt_for_datasets = ["test-analysis-dataset"]
+create_es_index_for_datasets = ["test-analysis-dataset"]
 
 [hail]
 billing_project = "test-analysis-dataset"
@@ -125,34 +130,43 @@ SEQR_LOADER_CONFIG = Path(to_path(__file__).parent.parent / 'configs' / 'default
 
 def _mock_cohort():
     from cpg_workflows.filetypes import BamPath, FastqPair, FastqPairs
-    from cpg_workflows.targets import Cohort
+    from cpg_workflows.targets import MultiCohort
 
-    cohort = Cohort()
-    ds = cohort.create_dataset('test-input-dataset')
-    ds.add_sequencing_group(
-        'CPG01',
-        'SAMPLE1',
-        alignment_input_by_seq_type={'genome': BamPath('gs://test-input-dataset-upload/sample1.bam')},
+    multi_cohort = MultiCohort()
+    cohort = multi_cohort.create_cohort(id='COH123', name='test-analysis-dataset')
+    ds = cohort.create_dataset('test-analysis-dataset')
+    mc_dataset = multi_cohort.add_dataset(ds)
+    sg1 = ds.add_sequencing_group(
+        'CPGAA',
+        external_id='SAMPLE1',
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+        alignment_input=BamPath('gs://test-input-dataset-upload/sample1.bam'),
     )
-    ds.add_sequencing_group(
-        'CPG02',
-        'SAMPLE2',
-        alignment_input_by_seq_type={
-            'genome': FastqPairs(
-                [
-                    FastqPair(
-                        'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
-                        'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
-                    ),
-                    FastqPair(
-                        'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
-                        'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
-                    ),
-                ],
-            ),
-        },
+    mc_dataset.add_sequencing_group_object(sg1)
+    sg2 = ds.add_sequencing_group(
+        'CPGBB',
+        external_id='SAMPLE2',
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+        alignment_input=FastqPairs(
+            [
+                FastqPair(
+                    'gs://test-input-dataset-upload/sample2_L1_R1.fq.gz',
+                    'gs://test-input-dataset-upload/sample2_L1_R2.fq.gz',
+                ),
+                FastqPair(
+                    'gs://test-input-dataset-upload/sample2_L2_R1.fq.gz',
+                    'gs://test-input-dataset-upload/sample2_L2_R2.fq.gz',
+                ),
+            ],
+        ),
     )
-    return cohort
+    mc_dataset.add_sequencing_group_object(sg2)
+
+    return multi_cohort
 
 
 def selective_mock_open(*args, **kwargs):
@@ -163,18 +177,22 @@ def selective_mock_open(*args, **kwargs):
         return mock_open(read_data='<stub>')(*args, **kwargs)
 
 
-def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
+def test_seqr_loader_dry(mocker: MockFixture):
     """
     Test entire seqr-loader in a dry mode.
     """
-    conf = TOML.format(directory=str(tmp_path))
-    set_config(
-        conf,
-        tmp_path / 'config.toml',
-        merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG],
-    )
 
-    mocker.patch('cpg_workflows.inputs.create_cohort', _mock_cohort)
+    # trying to generate a random tmp_path using pytest.tmp_path here fails on CI
+    # as the tmp_path is unbelievably long when running multiple parallel tests
+    tmp_path_string = f'test-seqr-loader-dry_tmp{uuid.uuid4().hex[:6]}'
+    makedirs(tmp_path_string, exist_ok=True)
+
+    conf = TOML.format(directory=tmp_path_string)
+    tmp_path = Path(tmp_path_string)
+
+    set_config(conf, tmp_path / 'config.toml', merge_with=[DEFAULT_CONFIG, SEQR_LOADER_CONFIG])
+
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', _mock_cohort)
 
     def do_nothing(*args, **kwargs):
         return None
@@ -189,14 +207,11 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
     mocker.patch('hailtop.batch.job.Job.always_run', do_nothing)
     # can't access secrets from CI environment
     mocker.patch('cpg_workflows.stages.seqr_loader.es_password', lambda: 'test-password')
-    mocker.patch(
-        'metamist.apis.AnalysisApi.create_analysis',
-        mock_create_analysis,
-    )
+    mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
     mocker.patch('metamist.apis.AnalysisApi.update_analysis', do_nothing)
 
     from cpg_utils.hail_batch import get_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.stages.cram_qc import CramMultiQC
     from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
     from cpg_workflows.stages.joint_genotyping_qc import JointVcfQC
@@ -205,11 +220,16 @@ def test_seqr_loader_dry(mocker: MockFixture, tmp_path):
 
     get_workflow().run(stages=[MtToEs, GvcfMultiQC, CramMultiQC, JointVcfQC])
 
-    assert get_batch().job_by_tool['gatk HaplotypeCaller']['job_n'] == len(get_cohort().get_sequencing_groups()) * 50
-    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(get_cohort().get_sequencing_groups())
-    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(get_cohort().get_sequencing_groups())
+    assert (
+        get_batch().job_by_tool['gatk HaplotypeCaller']['job_n'] == len(get_multicohort().get_sequencing_groups()) * 50
+    )
+    assert get_batch().job_by_tool['picard MergeVcfs']['job_n'] == len(get_multicohort().get_sequencing_groups())
+    assert get_batch().job_by_tool['gatk ReblockGVCF']['job_n'] == len(get_multicohort().get_sequencing_groups())
     assert (
         get_batch().job_by_tool['picard CollectVariantCallingMetrics']['job_n']
-        == len(get_cohort().get_sequencing_groups()) + 1
+        == len(get_multicohort().get_sequencing_groups()) + 1
     )
     assert get_batch().job_by_tool['gatk GenomicsDBImport']['job_n'] == 50
+
+    # if we got here, it's all good - clean up
+    shutil.rmtree(tmp_path_string)

@@ -5,7 +5,7 @@ Test building Workflow object.
 from unittest import mock
 
 from cpg_utils import Path, to_path
-from cpg_workflows.targets import Cohort, SequencingGroup
+from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_workflows.workflow import path_walk
 
 from . import set_config
@@ -36,15 +36,29 @@ backend = 'local'
 """
 
 
-def mock_create_cohort() -> Cohort:
-    c = Cohort()
+def mock_deprecated_create_cohort() -> MultiCohort:
+    m = MultiCohort()
+    c = m.create_cohort(id='COH123', name='fewgenomes')
     ds = c.create_dataset('my_dataset')
-    ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
-    ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
-    return c
+    m_ds = m.add_dataset(ds)
+
+    def add_sg(id, external_id):
+        return ds.add_sequencing_group(
+            id=id,
+            external_id=external_id,
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        )
+
+    sg1 = add_sg('CPGAA', external_id='SAMPLE1')
+    sg2 = add_sg('CPGBB', external_id='SAMPLE2')
+    m_ds.add_sequencing_group_object(sg1)
+    m_ds.add_sequencing_group_object(sg2)
+    return m
 
 
-@mock.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+@mock.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_deprecated_create_cohort)
 def test_workflow(tmp_path):
     """
     Testing running a workflow from a mock cohort.
@@ -52,8 +66,9 @@ def test_workflow(tmp_path):
     conf = TOML.format(directory=tmp_path)
     set_config(conf, tmp_path / 'config.toml')
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.workflow import (
         CohortStage,
         SequencingGroupStage,
@@ -65,7 +80,14 @@ def test_workflow(tmp_path):
 
     output_path = to_path(dataset_path('cohort.tsv'))
 
-    assert len(get_cohort().get_sequencing_groups()) == 2
+    multi_cohort = get_multicohort()
+
+    assert len(multi_cohort.get_sequencing_groups()) == 2
+
+    assert multi_cohort.alignment_inputs_hash is None
+    mc_hash = multi_cohort.get_alignment_inputs_hash()
+    assert multi_cohort.alignment_inputs_hash == mc_hash
+    assert mc_hash == 'e3b0c44298fc1c149afbf4c8996fb92427ae41_2'
 
     @stage
     class MySequencingGroupStage(SequencingGroupStage):
@@ -109,7 +131,7 @@ def test_workflow(tmp_path):
     print(f'Checking result in {output_path}:')
     with output_path.open() as f:
         result = f.read()
-        assert result.split() == ['CPG01_done', 'CPG02_done'], result
+        assert result.split() == ['CPGAA_done', 'CPGBB_done'], result
 
 
 def test_path_walk():

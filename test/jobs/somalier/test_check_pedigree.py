@@ -45,7 +45,13 @@ def setup_pedigree_test(tmp_path: Path, config: PipelineConfig | None = None):
     dataset_id = config.workflow.dataset
 
     dataset = create_dataset(name=dataset_id)
-    dataset.add_sequencing_group(id='CPG000001', external_id='SAMPLE1')
+    dataset.add_sequencing_group(
+        id='CPGABCD',
+        external_id='SAMPLE1',
+        sequencing_type='genome',
+        sequencing_technology='short-read',
+        sequencing_platform='illumina',
+    )
     batch = create_local_batch(tmp_path)
 
     sg_id = dataset.get_sequencing_group_ids()[0]
@@ -196,7 +202,12 @@ class TestSomalierCheckPedigree:
 
         dataset_id = config.workflow.dataset
         dataset = create_dataset(name=dataset_id)
-        dataset.add_sequencing_group(id='CPG000001')
+        dataset.add_sequencing_group(
+            id='CPGABCD',
+            sequencing_type='genome',
+            sequencing_technology='short-read',
+            sequencing_platform='illumina',
+        )
 
         pedigree_jobs = pedigree(
             dataset=dataset,

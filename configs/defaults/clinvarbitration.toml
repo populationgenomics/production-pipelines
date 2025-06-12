@@ -1,0 +1,3 @@
+[workflow]
+sequencing_type = 'genome'
+site_blacklist = ["victorian clinical genetics services, murdoch childrens research institute"]

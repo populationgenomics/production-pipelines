@@ -1,5 +1,18 @@
 #!/usr/bin/env python3
 
+"""
+Copy CRAM files while replacing existing @SQ headers with new ones as specified,
+add new analysis records to metamist pointing to the new CRAM files, and
+inactivate the existing analysis records for these sequencing groups.
+
+Typical usage:
+
+analysis-runner ... scripts/fix_sq_headers --ref gs://.../reference.dict
+    --expected 'Homo_sapiens_assembly38[unmasked]'
+    --intended 'Homo_sapiens_assembly38_masked'
+    [gs://... directory or file paths to limit processing]...
+"""
+
 import hashlib
 import os
 import subprocess as sb
@@ -10,45 +23,52 @@ import click
 from hailtop.batch.resource import JobResourceFile
 
 from cpg_utils import to_path
-from cpg_utils.hail_batch import get_batch, get_config, image_path
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import get_batch
 from metamist import models
 from metamist.apis import AnalysisApi
 from metamist.graphql import gql, query
 
-FIND_CRAMS = gql(
+FIND_ANALYSES = gql(
     """
-query CramQuery($project: String!) {
+query AnalysesQuery($project: String!) {
   project(name: $project) {
-    sequencingGroups {
+    analyses(type: {eq: "cram"}, active: {eq: true}) {
       id
-      analyses(type: {eq: "cram"}) {
-        id
-        meta
-        output
-        active
-        type
+      meta
+      output
+      sequencingGroups {
+        sample {
+          id
+        }
       }
+      status
+      type
     }
   }
 }
 """,
 )
 
-
-def query_metamist(dataset: str):
-    cram_list = []
-
-    for seqgroup in query(FIND_CRAMS, {'project': dataset})['project']['sequencingGroups']:
-        for analysis in seqgroup['analyses']:
-            fname = analysis['output']
-            if fname is not None and fname.endswith('.cram'):
-                cram_list.append(fname)
-            else:
-                sgid = seqgroup['id']
-                anid = analysis['id']
-                print(f'Sequencing group {sgid} analysis {anid} is not CRAM: {fname}')
-
-    return cram_list
+FIND_SAMPLES = gql(
+    """
+query SamplesQuery($project: String!) {
+  project(name: $project) {
+    samples {
+      id
+      sequencingGroups {
+        id
+        analyses(type: {eq: "cram"}, active: {eq: true}) {
+          id
+          output
+          status
+        }
+      }
+    }
+  }
+}
+""",
+)
 
 
 # Precomputed hashes (as per classify_SQ()) for common reference sets
@@ -137,22 +157,32 @@ def do_reheader(dry_run, refset, newref, newrefset, incram, outcram, outcrai):
     }
 
 
-def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, result):
+def do_metamist_update(dataset, activeseqgroup, oldanalysis, oldpath, newpath, result):
     aapi = AnalysisApi()
 
-    analysis = models.Analysis(
-        type='cram',
-        status=models.AnalysisStatus('completed'),
+    newmeta = oldanalysis['meta']
+    newmeta['size'] = result['cram_size']
+    newmeta['source'] += f' (reheadered from {oldpath})'
+
+    newanalysis = models.Analysis(
+        type=oldanalysis['type'],
+        status=models.AnalysisStatus(oldanalysis['status'].lower()),
         output=str(newpath),
-        sequencing_group_ids=[seqgroup],
-        meta={
-            'sequencing_type': sequencing_type,
-            'size': result['cram_size'],
-            'source': f'Reheadered from {oldpath}',
-        },
+        sequencing_group_ids=[activeseqgroup['id']],
+        meta=newmeta,
     )
-    aid = aapi.create_analysis(dataset, analysis)
+    aid = aapi.create_analysis(dataset, newanalysis)
     print(f'Created Analysis(id={aid}, output={newpath}) in {dataset}')
+
+    for analysis in activeseqgroup['analyses']:
+        activeid = analysis['id']
+        analysisupdate = models.AnalysisUpdateModel(
+            active=False,
+            status=models.AnalysisStatus(analysis['status'].lower()),
+        )
+        if not aapi.update_analysis(activeid, analysisupdate):
+            raise ValueError(f'Updating analysis id={activeid} failed')
+        print(f'Inactivated Analysis(id={activeid}, output={analysis["output"]} in {dataset}')
 
 
 @click.command()
@@ -177,16 +207,18 @@ def do_metamist_update(dataset, sequencing_type, seqgroup, oldpath, newpath, res
     metavar='NAME',
     help='KNOWN_REFS name of the replacement headers',
 )
+@click.option('--update-db', is_flag=True, help='Update metamist Analysis records to point to new CRAMs')
 @click.option('--dry-run', is_flag=True, help='Display information only without making changes')
 def main(
     source: tuple[str],
     new_reference_path: str,
     expected_refset: str,
     new_refset: str,
+    update_db: bool,
     dry_run: bool,
 ):
     """
-    This script uses the usual config entries (workflow.dataset, .access_level, .sequencing_type
+    This script uses the usual config entries (workflow.dataset, .access_level, .driver_image
     and images.samtools) and the following options to select CRAM files to have their @SQ
     headers rewritten.
     """
@@ -196,16 +228,30 @@ def main(
     if config['workflow']['access_level'] == 'test' and not dataset.endswith('-test'):
         dataset = f'{dataset}-test'
 
+    project_analyses = query(FIND_ANALYSES, {'project': dataset})['project']['analyses']
+    analysis_by_path = {analysis['output']: analysis for analysis in project_analyses}
+
     if len(source) > 0:
         print(f'Scanning {" ".join(source)} for *.cram files')
-        cram_list = [fn for srcdir in source for fn in to_path(srcdir).iterdir() if fn.suffix == '.cram']
+        cram_list = []
+        for src in source:
+            if src.endswith('.cram'):
+                if src in analysis_by_path:
+                    cram_list.append(src)
+                else:
+                    print(f'No analysis record found for {src}')
+            else:
+                for fn in to_path(src).iterdir():
+                    if fn.suffix == '.cram':
+                        if fn in analysis_by_path:
+                            cram_list.append(fn)
+                        else:
+                            print(f'No analysis record found for {fn}')
     else:
-        print(f'Finding CRAMs for {dataset} in database')
-        cram_list = query_metamist(dataset)
+        print(f'Using all CRAMs for {dataset} in database')
+        cram_list = analysis_by_path.keys()
 
     print(f'Total CRAM file entries found: {len(cram_list)}')
-
-    sequencing_type = config['workflow']['sequencing_type']
 
     reheader_list = []
     for fname in cram_list:
@@ -223,6 +269,9 @@ def main(
         sys.exit('No CRAMs to be reheadered!')
 
     print(f'CRAM files to be reheadered: {len(reheader_list)}')
+
+    project_samples = query(FIND_SAMPLES, {'project': dataset})['project']['samples']
+    sample_by_id = {sample['id']: sample for sample in project_samples}
 
     b = get_batch(f'Reheader {dataset} to {new_reference_path}')
     new_reference = b.read_input(new_reference_path)
@@ -254,19 +303,28 @@ def main(
 
         print(f'Added reheader job for {path}')
 
-        if not dry_run:
+        analysis = analysis_by_path[str(path)]
+        if seqgroupcount := len(analysis['sequencingGroups']) != 1:
+            print(f'Analysis id={analysis["id"]} for {path} is in {seqgroupcount} sequencing groups')
+        elif update_db and not dry_run:
             db_j = b.new_python_job(f'Update metamist for {newpath}')
             db_j.image(config['workflow']['driver_image'])
+
+            sample = sample_by_id[analysis['sequencingGroups'][0]['sample']['id']]
+            seqgroup = sample['sequencingGroups'][0]
 
             db_j.call(
                 do_metamist_update,
                 dataset,
-                sequencing_type,
-                path.stem,
+                seqgroup,
+                analysis,
                 str(path),
                 str(newpath),
                 j_result,
             )
+
+            oldids = ', '.join(str(a['id']) for a in seqgroup['analyses'])
+            print(f'Added metamist job to create new analysis and inactivate id={oldids}')
 
     b.run(wait=False)
 

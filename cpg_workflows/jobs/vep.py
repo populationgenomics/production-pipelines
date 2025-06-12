@@ -4,6 +4,7 @@
 Creates a Hail Batch job to run the command line VEP tool.
 """
 import logging
+from textwrap import dedent
 from typing import Literal
 
 import hailtop.batch as hb
@@ -11,20 +12,18 @@ from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import image_path, query_command, reference_path
-from cpg_workflows.jobs.picard import get_intervals
-from cpg_workflows.jobs.vcf import gather_vcfs, subset_vcf
+from cpg_utils.config import config_retrieve, get_config, image_path, reference_path
+from cpg_utils.hail_batch import query_command
+from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.query_modules import vep
 from cpg_workflows.utils import can_reuse
 
 
 def add_vep_jobs(
     b: Batch,
-    input_siteonly_vcf_path: Path,
+    input_vcfs: list[Path],
     tmp_prefix: Path,
     scatter_count: int,
-    input_siteonly_vcf_part_paths: list[Path] | None = None,
     out_path: Path | None = None,
     job_attrs: dict | None = None,
 ) -> list[Job]:
@@ -40,48 +39,18 @@ def add_vep_jobs(
         return []
 
     jobs: list[Job] = []
-    siteonly_vcf = b.read_input_group(
-        **{
-            'vcf.gz': str(input_siteonly_vcf_path),
-            'vcf.gz.tbi': str(input_siteonly_vcf_path) + '.tbi',
-        },
-    )
 
-    input_vcf_parts: list[hb.ResourceGroup] = []
-    if input_siteonly_vcf_part_paths:
-        assert len(input_siteonly_vcf_part_paths) == scatter_count
-        for path in input_siteonly_vcf_part_paths:
-            input_vcf_parts.append(b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}))
+    if len(input_vcfs) == 0:
+        raise ValueError('No input VCFs provided')
 
-    # If there is only one partition, we don't need to split the VCF
-    elif scatter_count == 1:
-        input_vcf_parts.append(siteonly_vcf)
-
-    else:
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            job_attrs=job_attrs,
-            output_prefix=tmp_prefix / f'intervals_{scatter_count}',
-        )
-        if intervals_j:
-            jobs.append(intervals_j)
-
-        # Splitting variant calling by intervals
-        for idx in range(scatter_count):
-            subset_j = subset_vcf(
-                b,
-                vcf=siteonly_vcf,
-                interval=intervals[idx],
-                job_attrs=(job_attrs or {}) | dict(part=f'{idx + 1}/{scatter_count}'),
-            )
-            jobs.append(subset_j)
-            assert isinstance(subset_j.output_vcf, hb.ResourceGroup)
-            input_vcf_parts.append(subset_j.output_vcf)
+    # read all input VCFs as resource groups
+    input_vcf_resources: list[hb.ResourceGroup] = [
+        b.read_input_group(**{'vcf.gz': str(path), 'vcf.gz.tbi': str(path) + '.tbi'}) for path in input_vcfs
+    ]
 
     result_parts_bucket = tmp_prefix / 'vep' / 'parts'
     result_part_paths = []
-    for idx, resource in enumerate(input_vcf_parts):
+    for idx, resource in enumerate(input_vcf_resources):
         if to_hail_table:
             result_part_path = result_parts_bucket / f'part{idx + 1}.jsonl'
         else:
@@ -112,17 +81,16 @@ def add_vep_jobs(
         gather_jobs = [j]
     elif scatter_count != 1:
         assert len(result_part_paths) == scatter_count
-        gather_jobs = gather_vcfs(
-            b=b,
-            input_vcfs=result_part_paths,
-            out_vcf_path=out_path,
-        )
+        gather_jobs = gather_vcfs(b=b, input_vcfs=result_part_paths, out_vcf_path=out_path)
     else:
-        print('no need to merge VCF results')
+        print('no need to merge VEP results')
         gather_jobs = []
+
     for j in gather_jobs:
         j.depends_on(*jobs)
-        jobs.append(j)
+
+    jobs.extend(gather_jobs)
+
     return jobs
 
 
@@ -174,13 +142,11 @@ def vep_one(
 
     # check that the cache and image for this version exist
     vep_image = image_path(f'vep_{vep_version}')
-    vep_mount_path = reference_path(f'vep_{vep_version}_mount')
+    vep_mount_path = to_path(reference_path(f'vep_{vep_version}_mount'))
     assert all([vep_image, vep_mount_path])
-    logging.info(f'Using VEP {vep_version}')
 
     j = b.new_job('VEP', (job_attrs or {}) | dict(tool=f'VEP {vep_version}'))
     j.image(vep_image)
-    splice_ai = get_config()['workflow'].get('spliceai_plugin', False)
 
     # vep is single threaded, with a middling memory requirement
     # during test it can exceed 8GB, so we'll give it 16GB
@@ -213,21 +179,23 @@ def vep_one(
     # sexy new plugin - only present in 110 build
     alpha_missense_plugin = f'--plugin AlphaMissense,file={vep_dir}/AlphaMissense_hg38.tsv.gz '
 
-    # UTRannotator plugin doesn't support JSON output at this time; only activate for VCF outputs
     # VCF annotation doesn't utilise the aggregated Seqr reference data, including spliceAI
     # SpliceAI requires both indel and SNV files to be present (~100GB), untested
-    vcf_plugins = '--plugin UTRAnnotator,file=$UTR38 '
-    if splice_ai:
-        vcf_plugins += (
+    use_splice_ai = config_retrieve(['workflow', 'spliceai_plugin'], False)
+    vcf_plugins = (
+        (
             f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
             f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
         )
+        if (use_splice_ai and vep_version == '110' and out_format == 'vcf')
+        else ''
+    )
 
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
-    cmd = f"""\
-    FASTA={vep_dir}/vep/homo_sapiens/*/Homo_sapiens.GRCh38*.fa.gz
+    cmd = f"""
+    set -x
     vep \\
     --format vcf \\
     --{out_format} {'--compress_output bgzip' if out_format == 'vcf' else ''} \\
@@ -240,16 +208,16 @@ def vep_one(
     --species homo_sapiens \\
     --cache --offline --assembly GRCh38 \\
     --dir_cache {vep_dir}/vep/ \\
-    --fasta $FASTA \\
-    {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \
-    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \
-    {vcf_plugins if (vep_version == '110' and out_format == 'vcf') else ''}
+    --fasta /cpg-common-main/references/vep/110/mount/vep/homo_sapiens/110/Homo_sapiens.GRCh38.dna.toplevel.fa.gz \\
+    {loftee_plugin_path if vep_version == '105' else alpha_missense_plugin} \\
+    --plugin LoF,{','.join(f'{k}:{v}' for k, v in loftee_conf.items())} \\
+    --plugin UTRAnnotator,file=$UTR38 {vcf_plugins}
     """
 
     if out_format == 'vcf':
         cmd += f'tabix -p vcf {output}'
 
-    j.command(cmd)
+    j.command(dedent(cmd))
 
     if out_path:
         b.write_output(j.output, str(out_path).replace('.vcf.gz', ''))

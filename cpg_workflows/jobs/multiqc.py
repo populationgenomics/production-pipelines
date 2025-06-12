@@ -9,8 +9,8 @@ from hailtop.batch import Batch, ResourceFile
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, copy_common_env, image_path
+from cpg_utils.config import get_config, image_path
+from cpg_utils.hail_batch import command, copy_common_env
 from cpg_workflows.python_scripts import check_multiqc
 from cpg_workflows.resources import STANDARD
 from cpg_workflows.targets import Dataset
@@ -31,6 +31,7 @@ def multiqc(
     modules_to_trim_endings: set[str] | None = None,
     job_attrs: dict | None = None,
     sequencing_group_id_map: dict[str, str] | None = None,
+    send_to_slack: bool = True,
     extra_config: dict | None = None,
 ) -> list[Job]:
     """
@@ -49,6 +50,7 @@ def multiqc(
     @param job_attrs: attributes to add to Hail Batch job
     @param sequencing_group_id_map: sequencing group ID map for bulk sequencing group renaming:
         (https://multiqc.info/docs/#bulk-sample-renaming-in-reports)
+    @param send_to_slack: whether or not to send a Slack message to the qc channel
     @param extra_config: extra config to pass to MultiQC
     @return: job objects
     """
@@ -60,7 +62,7 @@ def multiqc(
     mqc_j.image(image_path('multiqc'))
     STANDARD.set_resources(mqc_j, ncpu=16)
 
-    file_list_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_multiqc-file-list.txt'
+    file_list_path = tmp_prefix / f'{dataset.get_alignment_inputs_hash()}_multiqc-file-list.txt'
     if not get_config()['workflow'].get('dry_run', False):
         with file_list_path.open('w') as f:
             f.writelines([f'{p}\n' for p in paths])
@@ -70,7 +72,7 @@ def multiqc(
     modules_conf = ', '.join(list(modules_to_trim_endings)) if modules_to_trim_endings else ''
 
     if sequencing_group_id_map:
-        sample_map_path = tmp_prefix / f'{dataset.alignment_inputs_hash()}_rename-sample-map.tsv'
+        sample_map_path = tmp_prefix / f'{dataset.get_alignment_inputs_hash()}_rename-sample-map.tsv'
         if not get_config()['workflow'].get('dry_run', False):
             _write_sg_id_map(sequencing_group_id_map, sample_map_path)
         sample_map_file = b.read_input(str(sample_map_path))
@@ -78,8 +80,11 @@ def multiqc(
         sample_map_file = None
 
     if extra_config:
-        serialised = ', '.join(f'{k}: {v}' for k, v in extra_config.items())
-        extra_config_param = f'--cl-config "{serialised}"'
+        extra_config_param = ''
+        for k, v in extra_config.items():
+            serialised = f'{k}: {v}'
+            extra_config_param += f'''--cl-config "{serialised}" \\
+            '''
     else:
         extra_config_param = ''
 
@@ -120,6 +125,7 @@ def multiqc(
             label=label,
             out_checks_path=out_checks_path,
             job_attrs=job_attrs,
+            send_to_slack=send_to_slack,
         )
         check_j.depends_on(mqc_j)
         jobs.append(check_j)

@@ -1,0 +1,120 @@
+[workflow]
+name = 'gatk_sv'
+ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
+
+# update this when cpg_workflows.scripts.get_gencode_gtf.sh is re-run
+gencode_gtf_file = 'gs://cpg-common-main/references/hg38/v0/gencode_47.gtf.gz'
+
+# Write dataset MTs for these datasets. Required for the AnnotateDatasetSv stage.
+# write_mt_for_datasets = []
+
+# Create Seqr ElasticSearch indices for these datasets. Required for the MtToEsSv stage.
+# create_es_index_for_datasets = []
+
+# switches to deactivate all Metrics workflows. We ran into some resourcing issues when our total
+# cohort size approached ~1600. Response when raised with GATK team:
+#
+# "GatherBatchEvidenceMetrics and the other metrics routines at the end of the main workflows are
+# primarily for development and testing purposes, so you don’t need to run them as a user"
+
+# these metrics workflows are typically running svtest (https://github.com/broadinstitute/gatk-sv/blob/d37e453038e425acba9683da503218fe3d4b1033/src/svtest/setup.py)
+# on each output of the stage, producing output files containing a count/distribution of different variants
+# and sizes. The workflow files we are using as Stages do not always capture these results as top-level outputs,
+# so we have no reliable method to extract these files into permanent storage.
+[resource_overrides.GatherBatchEvidence]
+run_matrix_qc = false
+run_module_metrics = false
+
+[resource_overrides.ClusterBatch]
+run_module_metrics = false
+
+[resource_overrides.GenerateBatchMetrics]
+run_module_metrics = false
+
+[resource_overrides.FilterBatch]
+run_module_metrics = false
+
+[resource_overrides.GenotypeBatch]
+run_module_metrics = false
+
+# If we run into silent failures in integrateGQ.sh, modify the number of splits (affecting number of shards)
+n_per_split = 5001
+n_RD_genotype_bins = 100000
+
+[resource_overrides.MakeCohortVcf]
+run_module_metrics = false
+
+[resource_overrides.FilterGenotypes]
+run_qc = false
+
+[references.gatk_sv]
+clustering_track_names = ["SR", "SD", "RM"]
+external_af_population=['ALL', 'AFR', 'AMR', 'EAS', 'EUR', 'MID', 'FIN', 'ASJ', 'RMI', 'SAS', 'AMI']
+external_af_ref_bed_prefix='gnomad_v4.1_sv'
+
+# This model is trained on the All Of Us dataset. If this is used in any published work,
+# credit must be given in accordance with the AoU publication policy.
+# Access to this file was provided on a one-off basis, and is not publicly available.
+# If an updated model is required, contact Mark Walker at the Broad Institute
+aou_filtering_model = 'gs://cpg-common-test/references/gatk-sv/gatk-sv-recalibrator.aou_phase_1.v1.model'
+strvctvre_phylop = 'gs://cpg-common-test/references/hg38.phyloP100way.bw'
+
+# genome tracks are a list of CPG config keys
+genome_tracks = [
+    'recalibrate_gq_repeatmasker',
+    'recalibrate_gq_segmental_dups',
+    'recalibrate_gq_simple_reps',
+    'recalibrate_gq_umap_s100',
+    'recalibrate_gq_umap_s24',
+]
+genome_tracks_index = [
+    'recalibrate_gq_repeatmasker_index',
+    'recalibrate_gq_segmental_dups_index',
+    'recalibrate_gq_simple_reps_index',
+    'recalibrate_gq_umap_s100_index',
+    'recalibrate_gq_umap_s24_index',
+]
+recalibrate_gq_args = [
+    '--keep-homvar false',
+    '--keep-homref true',
+    '--keep-multiallelic true',
+    '--skip-genotype-filtering true',
+    '--min-samples-to-estimate-allele-frequency -1',
+]
+
+# FilterGenotypes - stringent end of [0.3, 0.5] range
+fmax_beta = 0.3
+
+sl_filter_args = '--small-del-threshold 93 --medium-del-threshold 100 --small-dup-threshold -51 --medium-dup-threshold -4 --ins-threshold -13 --inv-threshold -19'
+noncoding_bed = 'gs://cpg-common-main/references/gatk-sv/hg38/v0/sv-resources/resources/v1/noncoding.sort.hg38.bed'
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
+
+[images]
+# cloned over from the GATK-SV config values
+cloud_sdk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cloud-sdk"
+cnmops_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/cnmops:2024-11-08-v1.0-62adb329"
+condense_counts_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+gatk_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:2024-12-05-4.6.1.0-6-gfc248dfc1-NIGHTLY-SNAPSHOT"
+gatk_docker_pesr_override = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:4.2.6.1-57-g9e03432"
+genomes_in_the_cloud_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/genomes-in-the-cloud:2.3.2-1510681135"
+linux_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/ubuntu1804"
+sv_base_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base:2024-10-25-v0.29-beta-5ea22a52"
+sv_base_mini_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-base-mini:2024-10-25-v0.29-beta-5ea22a52"
+sv_pipeline_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2025-03-25-v1.0.2-hotfix-65eddd78"
+sv_pipeline_qc_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/sv-pipeline:2025-03-25-v1.0.2-hotfix-65eddd78"
+gq_recalibrator_docker = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/gatk:mw-tb-form-sv-filter-training-data-899360a"
+str = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/str:2023-05-23-v0.27.3-beta-e537bdd6"
+denovo = "australia-southeast1-docker.pkg.dev/cpg-common/images/sv/denovo:2025-03-25-v1.0.2-hotfix-65eddd78"
+
+[sv_ref_panel]
+ref_panel_samples = ['HG00096', 'HG00129', 'HG00140', 'HG00150', 'HG00187', 'HG00239', 'HG00277', 'HG00288', 'HG00337', 'HG00349', 'HG00375', 'HG00410', 'HG00457', 'HG00557', 'HG00599', 'HG00625', 'HG00701', 'HG00740', 'HG00844', 'HG01060', 'HG01085', 'HG01112', 'HG01275', 'HG01325', 'HG01344', 'HG01356', 'HG01384', 'HG01393', 'HG01396', 'HG01474', 'HG01507', 'HG01572', 'HG01607', 'HG01709', 'HG01747', 'HG01790', 'HG01794', 'HG01799', 'HG01861', 'HG01874', 'HG01880', 'HG01885', 'HG01958', 'HG01982', 'HG02002', 'HG02010', 'HG02019', 'HG02020', 'HG02069', 'HG02085', 'HG02186', 'HG02221', 'HG02235', 'HG02272', 'HG02275', 'HG02299', 'HG02332', 'HG02367', 'HG02374', 'HG02489', 'HG02490', 'HG02491', 'HG02586', 'HG02588', 'HG02611', 'HG02620', 'HG02642', 'HG02648', 'HG02658', 'HG02855', 'HG02953', 'HG03007', 'HG03009', 'HG03085', 'HG03099', 'HG03100', 'HG03111', 'HG03369', 'HG03370', 'HG03436', 'HG03449', 'HG03472', 'HG03476', 'HG03556', 'HG03604', 'HG03649', 'HG03684', 'HG03694', 'HG03709', 'HG03722', 'HG03727', 'HG03744', 'HG03756', 'HG03789', 'HG03850', 'HG03864', 'HG03872', 'HG03888', 'HG04118', 'HG04158', 'HG04161', 'HG04183', 'NA06984', 'NA10847', 'NA11894', 'NA12340', 'NA12489', 'NA12872', 'NA18499', 'NA18507', 'NA18530', 'NA18539', 'NA18549', 'NA18553', 'NA18560', 'NA18638', 'NA18923', 'NA18941', 'NA18945', 'NA18956', 'NA18995', 'NA19001', 'NA19035', 'NA19062', 'NA19102', 'NA19143', 'NA19184', 'NA19350', 'NA19351', 'NA19377', 'NA19443', 'NA19449', 'NA19661', 'NA19678', 'NA19679', 'NA19684', 'NA19746', 'NA19795', 'NA19818', 'NA19913', 'NA20126', 'NA20320', 'NA20321', 'NA20346', 'NA20509', 'NA20510', 'NA20522', 'NA20752', 'NA20764', 'NA20802', 'NA20845', 'NA20869', 'NA20895', 'NA21102', 'NA21122', 'NA21133']
+model_tar_cnt = 285

@@ -7,7 +7,15 @@ import pprint
 import traceback
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
+from typing import Any, Callable, Optional
+
+from gql.transport.exceptions import TransportServerError
+from tenacity import (
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_config
@@ -21,7 +29,7 @@ from cpg_workflows.filetypes import (
 from cpg_workflows.utils import exists
 from metamist import models
 from metamist.apis import AnalysisApi
-from metamist.exceptions import ApiException
+from metamist.exceptions import ApiException, ServiceException
 from metamist.graphql import gql, query
 
 GET_SEQUENCING_GROUPS_QUERY = gql(
@@ -54,6 +62,42 @@ GET_SEQUENCING_GROUPS_QUERY = gql(
         }
         """,
 )
+
+GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
+    """
+    query SGByCohortQuery($cohort_id: String!) {
+        cohorts(id: {eq: $cohort_id}) {
+            name
+            sequencingGroups {
+                id
+                meta
+                platform
+                technology
+                type
+                sample {
+                    project {
+                        name
+                    }
+                    externalId
+                    participant {
+                        id
+                        externalId
+                        phenotypes
+                        reportedSex
+                        meta
+                    }
+                }
+                assays {
+                    id
+                    meta
+                    type
+                }
+            }
+        }
+    }
+    """,
+)
+
 
 GET_ANALYSES_QUERY = gql(
     """
@@ -142,6 +186,7 @@ class AnalysisType(Enum):
     MITO_CRAM = 'mito-cram'
     CUSTOM = 'custom'
     ES_INDEX = 'es-index'
+    COMBINER = 'combiner'
 
     @staticmethod
     def parse(val: str) -> 'AnalysisType':
@@ -197,6 +242,24 @@ class Analysis:
         return a
 
 
+def sort_sgs_by_project(response_data) -> dict:
+    """
+    Create dictionary organising sequencing groups by project
+    {project_id: [sequencing_group_1, sequencing_group_2, ...]}
+    """
+    result_dict: dict[str, list[str]] = {}
+
+    for sequencing_group in response_data:
+        project_id = sequencing_group['sample']['project']['name']
+
+        if project_id not in result_dict:
+            result_dict[project_id] = []
+
+        result_dict[project_id].append(sequencing_group)
+
+    return result_dict
+
+
 class Metamist:
     """
     Communication with metamist.
@@ -206,14 +269,92 @@ class Metamist:
         self.default_dataset: str = get_config()['workflow']['dataset']
         self.aapi = AnalysisApi()
 
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
+        retry=retry_if_exception_type(ServiceException),
+        reraise=True,
+    )
+    def make_retry_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi with retries.
+        Retry only if ServiceException is thrown
+
+        TODO: How many retries?
+        e.g. try 3 times, wait 2^3: 8, 16, 24 seconds
+        """
+        try:
+            return api_func(**kwargv)
+        except ServiceException:
+            # raise here so the retry occurs
+            logging.warning(
+                f'Retrying {api_func} ...',
+            )
+            raise
+
+    def make_aapi_call(self, api_func: Callable, **kwargv: Any):
+        """
+        Make a generic API call to self.aapi.
+        This is a wrapper around retry of API call to handle exceptions and logging.
+        """
+        try:
+            return self.make_retry_aapi_call(api_func, **kwargv)
+        except (ServiceException, ApiException) as e:
+            # Metamist API failed even after retries
+            # log the error and continue
+            traceback.print_exc()
+            logging.error(
+                f'Error: {e} Call {api_func} failed with payload:\n{str(kwargv)}',
+            )
+        # TODO: discuss should we catch all here as well?
+        # except Exception as e:
+        #     # Other exceptions?
+
+        return None
+
+    def get_sgs_for_cohorts(self, cohort_ids: list[str]) -> dict[str, dict[str, Any]]:
+        """
+        Retrieve the sequencing groups per dataset for a list of cohort IDs.
+        """
+        return {cohort_id: self.get_sgs_by_project_from_cohort(cohort_id) for cohort_id in cohort_ids}
+
+    def get_sgs_by_project_from_cohort(self, cohort_id: str) -> dict:
+        """
+        Retrieve sequencing group entries for a cohort.
+        """
+        entries = query(GET_SEQUENCING_GROUPS_BY_COHORT_QUERY, {'cohort_id': cohort_id})
+
+        # Create dictionary keying sequencing groups by project and including cohort name
+        # {
+        #     "sequencing_groups": {
+        #         project_id: [sequencing_group_1, sequencing_group_2, ...],
+        #         ...
+        #     },
+        #     "name": "CohortName"
+        # }
+        if len(entries['cohorts']) != 1:
+            raise MetamistError('We only support one cohort at a time currently')
+        sequencing_groups = entries['cohorts'][0]['sequencingGroups']
+        cohort_name = entries['cohorts'][0]['name']
+        # TODO (mwelland): future optimisation following closure of #860
+        # TODO (mwelland): return all the SequencingGroups in the Cohort, no need for stratification
+        return {
+            'sequencing_groups': sort_sgs_by_project(sequencing_groups),
+            'name': cohort_name,
+        }
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=3, min=8, max=30),
+        retry=retry_if_exception_type(TransportServerError),
+        reraise=True,
+    )
     def get_sg_entries(self, dataset_name: str) -> list[dict]:
         """
         Retrieve sequencing group entries for a dataset, in the context of access level
         and filtering options.
         """
-        metamist_proj = dataset_name
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset_name)
         logging.info(f'Getting sequencing groups for dataset {metamist_proj}')
 
         skip_sgs = get_config()['workflow'].get('skip_sgs', [])
@@ -233,20 +374,21 @@ class Metamist:
             },
         )
 
-        sequencing_groups = sequencing_group_entries['project']['sequencingGroups']
-        return sequencing_groups
+        return sequencing_group_entries['project']['sequencingGroups']
 
     def update_analysis(self, analysis: Analysis, status: AnalysisStatus):
         """
         Update "status" of an Analysis entry.
         """
-        try:
-            self.aapi.update_analysis(
-                analysis.id,
-                models.AnalysisUpdateModel(status=models.AnalysisStatus(status.value)),
-            )
-        except ApiException:
-            traceback.print_exc()
+        self.make_aapi_call(
+            self.aapi.update_analysis,
+            analysis_id=analysis.id,
+            analysis_update_model=models.AnalysisUpdateModel(
+                status=models.AnalysisStatus(status.value),
+            ),
+        )
+        # Keeping this as is for compatibility with the existing code
+        # However this should only be set after the API call is successful
         analysis.status = status
 
     # NOTE: This isn't used anywhere.
@@ -258,19 +400,20 @@ class Metamist:
         """
         Query the DB to find the last completed joint-calling analysis for the sequencing groups.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
-        try:
-            data = self.aapi.get_latest_complete_analysis_for_type(
-                project=metamist_proj,
-                analysis_type=models.AnalysisType('joint-calling'),
-            )
-        except ApiException:
+        metamist_proj = self.get_metamist_proj(dataset)
+
+        data = self.make_aapi_call(
+            self.aapi.get_latest_complete_analysis_for_type,
+            project=metamist_proj,
+            analysis_type=models.AnalysisType('joint-calling'),
+        )
+        if data is None:
             return None
+
         a = Analysis.parse(data)
         if not a:
             return None
+
         assert a.type == AnalysisType.JOINT_CALLING, data
         assert a.status == AnalysisStatus.COMPLETED, data
         if a.sequencing_group_ids != set(sequencing_group_ids):
@@ -290,10 +433,7 @@ class Metamist:
         and sequencing type, one Analysis object per sequencing group. Assumes the analysis
         is defined for a single sequencing group (that is, analysis_type=cram|gvcf|qc).
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         analyses = query(
             GET_ANALYSES_QUERY,
@@ -304,9 +444,13 @@ class Metamist:
             },
         )
 
-        analysis_per_sid: dict[str, Analysis] = dict()
+        raw_analyses = analyses['project']['analyses']
+        if meta:
+            raw_analyses = filter_analyses_by_meta(raw_analyses, meta)
 
-        for analysis in analyses['project']['analyses']:
+        analysis_per_sid: dict[str, Analysis] = {}
+
+        for analysis in raw_analyses:
             a = Analysis.parse(analysis)
             if not a:
                 continue
@@ -337,10 +481,7 @@ class Metamist:
         """
         Tries to create an Analysis entry, returns its id if successful.
         """
-        dataset = dataset or self.default_dataset
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
+        metamist_proj = self.get_metamist_proj(dataset)
 
         if isinstance(type_, AnalysisType):
             type_ = type_.value
@@ -354,10 +495,15 @@ class Metamist:
             sequencing_group_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
-        try:
-            aid = self.aapi.create_analysis(project=metamist_proj, analysis=am)
-        except ApiException:
-            traceback.print_exc()
+        aid = self.make_aapi_call(
+            self.aapi.create_analysis,
+            project=metamist_proj,
+            analysis=am,
+        )
+        if aid is None:
+            logging.error(
+                f'Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
+            )
             return None
         else:
             logging.info(
@@ -458,15 +604,22 @@ class Metamist:
         """
         Retrieve PED lines for a specified SM project, with external participant IDs.
         """
-        metamist_proj = dataset or self.default_dataset
-        if get_config()['workflow']['access_level'] == 'test':
-            metamist_proj += '-test'
-
+        metamist_proj = self.get_metamist_proj(dataset)
         entries = query(GET_PEDIGREE_QUERY, variables={'metamist_proj': metamist_proj})
 
         pedigree_entries = entries['project']['pedigree']
 
         return pedigree_entries
+
+    def get_metamist_proj(self, dataset: str | None = None) -> str:
+        """
+        Return the Metamist project name, appending '-test' if the access level is 'test'.
+        """
+        metamist_proj = dataset or self.default_dataset
+        if get_config()['workflow']['access_level'] == 'test' and not metamist_proj.endswith('-test'):
+            metamist_proj += '-test'
+
+        return metamist_proj
 
 
 @dataclass
@@ -561,11 +714,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         index_location = None
         if reads_data[0].get('secondaryFiles'):
             index_location = reads_data[0]['secondaryFiles'][0]['location']
-            if (
-                location.endswith('.cram')
-                and not index_location.endswith('.crai')
-                or location.endswith('.bai')
-                and not index_location.endswith('.bai')
+            if (location.endswith('.cram') and not index_location.endswith('.crai')) or (
+                location.endswith('.bam') and not index_location.endswith('.bai')
             ):
                 raise MetamistError(
                     f'{sequencing_group_id}: ERROR: expected the index file to have an extension '
@@ -614,3 +764,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
             )
 
         return fastq_pairs
+
+
+def filter_analyses_by_meta(analyses: list[dict], meta_filter: dict) -> list[dict]:
+    """Filter analyses by matching key-value pairs in the meta field."""
+    return [a for a in analyses if a.get('meta') and all(a['meta'].get(k) == v for k, v in meta_filter.items())]

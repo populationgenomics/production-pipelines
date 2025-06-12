@@ -5,8 +5,8 @@ Create Hail Batch jobs for VerifyBAMID.
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import command, fasta_res_group, image_path, reference_path
+from cpg_utils.config import get_config, image_path, reference_path
+from cpg_utils.hail_batch import command, fasta_res_group
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.resources import STANDARD, storage_for_cram_qc_job
 from cpg_workflows.utils import can_reuse
@@ -63,9 +63,9 @@ def verifybamid(
     --Output OUTPUT \
     --BamFile $CRAM \
     --Reference {reference.base} \
-    --UDPath {b.read_input(str(contam_ud))} \
-    --MeanPath {b.read_input(str(contam_mu))} \
-    --BedPath {b.read_input(str(contam_bed))} \
+    --UDPath {b.read_input(contam_ud)} \
+    --MeanPath {b.read_input(contam_mu)} \
+    --BedPath {b.read_input(contam_bed)} \
     {extra_opts}
     1>/dev/null
 

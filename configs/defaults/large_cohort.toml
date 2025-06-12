@@ -5,14 +5,38 @@ scatter_count_genotype = 50
 status_reporter = 'metamist'
 # define reference fasta. If not specified here, the reference file is pulled from [references.broad][ref_fasta]
 ref_fasta='gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
-
+highmem_workers = true
 # Realign CRAM when available, instead of using FASTQ.
 # The parameter value should correspond to CRAM version
 # (e.g. v0 in gs://cpg-fewgenomes-main/cram/v0/CPGaaa.cram
 #realign_from_cram_version = 'v0'
 
+# Write the sorted BAM file to the temp bucket after alignment and before MarkDuplicates
+checkpoint_sorted_bam = false
+
+# Shard exome BAMs and CRAMs with bazam to align them in chunks
+exome_realignment_shards = 1
+
 # Calling intervals (defauls to whole genome intervals)
 #intervals_path =
+
+# Stage SomalierPedigree sends message to Slack by default. LC does not have Slack token setup so we set to False
+[workflow.somalier_pedigree]
+send_to_slack = false
+
+[combiner]
+force_new_combiner = false
+vds_version = "0.1"
+memory = "8Gi"
+storage = "10Gi"
+vds_analysis_ids = []
+merge_only_vds = false
+# if false, use non-preemptible VMs
+preemptible_vms = false
+# for each combiner step, generate 5 intermediate VDSs, each combining 50 gVCFs
+gvcf_batch_size = 5
+branch_factor = 50
+
 
 [vqsr]
 # VQSR, when applying model, targets indel_filter_level and snp_filter_level
@@ -42,6 +66,16 @@ training_pop = 'Superpopulation name'  # metamist's `Participant/meta` field for
 # whether or not to key sequencing groups by their external ID
 use_external_id = true
 pca_plot_name = 'hgdp_1kg_sites'
+# Specify the samples to exclude from the PCA analysis.
+# Provide a list of sample IDs in 'pca_samples_to_remove'.
+# If 'pca_samples_to_remove' is empty or not provided, the PCA analysis will include all samples.
+pca_samples_to_remove = []
+# Specify whether to remove related individuals prior to plotting.
+# Set 'remove_relateds' to true to remove related individuals from the tables before generating plots.
+# By default, 'remove_relateds' is set to false, meaning that related individuals are included in the tables used for plotting.
+remove_relateds = false
+# In addition to related individuals, remove samples from the PCA that failed QC
+remove_failed_qc_pca = true
 
 # Section that specifies background samples for PCA analysis.
 # `datasets` must be a list paths to matrix tables or VDS, and
@@ -59,8 +93,16 @@ inferred_ancestry = false
 # function to use reference blocks for ploidy calculations
 # https://centrepopgen.slack.com/archives/C018KFBCR1C/p1705539231990829?thread_ts=1704233101.883849&cid=C018KFBCR1C
 
+# Extra functionality at the Ancestry stage to make a PCA at a more granular level,
+# by subsetting the background population to individuals of a particular ancestry.
+# Specify in list format the superpopulations to filter for.
+# https://centrepopgen.slack.com/archives/C018KFBCR1C/p1717731698661969
+# superpopulation_to_filter = ['African']
+
 # Set whether to allow column discrepancies when unioning background dataset tables
 #allow_missing_columns = false
+# Columns to be dropped from the final unioned background table
+#drop_columns = ['autosomal_mean_dp']
 
 # Parameters for sample QC. The default values for soft filtering taken from gnomAD QC:
 # https://macarthurlab.org/2019/10/16/gnomad-v3-0, with `max_n_snps` and

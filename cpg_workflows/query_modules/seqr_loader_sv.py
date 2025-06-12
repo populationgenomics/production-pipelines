@@ -4,15 +4,13 @@ Hail Query functions for seqr loader; SV edition.
 
 import gzip
 import logging
-
-import requests
+from os.path import join
 
 import hail as hl
 
-from cpg_utils import to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
-from cpg_workflows.utils import checkpoint_hail, read_hail
+from cpg_utils.config import config_retrieve, reference_path
+from cpg_utils.hail_batch import genome_build
+from cpg_workflows.utils import generator_chunks, read_hail
 
 # I'm just going to go ahead and steal these constants from their seqr loader
 BOTHSIDES_SUPPORT = 'BOTHSIDES_SUPPORT'
@@ -103,48 +101,16 @@ def get_cpx_interval(x):
     return hl.struct(type=type_chr[0], chrom=chr_pos[0], start=hl.int32(pos[0]), end=hl.int32(pos[1]))
 
 
-def download_gencode_gene_id_mapping(gencode_release: str) -> str:
+def parse_gtf_from_local(gtf_path: str, chunk_size: int | None = None) -> hl.dict:
     """
-    This is an inefficient stand-in for now. Swap this out with a more permanent
-    location for this file in the resources bucket
-    Not suuuuuuper keen on storing a pickled representation, but a minimised JSON
-    would be a good middle ground. Parsed ~= 62000 {str: str}
-    Args:
-        gencode_release (str | int): Which gencode release do you want?
-    Returns:
-        str - path to localised GTF file
-    """
+    Read over the localised GTF file and read into a dict
 
-    # this is the thing
-    local_gtf = 'localfile.gtf.gz'
-
-    # check for presence in config
-    if (config_gtf := get_config().get('gencode_gtf_path')) is not None:
-        # treat as GCP
-        if config_gtf.startswith('gs://'):
-            to_path(config_gtf).copy(local_gtf)
-            gtf_path = local_gtf
-        else:
-            gtf_path = config_gtf
-    else:
-        gtf_path = GENCODE_GTF_URL.format(gencode_release=gencode_release)
-
-    # if it wasn't a local file, download it
-    if gtf_path.startswith(('http://', 'https://')):
-        gz_stream = requests.get(gtf_path, stream=True)
-        with open(local_gtf, 'wb') as f:
-            f.writelines(gz_stream)
-        gz_stream.close()
-
-    # OK - I think that covers all the viable situations for now
-    return local_gtf
-
-
-def parse_gtf_from_local(gtf_path: str) -> hl.dict:
-    """
-    Read over the localised file and read into a dict
+    n.b. due to a limit in Spark of 20MB per String length, the dictionary here is actually too large to be used
+    in annotation expressions. To remedy this, the dictionary is returned as a list of fragments, and we can use each
+    one in turn, then create a checkpoint between them.
     Args:
         gtf_path ():
+        chunk_size (int): if specified, returns this dict as a list of dicts
     Returns:
         the gene lookup dictionary as a Hail DictExpression
     """
@@ -165,12 +131,24 @@ def parse_gtf_from_local(gtf_path: str) -> hl.dict:
             # parse info field
             info_fields_list = [x.strip().split() for x in record['info'].split(';') if x != '']
             info_fields = {k: v.strip('"') for k, v in info_fields_list}
+
+            # skip an ENSG: ENSG mapping, redundant...
+            if info_fields['gene_name'].startswith('ENSG'):
+                continue
             gene_id_mapping[info_fields['gene_name']] = info_fields['gene_id'].split('.')[0]
-    logging.info('Completed ingestion of gene-ID mapping')
-    return hl.literal(gene_id_mapping)
+
+    all_keys = list(gene_id_mapping.keys())
+    logging.info(f'Completed ingestion of gene-ID mapping, {len(all_keys)} entries')
+    if chunk_size is None:
+        return [hl.literal(gene_id_mapping)]
+
+    # hail can't impute the type of a generator, so do this in baby steps
+    sub_dictionaries = [{key: gene_id_mapping[key] for key in keys} for keys in generator_chunks(all_keys, chunk_size)]
+
+    return [hl.literal(each_dict) for each_dict in sub_dictionaries]
 
 
-def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str | None = None):
+def annotate_cohort_sv(vcf_path: str, out_mt_path: str, gencode_gz: str, checkpoint: str | None = None):
     """
     Translate an annotated SV VCF into a Seqr-ready format
     Relevant gCNV specific schema
@@ -180,7 +158,8 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
     Args:
         vcf_path (str): Where is the VCF??
         out_mt_path (str): And where do you need output!?
-        checkpoint_prefix (str): CHECKPOINT!@!!
+        gencode_gz (str): The path to a compressed GENCODE GTF file
+        checkpoint (str): CHECKPOINT!@!!
     """
 
     logger = logging.getLogger('annotate_cohort_sv')
@@ -201,7 +180,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
         hail_version=hl.version(),
         datasetType='SV',
     )
-    if sequencing_type := get_config()['workflow'].get('sequencing_type'):
+    if sequencing_type := config_retrieve(['workflow', 'sequencing_type']):
         # Map to Seqr-style string
         # https://github.com/broadinstitute/seqr/blob/e0c179c36c0f68c892017de5eab2e4c1b9ffdc92/seqr/models.py#L592-L594
         mt = mt.annotate_globals(
@@ -212,47 +191,67 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
             }.get(sequencing_type, ''),
         )
 
+    # flexibly draw annotations depending on whether the VCF has them - this is for compatibility with Long-Read & GATK
+    # this can all be removed if/when Long-read is removed to a separate pipeline
+
+    # add end_locus, with flexibility for END2
+    if 'END2' in mt.info:
+        mt = mt.annotate_rows(
+            end_locus=hl.if_else(
+                hl.is_defined(mt.info.END2),
+                hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
+                hl.struct(contig=mt.locus.contig, position=mt.info.END),
+            ),
+        )
+    else:
+        mt = mt.annotate_rows(end_locus=hl.struct(contig=mt.locus.contig, position=mt.info.END))
+
+    # GATK-SV consists of multiple algorithms, other pathways may not
+    if 'ALGORITHMS' in mt.info:
+        mt = mt.annotate_rows(algorithms=mt.info.ALGORITHMS)
+
+    # CPX_INTERVALS is not present in all VCFs
+    if 'CPX_INTERVALS' in mt.info:
+        mt = mt.annotate_rows(
+            cpx_intervals=hl.or_missing(
+                hl.is_defined(mt.info.CPX_INTERVALS),
+                mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
+            ),
+        )
+
     # reimplementation of
     # github.com/populationgenomics/seqr-loading-pipelines..luigi_pipeline/lib/model/sv_mt_schema.py
+    population_prefix = config_retrieve(['references', 'gatk_sv', 'external_af_ref_bed_prefix'])
     mt = mt.annotate_rows(
         sc=mt.info.AC[0],
         sf=mt.info.AF[0],
         sn=mt.info.AN,
         end=mt.info.END,
-        end_locus=hl.if_else(
-            hl.is_defined(mt.info.END2),
-            hl.struct(contig=mt.info.CHR2, position=mt.info.END2),
-            hl.struct(contig=mt.locus.contig, position=mt.info.END),
-        ),
         sv_callset_Het=mt.info.N_HET,
         sv_callset_Hom=mt.info.N_HOMALT,
-        gnomad_svs_ID=mt.info['gnomad_v2.1_sv_SVID'],
-        gnomad_svs_AF=mt.info['gnomad_v2.1_sv_AF'],
+        gnomad_svs_ID=mt.info[f'{population_prefix}_SVID'],
+        gnomad_svs_AF=mt.info[f'{population_prefix}_AF'],
         gnomad_svs_AC=hl.missing('float64'),
         gnomad_svs_AN=hl.missing('float64'),
-        # I DON'T HAVE THESE ANNOTATIONS
-        # gnomad_svs_AC=unsafe_cast_int32(mt.info.gnomAD_V2_AC),
-        # gnomad_svs_AN=unsafe_cast_int32(mt.info.gnomAD_V2_AN),
         StrVCTVRE_score=hl.parse_float(mt.info.StrVCTVRE),
-        filters=hl.or_missing(  # hopefully this plays nicely
+        filters=hl.or_missing(
             (mt.filters.filter(lambda x: (x != PASS) & (x != BOTHSIDES_SUPPORT))).size() > 0,
             mt.filters,
         ),
         bothsides_support=mt.filters.any(lambda x: x == BOTHSIDES_SUPPORT),
-        algorithms=mt.info.ALGORITHMS,
-        cpx_intervals=hl.or_missing(
-            hl.is_defined(mt.info.CPX_INTERVALS),
-            mt.info.CPX_INTERVALS.map(lambda x: get_cpx_interval(x)),
-        ),
         sv_types=mt.alleles[1].replace('[<>]', '').split(':', 2),
     )
 
+    # add CPX_TYPE if not present - this is a hack to make the loader work
+    if 'CPX_TYPE' not in mt.info:
+        mt = mt.annotate_rows(info=mt.info.annotate(CPX_TYPE=mt.sv_types[0]))
+
     # save those changes
-    mt = checkpoint_hail(mt, 'initial_annotation_round.mt', checkpoint_prefix)
+    if checkpoint:
+        mt = mt.checkpoint(join(checkpoint, 'initial_annotation_round.mt'))
 
     # get the Gene-Symbol mapping dict
-    gene_id_mapping_file = download_gencode_gene_id_mapping(get_config().get('gencode_release', '42'))
-    gene_id_mapping = parse_gtf_from_local(gene_id_mapping_file)
+    gene_id_mapping = parse_gtf_from_local(gencode_gz)[0]
 
     # OK, NOW IT'S BUSINESS TIME
     conseq_predicted_gene_cols = [
@@ -313,10 +312,7 @@ def annotate_cohort_sv(vcf_path: str, out_mt_path: str, checkpoint_prefix: str |
         sv_type_detail=hl.if_else(
             mt.sv_types[0] == 'CPX',
             mt.info.CPX_TYPE,
-            hl.or_missing(
-                (mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1),
-                mt.sv_types[1],
-            ),
+            hl.or_missing((mt.sv_types[0] == 'INS') & (hl.len(mt.sv_types) > 1), mt.sv_types[1]),
         ),
         variantId=mt.rsid,
         docId=mt.rsid[0:512],

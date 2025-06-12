@@ -7,29 +7,34 @@ import logging
 import hail as hl
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import get_config
-from cpg_utils.hail_batch import genome_build, reference_path
-from cpg_workflows.inputs import get_cohort
+from cpg_utils.config import config_retrieve, get_config, reference_path
+from cpg_utils.hail_batch import genome_build
+from cpg_workflows.batch import override_jar_spec
+from cpg_workflows.inputs import get_multicohort
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.pipeline import annotate_sex
 
 
 def run(vds_path: str, out_sample_qc_ht_path: str, tmp_prefix: str):
-    if can_reuse(out_sample_qc_ht_path, overwrite=True):
+    logging.basicConfig(level=logging.INFO)
+    if can_reuse(out_sample_qc_ht_path):
         return []
+
+    if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
+        override_jar_spec(jar_spec)
 
     ht = initialise_sample_table()
 
     vds = hl.vds.read_vds(vds_path)
 
     # Remove centromeres and telomeres:
-    tel_cent_ht = hl.read_table(str(reference_path('gnomad/tel_and_cent_ht')))
+    tel_cent_ht = hl.read_table(reference_path('gnomad/tel_and_cent_ht'))
     if tel_cent_ht.count() > 0:
         vds = hl.vds.filter_intervals(vds, tel_cent_ht, keep=False)
 
     # Run Hail sample-QC stats:
     sqc_ht_path = to_path(tmp_prefix) / 'sample_qc.ht'
-    if can_reuse(sqc_ht_path, overwrite=True):
+    if can_reuse(sqc_ht_path):
         sqc_ht = hl.read_table(str(sqc_ht_path))
     else:
         # Filter to autosomes:
@@ -65,7 +70,7 @@ def initialise_sample_table() -> hl.Table:
             'superpopulation': s.meta.get('Superpopulation name'),
             'population': s.meta.get('Population name'),
         }
-        for s in get_cohort().get_sequencing_groups()
+        for s in get_multicohort().get_sequencing_groups()
         if s.gvcf
     ]
     if not entries:
@@ -84,7 +89,7 @@ def impute_sex(
     Impute sex based on coverage.
     """
     checkpoint_path = tmp_prefix / 'sample_qc' / 'sex.ht'
-    if can_reuse(str(checkpoint_path), overwrite=True):
+    if can_reuse(str(checkpoint_path)):
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
@@ -101,16 +106,22 @@ def impute_sex(
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
     for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
-        interval_table = hl.read_table(str(reference_path(f'gnomad/{name}')))
+        interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
-            # remove all rows where the locus falls within a defined interval
-            tmp_variant_data = vds.variant_data.filter_rows(
-                hl.is_defined(interval_table[vds.variant_data.locus]),
-                keep=False,
-            )
-            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                str(tmp_prefix / f'{name}_checkpoint.vds'),
-            )
+            vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
+            if can_reuse(vds_tmp_path):
+                logging.info(f'Loading {name} filtered tmp vds')
+                vds = hl.vds.read_vds(str(vds_tmp_path))
+            else:
+                # remove all rows where the locus falls within a defined interval
+                tmp_variant_data = vds.variant_data.filter_rows(
+                    hl.is_defined(interval_table[vds.variant_data.locus]),
+                    keep=False,
+                )
+                vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+                    str(vds_tmp_path),
+                    overwrite=True,
+                )
             logging.info(f'count post {name} filter:{vds.variant_data.count()}')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)

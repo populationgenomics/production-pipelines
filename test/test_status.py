@@ -61,23 +61,38 @@ def _common(mocker, tmp_path):
 
     mocker.patch('metamist.apis.AnalysisApi.create_analysis', mock_create_analysis)
 
-    from cpg_workflows.targets import Cohort
+    from cpg_workflows.targets import MultiCohort
 
-    def mock_create_cohort() -> Cohort:
-        c = Cohort()
+    def mock_create_cohort() -> MultiCohort:
+        m = MultiCohort()
+        c = m.create_cohort(id='COH123', name='fewgenomes')
         ds = c.create_dataset('my_dataset')
-        ds.add_sequencing_group('CPG01', external_id='SAMPLE1')
-        ds.add_sequencing_group('CPG02', external_id='SAMPLE2')
-        return c
+        m_ds = m.add_dataset(ds)
 
-    mocker.patch('cpg_workflows.inputs.create_cohort', mock_create_cohort)
+        def add_sg(id, external_id):
+            return ds.add_sequencing_group(
+                id,
+                external_id=external_id,
+                sequencing_type='genome',
+                sequencing_technology='short-read',
+                sequencing_platform='illumina',
+            )
+
+        sg1 = add_sg('CPGAA', external_id='SAMPLE1')
+        sg2 = add_sg('CPGBB', external_id='SAMPLE2')
+        m_ds.add_sequencing_group_object(sg1)
+        m_ds.add_sequencing_group_object(sg2)
+        return m
+
+    mocker.patch('cpg_workflows.inputs.deprecated_create_cohort', mock_create_cohort)
 
 
 def test_status_reporter(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch, reset_batch
-    from cpg_workflows.inputs import get_cohort
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch, reset_batch
+    from cpg_workflows.inputs import get_multicohort
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -128,7 +143,7 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     print(get_batch().job_by_tool['metamist'])
     assert 'metamist' in get_batch().job_by_tool, get_batch().job_by_tool
     # 2 jobs per sequencing group (2 analysis outputs)
-    assert get_batch().job_by_tool['metamist']['job_n'] == len(get_cohort().get_sequencing_groups()) * 2
+    assert get_batch().job_by_tool['metamist']['job_n'] == len(get_multicohort().get_sequencing_groups()) * 2
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
@@ -141,7 +156,8 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,
@@ -170,7 +186,8 @@ def test_status_reporter_with_custom_updater(mocker: MockFixture, tmp_path):
 def test_status_reporter_fails(mocker: MockFixture, tmp_path):
     _common(mocker, tmp_path)
 
-    from cpg_utils.hail_batch import dataset_path, get_batch
+    from cpg_utils.config import dataset_path
+    from cpg_utils.hail_batch import get_batch
     from cpg_workflows.targets import SequencingGroup
     from cpg_workflows.workflow import (
         SequencingGroupStage,

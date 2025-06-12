@@ -2,38 +2,46 @@
 single-sample components of the GATK SV workflow
 """
 
+import json
 import logging
+from functools import cache
 from typing import Any
 
-from cpg_utils import Path
-from cpg_utils.config import AR_GUID_NAME, get_config, try_get_ar_guid
+from cpg_utils import Path, to_path
+from cpg_utils.config import AR_GUID_NAME, config_retrieve, try_get_ar_guid
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.jobs import sample_batching
 from cpg_workflows.stages.gatk_sv.gatk_sv_common import (
     SV_CALLERS,
     CromwellJobSizes,
-    _sv_individual_meta,
     add_gatk_sv_jobs,
     get_fasta,
     get_images,
     get_references,
 )
+from cpg_workflows.targets import Cohort, MultiCohort, SequencingGroup
 from cpg_workflows.workflow import (
-    Cohort,
     CohortStage,
-    SequencingGroup,
+    MultiCohortStage,
     SequencingGroupStage,
     StageInput,
     StageOutput,
+    get_workflow,
     stage,
 )
 
 
-@stage(
-    analysis_keys=[f'{caller}_vcf' for caller in SV_CALLERS],
-    analysis_type='sv',
-    update_analysis_meta=_sv_individual_meta,
-)
+@cache
+def get_sv_callers():
+    if only_jobs := config_retrieve(['workflow', 'GatherSampleEvidence', 'only_jobs'], None):
+        callers = [caller for caller in SV_CALLERS if caller in only_jobs]
+        if not callers:
+            logging.warning('No SV callers enabled')
+        return callers
+    return SV_CALLERS
+
+
+@stage(analysis_keys=[f'{caller}_vcf' for caller in get_sv_callers()] if get_sv_callers() else None, analysis_type='sv')
 class GatherSampleEvidence(SequencingGroupStage):
     """
     https://github.com/broadinstitute/gatk-sv#gathersampleevidence
@@ -68,9 +76,20 @@ class GatherSampleEvidence(SequencingGroupStage):
         }
 
         # Caller's VCFs
-        for caller in SV_CALLERS:
+        for caller in get_sv_callers():
             d[f'{caller}_vcf'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz'
             d[f'{caller}_index'] = sequencing_group.make_sv_evidence_path / f'{sequencing_group.id}.{caller}.vcf.gz.tbi'
+
+        # TODO This selection process may need to adapt to a new condition...
+        # TODO If Scramble is being run, but Manta is now, manta_vcf and index becomes a required input
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
+            # remove the expected outputs for the jobs that are not in only_jobs
+            new_expected = {}
+            for job in only_jobs:
+                for key, path in d.items():
+                    if job in key:
+                        new_expected[key] = path
+            d = new_expected
 
         return d
 
@@ -89,11 +108,15 @@ class GatherSampleEvidence(SequencingGroupStage):
             reference_index=str(get_fasta()) + '.fai',
             reference_dict=str(get_fasta().with_suffix('.dict')),
             reference_version='38',
+            # a cost-improvement in cloud environments
+            move_bam_or_cram_files=True,
         )
+
+        # If DRAGEN input is going to be used, first the input parameter 'is_dragen_3_7_8' needs to be set to True
+        # then some parameters need to be added to the input_dict to enable BWA to be run
 
         input_dict |= get_images(
             [
-                'sv_pipeline_base_docker',
                 'sv_pipeline_docker',
                 'sv_base_mini_docker',
                 'samtools_cloud_docker',
@@ -112,6 +135,8 @@ class GatherSampleEvidence(SequencingGroupStage):
                 'primary_contigs_list',
                 'preprocessed_intervals',
                 'manta_region_bed',
+                'manta_region_bed_index',
+                'mei_bed',
                 'wham_include_list_bed_file',
                 {'sd_locs_vcf': 'dbsnp_vcf'},
             ],
@@ -119,12 +144,29 @@ class GatherSampleEvidence(SequencingGroupStage):
 
         expected_d = self.expected_outputs(sequencing_group)
 
+        if only_jobs := config_retrieve(['workflow', self.name, 'only_jobs'], None):
+            # if only_jobs is set, only run the specified jobs
+            # this is useful for samples which need to re-run specific jobs
+            # e.g. if manta failed and needs to be re-run with more memory
+
+            # disable the evidence collection jobs if they're not in only_jobs
+            if 'coverage_counts' not in only_jobs:
+                input_dict['collect_coverage'] = False
+            if 'pesr' not in only_jobs:
+                input_dict['collect_pesr'] = False
+
+            # disable the caller jobs that are not in only_jobs by nulling their docker image
+            for key, val in input_dict.items():
+                if key in [f'{caller}_docker' for caller in SV_CALLERS]:
+                    caller = key.removesuffix('_docker')
+                    input_dict[key] = val if caller in only_jobs else None
+
         # billing labels!
         # https://cromwell.readthedocs.io/en/stable/wf_options/Google/
         # these must conform to the regex [a-z]([-a-z0-9]*[a-z0-9])?
         billing_labels = {
             'dataset': sequencing_group.dataset.name,  # already lowercase
-            'sequencing-group': sequencing_group.id.lower(),  # cpg123123
+            'sequencing-group': sequencing_group.id.lower(),
             'stage': self.name.lower(),
             AR_GUID_NAME: try_get_ar_guid(),
         }
@@ -146,7 +188,7 @@ class GatherSampleEvidence(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=expected_d, jobs=jobs)
 
 
-@stage(required_stages=GatherSampleEvidence)
+@stage(required_stages=GatherSampleEvidence, analysis_type='qc', analysis_keys=['qc_table'])
 class EvidenceQC(CohortStage):
     """
     https://github.com/broadinstitute/gatk-sv#evidenceqc
@@ -171,14 +213,14 @@ class EvidenceQC(CohortStage):
             for k in ['low', 'high']:
                 fname_by_key[f'{caller}_qc_{k}'] = f'{caller}_QC.outlier.{k}'
 
-        return {key: self.prefix / fname for key, fname in fname_by_key.items()}
+        return {key: self.get_stage_cohort_prefix(cohort) / fname for key, fname in fname_by_key.items()}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         d = inputs.as_dict_by_target(GatherSampleEvidence)
         sgids = cohort.get_sequencing_group_ids()
 
         input_dict: dict[str, Any] = {
-            'batch': cohort.name,
+            'batch': cohort.id,
             'samples': sgids,
             'run_vcf_qc': True,
             'counts': [str(d[sid]['coverage_counts']) for sid in sgids],
@@ -187,12 +229,7 @@ class EvidenceQC(CohortStage):
             input_dict[f'{caller}_vcfs'] = [str(d[sid][f'{caller}_vcf']) for sid in sgids]
 
         input_dict |= get_images(
-            [
-                'sv_base_mini_docker',
-                'sv_base_docker',
-                'sv_pipeline_docker',
-                'sv_pipeline_qc_docker',
-            ],
+            ['sv_base_mini_docker', 'sv_base_docker', 'sv_pipeline_docker', 'sv_pipeline_qc_docker'],
         )
 
         input_dict |= get_references(['genome_file', 'wgd_scoring_mask'])
@@ -213,13 +250,8 @@ class EvidenceQC(CohortStage):
         return self.make_outputs(cohort, data=expected_d, jobs=jobs)
 
 
-@stage(
-    required_stages=EvidenceQC,
-    analysis_type='sv',
-    analysis_keys=['batch_json_negative', 'batch_json_positive'],
-    tolerate_missing_output=True,
-)
-class CreateSampleBatches(CohortStage):
+@stage(required_stages=EvidenceQC, analysis_type='sv', analysis_keys=['batch_json'])
+class CreateSampleBatches(MultiCohortStage):
     """
     uses the values generated in EvidenceQC
     splits the sequencing groups into batches based on median coverage,
@@ -232,57 +264,52 @@ class CreateSampleBatches(CohortStage):
     then run separately for each sub-batch, with the active SGs controlled via the
     config contents.
 
-    When we move to custom cohorts, the output of this stage will be used as input
-    when generating a custom Metamist cohort per sub-batch.
+    The output of this stage is used to generate custom cohorts
     """
 
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        return {
-            'batch_json_positive': self.prefix / 'pcr_positive_batches.json',
-            'batch_json_negative': self.prefix / 'pcr_negative_batches.json',
+    def expected_outputs(self, multicohort: MultiCohort) -> dict:
+        return {'batch_json': self.prefix / 'sgid_batches.json'}
+
+    def queue_jobs(self, multicohort: MultiCohort, inputs: StageInput) -> StageOutput | None:
+        """
+        this stage has been clarified - this will only run on Genomes
+        Exomes were never a supported case, they have a separate pipeline
+        """
+
+        expected = self.expected_outputs(multicohort)
+
+        if config_retrieve(['workflow', 'sequencing_type']) != 'genome':
+            raise RuntimeError('This workflow is not intended for Exome data')
+
+        # get the batch size parameters
+        min_batch_size = config_retrieve(['workflow', 'min_batch_size'], 100)
+        max_batch_size = config_retrieve(['workflow', 'max_batch_size'], 300)
+
+        # Get the sequencing groups
+        sequencing_groups = {
+            sequencing_group.id: sequencing_group.meta for sequencing_group in multicohort.get_sequencing_groups()
         }
+        if len(sequencing_groups) < min_batch_size:
+            logging.error('Too few sequencing groups to form batches')
+            raise RuntimeError('too few samples to create batches')
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        expected = self.expected_outputs(cohort)
+        # write them to a json file in tmp
+        sgs_json_path = to_path(self.tmp_prefix / 'sgs_meta.json')
+        with sgs_json_path.open('w') as f:
+            json.dump(sequencing_groups, f)
 
-        # PCR +/- logic is only relevant to exomes
-        if get_config()['workflow'].get('sequencing_type') != 'genome':
-            sequencing_group_types = {'exome': [sg.id for sg in cohort.get_sequencing_groups()]}
-        # within exomes, divide into PCR- and all other sequencing groups
-        # this logic is currently invalid, as pcr_status isn't populated
-        # TODO resolve issue #575
-        else:
-            sequencing_group_types = {'positive': [], 'negative': []}
-            for sequencing_group in cohort.get_sequencing_groups():
-                if sequencing_group.meta.get('pcr_status', 'negative') == 'negative':
-                    sequencing_group_types['negative'].append(sequencing_group.id)
-                else:
-                    sequencing_group_types['positive'].append(sequencing_group.id)
+        # Get the QC tables for each input cohort
+        qc_tables = [inputs.as_dict(cohort, EvidenceQC)['qc_table'] for cohort in multicohort.get_cohorts()]
 
-        # get those settings
-        min_batch_size = get_config()['workflow'].get('min_batch_size', 100)
-        max_batch_size = get_config()['workflow'].get('max_batch_size', 300)
+        py_job = get_batch().new_python_job('create_sample_batches')
+        py_job.image(config_retrieve(['workflow', 'driver_image']))
+        py_job.call(
+            sample_batching.partition_batches,
+            qc_tables,
+            sgs_json_path,
+            str(expected['batch_json']),
+            min_batch_size,
+            max_batch_size,
+        )
 
-        all_jobs = []
-
-        for status, sequencing_groups in sequencing_group_types.items():
-            if not sequencing_groups:
-                logging.info(f'No {status} sequencing groups found')
-                continue
-            elif len(sequencing_groups) < min_batch_size:
-                logging.info(f'Too few {status} sequencing groups to form batches')
-                continue
-            logging.info(f'Creating {status} sequencing group batches')
-            py_job = get_batch().new_python_job(f'create_{status}_sample_batches')
-            py_job.image(get_config()['workflow']['driver_image'])
-            py_job.call(
-                sample_batching.partition_batches,
-                inputs.as_dict(cohort, EvidenceQC)['qc_table'],
-                sequencing_groups,
-                expected[f'batch_json_{status}'],
-                min_batch_size,
-                max_batch_size,
-            )
-            all_jobs.append(py_job)
-
-        return self.make_outputs(cohort, data=expected, jobs=all_jobs)
+        return self.make_outputs(multicohort, data=expected, jobs=py_job)

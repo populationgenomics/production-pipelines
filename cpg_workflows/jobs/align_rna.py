@@ -8,7 +8,8 @@ import hailtop.batch as hb
 from hailtop.batch.job import Job
 
 from cpg_utils import Path, to_path
-from cpg_utils.hail_batch import Batch, command, image_path
+from cpg_utils.config import image_path, reference_path
+from cpg_utils.hail_batch import Batch, command
 from cpg_workflows.filetypes import (
     BamPath,
     CramPath,
@@ -234,6 +235,7 @@ def align(
             extra_label=extra_label,
             job_attrs=job_attrs,
             requested_nthreads=requested_nthreads,
+            reference_fasta_path=reference_path('star/fasta'),
         )
         jobs.append(j)
         out_cram_path = to_path(output_cram.path)

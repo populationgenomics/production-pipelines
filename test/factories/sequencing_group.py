@@ -13,14 +13,19 @@ from .types import (
 
 
 def create_sequencing_group(
-    id: SequencingGroupId = 'CPG000001',
+    id: SequencingGroupId = 'CPGAAAAAA',
     external_id: SequencingGroupExternalId = 'SAMPLE1',
     dataset: DatasetId | Dataset = DEFAULT_DATASET_NAME,
     participant_id: str | None = None,
     meta: dict | None = None,
     sex: Sex | None = None,
     pedigree: PedigreeInfo | None = None,
+    # 2024-07-25 mfranklin: I don't think _generally_ the sequencing group should be
+    #   limited to the SequencingType[genome, exome] list. Maybe for specific stages,
+    #   but not in general for the tests, but I'll leave it here.
     sequencing_type: SequencingType = 'genome',
+    sequencing_technology: str = 'short-read',
+    sequencing_platform: str = 'illumina',
     alignment_input: FastqPair | FastqPairs | CramPath | BamPath | None = None,
     gvcf: GvcfPath | Literal['auto'] | None = None,
     cram: CramPath | Literal['auto'] | None = None,
@@ -32,7 +37,7 @@ def create_sequencing_group(
 
     Args:
         id (SequencingGroupId):
-            The ID of the sequencing group. Defaults to `CPG000001`.
+            The ID of the sequencing group. Defaults to `CPGAAAAAA`.
 
         external_id (SequencingGroupExternalId):
             The external ID of the sequencing group. Defaults to `SAMPLE1`.
@@ -55,12 +60,10 @@ def create_sequencing_group(
             `None`.
 
         sequencing_type (SequencingType):
-            The type of sequencing performed used as the key in the property
-            `alignment_input_by_seq_type` on the new instance. Defaults to 'genome'.
+            The sequencing_type of the group of assays. Defaults to 'genome'.
 
         alignment_input (FastqPair | FastqPairs | CramPath | BamPath | None, optional):
-            The alignment input data. Defaults to `None`. If `None`, the property
-            `alignment_input_by_seq_type` on the new instance will be `None`.
+            The alignment input data. Defaults to `None`.
 
         gvcf (GvcfPath | Literal['auto'] | None, optional):
             Path to a gVCF file path for the sequencing group that will be used to save
@@ -97,12 +100,15 @@ def create_sequencing_group(
         id=id,
         external_id=external_id,
         participant_id=participant_id,
+        sequencing_type=sequencing_type,
+        sequencing_technology=sequencing_technology,
+        sequencing_platform=sequencing_platform,
         dataset=dataset,
         meta=meta,
         sex=sex,
         pedigree=pedigree,
         forced=forced,
-        alignment_input_by_seq_type=({sequencing_type: alignment_input} if alignment_input else None),
+        alignment_input=alignment_input,
     )
 
     if gvcf == 'auto':

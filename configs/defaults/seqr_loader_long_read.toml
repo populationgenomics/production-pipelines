@@ -1,0 +1,21 @@
+[workflow]
+name = 'seqr_loader_long_read'
+dataset_gcp_project = 'seqr-308602'
+status_reporter = 'metamist'
+
+[workflow.bam_to_cram]
+analysis_type = 'pacbio_cram'
+
+[workflow.long_read_vcf_annotation]
+pipeface_versions = ['v0.6.1']
+sv_callers = ['cutesv']
+snps_indels_callers = ['deeptrio', 'deepvariant']
+
+[resource_overrides.bam_to_cram]
+nthreads = 1
+storage_gb = 50
+
+[resource_overrides.merge_vcfs]
+ncpu = 4
+mem_gb = 16
+storage_gb = 50

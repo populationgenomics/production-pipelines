@@ -1,0 +1,23 @@
+[workflow]
+name = 'long_read_snps_indels_annotation'
+ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
+status_reporter = 'metamist'
+vep_version = '110'
+
+[workflow.merge_vcfs]
+bcftools_image = 'bcftools_121'
+
+[workflow.annotate_cohort]
+highmem_drivers = false
+highmem_workers = false
+# driver_cores = 2
+# worker_cores = 2
+
+[elasticsearch]
+# Configure access to ElasticSearch server
+port = '9243'
+host = 'elasticsearch.es.australia-southeast1.gcp.elastic-cloud.com'
+username = 'seqr'
+# Load ElasticSearch password from a secret, unless SEQR_ES_PASSWORD is set
+password_secret_id = 'seqr-es-password'
+password_project_id = 'seqr-308602'
