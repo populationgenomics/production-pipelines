@@ -34,7 +34,7 @@ reblock_gq_bands = [13, 20, 30, 40]
 # Create Seqr ElasticSearch indices for these datasets. Required for the MtToEs stage.
 # create_es_index_for_datasets = []
 
-write_vcf = ["udn-aus"]
+write_vcf = []
 
 # Add in specific multiQC report config options
 # See https://multiqc.info/docs/getting_started/config for more details
