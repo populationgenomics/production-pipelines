@@ -1,17 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-from lib2to3.pgen2 import driver
-
 import click
-from sympy import capture
 
 import hail as hl
 
 from cpg_utils import Path
 from cpg_utils.config import output_path
-from cpg_utils.hail_batch import genome_build, init_batch, reference_path
-from gnomad.sample_qc.pipeline import get_qc_mt
+from cpg_utils.hail_batch import genome_build, init_batch
 
 NUM_ROWS_BEFORE_LD_PRUNE = 200000
 
@@ -55,14 +50,14 @@ def main(
 
     print('Will be writing to pruned_variant_table_path:', sites_table_outpath)
 
-    vqsr_table = hl.read_table(vqsr_table_path)
-
     # Initialise batch
     init_batch(
         worker_memory='highmem',
         driver_memory='highmem',
         driver_cores=4,
     )
+    vqsr_table = hl.read_table(vqsr_table_path)
+
     # exomes
     if exomes:
         if not intersected_bed_file:
