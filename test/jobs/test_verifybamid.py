@@ -23,7 +23,7 @@ def default_config() -> PipelineConfig:
             check_inputs=False,
         ),
         images={
-            'verifybamid': 'test_image',
+            'verifybamid': 'test_image/verifybamid@version',
         },
         references={
             'broad': {
@@ -129,7 +129,7 @@ class TestVerifyBAMID:
         )
 
         assert j is not None
-        assert j._image == config.images['verifybamid']
+        assert '/verifybamid@' in j._image
 
     def test_uses_num_principal_components_in_config_file_in_bash_command(self, tmp_path: Path):
         config, cram_pth, batch = setup_test(tmp_path)
