@@ -1,7 +1,7 @@
 import hailtop.batch as hb
 
 
-def test_python_function(*values):
+def python_test_function(*values):
     # making this smaller with 101 jobs means it passes
     print(*values)
     h = hash(values)
@@ -22,6 +22,6 @@ if __name__ == '__main__':
     # 101 submits, 102 fails
     for i in range(102):
         j = b.new_python_job(f'Function call {i+1}')
-        j.call(test_python_function, i + 1)
+        j.call(python_test_function, i + 1)
 
     submitted = b.run(wait=False)

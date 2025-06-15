@@ -37,6 +37,9 @@ indel_recal_disc_size = 20
 snps_gather_disc_size = 10
 snps_recal_disc_size = 20
 
+# add any datasets to this list to export a VCF from the Annotated Dataset mt
+write_vcf = []
+
 [workflow.es_index]
 # if false, use a non-preemptible instance to run the ES export
 spot_instance = false

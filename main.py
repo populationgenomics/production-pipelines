@@ -39,6 +39,7 @@ from cpg_workflows.stages.outrider import Outrider
 from cpg_workflows.stages.rd_combiner import (
     AnnotateCohortSmallVariantsWithHailQuery,
     AnnotateDatasetSmallVariantsWithHailQuery,
+    AnnotatedDatasetMtToVcfWithHailQuery,
     AnnotateFragmentedVcfWithVep,
     ConcatenateVcfFragmentsWithGcloud,
     CreateDenseMtFromVdsWithHail,
@@ -58,6 +59,7 @@ from cpg_workflows.stages.talos import MakePhenopackets, MinimiseOutputForSeqr, 
 from cpg_workflows.stages.talos_prep.talos_prep import SquashMtIntoTarball
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
+MIGRATED_WORKFLOWS = ['talos', 'clinvarbitration']
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, UploadTalosHtml, MinimiseOutputForSeqr],
@@ -77,6 +79,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         AnnotateCohortSmallVariantsWithHailQuery,
         SubsetMatrixTableToDatasetUsingHailQuery,
         AnnotateDatasetSmallVariantsWithHailQuery,
+        AnnotatedDatasetMtToVcfWithHailQuery,
         ExportMtAsEsIndex,
     ],
     'seqr_loader': [
@@ -158,6 +161,10 @@ def main(
     """
     fmt = '%(asctime)s %(levelname)s (%(pathname)s %(lineno)s): %(message)s'
     coloredlogs.install(level='DEBUG' if verbose else 'INFO', fmt=fmt)
+
+    if workflow in MIGRATED_WORKFLOWS:
+        click.echo(f'Workflow "{workflow}" has been migrated to cpg-flow, please use the migrated version instead.')
+        return
 
     if not workflow and not list_workflows:
         click.echo('You must specify WORKFLOW as a first positional command line argument.')

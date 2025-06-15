@@ -31,7 +31,6 @@ def run(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
-    site_only_ht_path: str,
     vqsr_ht_path: str,
     out_ht_path: str,
 ):
@@ -44,11 +43,10 @@ def run(
     vds = hl.vds.read_vds(str(vds_path))
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
-    site_only_ht = hl.read_table(str(site_only_ht_path))
     vqsr_ht = hl.read_table(str(vqsr_ht_path))
 
     logging.info('Generating frequency annotations...')
-    freq_ht = frequency_annotations(vds, sample_qc_ht, relateds_to_drop_ht, site_only_ht, vqsr_ht)
+    freq_ht = frequency_annotations(vds, sample_qc_ht, relateds_to_drop_ht, vqsr_ht)
     logging.info(f'Writing out frequency data to {out_ht_path}...')
     freq_ht.write(str(out_ht_path), overwrite=True)
 
@@ -57,7 +55,6 @@ def frequency_annotations(
     vds: hl.vds.VariantDataset,
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
-    site_only_ht: hl.Table,
     vqsr_ht: hl.Table,
 ) -> hl.Table:
     """
@@ -98,16 +95,15 @@ def frequency_annotations(
     mt = hl.variant_qc(mt)
 
     logging.info('Allele-specific statistics...')
-    # PLACEHOLDER UNTIL VQSR STAGE IS FIXED
-    # Because the site_only_ht is not split, this info will not be correctly populated for multiallelic
-    # variants until this is resolved.
     mt = mt.annotate_rows(info=vqsr_ht[mt.row_key].info)
+    mt = mt.annotate_rows(AS_lowqual=vqsr_ht[mt.row_key].AS_lowqual)
 
     logging.info('Inbreeding coefficient...')
     mt = mt.annotate_rows(inbreeding_coeff=hl.array([bi_allelic_site_inbreeding_expr(mt.GT)]))
 
     logging.info('VQSR filters...')
-    mt = mt.annotate_rows(vqsr_filters=vqsr_ht[mt.row_key].filters)
+    mt = mt.annotate_rows(site_vqsr_filters=vqsr_ht[mt.row_key].filters)
+    mt = mt.annotate_rows(as_vqsr_filters=vqsr_ht[mt.row_key].info.AS_FilterStatus)
 
     logging.info('Region flags...')
     mt = mt.annotate_rows(

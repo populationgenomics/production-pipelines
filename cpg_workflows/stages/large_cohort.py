@@ -27,10 +27,22 @@ HAIL_QUERY: Final = 'hail query'
 @stage(analysis_type='combiner', analysis_keys=['vds'])
 class Combiner(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
-        combiner_config = config_retrieve('combiner')
-        output_vds_name: str = slugify(
-            f'{cohort.id}-{combiner_config["vds_version"]}',
-        )
+        combiner_config: dict[str, str] = config_retrieve('combiner')
+
+        # Allow user to specify a custom VDS path
+        vds_path = combiner_config.get('vds_path', False)
+        if not vds_path:
+            output_vds_name: str = slugify(
+                f'{cohort.id}-{combiner_config["vds_version"]}',
+            )
+            vds_path = cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds'
+        else:
+            vds_path = to_path(vds_path)
+
+        return {'vds': vds_path}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        output_paths = self.expected_outputs(cohort)
 
         # include the list of all VDS IDs in the plan name
         if vds_ids := config_retrieve(['combiner', 'vds_analysis_ids']):
@@ -38,18 +50,13 @@ class Combiner(CohortStage):
             combiner_plan_name: str = f'combiner_{ids_list_as_string}'
         else:
             combiner_plan_name = f'combiner-{cohort.name}'
-        return {
-            'vds': cohort.analysis_dataset.prefix() / 'vds' / f'{cohort.name}' / f'{output_vds_name}.vds',
-            'combiner_plan': str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json'),
-        }
 
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        output_paths = self.expected_outputs(cohort)
+        combiner_plan: str = str(self.get_stage_cohort_prefix(cohort, 'tmp') / f'{combiner_plan_name}.json')
 
         j: PythonJob = combiner(
             cohort=cohort,
             output_vds_path=str(output_paths['vds']),
-            save_path=output_paths['combiner_plan'],
+            save_path=combiner_plan,
         )
 
         return self.make_outputs(cohort, output_paths, [j])
@@ -271,8 +278,19 @@ class MakeSiteOnlyVcf(CohortStage):
         site_only_version = site_only_version or get_workflow().output_version
 
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.vcf.bgz.tbi',
+            'as': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'as_siteonly.vcf.bgz',
+            'as_tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'as_siteonly.vcf.bgz.tbi',
+            'quasi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'quasi_siteonly.vcf.bgz',
+            'quasi_tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'quasi_siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
             'pre_adjusted': cohort.analysis_dataset.prefix()
             / get_workflow().name
@@ -308,7 +326,8 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, SampleQC)),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(self.expected_outputs(cohort)['vcf']),
+                str(self.expected_outputs(cohort)['as']),
+                str(self.expected_outputs(cohort)['quasi']),
                 str(self.expected_outputs(cohort)['ht']),
                 str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
@@ -335,7 +354,7 @@ class Vqsr(CohortStage):
       > java.lang.NumberFormatException: For input string: "6,11,2,0"
 
     - To avoid this issue, the header is extracted and modified to correct the `SB` field metadata:
-      > ##INFO=<ID=SB,Number=.,Type=Integer,Description="Strand Bias">
+      > ##INFO=<ID=SB,Number=.,Type=Float,Description="Strand Bias">
 
     - The corrected header is saved as a separate file (`header_siteonly.vqsr.vcf.gz`) so that it can be
       used in the subsequent `LoadVqsr` stage to overwrite the original header when importing the VCF into Hail.
@@ -349,9 +368,19 @@ class Vqsr(CohortStage):
             vqsr_version = slugify(vqsr_version)
 
         vqsr_version = vqsr_version or get_workflow().output_version
+        as_or_quasi = config_retrieve(
+            ['large_cohort', 'vqsr_input_vcf'],
+            default='quasi',
+        )
         return {
-            'vcf': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz',
-            'tbi': cohort.analysis_dataset.prefix() / get_workflow().name / vqsr_version / 'siteonly.vqsr.vcf.gz.tbi',
+            'vcf': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / f'{as_or_quasi}_siteonly.vqsr.vcf.gz',
+            'tbi': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / vqsr_version
+            / f'{as_or_quasi}_siteonly.vqsr.vcf.gz.tbi',
             'reheadered_header': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / vqsr_version
@@ -361,7 +390,11 @@ class Vqsr(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.jobs import vqsr
 
-        vcf_path = inputs.as_path(cohort, MakeSiteOnlyVcf, key='vcf')
+        vcf_path = inputs.as_path(
+            cohort,
+            MakeSiteOnlyVcf,
+            key=config_retrieve(['large_cohort', 'vqsr_input_vcf'], default='quasi'),
+        )
         jobs = vqsr.make_vqsr_jobs(
             b=get_batch(),
             input_siteonly_vcf_path=vcf_path,
@@ -385,6 +418,7 @@ class Vqsr(CohortStage):
         reheader_job.depends_on(*jobs)
 
         reheader_job.image(image_path('bcftools'))
+        reheader_job.storage(config_retrieve(['vqsr_reheader', 'storage'], default='16Gi'))
 
         vqsr_vcf = b.read_input(outputs['vcf'])
 
@@ -437,7 +471,7 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, MakeSiteOnlyVcf, LoadVqsr])
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
@@ -472,7 +506,6 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
-                str(inputs.as_path(cohort, MakeSiteOnlyVcf, key='ht')),
                 str(inputs.as_path(cohort, LoadVqsr)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,

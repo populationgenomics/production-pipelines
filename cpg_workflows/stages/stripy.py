@@ -7,7 +7,7 @@ See https://gitlab.com/andreassh/stripy-pipeline
 from typing import Any
 
 from cpg_utils import Path
-from cpg_utils.config import config_retrieve, get_config
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import get_batch
 from cpg_workflows.filetypes import CramPath
 from cpg_workflows.jobs import stripy
@@ -19,6 +19,35 @@ from cpg_workflows.workflow import (
     StageOutput,
     stage,
 )
+
+
+def _stripy_config_retrieve(key: str, dataset: str | None = None) -> Any:
+    """
+    Retrieve the STRipy config for a given key. If a dataset is provided, it will first
+    check for a dataset-specific config before falling back to the global config.
+
+    **NOT to be confused with the stripy config.json file used by the stripy job**
+    """
+    if dataset and config_retrieve(['stripy', dataset, key], default=None) is not None:
+        return config_retrieve(['stripy', dataset, key], default=None)
+    else:
+        return config_retrieve(['stripy', key], default=None)
+
+
+def _get_target_loci(dataset: str) -> str:
+    """
+    Get the target loci which stripy should run on.
+    Uses defaults + dataset-specific additional loci if available.
+    """
+    target_loci = _stripy_config_retrieve('target_loci')
+    if dataset_specific_loci := _stripy_config_retrieve('target_loci', dataset):
+        if _stripy_config_retrieve('target_loci_override', dataset) is True:
+            target_loci = dataset_specific_loci
+        else:
+            target_loci = ','.join(
+                set(target_loci.split(',')) | set(dataset_specific_loci.split(',')),
+            )
+    return target_loci
 
 
 def _update_meta(output_path: str) -> dict[str, Any]:
@@ -82,12 +111,13 @@ class Stripy(SequencingGroupStage):
             b=get_batch(),
             sequencing_group=sequencing_group,
             cram_path=CramPath(cram_path, crai_path),
-            target_loci=get_config()['stripy']['target_loci'],
+            target_loci=_get_target_loci(sequencing_group.dataset.name),
+            custom_loci_path=_stripy_config_retrieve('custom_loci_path', sequencing_group.dataset.name),
+            analysis_type=_stripy_config_retrieve('analysis_type'),
+            stripy_config=_stripy_config_retrieve('config', sequencing_group.dataset.name),
             log_path=self.expected_outputs(sequencing_group)['stripy_log'],
-            analysis_type=get_config()['stripy']['analysis_type'],
             out_path=self.expected_outputs(sequencing_group)['stripy_html'],
             json_path=self.expected_outputs(sequencing_group)['stripy_json'],
-            custom_loci_path=get_config()['stripy']['custom_loci_path'],
             job_attrs=self.get_job_attrs(sequencing_group),
         )
         jobs.append(j)
