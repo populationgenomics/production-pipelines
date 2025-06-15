@@ -2,7 +2,7 @@ import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import config_retrieve, genome_build, get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.large_cohort.combiner import combiner
 from cpg_workflows.targets import Cohort
