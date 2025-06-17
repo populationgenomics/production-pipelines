@@ -765,7 +765,7 @@ class SplitAnnotatedCnvVcfByDataset(DatasetStage):
     """
 
     def expected_outputs(self, dataset: Dataset) -> Path:
-        return dataset.prefix() / 'annotated_sv.vcf.bgz'
+        return dataset.prefix() / get_workflow().name / get_workflow().output_version / self.name / 'annotated_cnv.vcf.bgz'
 
     def queue_jobs(self, dataset: Dataset, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(dataset)
