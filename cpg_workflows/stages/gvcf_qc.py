@@ -112,7 +112,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         GvcfHappy,
     ],
     analysis_type='qc',
-    analysis_keys=['json'],
+    analysis_keys=['html', 'json'],
     update_analysis_meta=_update_meta,
 )
 class GvcfMultiQC(DatasetStage):
