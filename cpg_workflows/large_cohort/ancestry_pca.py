@@ -24,6 +24,32 @@ def reorder_columns(ht: hl.Table, reference_table: hl.Table) -> hl.Table:
     return ht.annotate(sample_qc=hl.struct(**ordered_sample_qc))
 
 
+def sync_sampleqc_hts(dataset_ht: hl.Table, reference_ht: hl.Table) -> tuple[hl.Table, hl.Table]:
+    """
+    Drop columns that are not shared between dataset and reference
+    sample_qc.ht
+    """
+    if dataset_ht.row.dtype.fields == reference_ht.row.dtype.fields:
+        return dataset_ht, reference_ht
+
+    dataset_rows = [f for f in dataset_ht.row.dtype.fields]
+    reference_rows = [f for f in reference_ht.row.dtype.fields]
+
+    extra_dataset_rows = [i for i in dataset_rows if i not in reference_rows]
+    dataset_ht = dataset_ht.drop(*extra_dataset_rows)
+
+    extra_reference_rows = [i for i in reference_rows if i not in dataset_rows]
+    reference_ht = reference_ht.drop(*extra_reference_rows)
+
+    dataset_ht = reorder_columns(dataset_ht, reference_ht)
+    if dataset_ht.row.dtype.fields == reference_ht.row.dtype.fields:
+        return dataset_ht, reference_ht
+    raise Exception(
+        """Sorry, could not synchronise the dataset and reference
+                    sample_qc hail tables""",
+    )
+
+
 def add_background(
     dense_mt: hl.MatrixTable,
     sample_qc_ht: hl.Table,
@@ -97,13 +123,22 @@ def add_background(
             background_mt = background_mt.naive_coalesce(5000)
             # combine dense dataset with background population dataset
             dense_mt = dense_mt.union_cols(background_mt)
-            sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
+            sample_qc_ht, ht = sync_sampleqc_hts(sample_qc_ht, ht)
+            sample_qc_ht = sample_qc_ht.union(ht)
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
 
     if drop_columns:
-        sample_qc_ht = sample_qc_ht.drop(*drop_columns)
-
+        filtered_drop_columns = [c for c in drop_columns if c in sample_qc_ht.row.dtype.fields]
+        if len(filtered_drop_columns) >= 1:
+            sample_qc_ht = sample_qc_ht.drop(*filtered_drop_columns)
+            logging.info(
+                f'Dropping qc table columns. Wanted to drop {drop_columns}. Only {filtered_drop_columns} were found in merged table',
+            )
+        else:
+            logging.info(
+                f'Skipping dropping qc table columns. Wanted to drop {drop_columns}. But none were present in merged table',
+            )
     return dense_mt, sample_qc_ht
 
 
