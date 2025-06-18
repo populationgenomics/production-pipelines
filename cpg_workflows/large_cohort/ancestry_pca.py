@@ -32,8 +32,8 @@ def sync_sampleqc_hts(dataset_ht: hl.Table, reference_ht: hl.Table) -> tuple[hl.
     if dataset_ht.row.dtype.fields == reference_ht.row.dtype.fields:
         return dataset_ht, reference_ht
 
-    dataset_rows = [i[0] for i in dataset_ht.row.items()]
-    reference_rows = [i[0] for i in reference_ht.row.items()]
+    dataset_rows = [f for f in dataset_ht.row.dtype.fields]
+    reference_rows = [f for f in reference_ht.row.dtype.fields]
 
     extra_dataset_rows = [i for i in dataset_rows if i not in reference_rows]
     dataset_ht = dataset_ht.drop(*extra_dataset_rows)
@@ -129,9 +129,16 @@ def add_background(
             raise ValueError('Background dataset path must be either .mt or .vds')
 
     if drop_columns:
-
-        sample_qc_ht = sample_qc_ht.drop(*drop_columns)
-
+        filtered_drop_columns = [c for c in drop_columns if c in sample_qc_ht.row.dtype.fields]
+        if len(filtered_drop_columns) >= 1:
+            sample_qc_ht = sample_qc_ht.drop(*filtered_drop_columns)
+            logging.info(
+                f'Dropping qc table columns. Wanted to drop {drop_columns}. Only {filtered_drop_columns} were found in merged table',
+            )
+        else:
+            logging.info(
+                f'Skipping dropping qc table columns. Wanted to drop {drop_columns}. But none were present in merged table',
+            )
     return dense_mt, sample_qc_ht
 
 
