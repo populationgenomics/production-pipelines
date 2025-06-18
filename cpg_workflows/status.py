@@ -152,8 +152,9 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
+        outputs_str = ', '.join(f'{k}: {str(v)}' for k, v in outputs.items())
         py_job = b.new_python_job(
-            f'Register analysis outputs {outputs}',
+            f'Register analysis outputs: {outputs_str}',
             job_attr or {} | {'tool': 'metamist'},
         )
         py_job.image(get_config()['workflow']['driver_image'])
