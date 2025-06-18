@@ -25,7 +25,7 @@ from cloudpathlib import CloudPath
 from hailtop.batch.job import Job
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_utils.hail_batch import get_batch, reset_batch
 
 from .inputs import get_multicohort
@@ -400,7 +400,7 @@ class Stage(Generic[TargetT], ABC):
         self.assume_outputs_exist = assume_outputs_exist
 
         # If true, only one analysis output will be created for this stage,
-        self.merge_analyses = merge_analyses
+        self.merge_analyses = merge_analyses or self.name in config_retrieve(['workflow', 'merge_analyses_stages'], [])
 
     @property
     def tmp_prefix(self):
