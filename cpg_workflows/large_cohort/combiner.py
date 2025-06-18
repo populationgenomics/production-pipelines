@@ -89,6 +89,11 @@ def combiner(cohort: Cohort, output_vds_path: str, save_path: str) -> PythonJob:
 
     sgs_for_withdrawal: list[str] = [sg for sg in sg_ids_in_vds if sg not in cohort_sg_ids]
 
+    # Allow passing in VDS paths via config, workaround for Hail 134 combining woes
+    # We still gather info from Metamist in order to check for withdrawals
+    if specified_vds := config_retrieve(['combiner', 'vds_paths'], None):
+        vds_paths = specified_vds
+
     if not config_retrieve(['combiner', 'merge_only_vds'], False):
         # Get SG IDs from the cohort object itself, rather than call Metamist.
         # Get VDS IDs first and filter out from this list
