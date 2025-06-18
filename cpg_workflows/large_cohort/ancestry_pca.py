@@ -70,6 +70,8 @@ def add_background(
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
+            metadata_tables = hl.Table.union(*[metadata_tables, sample_qc_ht], unify=allow_missing_columns)
+
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if populations_to_filter:
                 logging.info(f'Filtering background samples by {populations_to_filter}')
