@@ -16,7 +16,7 @@ from cpg_workflows.resources import HIGHMEM
 from cpg_workflows.scripts import upgrade_ped_with_inferred
 from cpg_workflows.utils import can_reuse, chunks
 
-GATK_VERSION = '4.5.0.0-1'
+GCNV_GATK_VERSION = '4.2.6.1-57-g9e03432'
 
 
 def upgrade_ped_file(local_ped: ResourceFile, new_output: str, aneuploidies: str, ploidy_tar: str):
@@ -48,7 +48,7 @@ def prepare_intervals(job_attrs: dict[str, str], output_paths: dict[str, Path]) 
         'Prepare intervals',
         job_attrs | {'tool': 'gatk PreprocessIntervals/AnnotateIntervals'},
     )
-    j.image(image_path('gatk_gcnv', GATK_VERSION))
+    j.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
     sequencing_type = get_config()['workflow']['sequencing_type']
     reference = fasta_res_group(get_batch())
@@ -102,7 +102,7 @@ def collect_read_counts(
     output_base_path: Path,
 ) -> list[Job]:
     j = get_batch().new_job('Collect gCNV read counts', job_attrs | {'tool': 'gatk CollectReadCounts'})
-    j.image(image_path('gatk_gcnv', GATK_VERSION))
+    j.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
     reference = fasta_res_group(get_batch())
 
@@ -164,7 +164,7 @@ def filter_and_determine_ploidy(
             'tool': 'gatk FilterIntervals/DetermineGermlineContigPloidy',
         },
     )
-    j.image(image_path('gatk_gcnv', GATK_VERSION))
+    j.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
@@ -262,7 +262,7 @@ def shard_gcnv(
                 'part': f'shard {i} of {n}',
             },
         )
-        j.image(image_path('gatk_gcnv', GATK_VERSION))
+        j.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
         # set highmem resources for this job
         job_res = HIGHMEM.request_resources(ncpu=8, mem_gb=52, storage_gb=10)
@@ -311,7 +311,7 @@ def postprocess_calls(
         assert all([clustered_vcf, intervals_vcf, qc_file]), [clustered_vcf, intervals_vcf, qc_file]
 
     j = get_batch().new_job('Postprocess gCNV calls', job_attrs | {'tool': 'gatk PostprocessGermlineCNVCalls'})
-    j.image(image_path('gatk_gcnv', GATK_VERSION))
+    j.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=20)
@@ -430,7 +430,7 @@ def joint_segment_vcfs(
     """
     job = get_batch().new_bash_job(f'Joint Segmentation {title}', job_attrs | {'tool': 'gatk'})
     job.declare_resource_group(output={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
-    job.image(image_path('gatk_gcnv', GATK_VERSION))
+    job.image(image_path('sv/gatk', GCNV_GATK_VERSION))
 
     # set highmem resources for this job
     job_res = HIGHMEM.request_resources(ncpu=2, storage_gb=10)
