@@ -50,7 +50,7 @@ def _get_target_loci(dataset: str) -> str:
     return target_loci
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
+def _update_meta(output_paths: dict[str, str | Path]) -> dict[str, Any]:
     """
     Add the detected outlier loci to the analysis meta
     """
@@ -58,7 +58,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
 
     # Munge html path into log path (As far as I can know I can not pass to
     # output paths to one analysis object?)
-    log_path = output_path.replace('-web/', '-analysis/').replace('.html', '.log.txt')
+    log_path = output_paths['log']
 
     outlier_loci = {}
     with CloudPath(log_path).open() as f:
@@ -80,7 +80,9 @@ def _update_meta(output_path: str) -> dict[str, Any]:
     required_stages=Align,
     analysis_type='web',
     analysis_keys=[
-        'stripy_html',
+        'html',
+        'json',
+        'log',
     ],
     update_analysis_meta=_update_meta,
 )
@@ -93,13 +95,9 @@ class Stripy(SequencingGroupStage):
         # When testing new loci, its useful to save the report to an alternate path
         output_prefix = config_retrieve(['stripy', 'output_prefix'], default='stripy')
         return {
-            'stripy_html': sequencing_group.dataset.web_prefix() / output_prefix / f'{sequencing_group.id}.stripy.html',
-            'stripy_json': sequencing_group.dataset.analysis_prefix()
-            / output_prefix
-            / f'{sequencing_group.id}.stripy.json',
-            'stripy_log': sequencing_group.dataset.analysis_prefix()
-            / output_prefix
-            / f'{sequencing_group.id}.stripy.log.txt',
+            'html': sequencing_group.dataset.web_prefix() / output_prefix / f'{sequencing_group.id}.stripy.html',
+            'json': sequencing_group.dataset.analysis_prefix() / output_prefix / f'{sequencing_group.id}.stripy.json',
+            'log': sequencing_group.dataset.analysis_prefix() / output_prefix / f'{sequencing_group.id}.stripy.log.txt',
         }
 
     def queue_jobs(self, sequencing_group: SequencingGroup, inputs: StageInput) -> StageOutput | None:

@@ -361,7 +361,7 @@ class Stage(Generic[TargetT], ABC):
         required_stages: list[StageDecorator] | StageDecorator | None = None,
         analysis_type: str | None = None,
         analysis_keys: list[str] | None = None,
-        update_analysis_meta: Callable[[str], dict] | None = None,
+        update_analysis_meta: Callable[[dict], dict] | None = None,
         tolerate_missing_output: bool = False,
         skipped: bool = False,
         assume_outputs_exist: bool = False,
@@ -512,6 +512,8 @@ class Stage(Generic[TargetT], ABC):
         """
         Create StageOutput for this stage.
         """
+        if isinstance(data, (str, Path)):
+            data = {'output': data}
         return StageOutput(
             target=target,
             data=data,
@@ -770,7 +772,7 @@ def stage(
     *,
     analysis_type: str | None = None,
     analysis_keys: list[str | Path] | None = None,
-    update_analysis_meta: Callable[[str], dict] | None = None,
+    update_analysis_meta: Callable[[dict], dict] | None = None,
     tolerate_missing_output: bool = False,
     required_stages: list[StageDecorator] | StageDecorator | None = None,
     skipped: bool = False,
