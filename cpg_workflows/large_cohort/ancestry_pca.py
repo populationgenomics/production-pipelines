@@ -70,6 +70,7 @@ def add_background(
                 metadata_tables.append(sample_qc_background)
             metadata_tables = hl.Table.union(*metadata_tables, unify=allow_missing_columns)
             metadata_tables = reorder_columns(metadata_tables, sample_qc_ht)
+            metadata_tables = hl.Table.union(*[metadata_tables, sample_qc_ht], unify=allow_missing_columns)
             background_mt = background_mt.annotate_cols(**metadata_tables[background_mt.col_key])
             if populations_to_filter:
                 logging.info(f'Filtering background samples by {populations_to_filter}')
@@ -102,6 +103,12 @@ def add_background(
             raise ValueError('Background dataset path must be either .mt or .vds')
 
     if drop_columns:
+        missing = [field for field in drop_columns if field not in sample_qc_ht.row.dtype.fields]
+        if missing:
+            raise ValueError(
+                f"Cannot drop columns: {missing}. These fields do not exist in the table. "
+                f"Available fields: {list(sample_qc_ht.row.dtype.fields)}",
+            )
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
 
     return dense_mt, sample_qc_ht
