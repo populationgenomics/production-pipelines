@@ -107,7 +107,7 @@ def add_background(
         if missing:
             raise ValueError(
                 f"Cannot drop columns: {missing}. These fields do not exist in the table. "
-                f"Available fields: {list(sample_qc_ht.describe())}",
+                f"Available fields: {list(sample_qc_ht.row.dtype.fields)}",
             )
         sample_qc_ht = sample_qc_ht.drop(*drop_columns)
 
