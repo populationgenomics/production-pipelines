@@ -7,6 +7,10 @@ on:
     branches:
       - main
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -24,6 +28,12 @@ jobs:
 
       - name: Install
         run: pip install .[test]
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: "projects/1051897107465/locations/global/workloadIdentityPools/github-pool/providers/github-provider"
+          service_account: "gh-artifact-registry-reader@cpg-common.iam.gserviceaccount.com"
 
       - name: Run unit tests
         id: runtests
