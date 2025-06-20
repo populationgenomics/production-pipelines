@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+
+from typing import TYPE_CHECKING
+
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import get_batch, init_batch
+
+if TYPE_CHECKING:
+    from hailtop.batch.job import Job
+
+
+def run(output_path: str) -> 'Job':
+    """
+    This is a simple example of a job that writes a statement to a file.
+
+    Args:
+        statement (str): the intended file contents
+        output_file (str): the path to write the file to
+
+    Returns:
+        the resulting job
+    """
+
+    # create a job
+    j = get_batch().new_job('DeepVariant')
+
+    # choose an image to run this job in (default is bare ubuntu)
+    j.image(image_path('deepvariant', '1.9.0-1', 'dev'))
+
+    # copy test data
+    j.command(
+        f"""
+        INPUT_DIR="$BATCH_TMPDIR/quickstart-testdata"
+        CHECKPOINT_DIR="$BATCH_TMPDIR/checkpoint"
+        DATA_HTTP_DIR="https://storage.googleapis.com/deepvariant/quickstart-testdata"
+
+        mkdir -p ${{INPUT_DIR}}
+        mkdir -p ${{CHECKPOINT_DIR}}
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/NA12878_S1.chr20.10_10p1mb.bam"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/NA12878_S1.chr20.10_10p1mb.bam.bai"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/test_nist.b37_chr20_100kbp_at_10mb.bed"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/test_nist.b37_chr20_100kbp_at_10mb.vcf.gz"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/test_nist.b37_chr20_100kbp_at_10mb.vcf.gz.tbi"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.fai"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.fai"
+        wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.gzi"
+
+        # Run make_examples
+        /opt/deepvariant/bin/make_examples \
+        --mode calling \
+        --ref "${{INPUT_DIR}}/ucsc.hg19.chr20.unittest.fasta" \
+        --reads "${{INPUT_DIR}}/NA12878_S1.chr20.10_10p1mb.bam" \
+        --examples "{j.outfile}" \
+        --checkpoint "${{CHECKPOINT_DIR}}" \
+        --regions "chr20:10,000,000-10,010,000" \
+        --task 0
+        """,
+    )
+
+    # write the output to the expected location
+    get_batch().write_output(j.outfile, output_path)
+
+    # return the job
+    return j
+
+
+def main():
+    """
+    Main entry point for testing the run function.
+    """
+    init_batch()
+    output_path = 'gs://cpg-bioheart-test/deepvariant_test/examples.tfrecord@1.gz'
+    job = run(output_path)
+    print(f"Job {job.name} created with output path: {output_path}")
+
+
+if __name__ == '__main__':
+    main()
