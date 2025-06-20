@@ -2,6 +2,8 @@
 
 from typing import TYPE_CHECKING
 
+from requests import get
+
 from cpg_utils.config import image_path
 from cpg_utils.hail_batch import get_batch, init_batch
 
@@ -74,6 +76,8 @@ def main():
     output_path = 'gs://cpg-bioheart-test/deepvariant_test/examples.tfrecord@1.gz'
     job = run(output_path)
     print(f"Job {job.name} created with output path: {output_path}")
+
+    get_batch().run()
 
 
 if __name__ == '__main__':
