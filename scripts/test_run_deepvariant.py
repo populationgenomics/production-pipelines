@@ -51,6 +51,9 @@ def run(output_path: str) -> 'Job':
 
         pip freeze
         python3 -c "import site; print(site.getsitepackages())"
+        PYTHONPATH=/usr/local/lib/python3.10/site-packages
+        echo $PYTHONPATH
+
         # Run make_examples
         python3 make_examples.zip \
         --mode calling \
