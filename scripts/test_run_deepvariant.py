@@ -32,6 +32,11 @@ def run(output_path: str) -> 'Job':
     # copy test data
     j.command(
         f"""
+        ls
+        ls -l /opt/
+        ls -l /opt/deepvariant
+        ls -l /opt/deepvariant/bin
+        ls -l /opt/deepvariant/bin/make_examples
         INPUT_DIR="$BATCH_TMPDIR/quickstart-testdata"
         CHECKPOINT_DIR="$BATCH_TMPDIR/checkpoint"
         DATA_HTTP_DIR="https://storage.googleapis.com/deepvariant/quickstart-testdata"
