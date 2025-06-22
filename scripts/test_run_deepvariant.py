@@ -55,7 +55,7 @@ def run(output_path: str) -> 'Job':
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.gzi"
 
         # Run make_examples
-        /opt/deepvariant/bin/make_examples \
+        python3 make_examples.zip \
         --mode calling \
         --ref "${{INPUT_DIR}}/ucsc.hg19.chr20.unittest.fasta" \
         --reads "${{INPUT_DIR}}/NA12878_S1.chr20.10_10p1mb.bam" \
