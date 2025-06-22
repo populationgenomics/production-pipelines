@@ -49,6 +49,8 @@ def run(output_path: str) -> 'Job':
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.fai"
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.gzi"
 
+        pip freeze
+
         # Run make_examples
         python3 make_examples.zip \
         --mode calling \
