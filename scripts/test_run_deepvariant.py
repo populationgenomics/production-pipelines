@@ -50,7 +50,7 @@ def run(output_path: str) -> 'Job':
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.gzi"
 
         pip freeze
-
+        python3 -c "import site; print(site.getsitepackages())"
         # Run make_examples
         python3 make_examples.zip \
         --mode calling \
