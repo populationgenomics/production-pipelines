@@ -27,7 +27,7 @@ def run(output_path: str) -> 'Job':
     j = get_batch().new_job('DeepVariant')
 
     # choose an image to run this job in (default is bare ubuntu)
-    j.image(image_path('deepvariant', '1.9.0-1', 'dev'))
+    j.image(image_path('deepvariant'))
 
     # copy test data
     j.command(
