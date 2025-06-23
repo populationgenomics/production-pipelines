@@ -83,12 +83,14 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
         FTPDIR=ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids
         curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz | gunzip > reference/GRCh38_no_alt_analysis_set.fasta
         curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.fai > reference/GRCh38_no_alt_analysis_set.fasta.fai
+        ls -l reference
 
         mkdir -p benchmark
         FTPDIR=ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/AshkenazimTrio/HG003_NA24149_father/NISTv4.2.1/GRCh38
         curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
         curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
         curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi
+        ls -l benchmark
 
         mkdir -p input
         HTTPDIR=https://storage.googleapis.com/deepvariant/case-study-testdata
@@ -97,7 +99,7 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
 
         mkdir -p input
         HTTPDIR=https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38
-        curl ${{HTTPDIR}}/hprc-v1.1-mc-grch38.gbz > input/hprc-v1.1-mc-grch38.gbz
+        curl -L "${{HTTPDIR}}/hprc-v1.1-mc-grch38.gbz" -o input/hprc-v1.1-mc-grch38.gbz
 
         # Run pangenome-aware DeepVariant
         mkdir -p output
