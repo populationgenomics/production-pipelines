@@ -79,7 +79,7 @@ def main():
     Main entry point for testing the run function.
     """
     init_batch()
-    output_path = 'gs://cpg-bioheart-test/deepvariant_test/examples.tfrecord@1.gz'
+    output_path = 'gs://cpg-bioheart-test/deepvariant_test/test_out.g.vcf.gz'
     job = run(output_path)
     print(f"Job {job.name} created with output path: {output_path}")
 
