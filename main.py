@@ -58,7 +58,7 @@ from cpg_workflows.stages.talos import MakePhenopackets, MinimiseOutputForSeqr, 
 from cpg_workflows.stages.talos_prep.talos_prep import SquashMtIntoTarball
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
-MIGRATED_WORKFLOWS = ['talos', 'clinvarbitration']
+MIGRATED_WORKFLOWS = ['talos', 'talos_prep', 'exomiser', 'clinvarbitration']
 WORKFLOWS: dict[str, list[StageDecorator]] = {
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, UploadTalosHtml, MinimiseOutputForSeqr],
