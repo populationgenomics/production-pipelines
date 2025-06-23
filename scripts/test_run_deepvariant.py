@@ -49,20 +49,17 @@ def run(output_path: str) -> 'Job':
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.fai"
         wget -P ${{INPUT_DIR}} "${{DATA_HTTP_DIR}}/ucsc.hg19.chr20.unittest.fasta.gz.gzi"
 
-        pip freeze
-        python3 -c "import site; print(site.getsitepackages())"
-        PYTHONPATH=/usr/local/lib/python3.10/site-packages
-        echo $PYTHONPATH
-
         # Run make_examples
-        python3 make_examples.zip \
-        --mode calling \
-        --ref "${{INPUT_DIR}}/ucsc.hg19.chr20.unittest.fasta" \
-        --reads "${{INPUT_DIR}}/NA12878_S1.chr20.10_10p1mb.bam" \
-        --examples "{j.outfile}" \
-        --checkpoint "${{CHECKPOINT_DIR}}" \
+        /opt/deepvariant/bin/run_deepvariant \
+        --model_type=WGS \
+        --vcf_stats_report=true \
+        --ref=${{INPUT_DIR}}/ucsc.hg19.chr20.unittest.fasta \
+        --reads=${{INPUT_DIR}}/NA12878_S1.chr20.10_10p1mb.bam \
         --regions "chr20:10,000,000-10,010,000" \
-        --task 0
+        --output_vcf=/output/output.vcf.gz \
+        --output_gvcf={j.outfile} \
+        --intermediate_results_dir /output/intermediate_results_dir \
+        --num_shards=1
         """,
     )
 
