@@ -96,8 +96,10 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
         HTTPDIR=https://storage.googleapis.com/deepvariant/case-study-testdata
         curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam > input/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam
         curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai > input/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai
+        ls -l input
 
         mkdir -p input
+        ls -l input
         HTTPDIR=https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38
         curl -L "${{HTTPDIR}}/hprc-v1.1-mc-grch38.gbz" -o input/hprc-v1.1-mc-grch38.gbz
 
