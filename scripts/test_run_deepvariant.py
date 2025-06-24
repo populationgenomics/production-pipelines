@@ -80,43 +80,37 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
     j.command(
         f"""
         set -ex
-        mkdir -p reference
         FTPDIR=ftp://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids
-        curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz | gunzip > reference/GRCh38_no_alt_analysis_set.fasta
-        curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.fai > reference/GRCh38_no_alt_analysis_set.fasta.fai
-        ls -l reference
+        curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.gz | gunzip > ${{BATCH_TMPDIR}}/GRCh38_no_alt_analysis_set.fasta
+        curl ${{FTPDIR}}/GCA_000001405.15_GRCh38_no_alt_analysis_set.fna.fai > ${{BATCH_TMPDIR}}/GRCh38_no_alt_analysis_set.fasta.fai
+        ls -l ${{BATCH_TMPDIR}}
 
-        mkdir -p benchmark
         FTPDIR=ftp://ftp-trace.ncbi.nlm.nih.gov/giab/ftp/release/AshkenazimTrio/HG003_NA24149_father/NISTv4.2.1/GRCh38
-        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
-        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
-        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi > benchmark/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi
-        ls -l benchmark
+        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed > ${{BATCH_TMPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark_noinconsistent.bed
+        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz > ${{BATCH_TMPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz
+        curl ${{FTPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi > ${{BATCH_TMPDIR}}/HG003_GRCh38_1_22_v4.2.1_benchmark.vcf.gz.tbi
+        ls -l ${{BATCH_TMPDIR}}
 
-        mkdir -p input
         HTTPDIR=https://storage.googleapis.com/deepvariant/case-study-testdata
-        curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam > input/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam
-        curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai > input/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai
-        ls -l input
+        curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam > ${{BATCH_TMPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam
+        curl ${{HTTPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai > ${{BATCH_TMPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam.bai
+        ls -l ${{BATCH_TMPDIR}}
 
-        mkdir -p input
-        ls -l input
         HTTPDIR=https://s3-us-west-2.amazonaws.com/human-pangenomics/pangenomes/freeze/freeze1/minigraph-cactus/hprc-v1.1-mc-grch38
-        curl -L "${{HTTPDIR}}/hprc-v1.1-mc-grch38.gbz" -o input/hprc-v1.1-mc-grch38.gbz
+        curl -L "${{HTTPDIR}}/hprc-v1.1-mc-grch38.gbz" -o ${{BATCH_TMPDIR}}/hprc-v1.1-mc-grch38.gbz
 
         # Run pangenome-aware DeepVariant
-        mkdir -p output
-        mkdir -p output/intermediate_results_dir
+        mkdir -p ${{BATCH_TMPDIR}}/intermediate_results_dir
         /opt/deepvariant/bin/run_pangenome_aware_deepvariant \
         --model_type WGS \
-        --ref /reference/GRCh38_no_alt_analysis_set.fasta \
-        --reads /input//HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam  \
-        --pangenome /input/hprc-v1.1-mc-grch38.gbz \
+        --ref ${{BATCH_TMPDIR}}/GRCh38_no_alt_analysis_set.fasta \
+        --reads ${{BATCH_TMPDIR}}/HG003.novaseq.pcr-free.35x.dedup.grch38_no_alt.chr20.bam  \
+        --pangenome ${{BATCH_TMPDIR}}/hprc-v1.1-mc-grch38.gbz \
         --output_vcf {j.out_vcf} \
         --output_gvcf {j.out_gvcf} \
         --num_shards $(nproc) \
         --regions chr20 \
-        --intermediate_results_dir /output/intermediate_results_dir
+        --intermediate_results_dir ${{BATCH_TMPDIR}}/intermediate_results_dir
         """,
     )
 
