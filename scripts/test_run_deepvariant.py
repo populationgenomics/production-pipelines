@@ -74,7 +74,7 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
 
     # choose an image to run this job in (default is bare ubuntu)
     j.image(image_path('deepvariant_pangenome_aware'))
-    j.memory('32Gi')
+    j.memory('96Gi')
     j.storage('50Gi')
 
     # copy test data
