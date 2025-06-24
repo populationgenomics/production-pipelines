@@ -102,6 +102,11 @@ def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
 
         # Run pangenome-aware DeepVariant
         mkdir -p ${{BATCH_TMPDIR}}/intermediate_results_dir
+        pwd
+        ls -l
+        ls -l /opt
+        ls -l /opt/deepvariant/
+        ls -l /opt/deepvariant/bin/
         /opt/deepvariant/bin/run_pangenome_aware_deepvariant \
         --model_type WGS \
         --ref ${{BATCH_TMPDIR}}/GRCh38_no_alt_analysis_set.fasta \
