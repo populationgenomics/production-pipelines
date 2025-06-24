@@ -70,11 +70,11 @@ def run(output_path: str) -> 'Job':
 
 def run_pangenome_aware(output_vcf: str, output_gvcf: str) -> 'Job':
     # create a job
-    j = get_batch().new_job('DeepVariant PangenomeAware')
+    j = get_batch().new_job('DeepVariant Pangenome Aware')
 
     # choose an image to run this job in (default is bare ubuntu)
     j.image(image_path('deepvariant_pangenome_aware'))
-    j.memory('8Gi')
+    j.memory('32Gi')
     j.storage('50Gi')
 
     # copy test data
@@ -132,7 +132,10 @@ def main():
     """
     Main entry point for testing the run function.
     """
-    init_batch()
+    init_batch(
+        worker_memory='highmem',
+        worker_cores=8,
+    )
     output_vcf = 'gs://cpg-bioheart-test/deepvariant_test/test_out.vcf.gz'
     output_gvcf = 'gs://cpg-bioheart-test/deepvariant_test/test_out.g.vcf.gz'
     job = run_pangenome_aware(output_vcf, output_gvcf)
