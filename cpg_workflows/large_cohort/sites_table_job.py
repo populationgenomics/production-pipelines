@@ -8,8 +8,6 @@ from cpg_utils import Path
 from cpg_utils.config import output_path
 from cpg_utils.hail_batch import genome_build, init_batch
 
-NUM_ROWS_BEFORE_LD_PRUNE = 200000
-
 
 @click.option(
     '--vds-path',
@@ -53,9 +51,11 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
 def main(
     vds_path: str,
     exomes: bool,
+    subsample: bool,
     vqsr_table_path: str,
     sites_table_outpath: str,
     intersected_bed_file: list[str] | None = None,
+    subsample_n: int | None = None,
 ):
     print(f'Input vds_path: {vds_path}')
 
@@ -131,17 +131,25 @@ def main(
     # downsize input variants for ld_prune
     # otherwise, persisting the pruned_variant_table will cause
     # script to fail. See https://github.com/populationgenomics/ancestry/pull/79
+
+    # subsample
+    if subsample:
+        if not subsample_n:
+            raise ValueError('If --subsample is set, you must provide a value for --subsample-n')
+        print('Sub-sampling sites table before LD pruning')
+        nrows = hgdp_1kg.count_rows()
+        print(f'pre sub-sample rows = {nrows}')
+        hgdp_1kg = hgdp_1kg.sample_rows(
+            subsample_n / nrows,
+            seed=12345,
+        )
+        nrows = hgdp_1kg.count_rows()
+        print(f'post sub-sample rows = {nrows}')
+
     print('Writing sites table pre-LD pruning')
     checkpoint_path = output_path('hgdp_1kg_exome_pre_pruning.mt', 'default')
     hgdp_1kg = hgdp_1kg.checkpoint(checkpoint_path, overwrite=True)
     print('Done writing sites table pre-LD pruning')
-
-    # nrows = hgdp_1kg.count_rows()
-    # print(f'hgdp_1kg.count_rows() = {nrows}')
-    # hgdp_1kg = hgdp_1kg.sample_rows(
-    #     NUM_ROWS_BEFORE_LD_PRUNE / nrows,
-    #     seed=12345,
-    # )
 
     # as per gnomAD, LD-prune variants with a cutoff of r2 = 0.1
     print('Pruning sites table')
