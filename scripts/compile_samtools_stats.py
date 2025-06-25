@@ -3,9 +3,9 @@
 """
 A script to read the samtools stats files of genome sequencing groups in Metamist datasets.
 
-The script fetches the sequencing groups from the Metamist Project API, reads the samtools-stats
-files for each sequencing group, and writes the statistics to a TSV file. It can filter datasets
-based on command line arguments and can append to an existing output file.
+The script fetches the sequencing groups from Metamist using GraphQL. It then reads the samtools-stats
+files for each sequencing group and writes the statistics to a TSV file. It can filter datasets
+based on command line arguments and can re-use the results from and append to an existing output file.
 """
 
 import csv
