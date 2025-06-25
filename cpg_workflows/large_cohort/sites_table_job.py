@@ -58,6 +58,13 @@ def main(
     )
     vqsr_table = hl.read_table(vqsr_table_path)
 
+    if not 'AS_FilterStatus' in [k for k in vqsr_table.info.keys()]:
+        vqsr_table = vqsr_table.annotate(
+            info=vqsr_table.info.annotate(
+                AS_FilterStatus=hl.if_else(hl.len(vqsr_table.filters) == 0, "PASS", "FAIL"),
+            ),
+        )
+
     # exomes
     if exomes:
         if not intersected_bed_file:
