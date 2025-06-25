@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+"""
+This script generates a sites table from a VDS file, filtering variants based on an
+external dataset (e.g. gnomAD VQSR status) and applying LD pruning. It can handle both
+exome and genome datasets, with options for subsampling sites before LD pruning.
+
+This script used to only prune sites in the HGDP+1KG dataset however we are now pruning
+to cohort specific sites that have passed VQSR. This is to ensure that the sites
+are representative of the cohort and to avoid using sites that may not be relevant.
+"""
+
+
 import click
 
 import hail as hl
@@ -52,7 +63,7 @@ def main(
     vds_path: str,
     exomes: bool,
     subsample: bool,
-    vqsr_table_path: str,
+    external_sites_filter_table_path: str,
     sites_table_outpath: str,
     intersected_bed_file: list[str] | None = None,
     subsample_n: int | None = None,
@@ -67,12 +78,15 @@ def main(
         driver_memory='highmem',
         driver_cores=4,
     )
-    vqsr_table = hl.read_table(vqsr_table_path)
+    external_sites_table = hl.read_table(external_sites_filter_table_path)
 
-    if not 'AS_FilterStatus' in [k for k in vqsr_table.info.keys()]:
-        vqsr_table = vqsr_table.annotate(
-            info=vqsr_table.info.annotate(
-                AS_FilterStatus=hl.if_else(hl.len(vqsr_table.filters) == 0, "PASS", "FAIL"),
+    # LC pipeline VQSR has AS_FilterStatus in info field. We need to annotate
+    # sites in the external sites table with AS_FilterStatus if it does not exist
+    # based on the `filters` field.
+    if not 'AS_FilterStatus' in [k for k in external_sites_table.info.keys()]:
+        external_sites_table = external_sites_table.annotate(
+            info=external_sites_table.info.annotate(
+                AS_FilterStatus=hl.if_else(hl.len(external_sites_table.filters) == 0, "PASS", "FAIL"),
             ),
         )
 
@@ -90,7 +104,7 @@ def main(
     vds = hl.vds.read_vds(str(vds_path), intervals=intervals if exomes else None)
 
     # Filter to variant sites that pass VQSR
-    passed_variants = vqsr_table.filter(vqsr_table.info.AS_FilterStatus == 'PASS')
+    passed_variants = external_sites_table.filter(external_sites_table.info.AS_FilterStatus == 'PASS')
     vds = hl.vds.filter_variants(vds, passed_variants)
 
     print('Splitting multi-allelic sites')
@@ -98,7 +112,7 @@ def main(
     print('Done splitting multi-allelic sites')
 
     print('Densifying VDS')
-    hgdp_1kg = hl.vds.to_dense_mt(vds)
+    cohort_dense_mt = hl.vds.to_dense_mt(vds)
     print('Done densifying VDS')
 
     # Run variant QC
@@ -108,23 +122,23 @@ def main(
     # Must be single nucleotide variants that are autosomal (i.e., no sex), and bi-allelic
     # Have an allele frequency above 1% (note deviation from gnomAD, which is 0.1%)
     # Have a call rate above 99%
-    hgdp_1kg = hl.variant_qc(hgdp_1kg)
+    cohort_dense_mt = hl.variant_qc(cohort_dense_mt)
     print('Done running variant QC')
 
     print('Generating sites table')
     print('Filtering using gnomAD v3 parameters')
-    hgdp_1kg = hgdp_1kg.annotate_rows(
+    cohort_dense_mt = cohort_dense_mt.annotate_rows(
         IB=hl.agg.inbreeding(
-            hgdp_1kg.GT,
-            hgdp_1kg.variant_qc.AF[1],
+            cohort_dense_mt.GT,
+            cohort_dense_mt.variant_qc.AF[1],
         ),
     )
-    hgdp_1kg = hgdp_1kg.filter_rows(
-        (hl.len(hgdp_1kg.alleles) == 2)
-        & (hgdp_1kg.locus.in_autosome())
-        & (hgdp_1kg.variant_qc.AF[1] > 0.01)
-        & (hgdp_1kg.variant_qc.call_rate > 0.99)
-        & (hgdp_1kg.IB.f_stat > -0.80),
+    cohort_dense_mt = cohort_dense_mt.filter_rows(
+        (hl.len(cohort_dense_mt.alleles) == 2)
+        & (cohort_dense_mt.locus.in_autosome())
+        & (cohort_dense_mt.variant_qc.AF[1] > 0.01)
+        & (cohort_dense_mt.variant_qc.call_rate > 0.99)
+        & (cohort_dense_mt.IB.f_stat > -0.80),
     )
     print('Done filtering using gnomAD v3 parameters')
 
@@ -137,24 +151,24 @@ def main(
         if not subsample_n:
             raise ValueError('If --subsample is set, you must provide a value for --subsample-n')
         print('Sub-sampling sites table before LD pruning')
-        nrows = hgdp_1kg.count_rows()
+        nrows = cohort_dense_mt.count_rows()
         print(f'pre sub-sample rows = {nrows}')
-        hgdp_1kg = hgdp_1kg.sample_rows(
+        cohort_dense_mt = cohort_dense_mt.sample_rows(
             subsample_n / nrows,
             seed=12345,
         )
-        nrows = hgdp_1kg.count_rows()
+        nrows = cohort_dense_mt.count_rows()
         print(f'post sub-sample rows = {nrows}')
 
     print('Writing sites table pre-LD pruning')
-    checkpoint_path = output_path('hgdp_1kg_exome_pre_pruning.mt', 'default')
-    hgdp_1kg = hgdp_1kg.checkpoint(checkpoint_path, overwrite=True)
+    checkpoint_path = output_path(f'cohort_dense_mt_{"exome_" if exomes else ""}pre_pruning.mt', 'default')
+    cohort_dense_mt = cohort_dense_mt.checkpoint(checkpoint_path, overwrite=True)
     print('Done writing sites table pre-LD pruning')
 
     # as per gnomAD, LD-prune variants with a cutoff of r2 = 0.1
     print('Pruning sites table')
     pruned_variant_table = hl.ld_prune(
-        hgdp_1kg.GT,
+        cohort_dense_mt.GT,
         r2=0.1,
         bp_window_size=500000,
     )
