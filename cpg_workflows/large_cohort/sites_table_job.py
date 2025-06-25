@@ -34,6 +34,17 @@ NUM_ROWS_BEFORE_LD_PRUNE = 200000
     type=str,
 )
 @click.option(
+    '--subsample',
+    help='Whether to subsample the sites before LD pruning',
+    is_flag=True,
+    default=False,
+)
+@click.option(
+    '--subsample-n',
+    help='N (number) of sites to subsample to before LD pruning.' 'If --subsample is set, this must be provided.',
+    type=int,
+)
+@click.option(
     '--sites-table-outpath',
     help='Path to write the output sites table.',
     type=str,
