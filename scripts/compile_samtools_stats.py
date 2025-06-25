@@ -195,43 +195,42 @@ def get_existing_data(
     """
     Read an existing output file and return its contents as a list of lines.
     """
+    existing_data: list[str] = []
     exists = to_path(output_file).exists()
-    if exists:
-        logger.info(f'Output file {output_file} already exists. Appending to it.')
-        # Download the existing file and read its contents, then append the new stats to it and write it back
-        if output_file.startswith('gs://'):
-            # If the output file is in GCS, download it to a temporary local file
-            storage_client = storage.Client()
-            bucket = storage_client.bucket(bucket_name)
-            blob = bucket.blob(output_file.removeprefix(f'gs://{bucket_name}/'))
-            temp_file = to_path('/tmp/temp_samtools_stats.tsv')
-            blob.download_to_filename(temp_file)
-            with open(temp_file, 'r', encoding='utf-8') as f:
-                logger.info(f'Reading existing data from {temp_file}')
-                reader = csv.DictReader(f, delimiter='\t')
-                if reader.fieldnames != fieldnames:
-                    logger.warning(
-                        f'Fieldnames in existing file {temp_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
-                    )
-                existing_data = f.readlines()
-            temp_file.unlink()  # Clean up the temporary file
-        else:
-            # If the output file is local, read it directly
-            logger.info(f'Reading existing data from {output_file}')
-            # Open the file and read its contents, skipping the header line
-            with open(output_file, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f, delimiter='\t')
-                if reader.fieldnames != fieldnames:
-                    logger.warning(
-                        f'Fieldnames in existing file {output_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
-                    )
-                # Read the existing data to avoid duplicating headers
-                existing_data = f.readlines()
-        logger.info(f'Found {len(existing_data)} existing lines in {output_file}')
-        return existing_data
-    else:
+    if not exists:
         logger.info(f'Output file {output_file} does not exist. Creating it.')
-        return []
+        return existing_data
+
+    # If the output file is in GCS, download it to a temporary local file and read it
+    if output_file.startswith('gs://'):
+        storage_client = storage.Client()
+        bucket = storage_client.bucket(bucket_name)
+        blob = bucket.blob(output_file.removeprefix(f'gs://{bucket_name}/'))
+        temp_file = to_path('/tmp/temp_samtools_stats.tsv')
+        blob.download_to_filename(temp_file)
+        with open(temp_file, 'r', encoding='utf-8') as f:
+            logger.info(f'Reading existing data from {temp_file}')
+            reader = csv.DictReader(f, delimiter='\t')
+            if reader.fieldnames != fieldnames:
+                logger.warning(
+                    f'Fieldnames in existing file {temp_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
+                )
+            existing_data = f.readlines()
+        temp_file.unlink()
+
+    # If the output file is local, read it directly
+    else:
+        logger.info(f'Reading existing data from {output_file}')
+        with open(output_file, 'r', encoding='utf-8') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            if reader.fieldnames != fieldnames:
+                logger.warning(
+                    f'Fieldnames in existing file {output_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
+                )
+            existing_data = f.readlines()
+
+    logger.info(f'Found {len(existing_data)} existing lines in {output_file}')
+    return existing_data
 
 
 def write_all_samtools_stats_to_file(
@@ -243,7 +242,7 @@ def write_all_samtools_stats_to_file(
     Write the samtools stats to a file in TSV format, or append to an existing file.
     """
     # Get the fieldnames from the first dataset's first sequencing group's stats
-    # All datasets should have the same fieldnames, so we can just take the first one
+    # All datasets/sgs stats should have the same fieldnames, so just take the first one
     stats_dict = next(iter(datasets_sg_stats.values())).get(
         next(iter(next(iter(datasets_sg_stats.values())).keys())),
         {},
