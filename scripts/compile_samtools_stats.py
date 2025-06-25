@@ -30,6 +30,7 @@ logger.propagate = False
 
 proj_api = ProjectApi()
 
+
 def get_datasets(seqr_datasets_only: bool) -> list[str]:
     """
     Get the datasets from the Metamist Project API.
@@ -147,7 +148,7 @@ def get_samtools_stats_from_file(filepath: Path) -> dict[str, str]:
 def get_samtools_stats_for_sgs(
     dataset_sgs: dict[str, list[str]],
     samtools_stats_filepaths_by_sg: dict[str, Path],
-) -> dict[str, dict[str, str]]:
+) -> dict[str, dict[str, dict[str, str]]]:
     """
     Read the samtools stats files for each sequencing group and return the statistics
 
@@ -205,7 +206,9 @@ def get_existing_data(
                 logger.info(f'Reading existing data from {temp_file}')
                 reader = csv.DictReader(f, delimiter='\t')
                 if reader.fieldnames != fieldnames:
-                    logger.warning(f'Fieldnames in existing file {temp_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}')
+                    logger.warning(
+                        f'Fieldnames in existing file {temp_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
+                    )
                 existing_data = f.readlines()
             temp_file.unlink()  # Clean up the temporary file
         else:
@@ -215,7 +218,9 @@ def get_existing_data(
             with open(output_file, 'r', encoding='utf-8') as f:
                 reader = csv.DictReader(f, delimiter='\t')
                 if reader.fieldnames != fieldnames:
-                    logger.warning(f'Fieldnames in existing file {output_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}')
+                    logger.warning(
+                        f'Fieldnames in existing file {output_file} do not match expected fieldnames. Expected: {fieldnames}, Found: {reader.fieldnames}',
+                    )
                 # Read the existing data to avoid duplicating headers
                 existing_data = f.readlines()
         logger.info(f'Found {len(existing_data)} existing lines in {output_file}')
@@ -223,7 +228,6 @@ def get_existing_data(
     else:
         logger.info(f'Output file {output_file} does not exist. Creating it.')
         return []
-
 
 
 def write_all_samtools_stats_to_file(
@@ -236,11 +240,14 @@ def write_all_samtools_stats_to_file(
     """
     # Get the fieldnames from the first dataset's first sequencing group's stats
     # All datasets should have the same fieldnames, so we can just take the first one
-    sg_stats = next(iter(datasets_sg_stats.values())).get(next(iter(next(iter(datasets_sg_stats.values())).keys())), {})
-    if not sg_stats:
+    stats_dict = next(iter(datasets_sg_stats.values())).get(
+        next(iter(next(iter(datasets_sg_stats.values())).keys())),
+        {},
+    )
+    if not stats_dict:
         logger.error('No statistics found in the provided datasets. Exiting.')
         sys.exit(1)
-    fieldnames = get_fieldnames_from_stats(sg_stats)
+    fieldnames = get_fieldnames_from_stats(stats_dict)
 
     existing_data = get_existing_data(
         output_file,
@@ -251,7 +258,9 @@ def write_all_samtools_stats_to_file(
     # Write the data to a buffer
     buffer = StringIO()
     writer = csv.DictWriter(
-        buffer, fieldnames=fieldnames, delimiter='\t',
+        buffer,
+        fieldnames=fieldnames,
+        delimiter='\t',
     )
     writer.writeheader()
     # Write existing data to the buffer
@@ -260,11 +269,13 @@ def write_all_samtools_stats_to_file(
     # Write the new stats to the buffer
     for dataset, sg_stats in datasets_sg_stats.items():
         for sg_id, stats in sg_stats.items():
-            writer.writerow({
-                'dataset': dataset,
-                'sg_id': sg_id,
-                **stats,
-            })
+            writer.writerow(
+                {
+                    'dataset': dataset,
+                    'sg_id': sg_id,
+                    **stats,
+                },
+            )
 
     # Save to a local file or GCS blob based on the output_file path
     if not bucket_name:
@@ -299,7 +310,9 @@ def read_existing_outputs_sgs(
                 dataset_sgs[row['dataset']] = set()
             dataset_sgs[row['dataset']].add(row['sg_id'])
 
-    logger.info(f'Found {len(dataset_sgs)} datasets with {sum(len(sgs) for sgs in dataset_sgs.values())} total sequencing groups in existing output file: {output_file}')
+    logger.info(
+        f'Found {len(dataset_sgs)} datasets with {sum(len(sgs) for sgs in dataset_sgs.values())} total sequencing groups in existing output file: {output_file}',
+    )
 
     all_sgs = set()
     for dataset, sgs in dataset_sgs.items():
@@ -312,8 +325,14 @@ def read_existing_outputs_sgs(
 @click.command()
 @click.option('-o', '--output-file', type=str)
 @click.option('--rd', is_flag=True, help='If set (and --datasets is not set) use RD datasets. Else use all datasets.')
-@click.option('-d', '--datasets', type=str, multiple=True, help='Filter to specific datasets. If not provided, all datasets will be used.')
-def main(output_file: str, rd: bool, datasets: tuple[str, ...]) -> None:
+@click.option(
+    '-d',
+    '--datasets',
+    type=str,
+    multiple=True,
+    help='Filter to specific datasets. If not provided, all datasets will be used.',
+)
+def main(output_file: str, rd: bool, datasets: list[str]) -> None:
     """
     Main function to run the script
     """
@@ -323,7 +342,6 @@ def main(output_file: str, rd: bool, datasets: tuple[str, ...]) -> None:
 
     if not datasets:
         datasets = get_datasets(seqr_datasets_only=rd)
-    datasets = list(datasets)
 
     excluded_sgs = set()
     if to_path(output_file).exists():
@@ -359,6 +377,7 @@ def main(output_file: str, rd: bool, datasets: tuple[str, ...]) -> None:
         bucket_name=bucket_name,
         output_file=output_file,
     )
+
 
 if __name__ == '__main__':
     main()
