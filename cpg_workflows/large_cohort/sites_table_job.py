@@ -38,7 +38,7 @@ from cpg_utils.hail_batch import genome_build, init_batch
     type=str,
 )
 @click.option(
-    '--vqsr-table-path',
+    '--external-sites-filter-table-path',
     help='Path to the VQSR table to use for filtering variants.',
     type=str,
 )
