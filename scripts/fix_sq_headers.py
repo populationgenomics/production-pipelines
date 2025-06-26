@@ -278,7 +278,7 @@ def main(
 
     for path, newpath, filesize in reheader_list:
         j = b.new_python_job(f'Reheader {path}')
-        j.image(image_path('samtools'))
+        j.image(image_path('samtools', '1.18-1'))
         j.storage(filesize * 1.2)  # Allow some extra space for index file, references, etc
 
         j_result = j.call(

@@ -141,7 +141,7 @@ def vep_one(
         raise IndexError('No VEP version specified in config.workflow.vep_version')
 
     # check that the cache and image for this version exist
-    vep_image = image_path(f'vep_{vep_version}')
+    vep_image = image_path('vep', config_retrieve(['workflow', 'vep_image']))
     vep_mount_path = to_path(reference_path(f'vep_{vep_version}_mount'))
     assert all([vep_image, vep_mount_path])
 

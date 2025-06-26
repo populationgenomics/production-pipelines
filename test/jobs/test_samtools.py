@@ -22,7 +22,7 @@ def default_config() -> PipelineConfig:
             check_inputs=False,
         ),
         images={
-            'samtools': 'test_image',
+            'samtools': 'test_image/samtools@version',
         },
         references={
             'broad': {
@@ -123,7 +123,7 @@ class TestSamtoolsStatsRun:
         )
 
         assert j is not None
-        assert j._image == config.images['samtools']
+        assert '/samtools@' in j._image
 
     def test_uses_reference_in_workflow_config_section_if_set(self, tmp_path: Path):
         config = default_config()

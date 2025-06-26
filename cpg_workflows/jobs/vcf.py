@@ -13,6 +13,8 @@ from cpg_utils.hail_batch import command, fasta_res_group, get_batch
 from cpg_workflows.resources import STANDARD, storage_for_joint_vcf
 from cpg_workflows.utils import can_reuse
 
+BCFTOOLS_VERSION = '1.16-1'
+
 
 def quick_and_easy_bcftools_concat(
     input_vcfs: list[hb.ResourceGroup | hb.Resource],
@@ -29,7 +31,7 @@ def quick_and_easy_bcftools_concat(
         a ResourceGroup with the concatenated VCF, with the 'vcf.gz', and 'vcf.gz.tbi' attributes
     """
     concat_job = get_batch().new_job(f'Concat {len(input_vcfs)} VCFs', (job_attrs or {}) | {'tool': 'bcftools concat'})
-    concat_job.image(image_path('bcftools'))
+    concat_job.image(image_path('bcftools', BCFTOOLS_VERSION))
     res = STANDARD.set_resources(concat_job, storage_gb=storage_gb)
 
     # declare a resource group for the concatenated output
@@ -68,7 +70,7 @@ def subset_vcf(
     job_name = 'Subset VCF'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk SelectVariants'}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', '4.2.6.1-1'))
     STANDARD.set_resources(j, ncpu=2)
 
     j.declare_resource_group(output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'})
@@ -135,7 +137,7 @@ def gather_vcfs(
     if not can_reuse(out_vcf_path):
         job_name = f'Merge {len(input_vcfs)} {"site-only " if site_only else ""}VCFs'
         j = b.new_job(job_name, (job_attrs or {}) | {'tool': 'bcftools concat'})
-        j.image(image_path('bcftools'))
+        j.image(image_path('bcftools', BCFTOOLS_VERSION))
         res = STANDARD.set_resources(j, storage_gb=storage_for_joint_vcf(sequencing_group_count, site_only))
         cmd = f"""
         bcftools concat --threads {res.get_nthreads() -1 } -a {" ".join(vcf["vcf.gz"] for vcf in vcfs_in_batch)} \
@@ -193,7 +195,7 @@ def sort_vcf(
 
     job_attrs = (job_attrs or {}) | {'tool': 'bcftools sort'}
     j = b.new_job('Sort gathered VCF', job_attrs)
-    j.image(image_path('bcftools'))
+    j.image(image_path('bcftools', BCFTOOLS_VERSION))
     if storage_gb := storage_for_joint_vcf(sequencing_group_count, site_only):
         storage_gb *= 2  # sort needs extra tmp space
     STANDARD.set_resources(j, fraction=1, storage_gb=storage_gb)
@@ -231,7 +233,7 @@ def tabix_vcf(
 
     job_attrs = (job_attrs or {}) | {'tool': 'tabix'}
     j = b.new_job('Tabix sorted VCF', job_attrs)
-    j.image(image_path('bcftools'))
+    j.image(image_path('bcftools', BCFTOOLS_VERSION))
     STANDARD.set_resources(
         j,
         fraction=1,
