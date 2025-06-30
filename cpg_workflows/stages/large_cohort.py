@@ -1,6 +1,8 @@
 import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+from matplotlib import category
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -522,53 +524,62 @@ class GenerateCoverageTable(CohortStage):
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
-        contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
-        shard_size = config_retrieve(['large_cohort', 'interval_size'], default=50_000_000)
+        # contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
+        # shard_size = config_retrieve(['large_cohort', 'interval_size'], default=50_000_000)
 
-        with open(to_path(contig_lengths_file)) as f:
-            contig_lengths: dict[str, int] = json.load(f)
+        # with open(to_path(contig_lengths_file)) as f:
+        #     contig_lengths: dict[str, int] = json.load(f)
 
-        contigs = contig_lengths.keys()
+        # contigs = contig_lengths.keys()
 
+        scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
         coverage_version = coverage_version or get_workflow().output_version
         return {
-            f'{contig}_{start}_{end}': cohort.analysis_dataset.prefix()  # TODO: pick bucket to store in that's not cohort-specific
+            f'index_{idx}': cohort.analysis_dataset.prefix(category='tmp')
             / get_workflow().name
             / coverage_version
             / 'split_coverage'
-            / f'{contig}_coverage_{start}_{end}.ht'
-            for contig in contigs
-            for start in range(1, contig_lengths[contig], shard_size)
-            for end in [min(start + shard_size, contig_lengths[contig])]
+            / f'coverage_{idx}.ht'
+            for idx in range(scatter_count)
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.jobs.picard import get_intervals
         from cpg_workflows.large_cohort import generate_coverage_table
 
         coverage_jobs = []
 
-        coverage_table_paths = self.expected_outputs(cohort)
+        b = get_batch()
+        scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
 
-        for shard, coverage_output_path in coverage_table_paths.items():
-            chrom, start, end = shard.split('_')
-            j = get_batch().new_job(
-                f'GenerateCoverageTable_{shard}',
+        intervals_j, intervals = get_intervals(
+            b=b,
+            scatter_count=scatter_count,
+            source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
+            output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
+        )
+        coverage_jobs.append(intervals_j)
+
+        for idx in range(scatter_count):
+            assert intervals[idx], intervals
+            coverage_table_j = get_batch().new_job(
+                f'GenerateCoverageTable_{idx}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
-            j.image(config_retrieve(['workflow', 'driver_image']))
-            j.command(
+            coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
+            coverage_table_j.command(
                 query_command(
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
-                    str(inputs.as_path(cohort, Combiner, key='vds')),
-                    chrom,
-                    int(start),
-                    int(end),
-                    str(coverage_output_path),
+                    b=b,
+                    vds_path=str(inputs.as_path(cohort, Combiner, key='vds')),
+                    interval_list=intervals[idx],
+                    output_path=self.tmp_prefix / f'coverage_{idx}.ht',
                     setup_gcp=True,
                 ),
             )
-            coverage_jobs.append(j)
+
+            coverage_jobs.append(coverage_table_j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
 

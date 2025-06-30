@@ -1,6 +1,7 @@
 import logging
 
 import hail as hl
+import hailtop.batch as hb
 
 from cpg_utils.hail_batch import genome_build
 from gnomad.utils import reference_genome, sparse_mt
@@ -31,14 +32,13 @@ def merge_coverage_tables(
 
 def run(
     vds_path: str,
-    chrom: str,
-    start: int,
-    end: int,
+    interval_list: list[hb.ResourceFile],
     out_path: str,
 ) -> hl.Table:
     """
     Generate a coverage table for a given VDS and interval.
     :param vds_path: Path to the VDS.
+    :interval_list: List .interval_list files in the form of Hail Batch ResourceFiles objects.
     :param chrom: Chromosome to generate coverage for.
     :param start: Start position of the interval.
     :param end: End position of the interval.
@@ -53,34 +53,35 @@ def run(
     add_reference_sequence(rg)
 
     # Generate reference coverage table
-    includes_end = False
-    chrom_length = hl.eval(hl.contig_length(chrom, reference_genome=genome_build()))
-    if end == chrom_length:
-        includes_end = True
+    intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=rg)
+    # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
+    intervals = intervals_ht.interval.collect()
+    ref_tables = []
 
-    interval = hl.Interval(
-        hl.Locus(chrom, start, reference_genome=rg),
-        hl.Locus(chrom, end, reference_genome=rg),
-        includes_end=includes_end,
-    )
+    for interval in intervals:
+        ref_ht = hl.utils.range_table(
+            (interval.end.position - interval.start.position),
+        )
+        locus_expr = hl.locus(
+            contig=interval.start.contig,
+            pos=ref_ht.idx + interval.start.position,
+            reference_genome=rg,
+        )
+        ref_allele_expr = locus_expr.sequence_context().lower()
+        alleles_expr = [ref_allele_expr]
+        ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
+        ref_ht = ref_ht.filter(ref_ht.alleles[0] == "n", keep=False)
+        ref_tables.append(ref_ht)
 
-    logging.info(f'Generating reference coverage for {chrom} interval {interval}')
-    ref_ht = hl.utils.range_table(
-        (interval.end.position - interval.start.position),
-    )
-    locus_expr = hl.locus(contig=chrom, pos=ref_ht.idx + interval.start.position, reference_genome=rg)
-    ref_allele_expr = locus_expr.sequence_context().lower()
-    alleles_expr = [ref_allele_expr]
-    ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
-    ref_ht = ref_ht.filter(ref_ht.alleles[0] == "n", keep=False)
+    ref_ht_joined = hl.Table.union(*ref_tables)
 
     # Read in VDS at the specified interval
     vds: hl.vds.VariantDataset = hl.vds.read_vds(
         vds_path,
-        intervals=[interval],
+        intervals=intervals,
     )
 
     # Generate coverage table
-    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, ref_ht)
+    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, ref_ht_joined)
 
     return coverage_ht.checkpoint(out_path, overwrite=True)
