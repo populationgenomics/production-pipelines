@@ -561,7 +561,6 @@ class GenerateCoverageTable(CohortStage):
         coverage_jobs.append(intervals_j)
 
         for idx in range(1, scatter_count + 1):
-            assert intervals[idx], intervals
             coverage_table_j = get_batch().new_job(
                 f'GenerateCoverageTable_{idx}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
