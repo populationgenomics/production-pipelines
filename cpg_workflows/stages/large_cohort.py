@@ -560,7 +560,7 @@ class GenerateCoverageTable(CohortStage):
         )
         coverage_jobs.append(intervals_j)
 
-        for idx in range(scatter_count):
+        for idx in range(1, scatter_count + 1):
             assert intervals[idx], intervals
             coverage_table_j = get_batch().new_job(
                 f'GenerateCoverageTable_{idx}',
@@ -572,7 +572,7 @@ class GenerateCoverageTable(CohortStage):
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(intervals[idx]),
+                    str(self.tmp_prefix / f'coverage_intervals_{scatter_count}'),
                     str(self.tmp_prefix / f'coverage_{idx}.ht'),
                     setup_gcp=True,
                 ),
