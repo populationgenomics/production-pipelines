@@ -572,7 +572,7 @@ class GenerateCoverageTable(CohortStage):
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(intervals[idx]),
+                    intervals[idx],
                     str(self.tmp_prefix / f'coverage_{idx}.ht'),
                     setup_gcp=True,
                 ),
