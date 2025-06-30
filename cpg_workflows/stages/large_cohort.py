@@ -571,9 +571,9 @@ class GenerateCoverageTable(CohortStage):
                 query_command(
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
-                    vds_path=str(inputs.as_path(cohort, Combiner, key='vds')),
-                    interval_list=intervals[idx],
-                    output_path=self.tmp_prefix / f'coverage_{idx}.ht',
+                    str(inputs.as_path(cohort, Combiner, key='vds')),
+                    intervals[idx],
+                    self.tmp_prefix / f'coverage_{idx}.ht',
                     setup_gcp=True,
                 ),
             )
