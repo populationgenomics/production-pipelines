@@ -63,7 +63,6 @@ def run_happy_on_gvcf(
 
     region_string = f'-R {batch_instance.read_input(region)}' if region else ''
 
-
     # run the command
     happy_j.command(
         textwrap.dedent(
