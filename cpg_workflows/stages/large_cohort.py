@@ -538,9 +538,9 @@ class GenerateCoverageTable(CohortStage):
             f'index_{idx}': cohort.analysis_dataset.prefix(category='tmp')
             / get_workflow().name
             / coverage_version
-            / 'split_coverage'
+            / 'split_coverage_tables'
             / f'coverage_{idx}.ht'
-            for idx in range(scatter_count)
+            for idx in range(1, scatter_count + 1)
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -550,6 +550,9 @@ class GenerateCoverageTable(CohortStage):
         coverage_jobs = []
 
         b = get_batch()
+
+        outputs: dict[str, Path] = self.expected_outputs(cohort)
+
         scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
 
         # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
@@ -573,7 +576,7 @@ class GenerateCoverageTable(CohortStage):
                     generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, Combiner, key='vds')),
                     str(self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'),
-                    str(self.tmp_prefix / 'split_coverage_tables' / f'coverage_{idx}.ht'),
+                    str(outputs[f'index_{idx}']),
                     setup_gcp=True,
                 ),
             )
