@@ -3,6 +3,7 @@ import logging
 import hail as hl
 import hailtop.batch as hb
 
+from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import genome_build
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
@@ -30,6 +31,37 @@ def merge_coverage_tables(
     return merged_coverage_table.checkpoint(out_path, overwrite=True)
 
 
+def adjust_interval_padding(ht: hl.Table, padding: int) -> hl.Table:
+    """
+    Function copied from `gnomad_qc` v4
+    https://github.com/broadinstitute/gnomad_qc/blob/main/gnomad_qc/v4/annotations/compute_coverage.py#L153
+
+    Adjust interval padding in HT.
+
+    .. warning::
+
+        This function can lead to overlapping intervals, so it is not recommended for
+        most applications. For example, it can be used to filter a variant list to all
+        variants within the returned interval list, but would not work for getting an
+        aggregate statistic for each interval if the desired output is independent
+        statistics.
+
+    :param ht: HT to adjust.
+    :param padding: Padding to use.
+    :return: HT with adjusted interval padding.
+    """
+    return ht.key_by(
+        interval=hl.locus_interval(
+            ht.interval.start.contig,
+            ht.interval.start.position - padding,
+            ht.interval.end.position + padding,
+            # Include the end of the intervals to capture all variants.
+            reference_genome=ht.interval.start.dtype.reference_genome,
+            includes_end=True,
+        ),
+    )
+
+
 def run(
     vds_path: str,
     interval_list: list[hb.ResourceFile],
@@ -38,10 +70,7 @@ def run(
     """
     Generate a coverage table for a given VDS and interval.
     :param vds_path: Path to the VDS.
-    :interval_list: List .interval_list files in the form of Hail Batch ResourceFiles objects.
-    :param chrom: Chromosome to generate coverage for.
-    :param start: Start position of the interval.
-    :param end: End position of the interval.
+    :interval_list: List of .interval_list files in the form of Hail Batch ResourceFiles objects.
     :param out_path: Path to save the coverage table.
     :return: Coverage Hail Table.
     """
@@ -54,11 +83,18 @@ def run(
 
     # Generate reference coverage table
     intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=rg)
+
+    if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
+        logging.info('Adjusting interval padding for exome sequencing.')
+        padding = config_retrieve(['workflow', 'exome_interval_padding'], default=50)
+        intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
+
     # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
     intervals = intervals_ht.interval.collect()
     ref_tables = []
 
     for interval in intervals:
+        logging.info(f"Generating reference coverage table for interval: {interval}")
         ref_ht = hl.utils.range_table(
             (interval.end.position - interval.start.position),
         )
@@ -75,13 +111,14 @@ def run(
 
     ref_ht_joined = hl.Table.union(*ref_tables)
 
-    # Read in VDS at the specified interval
+    logging.info(f"Reading VDS from {vds_path} with intervals: {intervals}")
     vds: hl.vds.VariantDataset = hl.vds.read_vds(
         vds_path,
         intervals=intervals,
     )
 
     # Generate coverage table
+    logging.info("Computing coverage statistics.")
     coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, ref_ht_joined)
 
     return coverage_ht.checkpoint(out_path, overwrite=True)
