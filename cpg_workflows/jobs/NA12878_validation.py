@@ -2,6 +2,8 @@
 jobs relating to the validation steps of the pipeline
 """
 
+from argparse import ArgumentParser
+
 from cpg_utils import to_path, config
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import fasta_res_group, get_batch
@@ -9,15 +11,14 @@ from cpg_utils.hail_batch import fasta_res_group, get_batch
 
 def run_happy_on_gvcf(
     vcf_path: str,
-    sample_ext_id: str,
-    output: str,
+    output_prefix: str,
 ):
     """Run hap.py on a single-sample gVCF (NA12878) using Truth data from config."""
 
     batch_instance = get_batch()
 
     # region: run BCFtools to filter the gVCF
-    bcftools_job = batch_instance.new_job(f'Run BCFtools on {sample_ext_id} VCF')
+    bcftools_job = batch_instance.new_job(f'Run BCFtools on {vcf_path!s}')
     bcftools_job.image(config.config_retrieve(['images', 'bcftools'])).memory('10Gi').storage('100Gi')
 
     # region: read input data into batch
@@ -33,7 +34,7 @@ def run_happy_on_gvcf(
     # endregion
 
     # region: run hap.py on the filtered VCF
-    happy_j = batch_instance.new_job(f'Run Happy on {sample_ext_id} VCF')
+    happy_j = batch_instance.new_job(f'Run Happy on {vcf_path!s}')
     happy_j.image(config.config_retrieve(['images', 'hap-py'])).memory('100Gi').storage('100Gi').cpu(4)
     # read in sample-specific truth data from config
     truth_vcf = batch_instance.read_input(config_retrieve(['references', 'na12878','truth_vcf']))
@@ -72,6 +73,18 @@ def run_happy_on_gvcf(
     )
     # endregion
 
-    batch_instance.write_output(happy_j.output, str(output).removesuffix('.summary.csv'))
+    batch_instance.write_output(happy_j.output, output_prefix)
 
-    return happy_j
+    return [bcftools_job, happy_j]
+
+
+if __name__ == '__main__':
+    parser = ArgumentParser(description='Run hap.py on NA12878 gVCF')
+    parser.add_argument('vcf_path', type=str, help='Path to the gVCF file')
+    parser.add_argument('output', type=str, help='Output prefix for the hap.py results')
+
+    args = parser.parse_args()
+
+    _jobs = run_happy_on_gvcf(vcf_path=args.vcf_path, output_prefix=args.output)
+
+    get_batch().run(wait=False)

@@ -1,4 +1,0 @@
-[workflow]
-# everything here comes from default analysis-runner config
-# expected input is a single-sample cohort containing a NA12878 sequencing group
-name  = "na12878_happy_validation"
