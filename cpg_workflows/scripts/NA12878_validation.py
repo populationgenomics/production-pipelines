@@ -74,7 +74,7 @@ def run_happy_on_gvcf(
             --preprocess-truth \\
             --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg \\
             --engine-vcfeval-template={sdf} \\
-            --engine=vcfeval 
+            --engine=vcfeval
             """
         )
     )
