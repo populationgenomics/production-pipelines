@@ -4,9 +4,11 @@ jobs relating to the validation steps of the pipeline
 
 from argparse import ArgumentParser
 
+import textwrap
+
 from cpg_utils import to_path, config
 from cpg_utils.config import config_retrieve
-from cpg_utils.hail_batch import fasta_res_group, get_batch
+from cpg_utils.hail_batch import fasta_res_group, get_batch, command
 
 
 def run_happy_on_gvcf(
@@ -60,19 +62,21 @@ def run_happy_on_gvcf(
 
     # run the command
     happy_j.command(
-        f"""
-        mkdir {happy_j.output}
-        
-        hap.py {truth_vcf} {vcf_input["vcf"]} \\
-        -r={fasta_res_group(batch_instance)["base"]} \\ 
-        -o={happy_j.output}/output \\
-        --leftshift \\
-        --threads=4 \\
-        --preprocess-truth \\
-        --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg \\ 
-        --engine-vcfeval-template={sdf} \\
-        --engine=vcfeval 
-        """
+        textwrap.dedent(
+            f"""
+            mkdir {happy_j.output}
+            
+            hap.py {truth_vcf} {vcf_input["vcf"]} \\
+            -r={fasta_res_group(batch_instance)["base"]} \\ 
+            -o={happy_j.output}/output \\
+            --leftshift \\
+            --threads=4 \\
+            --preprocess-truth \\
+            --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg \\ 
+            --engine-vcfeval-template={sdf} \\
+            --engine=vcfeval 
+            """
+        )
     )
     # endregion
 
