@@ -552,6 +552,7 @@ class GenerateCoverageTable(CohortStage):
         b = get_batch()
         scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
 
+        # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
         intervals_j, intervals = get_intervals(
             b=b,
             scatter_count=scatter_count,
