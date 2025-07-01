@@ -56,6 +56,7 @@ from cpg_workflows.stages.seqr_loader_long_read.long_read_sv_annotation import M
 from cpg_workflows.stages.stripy import Stripy
 from cpg_workflows.stages.talos import MakePhenopackets, MinimiseOutputForSeqr, UploadTalosHtml, ValidateMOI
 from cpg_workflows.stages.talos_prep.talos_prep import SquashMtIntoTarball
+from cpg_workflows.stages.na12878_happy_validation import SingleSampleHappyValidationNA12878
 from cpg_workflows.workflow import StageDecorator, run_workflow
 
 MIGRATED_WORKFLOWS = ['talos', 'clinvarbitration']
@@ -109,6 +110,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
     'gatk_sv_multisample': [FilterBatch, GenotypeBatch, MtToEsSv, SplitAnnotatedSvVcfByDataset],
     'rare_disease_rnaseq': [Outrider, Fraser],
     'gcnv': [AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV, SplitAnnotatedCnvVcfByDataset],
+    'na12878_happy_validation': [SingleSampleHappyValidationNA12878],
 }
 
 
