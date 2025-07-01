@@ -524,18 +524,14 @@ class GenerateCoverageTable(CohortStage):
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
-        # contig_lengths_file = config_retrieve(['large_cohort', 'references', 'contig_lengths'], default=None)
-        # shard_size = config_retrieve(['large_cohort', 'interval_size'], default=50_000_000)
-
-        # with open(to_path(contig_lengths_file)) as f:
-        #     contig_lengths: dict[str, int] = json.load(f)
-
-        # contigs = contig_lengths.keys()
-
         scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
         coverage_version = coverage_version or get_workflow().output_version
         return {
-            f'index_{idx}': self.tmp_prefix / 'split_coverage_tables' / f'coverage_{idx}.ht'
+            f'index_{idx}': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / coverage_version
+            / 'split_coverage_tables'
+            / f'coverage_{idx}.ht'
             for idx in range(1, scatter_count + 1)
         }
 
