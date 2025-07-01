@@ -30,7 +30,7 @@ def run_happy_on_gvcf(
         },
     )
     # quick rinse of a gVCF to remove non-alt sites
-    bcftools_job.command(f'bcftools view -c1 -Oz -o {bcftools_job.vcf_output["vcf"]} -W=tbi {vcf_input}')
+    bcftools_job.command(f'bcftools view -c1 -Oz -o {bcftools_job.vcf_output["vcf"]} -W=tbi {vcf_input["vcf"]}')
     # endregion
 
     # region: run hap.py on the filtered VCF
