@@ -62,14 +62,14 @@ def run_happy_on_gvcf(
     happy_j.command(
         f"""
         mkdir {happy_j.output}
-        hap.py {truth_vcf} {vcf_input["vcf"]} 
-        -r {fasta_res_group(batch_instance)["base"]} 
-        -o {happy_j.output}/output 
-        --leftshift 
-        --threads 4 
-        --preprocess-truth 
-        --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg 
-        --engine-vcfeval-template {sdf} 
+        hap.py {truth_vcf} {vcf_input["vcf"]}  \
+        -r {fasta_res_group(batch_instance)["base"]} \ 
+        -o {happy_j.output}/output \
+        --leftshift \
+        --threads 4 \
+        --preprocess-truth \ 
+        --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg \ 
+        --engine-vcfeval-template {sdf} \
         --engine=vcfeval 
         """
     )
