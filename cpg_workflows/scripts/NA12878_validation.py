@@ -14,6 +14,7 @@ from cpg_utils.hail_batch import fasta_res_group, get_batch, command
 def run_happy_on_gvcf(
     vcf_path: str,
     output_prefix: str,
+    region: str | None = None,
 ):
     """Run hap.py on a single-sample gVCF (NA12878) using Truth data from config."""
 
@@ -60,6 +61,9 @@ def run_happy_on_gvcf(
         **{file.name: file.as_uri() for file in to_path(ref_genome_sdf).glob('*')},
     )
 
+    region_string = f'-R {batch_instance.read_input(region)}' if region else ''
+
+
     # run the command
     happy_j.command(
         textwrap.dedent(
@@ -74,7 +78,7 @@ def run_happy_on_gvcf(
             --preprocess-truth \\
             --engine-vcfeval-path=/opt/hap.py/libexec/rtg-tools-install/rtg \\
             --engine-vcfeval-template={sdf} \\
-            --engine=vcfeval
+            --engine=vcfeval {region_string}
             """
         )
     )
@@ -89,9 +93,15 @@ if __name__ == '__main__':
     parser = ArgumentParser(description='Run hap.py on NA12878 gVCF')
     parser.add_argument('vcf_path', type=str, help='Path to the gVCF file')
     parser.add_argument('output', type=str, help='Output prefix for the hap.py results')
+    parser.add_argument(
+        '--region',
+        help='Optional, a BED file to filter the VCF on',
+        type=str,
+        default=None,
+    )
 
     args = parser.parse_args()
 
-    _jobs = run_happy_on_gvcf(vcf_path=args.vcf_path, output_prefix=args.output)
+    _jobs = run_happy_on_gvcf(vcf_path=args.vcf_path, output_prefix=args.output, region=args.region)
 
     get_batch().run(wait=False)
