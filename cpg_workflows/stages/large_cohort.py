@@ -524,7 +524,7 @@ class GenerateCoverageTable(CohortStage):
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
-        scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
+        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
         coverage_version = coverage_version or get_workflow().output_version
         return {
             f'index_{idx}': cohort.analysis_dataset.prefix()
@@ -545,7 +545,7 @@ class GenerateCoverageTable(CohortStage):
 
         outputs: dict[str, Path] = self.expected_outputs(cohort)
 
-        scatter_count = config_retrieve(['workflow', 'scatter_count_genotype'], default=50)
+        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
 
         # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
         intervals_j, intervals = get_intervals(
