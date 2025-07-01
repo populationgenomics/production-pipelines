@@ -19,7 +19,7 @@ def run_happy_on_gvcf(
 
     # region: run BCFtools to filter the gVCF
     bcftools_job = batch_instance.new_job(f'Run BCFtools on {vcf_path!s}')
-    bcftools_job.image(config.config_retrieve(['images', 'bcftools'])).memory('10Gi').storage('100Gi')
+    bcftools_job.image(config.config_retrieve(['images', 'bcftools_120'])).memory('10Gi').storage('100Gi')
 
     # region: read input data into batch
     vcf_input = batch_instance.read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
@@ -35,6 +35,8 @@ def run_happy_on_gvcf(
 
     # region: run hap.py on the filtered VCF
     happy_j = batch_instance.new_job(f'Run Happy on {vcf_path!s}')
+    happy_j.depends_on(bcftools_job)
+
     happy_j.image(config.config_retrieve(['images', 'hap-py'])).memory('100Gi').storage('100Gi').cpu(4)
     # read in sample-specific truth data from config
     truth_vcf = batch_instance.read_input(config_retrieve(['references', 'na12878','truth_vcf']))
