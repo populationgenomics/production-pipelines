@@ -173,7 +173,7 @@ def _haplotype_caller_one(
         return None, str(out_gvcf_path)
 
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk HaplotypeCaller'))
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', '4.2.6.1-1'))
 
     # Enough storage to localize CRAMs (can't pass GCS URL to CRAM to gatk directly
     # because we will hit GCP egress bandwidth limit:
@@ -261,7 +261,7 @@ def merge_gvcfs_job(
 
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='picard MergeVcfs'))
 
-    j.image(image_path('picard'))
+    j.image(image_path('picard', '2.27.4-1'))
     j.cpu(2)
     java_mem = 11
     j.memory('highmem')  # ~ 6G/core ~ 12G
@@ -315,7 +315,7 @@ def postproc_gvcf(
         return None
 
     j = b.new_job(job_name, (job_attrs or {}) | dict(tool='gatk ReblockGVCF'))
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', '4.2.6.1-1'))
 
     # We need at least 2 CPU, so on 16-core instance it would be 8 jobs,
     # meaning we have more than enough disk (265/8=33.125G).

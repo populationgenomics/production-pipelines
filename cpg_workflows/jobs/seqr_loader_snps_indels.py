@@ -163,7 +163,7 @@ def add_split_vcf_job(
     Use GATK SelectVariants to split the VCF by interval.
     """
     j = b.new_job('SplitVcf', (job_attrs or {}) | {'tool': 'gatk SelectVariants'})
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', '4.2.6.1-1'))
     res = STANDARD.set_resources(j, ncpu=2)
 
     for idx, interval in enumerate(intervals):
@@ -215,7 +215,7 @@ def add_make_sitesonly_job(
     job_name = 'MakeSitesOnlyVcf'
     job_attrs = (job_attrs or {}) | {'tool': 'gatk MakeSitesOnlyVcf'}
     j = b.new_job(job_name, job_attrs)
-    j.image(image_path('gatk'))
+    j.image(image_path('gatk', '4.2.6.1-1'))
     res = STANDARD.set_resources(j, ncpu=2)
     if storage_gb:
         j.storage(f'{storage_gb}G')
