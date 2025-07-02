@@ -3,10 +3,18 @@ from ast import literal_eval
 import hail as hl
 
 from cpg_utils import to_path
+import pandas as pd
 
 
 def pca_runner(file_path):
     mt = hl.read_matrix_table(str(file_path))
+
+    bioheart_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final-freeze/input_files/bioheart_n975_sample_covariates.csv')['sample_id']
+    tob_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final_freeze/input_files/tob_n950/covariates/6_rna_pcs/CD4_TCM_covariates.csv')['sample_id']
+    samples = bioheart_ids.to_list() + tob_ids.to_list()
+
+    # filter the MT to only include samples in the sample list
+    mt = mt.filter_cols(hl.literal(samples).contains(mt.s))
 
     # remove monomorphic variants, set locus level call rate >=0.9, observed heterozygosity >=0.00995, locus level HWEP (binom definition) >=10^-6
     mt = mt.filter_rows(
@@ -217,16 +225,16 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.DS_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/pca/n2412-default-filters/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/pca/n1925-default-filters/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/pca/n2412-default-filters/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/pca/n1925-default-filters/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/pca/n2412-default-filters/eigenvalues.txt').open(
+    with to_path('gs://cpg-bioheart-test/str/pca/n1925-default-filters/eigenvalues.txt').open(
         'w',
     ) as f:
         for item in eigenvalues_list:
