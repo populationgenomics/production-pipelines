@@ -15,7 +15,7 @@ def main():
     dataproc_job(
         function=pca_runner,
         function_path_args=dict(
-            file_path='gs://cpg-bioheart-test/str/polymorphic_run/mt/bioheart_tob/v1_tob_n950/str_annotated.mt',
+            file_path='gs://cpg-bioheart-test/str/polymorphic_run/mt/bioheart_tob/v1_bioheart_n975/str_annotated.mt',
         ),
         job_name='STR-PCA',
         num_workers=20,
