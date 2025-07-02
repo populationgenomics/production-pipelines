@@ -220,16 +220,16 @@ def pca_runner(file_path):
     # run PCA
     eigenvalues, scores, loadings = hl.pca(mt.DS_normalised, k=10, compute_loadings=True)
 
-    scores_output_path = 'gs://cpg-bioheart-test/str/pca/n975-bioheart-default-filters/scores.tsv.bgz'
+    scores_output_path = 'gs://cpg-bioheart-test/str/pca/n950-tob-default-filters/scores.tsv.bgz'
     scores.export(str(scores_output_path))
 
-    loadings_output_path = 'gs://cpg-bioheart-test/str/pca/n975-bioheart-default-filters/loadings.tsv.bgz'
+    loadings_output_path = 'gs://cpg-bioheart-test/str/pca/n950-tob-default-filters/loadings.tsv.bgz'
     loadings.export(str(loadings_output_path))
 
     # Convert the list to a regular Python list
     eigenvalues_list = hl.eval(eigenvalues)
     # write the eigenvalues to a file
-    with to_path('gs://cpg-bioheart-test/str/pca/n975-bioheart-default-filters/eigenvalues.txt').open(
+    with to_path('gs://cpg-bioheart-test/str/pca/n950-tob-default-filters/eigenvalues.txt').open(
         'w',
     ) as f:
         for item in eigenvalues_list:
