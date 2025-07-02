@@ -9,12 +9,12 @@ import pandas as pd
 def pca_runner(file_path):
     mt = hl.read_matrix_table(str(file_path))
 
-    bioheart_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final-freeze/input_files/bioheart_n975_sample_covariates.csv')['sample_id']
-    tob_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final_freeze/input_files/tob_n950/covariates/6_rna_pcs/CD4_TCM_covariates.csv')['sample_id']
-    samples = tob_ids.to_list()
+    #bioheart_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final-freeze/input_files/bioheart_n975_sample_covariates.csv')['sample_id']
+    ##tob_ids = pd.read_csv('gs://cpg-bioheart-test/tenk10k/str/associatr/final_freeze/input_files/tob_n950/covariates/6_rna_pcs/CD4_TCM_covariates.csv')['sample_id']
+    #samples = tob_ids.to_list()
 
     # filter the MT to only include samples in the sample list
-    mt = mt.filter_cols(hl.literal(samples).contains(mt.s))
+    #mt = mt.filter_cols(hl.literal(samples).contains(mt.s))
 
     # remove monomorphic variants, set locus level call rate >=0.9, observed heterozygosity >=0.00995, locus level HWEP (binom definition) >=10^-6
     mt = mt.filter_rows(
