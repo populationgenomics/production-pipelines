@@ -16,13 +16,6 @@ def pca_runner(file_path):
     # filter the MT to only include samples in the sample list
     #mt = mt.filter_cols(hl.literal(samples).contains(mt.s))
 
-    with to_path('gs://cpg-bioheart-test/tenk10k/bioheart_n975.txt').open() as f:
-        array_string = f.read().strip()
-        keep_samples = literal_eval(array_string)
-
-    # remove related individuals
-    mt = mt.filter_cols(hl.literal(keep_samples).contains(mt.s), keep=True)
-
     # remove monomorphic variants, set locus level call rate >=0.9, observed heterozygosity >=0.00995, locus level HWEP (binom definition) >=10^-6
     mt = mt.filter_rows(
         (mt.num_alleles > 1) & (mt.variant_qc.call_rate >= 0.9) & (mt.obs_het >= 0.00995) & (mt.binom_hwep >= 0.000001),
