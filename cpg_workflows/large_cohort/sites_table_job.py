@@ -10,7 +10,6 @@ to cohort specific sites that have passed VQSR. This is to ensure that the sites
 are representative of the cohort and to avoid using sites that may not be relevant.
 """
 
-
 import click
 
 import hail as hl
@@ -18,6 +17,8 @@ import hail as hl
 from cpg_utils import Path
 from cpg_utils.config import output_path
 from cpg_utils.hail_batch import genome_build, init_batch
+
+from gnomad_methods.gnomad.utils import reference_genome
 
 
 @click.option(
@@ -33,8 +34,7 @@ from cpg_utils.hail_batch import genome_build, init_batch
 )
 @click.option(
     '--intersected-bed-file',
-    help='A bed file that contains the intersection of all capture regions. '
-    'If --exomes is set, this must be provided.',
+    help='A bed file that contains the intersection of all capture regions. If --exomes is set, this must be provided.',
     type=str,
 )
 @click.option(
@@ -50,12 +50,17 @@ from cpg_utils.hail_batch import genome_build, init_batch
 )
 @click.option(
     '--subsample-n',
-    help='N (number) of sites to subsample to before LD pruning.' 'If --subsample is set, this must be provided.',
+    help='N (number) of sites to subsample to before LD pruning.If --subsample is set, this must be provided.',
     type=int,
 )
 @click.option(
     '--sites-table-outpath',
     help='Path to write the output sites table.',
+    type=str,
+)
+@click.option(
+    '--chromosome',
+    help='Chromosome to subset VDS to. e.g. chr1',
     type=str,
 )
 @click.command()
@@ -65,6 +70,7 @@ def main(
     subsample: bool,
     external_sites_filter_table_path: str,
     sites_table_outpath: str,
+    chromosome: str,
     intersected_bed_file: list[str] | None = None,
     subsample_n: int | None = None,
 ):
@@ -86,7 +92,7 @@ def main(
     if not 'AS_FilterStatus' in [k for k in external_sites_table.info.keys()]:
         external_sites_table = external_sites_table.annotate(
             info=external_sites_table.info.annotate(
-                AS_FilterStatus=hl.if_else(hl.len(external_sites_table.filters) == 0, "PASS", "FAIL"),
+                AS_FilterStatus=hl.if_else(hl.len(external_sites_table.filters) == 0, 'PASS', 'FAIL'),
             ),
         )
 
@@ -101,7 +107,17 @@ def main(
         # Generate list of intervals
         intervals: list[hl.Interval] = capture_interval_ht.interval.collect()
 
-    vds = hl.vds.read_vds(str(vds_path), intervals=intervals if exomes else None)
+    # Filter to specific chromosome
+    intervals = [
+        (
+            interval
+            if intervals and interval.start.contig == chromosome
+            else hl.Interval(hl.eval(hl.locus(chromosome, reference_genome=genome_build())))
+        )
+        for interval in intervals
+    ]
+
+    vds = hl.vds.read_vds(str(vds_path), intervals=intervals)
 
     # Filter to variant sites that pass VQSR
     passed_variants = external_sites_table.filter(external_sites_table.info.AS_FilterStatus == 'PASS')
