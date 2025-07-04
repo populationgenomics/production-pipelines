@@ -347,13 +347,15 @@ def run(
     ref_ht_joined = hl.Table.union(*ref_tables)
 
     logging.info(f"Reading VDS from {vds_path} with intervals: {intervals}")
-    vds: hl.vds.VariantDataset = hl.vds.read_vds(
-        vds_path,
-        intervals=intervals,
-    )
+    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
     # Generate coverage table
     logging.info("Computing coverage statistics.")
-    coverage_ht: hl.Table = sparse_mt.compute_coverage_stats(vds, ref_ht_joined)
+    coverage_ht: hl.Table = compute_coverage_stats(
+        vds,
+        ref_ht_joined,
+        intervals=intervals,
+        split_reference_blocks=False,
+    )
 
     return coverage_ht.checkpoint(out_path, overwrite=True)
