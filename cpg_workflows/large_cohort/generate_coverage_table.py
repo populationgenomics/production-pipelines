@@ -1,5 +1,6 @@
 import logging
 from re import split
+from typing import Optional
 
 import hail as hl
 import hailtop.batch as hb
@@ -69,7 +70,7 @@ def compute_coverage_stats(
     intervals: list[hl.Interval] = [],
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
     row_key_fields: list[str] = ["locus"],
-    strata_expr: list[dict[str, hl.expr.StringExpression]] = [],
+    strata_expr: Optional[list[dict[str, hl.expr.StringExpression]]] = None,
     split_reference_blocks: bool = False,
 ) -> hl.Table:
     """
@@ -98,7 +99,7 @@ def compute_coverage_stats(
     mt = vds.variant_data
 
     if strata_expr is None:
-        strata_expr = {}
+        strata_expr = [{}]
         no_strata = True
     else:
         no_strata = False
