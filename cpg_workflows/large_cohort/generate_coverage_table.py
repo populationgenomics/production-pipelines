@@ -95,6 +95,12 @@ def compute_coverage_stats(
     :param strata_expr: Optional list of dicts containing expressions to stratify the
         coverage stats by.
     :return: Table with per-base coverage stats
+    NOTE:
+    This implementation differs from `gnomad_methods.gnomad.utils.sparse_mt.compute_coverage_stats` (5baedb5) in several ways:
+      - This function expects `intervals` as a list of `hl.Interval` objects, whereas the gnomad_methods version expects `interval_ht` (a Hail Table of intervals).
+      - Filtering to intervals is performed using `hl.vds.filter_intervals` directly on the VDS, rather than filtering the reference table.
+      - This version handles the presence of the 'LEN' entry field in VDS reference data, which is required for VDS objects created with Hail >= 0.2.134.
+      - The logic for filtering and joining with the reference table is slightly different to accommodate these changes.
     """
     mt = vds.variant_data
 
