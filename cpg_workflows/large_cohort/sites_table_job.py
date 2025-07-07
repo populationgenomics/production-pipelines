@@ -157,8 +157,6 @@ def main(
             subsample_n / nrows,
             seed=12345,
         )
-        nrows = cohort_dense_mt.count_rows()
-        print(f'post sub-sample rows = {nrows}')
 
     print('Writing sites table pre-LD pruning')
     checkpoint_path = output_path(f'cohort_dense_mt_{"exome_" if exomes else ""}pre_pruning.mt', 'default')
