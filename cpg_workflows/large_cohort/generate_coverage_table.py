@@ -99,7 +99,7 @@ def compute_coverage_stats(
     mt = vds.variant_data
 
     if strata_expr is None:
-        strata_expr = [{}]
+        strata_expr = []
         no_strata = True
     else:
         no_strata = False
