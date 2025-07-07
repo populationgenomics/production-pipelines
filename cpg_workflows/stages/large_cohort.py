@@ -547,6 +547,18 @@ class GenerateCoverageTable(CohortStage):
 
         scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
 
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            if workflow_config.get(key):
+                init_batch_args[key] = workflow_config[key]
+
         # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
         intervals_j, intervals = get_intervals(
             b=b,
@@ -570,6 +582,7 @@ class GenerateCoverageTable(CohortStage):
                     str(self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'),
                     str(outputs[f'index_{idx}']),
                     setup_gcp=True,
+                    init_batch_args=init_batch_args,
                 ),
             )
 
