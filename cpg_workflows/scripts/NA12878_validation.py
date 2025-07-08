@@ -41,9 +41,9 @@ def run_happy_on_gvcf(
             --convert-gvcf-to-vcf \\
             --filter-nonref \\
             --pass-only \\
+            --reference {reference["base"]} \\
             {gvcf_input["gvcf"]} \\
             {prepy_j.vcf_output["vcf"]}
-            --reference {reference["base"]}
             """,
         ),
     )
