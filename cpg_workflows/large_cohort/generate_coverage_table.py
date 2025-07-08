@@ -323,7 +323,8 @@ def run(
     init_batch()
 
     if can_reuse(out_path):
-        return hl.read_table(out_path)
+        logging.info(f"Reusing existing coverage table at {out_path}.")
+        return None
 
     rg: hl.ReferenceGenome = hl.get_reference(genome_build())
     add_reference_sequence(rg)
