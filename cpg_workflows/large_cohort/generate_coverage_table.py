@@ -7,6 +7,7 @@ import hailtop.batch as hb
 
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import genome_build
+from cpg_workflows.utils import can_reuse
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
 
@@ -320,6 +321,10 @@ def run(
     from gnomad.utils.reference_genome import add_reference_sequence
 
     init_batch()
+
+    if can_reuse(out_path):
+        return hl.read_table(out_path)
+
     rg: hl.ReferenceGenome = hl.get_reference(genome_build())
     add_reference_sequence(rg)
 
