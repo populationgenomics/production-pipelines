@@ -1,8 +1,6 @@
 import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
-from matplotlib import category
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -614,7 +612,12 @@ class MergeCoverageTables(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
+        j.storage('50Gi')
 
+        coverage_version: str = coverage_version or get_workflow().output_version
+        tmp_path = (
+            cohort.analysis_dataset.prefix(category='tmp') / get_workflow().name / coverage_version / 'merged_coverage'
+        )
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
 
@@ -633,6 +636,7 @@ class MergeCoverageTables(CohortStage):
                 generate_coverage_table.merge_coverage_tables.__name__,
                 [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
                 str(self.expected_outputs(cohort)),
+                str(tmp_path),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
