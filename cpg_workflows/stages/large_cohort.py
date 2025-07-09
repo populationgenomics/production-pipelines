@@ -614,10 +614,14 @@ class MergeCoverageTables(CohortStage):
         j.image(image_path('cpg_workflows'))
         j.storage('50Gi')
 
-        coverage_version: str = coverage_version or get_workflow().output_version
+        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
+            coverage_version = slugify(coverage_version)
+
+        coverage_version = coverage_version or get_workflow().output_version
         tmp_path = (
             cohort.analysis_dataset.prefix(category='tmp') / get_workflow().name / coverage_version / 'merged_coverage'
         )
+
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
 
