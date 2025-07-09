@@ -320,8 +320,6 @@ def run(
     from cpg_utils.hail_batch import init_batch
     from gnomad.utils.reference_genome import add_reference_sequence
 
-    init_batch()
-
     if can_reuse(out_path):
         logging.info(f"Reusing existing coverage table at {out_path}.")
         return None
