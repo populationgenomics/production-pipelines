@@ -5,6 +5,7 @@ from typing import Optional
 import hail as hl
 import hailtop.batch as hb
 
+from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse
@@ -22,6 +23,7 @@ logger.setLevel(logging.INFO)
 def merge_coverage_tables(
     coverage_table_paths: list[str],
     out_path: str,
+    tmp_path: str,
 ) -> hl.Table:
     """
     Merge coverage tables.
@@ -30,7 +32,17 @@ def merge_coverage_tables(
     :return: Merged coverage table.
     """
     coverage_tables = [hl.read_table(coverage_table_path) for coverage_table_path in coverage_table_paths]
-    merged_coverage_table = hl.Table.union(*coverage_tables)
+    groups = [coverage_tables[i : i + 10] for i in range(0, len(coverage_tables), 10)]
+    merged_tables = []
+    for i, group in enumerate(groups):
+        merged_coverage_table = hl.Table.union(*group)
+        merged_coverage_table = merged_coverage_table.checkpoint(
+            str(to_path(tmp_path) / f"merged_coverage_table_{i}.ht"),
+            overwrite=True,
+        )
+        merged_tables.append(merged_coverage_table)
+
+    merged_coverage_table = hl.Table.union(*merged_tables)
     return merged_coverage_table.checkpoint(out_path, overwrite=True)
 
 
