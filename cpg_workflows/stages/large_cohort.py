@@ -615,6 +615,18 @@ class MergeCoverageTables(CohortStage):
         )
         j.image(image_path('cpg_workflows'))
 
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            if workflow_config.get(key):
+                init_batch_args[key] = workflow_config[key]
+
         j.command(
             query_command(
                 generate_coverage_table,
@@ -622,6 +634,7 @@ class MergeCoverageTables(CohortStage):
                 [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
                 str(self.expected_outputs(cohort)),
                 setup_gcp=True,
+                init_batch_args=init_batch_args,
             ),
         )
 
