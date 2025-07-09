@@ -612,6 +612,7 @@ class MergeCoverageTables(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
+        j.storage('50Gi')
 
         coverage_version: str = coverage_version or get_workflow().output_version
         tmp_path = (
