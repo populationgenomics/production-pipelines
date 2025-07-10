@@ -1,5 +1,5 @@
 import logging
-from re import split
+from math import ceil
 from typing import Optional
 
 import hail as hl
@@ -31,17 +31,22 @@ def merge_coverage_tables(
     :param coverage_tables: List of coverage tables.
     :return: Merged coverage table.
     """
-    coverage_tables = [hl.read_table(coverage_table_path) for coverage_table_path in coverage_table_paths]
-    groups = [coverage_tables[i : i + 10] for i in range(0, len(coverage_tables), 10)]
-    merged_tables = []
-    for i, group in enumerate(groups):
-        merged_coverage_table = hl.Table.union(*group)
-        merged_coverage_table = merged_coverage_table.checkpoint(
-            str(to_path(tmp_path) / f"merged_coverage_table_{i}.ht"),
-            overwrite=True,
-        )
-        merged_tables.append(merged_coverage_table)
 
+    chunk_size = 10
+    n_chunks = ceil(len(coverage_table_paths) / chunk_size)
+    chunk_paths = []
+
+    merged_tables = []
+    for i in range(n_chunks):
+        chunk = coverage_table_paths[i * chunk_size : (i + 1) * chunk_size]
+        tables = [hl.read_table(str(path)) for path in chunk]
+        merged = hl.Table.union(*tables)
+        chunk_path = str(to_path(tmp_path) / f"merged_coverage_table_{i}.ht")
+        merged = merged.checkpoint(chunk_path, overwrite=True)
+        chunk_paths.append(chunk_path)
+
+    # Merge all chunked coverage tables
+    merged_tables = [hl.read_table(str(path)) for path in chunk_paths]
     merged_coverage_table = hl.Table.union(*merged_tables)
     return merged_coverage_table.checkpoint(out_path, overwrite=True)
 
