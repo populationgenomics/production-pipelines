@@ -8,7 +8,7 @@ import hailtop.batch as hb
 from cpg_utils import to_path
 from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import genome_build
-from cpg_workflows.utils import can_reuse
+from cpg_workflows.utils import can_reuse, exists
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
 
@@ -38,11 +38,16 @@ def merge_coverage_tables(
 
     merged_tables = []
     for i in range(n_chunks):
-        chunk = coverage_table_paths[i * chunk_size : (i + 1) * chunk_size]
-        tables = [hl.read_table(str(path)) for path in chunk]
-        merged = hl.Table.union(*tables)
         chunk_path = str(to_path(tmp_path) / f"merged_coverage_table_{i}.ht")
-        merged = merged.checkpoint(chunk_path, overwrite=True)
+        if exists(chunk_path):
+            logger.info(f"Chunk {i} already exists at {chunk_path}, skipping.")
+            merged = hl.read_table(chunk_path)
+        else:
+            chunk = coverage_table_paths[i * chunk_size : (i + 1) * chunk_size]
+            tables = [hl.read_table(str(path)) for path in chunk]
+            merged = hl.Table.union(*tables)
+            logger.info(f"Writing chunk {i} to {chunk_path}")
+            merged = merged.checkpoint(chunk_path, overwrite=True)
         chunk_paths.append(chunk_path)
 
     # Merge all chunked coverage tables
