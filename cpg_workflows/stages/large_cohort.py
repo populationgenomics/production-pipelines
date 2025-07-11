@@ -177,12 +177,13 @@ class MergeExomeCaptureRegions(CohortStage):
                 default=None,
             ):
                 exome_capture_version = '-'.join(exome_capture_sets)
+                intersect_or_union = config_retrieve(['large_cohort', 'output_versions', 'intersect_or_union'])
             return (
                 cohort.analysis_dataset.prefix()
                 / get_workflow().name
                 / get_workflow().output_version
                 / exome_capture_version
-                / 'exome_regions.bed'
+                / f'{intersect_or_union}.bed'
             )
         else:
             raise ValueError(
