@@ -201,14 +201,14 @@ class MergeExomeCaptureRegions(CohortStage):
                 'No exome capture regions configured. Please set `large_cohort.output_versions.exome_capture_sets` in the config.',
             )
         probesets: dict[str, str] = config_retrieve(['references', 'exome_probesets'], default=None)
-        probsets_to_intersect: list[str] = []
+        probsets_to_merge: list[str] = []
         for capture in exome_capture_sets:
             if capture not in probesets:
                 raise ValueError(
                     f'Probeset for region {capture} not found in references.exome_probesets.',
                 )
             else:
-                probsets_to_intersect.append(probesets[capture])
+                probsets_to_merge.append(probesets[capture])
 
         b = get_batch()
 
@@ -217,9 +217,19 @@ class MergeExomeCaptureRegions(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('bedtools'))
-        j.command(
-            f'bedtools intersect -a {b.read_input(probsets_to_intersect[0])} -b {",".join([b.read_input(bed_file) for bed_file in probsets_to_intersect[1:]])} > {j.ofile}',
-        )
+        intersect_or_union = config_retrieve(['large_cohort', 'output_versions', 'intersect_or_union'], default=False)
+        if intersect_or_union == 'union':
+            j.command(
+                f'cat {" ".join([b.read_input(bed_file) for bed_file in probsets_to_merge])} | sort -k1,1 -k2,2n | bedtools merge > {j.ofile}',
+            )
+        elif intersect_or_union == 'intersection':
+            j.command(
+                f'bedtools intersect -a {b.read_input(probsets_to_merge[0])} -b {",".join([b.read_input(bed_file) for bed_file in probsets_to_merge[1:]])} > {j.ofile}',
+            )
+        else:
+            raise ValueError(
+                f'Invalid value for intersect_or_union: {intersect_or_union}. ' 'Expected "union" or "intersection".',
+            )
 
         b.write_output(
             j.ofile,
