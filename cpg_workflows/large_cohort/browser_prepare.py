@@ -3,6 +3,7 @@ import logging
 
 import hail as hl
 
+from cpg_utils.config import config_retrieve
 from gnomad.utils.filtering import add_filters_expr
 
 EMPTY_TABLE_CONFIG = """
@@ -173,7 +174,133 @@ def _subset_filter(subset):
     return lambda variant: variant.ac_adj[subset] > 0
 
 
-def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str) -> hl.Table:
+INBREEDING_COEFF_CUTOFF = config_retrieve(['large_cohorts', 'browser', 'inbreeding_coeff_cutoff'])
+SNP_BIN_THRESHOLD = config_retrieve(['large_cohorts', 'browser', 'snp_bin_threshold'])
+INDEL_BIN_THRESHOLD = config_retrieve(['large_cohorts', 'browser', 'indel_bin_threshold'])
+
+
+def process_score_cutoffs(
+    ht: hl.Table,
+    snv_bin_cutoff: int | None = None,
+    indel_bin_cutoff: int | None = None,
+    snv_score_cutoff: float | None = None,
+    indel_score_cutoff: float | None = None,
+    aggregated_bin_ht: hl.Table = None,
+    snv_bin_id: str = 'adj_bin',
+    indel_bin_id: str = 'adj_bin',
+) -> dict[str, hl.expr.StructExpression]:
+    """
+    Determine SNP and indel score cutoffs if given bin instead of score.
+
+    .. note::
+
+        - `snv_bin_cutoff` and `snv_score_cutoff` are mutually exclusive, and one must
+          be supplied.
+        - `indel_bin_cutoff` and `indel_score_cutoff` are mutually exclusive, and one
+          must be supplied.
+        - If a `snv_bin_cutoff` or `indel_bin_cutoff` cutoff is supplied then an
+          `aggregated_bin_ht` and `bin_id` must also be supplied to determine the SNP
+          and indel scores to use as cutoffs from an aggregated bin Table like one
+          created by `compute_grouped_binned_ht` in combination with `score_bin_agg`.
+
+    :param ht: Filtering Table to prepare as the final filter Table.
+    :param snv_bin_cutoff: Bin cutoff to use for SNP variant QC filter. Can't be used
+        with `snv_score_cutoff`.
+    :param indel_bin_cutoff: Bin cutoff to use for indel variant QC filter. Can't be
+        used with `indel_score_cutoff`.
+    :param snv_score_cutoff: Score cutoff (e.g. RF probability or AS_VQSLOD) to use
+        for SNP variant QC filter. Can't be used with `snv_bin_cutoff`.
+    :param indel_score_cutoff: Score cutoff (e.g. RF probability or AS_VQSLOD) to use
+        for indel variant QC filter. Can't be used with `indel_bin_cutoff`.
+    :param aggregated_bin_ht: Table with aggregate counts of variants based on bins
+    :param snv_bin_id: Name of bin to use in 'bin_id' column of `aggregated_bin_ht` to
+        determine the SNP score cutoff.
+    :param indel_bin_id: Name of bin to use in 'bin_id' column of `aggregated_bin_ht` to
+        determine the indel score cutoff.
+    :return: Finalized random forest Table annotated with variant filters.
+    """
+    if snv_bin_cutoff is not None and snv_score_cutoff is not None:
+        raise ValueError(
+            "snv_bin_cutoff and snv_score_cutoff are mutually exclusive, please only"
+            " supply one SNP filtering cutoff.",
+        )
+
+    if indel_bin_cutoff is not None and indel_score_cutoff is not None:
+        raise ValueError(
+            "indel_bin_cutoff and indel_score_cutoff are mutually exclusive, please"
+            " only supply one indel filtering cutoff.",
+        )
+
+    if snv_bin_cutoff is None and snv_score_cutoff is None:
+        raise ValueError(
+            "One (and only one) of the parameters snv_bin_cutoff and snv_score_cutoff" " must be supplied.",
+        )
+
+    if indel_bin_cutoff is None and indel_score_cutoff is None:
+        raise ValueError(
+            "One (and only one) of the parameters indel_bin_cutoff and" " indel_score_cutoff must be supplied.",
+        )
+
+    if (
+        (snv_bin_cutoff is not None and snv_bin_id is None) or (indel_bin_cutoff is not None and indel_bin_id is None)
+    ) and (aggregated_bin_ht is None):
+        raise ValueError(
+            "If using snv_bin_cutoff or indel_bin_cutoff, both aggregated_bin_ht and"
+            " snv_bin_id/indel_bin_id must be supplied",
+        )
+
+    cutoffs = {
+        "snv": {"score": snv_score_cutoff, "bin": snv_bin_cutoff, "bin_id": snv_bin_id},
+        "indel": {
+            "score": indel_score_cutoff,
+            "bin": indel_bin_cutoff,
+            "bin_id": indel_bin_id,
+        },
+    }
+
+    # Calculate min and max scores within each bin.
+    min_score = ht.aggregate(hl.agg.min(ht.score))
+    max_score = ht.aggregate(hl.agg.max(ht.score))
+    aggregated_bin_ht = aggregated_bin_ht.annotate(indel=~aggregated_bin_ht.snv)
+
+    cutoff_globals = {}
+    for variant_type, cutoff in cutoffs.items():
+        if cutoff["bin"] is not None:
+            score_cutoff = aggregated_bin_ht.aggregate(
+                hl.agg.filter(
+                    aggregated_bin_ht[variant_type]
+                    & (aggregated_bin_ht.bin_id == cutoff["bin_id"])
+                    & (aggregated_bin_ht.bin == cutoff["bin"]),
+                    hl.agg.min(aggregated_bin_ht.min_score),
+                ),
+            )
+            cutoff_globals[variant_type] = hl.struct(
+                bin=cutoff["bin"],
+                min_score=score_cutoff,
+                bin_id=cutoff["bin_id"],
+            )
+        else:
+            cutoff_globals[variant_type] = hl.struct(min_score=cutoff["score"])
+
+        score_cutoff = hl.eval(cutoff_globals[variant_type].min_score)
+        if score_cutoff < min_score or score_cutoff > max_score:
+            raise ValueError(
+                f"{variant_type}_score_cutoff is not within the range of score (" f"{min_score, max_score}).",
+            )
+
+    logging.info(
+        f"Using a SNP score cutoff of {hl.eval(cutoff_globals['snv'].min_score)} and an"
+        f" indel score cutoff of {hl.eval(cutoff_globals['indel'].min_score)}.",
+    )
+
+    return cutoff_globals
+
+
+def prepare_gnomad_v4_variants_helper(
+    ds_path: str | None,
+    exome_or_genome: str,
+    score_cutoffs: dict[str, hl.expr.StructExpression],
+) -> hl.Table:
 
     if ds_path is None:
         ds = hl.Table.parallelize(hl.literal([], "".join(EMPTY_TABLE_CONFIG.split()))).key_by('locus', 'alleles')
@@ -370,12 +497,13 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     # Add the variant filter flags.
     logging.info('Adding the variant filter flags...')
 
-    inbreeding_coeff_cutoff = -0.3
+    # inbreeding_coeff_cutoff = -0.3
     filters = {
-        "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        "InbreedingCoeff": ds.inbreeding_coeff[0] < INBREEDING_COEFF_CUTOFF,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_lowqual": ds.AS_lowqual,
         "AS_VQSR": ds.as_vqsr_filters != "PASS",
+        "AS_VQSLOD": ds.info.AS_VQSLOD < score_cutoffs['snv'].min_score,
     }
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
@@ -413,9 +541,25 @@ def prepare_v4_variants(
     genome_variants_outpath: str | None,
 ) -> hl.Table:
 
+    bin_ht_path = config_retrieve(['large_cohorts', 'browser', 'bin_ht_path'])
+    aggregated_bin_ht_path = config_retrieve(['large_cohorts', 'browser', 'aggregated_bin_ht_path'])
+    bin_ht = hl.read_table(bin_ht_path)
+    aggregated_bin_ht = hl.read_table(aggregated_bin_ht_path)
+
+    # Process the score cutoffs.
+    score_cutoffs = process_score_cutoffs(
+        bin_ht,
+        snv_bin_cutoff=SNP_BIN_THRESHOLD,
+        indel_bin_cutoff=INDEL_BIN_THRESHOLD,
+        snv_score_cutoff=None,
+        indel_score_cutoff=None,
+        aggregated_bin_ht=aggregated_bin_ht,
+        snv_bin_id='bin',
+        indel_bin_id='bin',
+    )
     # Generate the browser output tables for each data type.
-    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome')
-    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome')
+    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', score_cutoffs)
+    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', score_cutoffs)
 
     # checkpoint datasets
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
