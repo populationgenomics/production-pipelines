@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime
 from math import ceil
-from random import sample
 from typing import Optional
 
 import hail as hl
