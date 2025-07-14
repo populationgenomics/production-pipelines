@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from math import ceil
 from typing import Optional
 
@@ -189,7 +190,12 @@ def compute_coverage_stats(
         mt_col_key_fields = list(mt.col_key)
         mt_row_key_fields = list(mt.row_key)
         t = mt.select_entries(*keep_entries).select_cols().select_rows()
+        time_before = datetime.now()
+        logger.info(f'Time starting _localize_entries() data at {time_before}')
         t = t._localize_entries("__entries", "__cols")
+        time_after = datetime.now()
+        logger.info(f'Time finished _localize_entries() data at {time_after}')
+        logger.info(f'Time taken to _localize_entries() data: {time_after - time_before}')
         t = (
             t.key_by(*row_key_fields)
             .join(
@@ -217,7 +223,6 @@ def compute_coverage_stats(
         vds.reference_data.select_entries(*keep_entries).select_cols().select_rows(),
         join_with_ref(vds.variant_data),
     )
-
     # Densify
     mt = hl.vds.to_dense_mt(vds)
 
@@ -343,7 +348,7 @@ def run(
     from gnomad.utils.reference_genome import add_reference_sequence
 
     if can_reuse(out_path):
-        logging.info(f"Reusing existing coverage table at {out_path}.")
+        logger.info(f"Reusing existing coverage table at {out_path}.")
         return None
 
     rg: hl.ReferenceGenome = hl.get_reference(genome_build())
@@ -353,7 +358,7 @@ def run(
     intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=rg)
 
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
-        logging.info('Adjusting interval padding for exome sequencing.')
+        logger.info('Adjusting interval padding for exome sequencing.')
         padding = config_retrieve(['workflow', 'exome_interval_padding'], default=50)
         intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
@@ -362,7 +367,7 @@ def run(
     ref_tables = []
 
     for interval in intervals:
-        logging.info(f"Generating reference coverage table for interval: {interval}")
+        logger.info(f"Generating reference coverage table for interval: {interval}")
         ref_ht = hl.utils.range_table(
             (interval.end.position - interval.start.position),
         )
@@ -379,11 +384,15 @@ def run(
 
     ref_ht_joined = hl.Table.union(*ref_tables)
 
-    logging.info(f"Reading VDS from {vds_path} with intervals: {intervals}")
+    logger.info(f"Reading VDS from {vds_path} with intervals: {intervals}")
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
+    num_samples_to_keep = config_retrieve(['workflow', 'num_samples_to_keep'], default=500)
+    samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
+    vds = hl.vds.filter_samples(vds, samples_to_keep)
+
     # Generate coverage table
-    logging.info("Computing coverage statistics.")
+    logger.info("Computing coverage statistics.")
     coverage_ht: hl.Table = compute_coverage_stats(
         vds,
         ref_ht_joined,
