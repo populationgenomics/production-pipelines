@@ -563,6 +563,8 @@ class GenerateCoverageTable(CohortStage):
                 f'GenerateCoverageTable_{idx}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
+            coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+
             if scatter_count == 1:
                 interval_list_path = config_retrieve(['workflow', 'intervals_path'], default=None)
             else:
