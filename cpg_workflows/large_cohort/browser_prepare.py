@@ -180,7 +180,6 @@ INDEL_BIN_THRESHOLD = config_retrieve(['large_cohorts', 'browser', 'indel_bin_th
 
 
 def process_score_cutoffs(
-    ht: hl.Table,
     snv_bin_cutoff: int | None = None,
     indel_bin_cutoff: int | None = None,
     snv_score_cutoff: float | None = None,
@@ -259,8 +258,8 @@ def process_score_cutoffs(
     }
 
     # Calculate min and max scores within each bin.
-    min_score = ht.aggregate(hl.agg.min(ht.score))
-    max_score = ht.aggregate(hl.agg.max(ht.score))
+    min_score = aggregated_bin_ht.aggregate(hl.agg.min(aggregated_bin_ht.min_score))
+    max_score = aggregated_bin_ht.aggregate(hl.agg.max(aggregated_bin_ht.max_score))
     aggregated_bin_ht = aggregated_bin_ht.annotate(indel=~aggregated_bin_ht.snv)
 
     cutoff_globals = {}
@@ -547,14 +546,11 @@ def prepare_v4_variants(
     genome_variants_outpath: str | None,
 ) -> hl.Table:
 
-    bin_ht_path = config_retrieve(['large_cohorts', 'browser', 'bin_ht_path'])
     aggregated_bin_ht_path = config_retrieve(['large_cohorts', 'browser', 'aggregated_bin_ht_path'])
-    bin_ht = hl.read_table(bin_ht_path)
     aggregated_bin_ht = hl.read_table(aggregated_bin_ht_path)
 
     # Process the score cutoffs.
     score_cutoffs = process_score_cutoffs(
-        bin_ht,
         snv_bin_cutoff=SNP_BIN_THRESHOLD,
         indel_bin_cutoff=INDEL_BIN_THRESHOLD,
         snv_score_cutoff=None,
