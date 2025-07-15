@@ -1,8 +1,6 @@
 import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
-from matplotlib.pyplot import scatter
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
