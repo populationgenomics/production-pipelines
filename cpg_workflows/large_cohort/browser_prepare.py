@@ -180,10 +180,13 @@ def process_score_cutoffs(
     snv_score_cutoff: float | None = None,
     indel_score_cutoff: float | None = None,
     aggregated_bin_ht: hl.Table = None,
-    snv_bin_id: str = 'adj_bin',
-    indel_bin_id: str = 'adj_bin',
+    snv_bin_id: str = 'bin',
+    indel_bin_id: str = 'bin',
 ) -> dict[str, hl.expr.StructExpression]:
     """
+    NOTE: This function was lifted from the gnomad_qc repo `gnomad_qc.v4.variant_qc.final_filter.process_score_cutoffs`.
+        - Changes made:
+            - Global `min_score` and `max_score` are now calculated from the `aggregated_bin_ht`
     Determine SNP and indel score cutoffs if given bin instead of score.
 
     .. note::
