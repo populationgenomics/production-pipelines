@@ -502,9 +502,14 @@ def prepare_gnomad_v4_variants_helper(
         "InbreedingCoeff": ds.inbreeding_coeff[0] < INBREEDING_COEFF_CUTOFF,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_lowqual": ds.AS_lowqual,
-        "AS_VQSR": ds.as_vqsr_filters != "PASS",
-        "AS_VQSLOD": ds.info.AS_VQSLOD < score_cutoffs['snv'].min_score,
+        # "AS_VQSR": ds.as_vqsr_filters != "PASS",
+        "AS_VQSR": hl.is_missing(ds.info["AS_VQSR"]),
     }
+    snv_indel_expr = {'snv': hl.is_snp(ds.alleles[0], ds.alleles[1])}
+    snv_indel_expr['indel'] = ~snv_indel_expr['snv']
+    for var_type, score_cut in score_cutoffs.items():
+        filters['AS_VQSR'] = filters['AS_VQSR'] | (snv_indel_expr[var_type] & (ds.info.AS_VQSLOD < score_cut.min_score))
+
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
     # Drop unnecessary fields.
