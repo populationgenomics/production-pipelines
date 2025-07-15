@@ -186,7 +186,8 @@ def process_score_cutoffs(
     """
     NOTE: This function was lifted from the gnomad_qc repo `gnomad_qc.v4.variant_qc.final_filter.process_score_cutoffs`.
         - Changes made:
-            - Global `min_score` and `max_score` are now calculated from the `aggregated_bin_ht`
+            - Removed `ht` parameter, as it is not needed.
+                - Global `min_score` and `max_score` are now calculated from the `aggregated_bin_ht`
     Determine SNP and indel score cutoffs if given bin instead of score.
 
     .. note::
