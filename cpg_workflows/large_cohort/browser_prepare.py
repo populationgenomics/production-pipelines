@@ -174,11 +174,6 @@ def _subset_filter(subset):
     return lambda variant: variant.ac_adj[subset] > 0
 
 
-INBREEDING_COEFF_CUTOFF = config_retrieve(['large_cohorts', 'browser', 'inbreeding_coeff_cutoff'])
-SNP_BIN_THRESHOLD = config_retrieve(['large_cohorts', 'browser', 'snp_bin_threshold'])
-INDEL_BIN_THRESHOLD = config_retrieve(['large_cohorts', 'browser', 'indel_bin_threshold'])
-
-
 def process_score_cutoffs(
     snv_bin_cutoff: int | None = None,
     indel_bin_cutoff: int | None = None,
@@ -496,9 +491,9 @@ def prepare_gnomad_v4_variants_helper(
     # Add the variant filter flags.
     logging.info('Adding the variant filter flags...')
 
-    # inbreeding_coeff_cutoff = -0.3
+    inbreeding_coeff_cutoff = config_retrieve(['large_cohorts', 'browser', 'inbreeding_coeff_cutoff'])
     filters = {
-        "InbreedingCoeff": ds.inbreeding_coeff[0] < INBREEDING_COEFF_CUTOFF,
+        "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_lowqual": ds.AS_lowqual,
         "AS_VQSLOD": hl.is_missing(ds.info["AS_VQSLOD"]),
@@ -551,8 +546,8 @@ def prepare_v4_variants(
 
     # Process the score cutoffs.
     score_cutoffs = process_score_cutoffs(
-        snv_bin_cutoff=SNP_BIN_THRESHOLD,
-        indel_bin_cutoff=INDEL_BIN_THRESHOLD,
+        snv_bin_cutoff=config_retrieve(['large_cohorts', 'browser', 'snp_bin_threshold']),
+        indel_bin_cutoff=config_retrieve(['large_cohorts', 'browser', 'indel_bin_threshold']),
         snv_score_cutoff=None,
         indel_score_cutoff=None,
         aggregated_bin_ht=aggregated_bin_ht,
