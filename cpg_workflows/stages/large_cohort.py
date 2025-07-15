@@ -558,26 +558,35 @@ class GenerateCoverageTable(CohortStage):
                 init_batch_args[key] = workflow_config[key]
 
         # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
-            output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
-        )
-        coverage_jobs.append(intervals_j)
-
         for idx in range(1, scatter_count + 1):
             coverage_table_j = get_batch().new_job(
                 f'GenerateCoverageTable_{idx}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
+            if scatter_count == 1:
+                interval_list_path = config_retrieve(['workflow', 'intervals_path'], default=None)
+            else:
+                intervals_j, intervals = get_intervals(
+                    b=b,
+                    scatter_count=scatter_count,
+                    source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
+                    output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
+                )
+                coverage_jobs.append(intervals_j)
+
             coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
             coverage_table_j.command(
                 query_command(
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'),
+                    str(
+                        (
+                            interval_list_path
+                            if scatter_count == 1
+                            else self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'
+                        ),
+                    ),
                     str(outputs[f'index_{idx}']),
                     setup_gcp=True,
                     init_batch_args=init_batch_args,
