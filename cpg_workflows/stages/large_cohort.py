@@ -1,6 +1,8 @@
 import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+from matplotlib.pyplot import scatter
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -558,17 +560,10 @@ class GenerateCoverageTable(CohortStage):
                 init_batch_args[key] = workflow_config[key]
 
         # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
-        intervals_j, intervals = get_intervals(
-            b=b,
-            scatter_count=scatter_count,
-            source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
-            output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
-        )
-        coverage_jobs.append(intervals_j)
-
-        for idx in range(1, scatter_count + 1):
+        if scatter_count == 1:
+            interval_list_path = config_retrieve(['workflow', 'intervals_path'], default=None)
             coverage_table_j = get_batch().new_job(
-                f'GenerateCoverageTable_{idx}',
+                'GenerateCoverageTable_1',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
             coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
@@ -577,14 +572,41 @@ class GenerateCoverageTable(CohortStage):
                     generate_coverage_table,
                     generate_coverage_table.run.__name__,
                     str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'),
-                    str(outputs[f'index_{idx}']),
+                    str(interval_list_path),
+                    str(outputs['index_1']),
                     setup_gcp=True,
                     init_batch_args=init_batch_args,
                 ),
             )
-
             coverage_jobs.append(coverage_table_j)
+        else:
+            intervals_j, intervals = get_intervals(
+                b=b,
+                scatter_count=scatter_count,
+                source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
+                output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
+            )
+            coverage_jobs.append(intervals_j)
+
+            for idx in range(1, scatter_count + 1):
+                coverage_table_j = get_batch().new_job(
+                    f'GenerateCoverageTable_{idx}',
+                    (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+                )
+                coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
+                coverage_table_j.command(
+                    query_command(
+                        generate_coverage_table,
+                        generate_coverage_table.run.__name__,
+                        str(inputs.as_path(cohort, Combiner, key='vds')),
+                        str(self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'),
+                        str(outputs[f'index_{idx}']),
+                        setup_gcp=True,
+                        init_batch_args=init_batch_args,
+                    ),
+                )
+
+                coverage_jobs.append(coverage_table_j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
 
