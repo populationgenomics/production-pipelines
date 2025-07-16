@@ -21,5 +21,6 @@ def hello_job(
     """
 
     j.command(command(cmd))
+    j.image('australia-southeast1-docker.pkg.dev/cpg-common/images/samtools@1.18-1')
     get_batch().write_output(j.greet, str(output_base_path) + '.hello')
     return [j]
