@@ -81,7 +81,13 @@ def prepare_truth_sample_concordance(happy_vcf_path: str, high_confidence_only=T
     return concordance
 
 
-def create_binned_summary(ht, happy_vcf_path: str, n_bins=100, fam_stats_ht=None, truth_sample_concordance=None):
+def create_binned_summary(
+    ht,
+    happy_vcf_path: str,
+    n_bins=100,
+    fam_stats_ht=None,
+    truth_sample_concordance=None,
+) -> hl.Table:
     """
     Create a binned summary of AS-VQSR variant quality scores with optional family and truth sample statistics.
 
