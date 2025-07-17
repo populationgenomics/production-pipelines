@@ -693,7 +693,7 @@ class VariantBinnedSummaries(CohortStage):
             if workflow_config.get(key):
                 init_batch_args[key] = workflow_config[key]
 
-        happy_vcf_path = config_retrieve(['large_cohort', 'happy_concordance_vcf'])
+        happy_vcf_path = config_retrieve(['large_cohort', 'happy_vcf_path'])
         n_bins = config_retrieve(['large_cohort', 'n_bins'], default=None)  # n = 100 defaults in the stage itself
         fam_stats_ht_path = config_retrieve(['large_cohort', 'fam_stats_ht_path'], default=None)
         truth_sample_concordance_path = config_retrieve(['large_cohort', 'truth_sample_concordance_path'], default=None)
