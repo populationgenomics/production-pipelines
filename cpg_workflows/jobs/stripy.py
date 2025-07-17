@@ -42,7 +42,7 @@ def stripy(
 
     job_attrs = (job_attrs or {}) | {'tool': 'stripy'}
     j = b.new_job('STRipy', job_attrs)
-    j.image(image_path('stripy'))
+    j.image(image_path('stripy', '2.5-1'))
 
     config_path = 'config.json'
     if stripy_config:

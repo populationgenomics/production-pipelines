@@ -42,7 +42,7 @@ def run_happy_on_vcf(
     """
 
     happy_j = get_batch().new_job(f'Run Happy on {sample_ext_id} VCF')
-    happy_j.image(image_path('hap-py')).memory('100Gi').storage('100Gi').cpu(4)
+    happy_j.image(image_path('hap-py', '0.3.15-1')).memory('100Gi').storage('100Gi').cpu(4)
 
     # region: read input data into batch
     vcf_input = get_batch().read_input_group(vcf=vcf_path, index=f'{vcf_path}.tbi')
