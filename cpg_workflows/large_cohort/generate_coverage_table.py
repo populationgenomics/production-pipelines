@@ -7,7 +7,7 @@ import hail as hl
 import hailtop.batch as hb
 
 from cpg_utils import to_path
-from cpg_utils.config import config_retrieve
+from cpg_utils.config import config_retrieve, dataset_path
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse, exists
 from gnomad.utils import reference_genome, sparse_mt
@@ -158,7 +158,7 @@ def compute_coverage_stats(
 
     logger.info('Computing coverage stats on %d samples.', n_samples)
     # Filter datasets to interval list
-    if intervals is not None:
+    if intervals:
         # Building reference_ht based off of interavls so don't need to filter it
         # reference_ht = reference_ht.filter(
         #     hl.is_defined(intervals[reference_ht.locus]),
@@ -169,6 +169,9 @@ def compute_coverage_stats(
             intervals=intervals,
             split_reference_blocks=split_reference_blocks,
         )
+        vds.variant_data = vds.variant_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+        vds.reference_data = vds.reference_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+        vds = vds.checkpoint(dataset_path(suffix='coverage/exome_interval_repartition', category='tmp'))
 
     # Create an outer join with the reference Table
     def join_with_ref(mt: hl.MatrixTable) -> hl.MatrixTable:
@@ -385,12 +388,12 @@ def run(
     logger.info('Finished generating reference coverage tables')
     ref_ht_joined = hl.Table.union(*ref_tables)
 
-    logger.info(f'Reading VDS from {vds_path} with intervals: {intervals}')
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
-    num_samples_to_keep = config_retrieve(['workflow', 'num_samples_to_keep'], default=500)
-    samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
-    vds = hl.vds.filter_samples(vds, samples_to_keep)
+    # Sample filter for testing
+    if num_samples_to_keep := config_retrieve(['workflow', 'num_samples_to_keep'], default=False):
+        samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
+        vds = hl.vds.filter_samples(vds, samples_to_keep)
 
     # Generate coverage table
     logger.info('Computing coverage statistics.')
