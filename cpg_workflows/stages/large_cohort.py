@@ -696,7 +696,7 @@ class VariantBinnedSummaries(CohortStage):
         happy_vcf_path = config_retrieve(['large_cohort', 'happy_vcf_path'])
         n_bins = config_retrieve(['large_cohort', 'n_bins'], default=100)  # FIXME default also set in function
         fam_stats_ht_path = config_retrieve(['large_cohort', 'fam_stats_ht_path'], default=None)
-        truth_sample_concordance_path = config_retrieve(['large_cohort', 'truth_sample_concordance_path'], default=None)
+        use_truth_sample_concordance = config_retrieve(['large_cohort', 'truth_sample_concordance_path'], default=False)
 
         j.command(
             query_command(
@@ -704,10 +704,10 @@ class VariantBinnedSummaries(CohortStage):
                 variant_binned_summaries.create_binned_summary.__name__,
                 str(inputs.as_path(cohort, LoadVqsr)),
                 str(happy_vcf_path),
+                str(self.expected_outputs(cohort)),
                 int(n_bins),
                 str(fam_stats_ht_path),
-                str(truth_sample_concordance_path),
-                str(self.expected_outputs(cohort)),
+                str(use_truth_sample_concordance),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),

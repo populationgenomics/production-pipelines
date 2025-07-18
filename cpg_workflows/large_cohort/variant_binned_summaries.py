@@ -82,44 +82,53 @@ def prepare_truth_sample_concordance(happy_vcf_path: str, high_confidence_only=T
 
 
 def create_binned_summary(
-    ht,
+    vqsr_ht,
     happy_vcf_path: str,
-    n_bins=100,
-    fam_stats_ht=None,
-    truth_sample_concordance=None,
+    binned_summary_outpath: str,
+    n_bins: int,
+    fam_stats_ht: str,
+    use_truth_sample_concordance: bool,
 ) -> hl.Table:
     """
     Create a binned summary of AS-VQSR variant quality scores with optional family and truth sample statistics.
 
     :param ht: Input Hail Table with AS-VQSR variant annotations
-    :param happy_vcf_path: VCF path to pre-made table, required
+    :param happy_vcf_path: VCF path to pre-made table, required for use_truth_sample_concordance
     :param n_bins: Number of score bins to create
     :param fam_stats_ht: Optional family statistics table
     :param truth_sample_concordance: Optional truth sample concordance data
     :return: Binned summary table with aggregated statistics per score bin
     """
     # Ensure expected ht fields are present and appropriately named.
-    ht = ht.annotate(
-        score=ht.info.AS_VQSLOD,
-        ac=ht.info.AC,
-        ac_raw=ht.info.AC_raw,
-        singleton=(ht.info.AC_raw == 1),
-        biallelic=(~ht.was_split),
-        positive_train_site=ht.info.POSITIVE_TRAIN_SITE,
-        negative_train_site=ht.info.NEGATIVE_TRAIN_SITE,
-        ac_qc_samples_unrelated_raw=ht.info.AC_raw,
+    vqsr_ht = vqsr_ht.annotate(
+        score=vqsr_ht.info.AS_VQSLOD,
+        ac=vqsr_ht.info.AC,
+        ac_raw=vqsr_ht.info.AC_raw,
+        singleton=(vqsr_ht.info.AC_raw == 1),
+        biallelic=(~vqsr_ht.was_split),
+        positive_train_site=vqsr_ht.info.POSITIVE_TRAIN_SITE,
+        negative_train_site=vqsr_ht.info.NEGATIVE_TRAIN_SITE,
+        ac_qc_samples_unrelated_raw=vqsr_ht.info.AC_raw,
     )
+
+    # Hacky addition to generate the truth_sample_concordance table within the function
+    if use_truth_sample_concordance:
+        truth_sample_concordance = prepare_truth_sample_concordance(
+            happy_vcf_path,
+            high_confidence_only=True,
+            reference_paths=None,
+        )
 
     # If we have a truth sample, add those annotations too.
     if truth_sample_concordance is not None:
-        ht = ht.annotate(
-            TP=(truth_sample_concordance[ht.key].BD_QUERY == "TP"),
-            FP=(truth_sample_concordance[ht.key].BD_QUERY == "FP"),
-            FN=(truth_sample_concordance[ht.key].BD_TRUTH == "FN"),
+        vqsr_ht = vqsr_ht.annotate(
+            TP=(truth_sample_concordance[vqsr_ht.key].BD_QUERY == "TP"),
+            FP=(truth_sample_concordance[vqsr_ht.key].BD_QUERY == "FP"),
+            FN=(truth_sample_concordance[vqsr_ht.key].BD_TRUTH == "FN"),
         )
 
     # Annotate with score bins, then group based on these.
-    binned_ht = create_binned_ht(ht, n_bins)
+    binned_ht = create_binned_ht(vqsr_ht, n_bins)
     grouped_binned_ht = compute_grouped_binned_ht(binned_ht)
 
     # Construct the aggregation functions; if no fam_stats_ht is provided
@@ -168,5 +177,6 @@ def create_binned_summary(
             if x not in ['contig', 'bi_allelic', 'singleton', 'release_adj', 'min_score', 'max_score']
         },
     )
+    binned_summary_ht.write(binned_summary_outpath, overwrite=True)
 
     return binned_summary_ht
