@@ -82,7 +82,7 @@ def prepare_truth_sample_concordance(happy_vcf_path: str, high_confidence_only=T
 
 
 def create_binned_summary(
-    vqsr_ht,
+    vqsr_ht_path,
     happy_vcf_path: str,
     binned_summary_outpath: str,
     n_bins: int,
@@ -100,6 +100,10 @@ def create_binned_summary(
     :return: Binned summary table with aggregated statistics per score bin
     """
     # Ensure expected ht fields are present and appropriately named.
+
+    # Load the VQSR ht
+    vqsr_ht = hl.read_table(vqsr_ht_path)
+
     vqsr_ht = vqsr_ht.annotate(
         score=vqsr_ht.info.AS_VQSLOD,
         ac=vqsr_ht.info.AC,
