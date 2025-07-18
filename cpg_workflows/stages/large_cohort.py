@@ -702,7 +702,8 @@ class VariantBinnedSummaries(CohortStage):
             query_command(
                 variant_binned_summaries,
                 variant_binned_summaries.create_binned_summary.__name__,
-                str(inputs.as_path(cohort, LoadVqsr)),
+                # str(inputs.as_path(cohort, LoadVqsr)),
+                "gs://cpg-bioheart-test/large_cohort/browser-testing-data/vqsr.ht",
                 str(happy_vcf_path),
                 str(self.expected_outputs(cohort)),
                 int(n_bins),
