@@ -97,7 +97,7 @@ def add_background(
             background_mt = background_mt.select_cols().select_rows().select_entries('GT', 'GQ', 'DP', 'AD')
             background_mt = background_mt.naive_coalesce(5000)
             # combine dense dataset with background population dataset
-            dense_mt = dense_mt.union_cols(background_mt, row_join_type='outer')
+            dense_mt = dense_mt.union_cols(background_mt)
             sample_qc_ht = sample_qc_ht.union(ht, unify=allow_missing_columns)
         else:
             raise ValueError('Background dataset path must be either .mt or .vds')
