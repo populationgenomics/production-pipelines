@@ -29,6 +29,18 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
             GT=hl.vds.lgt_to_gt(vds.variant_data.LGT, vds.variant_data.LA),
         )
 
+    if 'AD' not in vds.variant_data.entry:
+        logging.info('Converting LAD to AD annotations...')
+        vds.variant_data = vds.variant_data.annotate_entries(
+            AD=hl.vds.local_to_global(
+                vds.variant_data.LAD,
+                vds.variant_data.LA,
+                n_alleles=hl.len(vds.variant_data.alleles),
+                fill_value=0,
+                number='R',
+            ),
+        )
+
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
     mt = mt.select_entries('GT', 'GQ', 'DP', 'AD')
