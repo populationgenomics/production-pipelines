@@ -25,6 +25,13 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
     sites_table = get_config()['references']['ancestry']['sites_table']
     qc_variants_ht = hl.read_table(sites_table)
     vds = hl.vds.filter_variants(vds, qc_variants_ht)
+
+    if 'GT' not in vds.variant_data.entry:
+        logging.info('Converting LGT to GT annotations...')
+        vds.variant_data = vds.variant_data.annotate_entries(
+            GT=hl.vds.lgt_to_gt(vds.variant_data.LGT, vds.variant_data.LA),
+        )
+
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
     mt = mt.select_entries('GT', 'GQ', 'DP', 'AD')
