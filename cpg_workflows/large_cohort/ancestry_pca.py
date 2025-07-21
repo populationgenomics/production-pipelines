@@ -317,7 +317,7 @@ def _infer_pop_labels(
         )
         pop_ht = scores_ht.annotate(
             training_pop=hl.missing(hl.tstr),
-            pop='Other',
+            pop='Unassigned',
             is_training=False,
             pca_scores=scores_ht.scores,
         )
@@ -337,6 +337,7 @@ def _infer_pop_labels(
             pc_cols=pop_pca_scores_ht_.scores[:n_pcs],
             known_col='training_pop',
             min_prob=min_prob_,
+            missing_label='na',
         )
         n_mislabeled_samples_ = pop_ht_.aggregate(hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop))
         return pop_ht_, pops_rf_model_, n_mislabeled_samples_
