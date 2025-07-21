@@ -55,10 +55,11 @@ num_pcs = 4
 
 [large_cohort]
 dense_subset_partitions = 10
-# Kinship threshold to consider two samples as related.
-# the default threshold for second degree relatives in gnomAD is 0.1:
-# https://github.com/broadinstitute/gnomad_methods/blob/382fc2c7976d58cc8983cc4c9f0df5d8d5f9fae3/gnomad/sample_qc/relatedness.py#L195
-max_kin = 0.1
+relatedness_pcs = 10 # number of PCs to use to control for population substructure in relatedness estimation.
+# Kinship threshold to consider two samples as related. Default is 0.08838835 as per Bycroft et al (2018).
+max_kin = 0.08838835
+# Minimum kinship score to retain in the relatedness inference results; default is None (no filtering).
+# min_kinship = 0.05
 # Parameters for population inference
 n_pcs = 16  # number of principal components for PCA analysis
 min_pop_prob = 0.5  # minimum random forest probability for population assignment

@@ -3,7 +3,7 @@ import logging
 import hail as hl
 
 from cpg_utils import Path
-from cpg_utils.config import get_config
+from cpg_utils.config import config_retrieve, get_config
 from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.relatedness import compute_related_samples_to_drop
 
@@ -58,7 +58,11 @@ def pcrelate(
         scores_ht = hl.read_table(str(scores_ht_path))
     else:
         sample_num = mt.cols().count()
-        _, scores_ht, _ = hl.hwe_normalized_pca(mt.GT, k=max(1, min(sample_num // 3, 10)), compute_loadings=False)
+        _, scores_ht, _ = hl.hwe_normalized_pca(
+            mt.GT,
+            k=max(1, min(sample_num // 3, config_retrieve(['large_cohort', 'relatedness_pcs']))),
+            compute_loadings=False,
+        )
         scores_ht.checkpoint(str(scores_ht_path), overwrite=True)
 
     relatedness_ht = hl.pc_relate(
@@ -66,7 +70,7 @@ def pcrelate(
         min_individual_maf=0.01,
         scores_expr=scores_ht[mt.col_key].scores,
         block_size=4096,
-        min_kinship=0.05,
+        min_kinship=config_retrieve(['large_cohort', 'min_kinship'], default=None),
     )
 
     # Converting keys for type struct{str} to str to align
