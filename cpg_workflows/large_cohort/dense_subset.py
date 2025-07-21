@@ -26,7 +26,7 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
     mt = hl.vds.to_dense_mt(vds)
     mt = mt.select_entries('GT', 'GQ', 'DP', 'AD')
 
-    n_partitions = get_config()['large_cohort']['dense_subset']['n_partitions']
+    n_partitions = get_config()['large_cohort']['dense_subset_partitions']
     mt = mt.repartition(n_partitions)
     mt = mt.checkpoint(out_dense_mt_path, overwrite=True)
     logging.info(f'Number of predetermined QC variants found in the VDS: {mt.count_rows()}')
