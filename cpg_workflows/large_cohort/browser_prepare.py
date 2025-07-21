@@ -3,6 +3,7 @@ import logging
 
 import hail as hl
 
+from cpg_utils.config import reference_path
 from gnomad.utils.filtering import add_filters_expr
 
 EMPTY_TABLE_CONFIG = """
@@ -417,7 +418,7 @@ def prepare_v4_variants(
     exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome')
     genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome')
 
-    # checkpoint datasets
+    # Checkpoint datasets
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
     genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
 
@@ -438,6 +439,25 @@ def prepare_v4_variants(
     variants = variants.annotate(
         colocated_variants=variants.colocated_variants.annotate(
             all=hl.array(hl.set(hl.flatten([value for value in variants.colocated_variants.values()]))),
+        ),
+    )
+
+    # Annotate gene IDs from gnomAD v4 gene table.
+    logging.info('Annotating gene IDs from gnomAD v4 gene table...')
+    gnomad_v4_gene_table = hl.read_table(reference_path('gnomad_browser/gene_table'))
+    gene_table_with_loci = gnomad_v4_gene_table.annotate(
+        loci=hl.range(gnomad_v4_gene_table.interval.start.position, gnomad_v4_gene_table.interval.end.position + 1).map(
+            lambda pos: hl.locus(gnomad_v4_gene_table.interval.start.contig, pos, reference_genome='GRCh38'),
+        ),
+    )
+    exploded_gene_table = gene_table_with_loci.explode('loci')
+    exploded_gene_table = exploded_gene_table.annotate(locus=exploded_gene_table.loci).drop('loci')
+    exploded_gene_table = exploded_gene_table.key_by('locus')
+    variants = variants.annotate(
+        transcript_consequences=hl.if_else(
+            hl.is_defined(exploded_gene_table[variants.locus].gene_id),
+            [hl.struct(gene_id=exploded_gene_table[variants.locus].gene_id)],
+            hl.empty_array(hl.tstruct(gene_id=hl.tstr)),
         ),
     )
 
