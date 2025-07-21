@@ -18,9 +18,6 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
 
     vds = hl.vds.read_vds(vds_path)
 
-    logging.info('Splitting multiallelics')
-    vds = hl.vds.split_multi(vds, filter_changed_loci=True)
-
     logging.info('Filtering variants to predetermined QC variants...')
     sites_table = get_config()['references']['ancestry']['sites_table']
     qc_variants_ht = hl.read_table(sites_table)
@@ -28,7 +25,9 @@ def run(vds_path: str, out_dense_mt_path: str) -> hl.MatrixTable:
     logging.info('Densifying data...')
     mt = hl.vds.to_dense_mt(vds)
     mt = mt.select_entries('GT', 'GQ', 'DP', 'AD')
-    mt = mt.naive_coalesce(5000)
+
+    n_partitions = get_config()['large_cohort']['dense_subset']['n_partitions']
+    mt = mt.repartition(n_partitions)
     mt = mt.checkpoint(out_dense_mt_path, overwrite=True)
     logging.info(f'Number of predetermined QC variants found in the VDS: {mt.count_rows()}')
     return mt

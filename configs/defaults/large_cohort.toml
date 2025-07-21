@@ -54,6 +54,7 @@ num_pcs = 4
 # demanding higher resources for all operations as standard. Examples below
 
 [large_cohort]
+dense_subset_partitions = 10
 # Kinship threshold to consider two samples as related.
 # the default threshold for second degree relatives in gnomAD is 0.1:
 # https://github.com/broadinstitute/gnomad_methods/blob/382fc2c7976d58cc8983cc4c9f0df5d8d5f9fae3/gnomad/sample_qc/relatedness.py#L195
