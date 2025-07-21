@@ -169,9 +169,9 @@ def compute_coverage_stats(
             intervals=intervals,
             split_reference_blocks=split_reference_blocks,
         )
-        vds.variant_data = vds.variant_data.repartition(config_retrieve(['workflow', 'n_partitions']))
-        vds.reference_data = vds.reference_data.repartition(config_retrieve(['workflow', 'n_partitions']))
-        vds = vds.checkpoint(dataset_path(suffix='coverage/exome_interval_repartition', category='tmp'))
+    vds.variant_data = vds.variant_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+    vds.reference_data = vds.reference_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+    vds = vds.checkpoint(dataset_path(suffix='coverage/exome_interval_repartition', category='tmp'))
 
     # Create an outer join with the reference Table
     def join_with_ref(mt: hl.MatrixTable) -> hl.MatrixTable:
