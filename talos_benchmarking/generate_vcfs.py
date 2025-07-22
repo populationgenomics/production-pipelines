@@ -167,3 +167,5 @@ if not utils.exists(out_path):
     logging.info(f'Creating {out_path}')
     sam_mt = mt.filter_cols(hl.literal(_5_samples).contains(mt.s))
     export_and_condense(sam_mt, '5_samples', tmp_dir, out_path)
+
+hail_batch.get_batch().run(wait=False)
