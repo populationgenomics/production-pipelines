@@ -113,13 +113,18 @@ _250_samples = list(mt.s.collect())
 
 tmp_dir = os.path.join(config.config_retrieve(['storage', 'default', 'tmp']), 'talos_benchmarking')
 
-for each_sam in _250_samples:
-    out_path = os.path.join(ss_vcf_prefix, f'{each_sam}.vcf.bgz')
-    if utils.exists(out_path):
-        logging.info(f'{out_path} exists, skipping')
-        continue
-    sam_mt = mt.filter_cols(mt.s == each_sam)
-    export_and_condense(sam_mt, each_sam, tmp_dir, out_path)
+
+"""
+replace the vcf extraction with https://github.com/populationgenomics/production-pipelines/pull/1270/files
+"""
+
+# for each_sam in _250_samples:
+#     out_path = os.path.join(ss_vcf_prefix, f'{each_sam}.vcf.bgz')
+#     if utils.exists(out_path):
+#         logging.info(f'{out_path} exists, skipping')
+#         continue
+#     sam_mt = mt.filter_cols(mt.s == each_sam)
+#     export_and_condense(sam_mt, each_sam, tmp_dir, out_path)
 
 # export the bigboi
 out_path = os.path.join(output_prefix, '250.vcf.bgz')
