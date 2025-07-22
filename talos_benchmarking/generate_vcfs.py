@@ -26,12 +26,19 @@ random.seed(42)
 hail_batch.init_batch()
 
 input_mt = 'gs://cpg-acute-care-test/mt/bbf37e78fe_5866-acute-care_full_copy.mt'
-output_prefix = 'gs://cpg-acute-care-test/mt/ms_vcfs'
-ss_vcf_prefix = 'gs://cpg-acute-care-test/mt/solo_vcfs'
+output_prefix = 'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs'
+ss_vcf_prefix = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs'
 
 mt = hl.read_matrix_table(input_mt)
 
-samples = set(mt.s.collect())
+samples = list(mt.s.collect())
+
+# drop everything except variants
+mt = mt.select_rows()
+
+# write_this_little_mt, but seriously down-partitioned
+mt = mt.repartition(50)
+mt = mt.checkpoint('gs://cpg-acute-care-test/talos_benchmarking/250samples.mt', _read_if_exists=True)
 
 # generate the biggest subset
 _250_samples = random.sample(samples, 250)
