@@ -33,7 +33,7 @@ def compose_object_fragments(obj_folder: str, temp_dir: str, output_final: str):
     """
 
     vcf_fragments = []
-    with open(f'{obj_folder}/shard-manifest.txt') as read_handle:
+    with to_path(f'{obj_folder}/shard-manifest.txt').open() as read_handle:
         vcf_fragments = [os.path.join(obj_folder, line.strip()) for line in read_handle if line.strip()]
 
     if not vcf_fragments:
@@ -59,7 +59,7 @@ def compose_object_fragments(obj_folder: str, temp_dir: str, output_final: str):
 
     # Write the final script to the output file
     script_path = os.path.join(temp_dir, 'compose_script.sh')
-    with open(script_path, 'w') as script_file:
+    with to_path(script_path).open('w') as script_file:
         script_file.write('#!/bin/bash\n\n')
         for condense_string in condense_strings:
             script_file.write(f'{condense_string}\n')
