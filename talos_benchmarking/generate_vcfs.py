@@ -87,7 +87,9 @@ def export_and_condense(mt: hl.MatrixTable, sample: str, tmp_dir: str, output_fi
 
     new_job = hail_batch.get_batch().new_bash_job(f'Compose VCF for {sample}')
     new_job.image(config.config_retrieve(['workflow', 'driver_image']))
-    new_job.command(f'bash {command_script}')
+
+    localised_script = hail_batch.get_batch().read_input(command_script)
+    new_job.command(f'bash {localised_script}')
 
 
 logging.basicConfig(level=logging.INFO)
