@@ -33,15 +33,23 @@ mt = hl.read_matrix_table(input_mt)
 
 samples = list(mt.s.collect())
 
+# generate the biggest subset
+_250_samples = random.sample(samples, 250)
+
 # drop everything except variants
 mt = mt.select_rows()
+
+# select only the 250 samples
+mt.filter_cols(hl.literal(_250_samples).contains(mt.s))
+
+# strip out non-variant rows
+mt = hl.variant_qc(mt)
+mt = mt.filter_rows(mt.variant_qc.n_non_ref > 0)
+mt = mt.drop('variant_qc')
 
 # write_this_little_mt, but seriously down-partitioned
 mt = mt.repartition(50)
 mt = mt.checkpoint('gs://cpg-acute-care-test/talos_benchmarking/250samples.mt', _read_if_exists=True)
-
-# generate the biggest subset
-_250_samples = random.sample(samples, 250)
 
 for each_sam in _250_samples:
     out_path = os.path.join(ss_vcf_prefix, f'{each_sam}.vcf.bgz')
