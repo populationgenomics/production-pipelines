@@ -41,7 +41,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
 
     output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results/{each_group}'
 
-    command = f"""
+    new_job.command(f"""
     set -x
     
     mkdir $BATCH_TMPDIR/output
@@ -61,7 +61,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         -without-docker -with-report {new_job.report}
     
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_group}.mt {output_folder}/
-    """
+    """)
 
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
 
