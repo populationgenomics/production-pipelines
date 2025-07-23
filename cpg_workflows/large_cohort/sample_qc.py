@@ -93,10 +93,20 @@ def impute_sex(
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
-    # Load calling intervals
+    # Load calling intervals -> default inferred from seq_type, or user supplied
     seq_type = get_config()['workflow']['sequencing_type']
-    calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
-    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
+
+    sampleqc_intervals: str | None = config_retrieve(
+        ['large_cohort', 'sampleqc_intervals'],
+        default=None,
+    )
+    if sampleqc_intervals:
+        intervals_path = reference_path(sampleqc_intervals)
+    else:
+        intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
+
+    calling_intervals_ht = hl.import_locus_intervals(str(intervals_path), reference_genome=genome_build())
+
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
