@@ -85,9 +85,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
         --mane_json {mane_local} \\
         --ref_genome {reference_local}
     
-    wait
-    
-    gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
+    # gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
     """)
 
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
