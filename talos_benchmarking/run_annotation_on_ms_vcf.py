@@ -23,7 +23,7 @@ unmasked_reference = "gs://cpg-common-main/references/ensembl_113/Homo_sapiens.G
 reference_local = hail_batch.get_batch().read_input(unmasked_reference)
 
 am_tar = 'gs://cpg-common-test/references/alphamissense/alphamissense_38.ht.tar'
-am_local = hail_batch.get_batch(am_tar)
+am_local = hail_batch.get_batch().read_input(am_tar)
 
 # required = cohort_output_dir
 # required = merged_vcf
