@@ -58,6 +58,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
     bcftools index -t {local_vcf}
     
     nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
+        -without-docker -with-report {new_job.report} \\
         --merged_vcf {local_vcf} \\
         --alphamissense_tar {am_local} \\
         --cohort {each_group} \\
@@ -67,8 +68,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         --ensembl_gff {gff_local} \\
         --gnomad_zip {echtvar_local} \\
         --mane_json {mane_local} \\
-        --ref_genome {reference_local} \\
-        -without-docker -with-report {new_job.report}
+        --ref_genome {reference_local}
     
     wait
     
