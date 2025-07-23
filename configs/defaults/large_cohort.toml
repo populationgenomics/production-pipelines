@@ -83,6 +83,10 @@ remove_failed_qc_pca = true
 # `datasets` must be a list paths to matrix tables or VDS, and
 # `pop_field` if defined would specify the column-level field in th datasets
 # to extract the population tag for RF training for ancestry inference.
+
+# section that specifies intervals for sample_qc
+# sampleqc_intervals = None
+
 [large_cohort.pca_background]
 #datasets = ['gs://cpg-common-main/references/ancestry/oceania_eur.mt']
 #pop_field = 'continental_pop'
