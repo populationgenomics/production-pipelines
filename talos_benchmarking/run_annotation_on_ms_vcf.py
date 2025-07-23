@@ -2,12 +2,9 @@
 takes the ms VCFs we have available, and runs the Talos annotation pipeline on them.
 """
 
+
 from cpg_utils import hail_batch
 
-
-MS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs'
-
-ms_batches = [5, 10, 25, 50, 100, 250]
 
 # read some reference files to feed into the annotation pipeline
 echtvar_gnomad = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"
@@ -32,7 +29,7 @@ am_local = hail_batch.get_batch(am_tar)
 # required = merged_vcf
 # -with-docker arg to turn off containerisation
 
-for each_group in MS_VCFS:
+for each_group in [5, 10, 25, 50, 100, 250]:
     ms_vcf = f'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs/{each_group}.vcf.bgz'
     local_vcf = hail_batch.get_batch().read_input(ms_vcf)
 
