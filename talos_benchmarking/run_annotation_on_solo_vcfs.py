@@ -2,9 +2,14 @@
 takes the ms VCFs we have available, and runs the Talos annotation pipeline on them.
 """
 
+import random
 
-from cpg_utils import hail_batch
+from cpg_utils import hail_batch, to_path
 
+
+random.seed(42)
+
+batch_instance = hail_batch.get_batch('SingleSample Merge Talos Nextflow')
 
 # read some reference files to feed into the annotation pipeline
 echtvar_gnomad = "gs://cpg-common-main/gnomad/echtvar/gnomad_4.1_region_merged_GRCh38_whole_genome.zip"
@@ -25,30 +30,42 @@ reference_local = hail_batch.get_batch().read_input(unmasked_reference)
 am_tar = 'gs://cpg-common-test/references/alphamissense/alphamissense_38.ht.tar'
 am_local = hail_batch.get_batch().read_input(am_tar)
 
-for each_group in [5, 10, 25, 50, 100, 250]:
-    ms_vcf = f'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs/{each_group}.vcf.bgz'
-    local_vcf = hail_batch.get_batch().read_input(ms_vcf)
+# where are the solo VCFs?
+GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs'
+
+# grab all the VCFs in the solo_vcfs bucket
+vcf_list = [str(each_vcf) for each_vcf in to_path(GS_VCFS).glob('*.vcf.gz')]
+
+for each_count in [5, 10, 25, 50, 100, 250]:
+
+    # create a subset of VCFs to run
+    vcf_group = random.sample(vcf_list, each_count)
+
+    vcf_inputs = [batch_instance.read_input_group(gvcf=sample_vcf, index=f'{sample_vcf}.tbi') for sample_vcf in vcf_group]
+
+    cmd = 'mkdir $BATCH_TMPDIR/individual_vcfs'
+
+    # move these into --input_vcf_dir
+    for each_vcf in vcf_inputs:
+        cmd += f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs/'
 
     image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
 
-    new_job = hail_batch.get_batch().new_bash_job(f'Run Nextflow for {each_group} MS VCF')
+    new_job = hail_batch.get_batch().new_bash_job(f'Run Nextflow for {each_count} MS VCF')
     new_job.cpu(16).memory('32GiB').storage('250GiB')
     new_job.image(image)
 
-    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results/{each_group}'
+    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_merged_results/{each_count}'
 
-    new_job.command(f"""
+    cmd += f"""
     set -x
     
     mkdir $BATCH_TMPDIR/output
     
-    # index the VCF
-    bcftools index -t {local_vcf}
-    
     nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
-        --merged_vcf {local_vcf} \\
+        --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
-        --cohort {each_group} \\
+        --cohort {each_count} \\
         --cohort_output_dir $BATCH_TMPDIR/output \\
         --ensembl_bed {ensembl_local} \\
         --ensembl_merged_bed {merged_bed_local} \\
@@ -57,8 +74,10 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         --ref_genome {reference_local} \\
         -without-docker -with-report {new_job.report}
     
-    gcloud storage cp -r $BATCH_TMPDIR/output/{each_group}.mt {output_folder}/
-    """)
+    gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
+    """
+
+    new_job.command(cmd)
 
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
 
