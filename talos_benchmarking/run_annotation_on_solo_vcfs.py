@@ -85,6 +85,8 @@ for each_count in [5, 10, 25, 50, 100, 250]:
         --ref_genome {reference_local} \\
         -without-docker -with-report {new_job.report}
     
+    await
+    
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
     """)
 
