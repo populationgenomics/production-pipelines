@@ -105,24 +105,29 @@ def impute_sex(
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
-    for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
+    interval_tables = []
+    names = ['lcr_intervals_ht', 'seg_dup_intervals_ht']
+    for name in names:
         interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
-            vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
-            if can_reuse(vds_tmp_path):
-                logging.info(f'Loading {name} filtered tmp vds')
-                vds = hl.vds.read_vds(str(vds_tmp_path))
-            else:
-                # remove all rows where the locus falls within a defined interval
-                tmp_variant_data = vds.variant_data.filter_rows(
-                    hl.is_defined(interval_table[vds.variant_data.locus]),
-                    keep=False,
-                )
-                vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                    str(vds_tmp_path),
-                    overwrite=True,
-                )
-            logging.info(f'count post {name} filter:{vds.variant_data.count()}')
+            interval_tables.append(interval_table)
+
+    interval_table = hl.Table.union(*interval_tables)
+    vds_tmp_path = tmp_prefix / f'{"-".join(names)}_checkpoint.vds'
+    if can_reuse(vds_tmp_path):
+        logging.info(f'Loading {"-".join(names)} filtered tmp vds')
+        vds = hl.vds.read_vds(str(vds_tmp_path))
+    else:
+        # remove all rows where the locus falls within a defined interval
+        tmp_variant_data = vds.variant_data.filter_rows(
+            hl.is_defined(interval_table[vds.variant_data.locus]),
+            keep=False,
+        )
+        vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+            str(vds_tmp_path),
+            overwrite=True,
+        )
+    logging.info(f'VDS checkpointed after filtering with {" ".join(names)}. ')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
