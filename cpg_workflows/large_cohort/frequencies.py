@@ -16,7 +16,6 @@ from gnomad.utils.annotations import (
     annotate_freq,
     bi_allelic_site_inbreeding_expr,
     faf_expr,
-    gen_anc_faf_max_expr,
     get_adj_expr,
     pop_max_expr,
     qual_hist_expr,
@@ -174,6 +173,81 @@ def _compute_age_hists(mt: hl.MatrixTable, sample_qc_ht: hl.Table) -> hl.MatrixT
     return mt
 
 
+def get_freq_meta_index(faf_meta_dict, freq_meta):
+    """
+    Get the index of the frequency metadata in the FAF metadata dictionary.
+
+    :param faf_meta_dict: Dictionary containing FAF metadata.
+    :param freq_meta: ArrayExpression of frequency metadata.
+    :return: Index of the frequency metadata in the FAF metadata dictionary.
+    """
+    return hl.array(faf_meta_dict).index(freq_meta)
+
+
+def gen_anc_faf_max_expr(
+    mt: hl.MatrixTable,
+    faf: hl.expr.ArrayExpression,
+    faf_meta: hl.expr.ArrayExpression,
+    pop_label: str = "pop",
+) -> hl.expr.StructExpression:
+    """
+    Retrieve the maximum FAF and corresponding genetic ancestry for each of the thresholds in `faf`.
+
+    This resulting struct contains the following fields:
+
+        - faf95_max: float64
+        - faf95_max_gen_anc: str
+        - faf99_max: float64
+        - faf99_max_gen_anc: str
+
+    :param faf: ArrayExpression of Structs of FAF thresholds previously computed. When
+        `faf_expr` is used, contains fields 'faf95' and 'faf99'.
+    :param faf_meta: ArrayExpression of meta dictionaries corresponding to faf (as
+        returned by faf_expr)
+    :param pop_label: Label of the population field in the meta dictionary
+    :return: Genetic ancestry group struct for FAF max
+    """
+    faf_gen_anc_indices = hl.enumerate(faf_meta).filter(
+        lambda i: (hl.set(i[1].keys()) == {"group", pop_label}) & (i[1]["group"] == "adj"),
+    )
+    max_fafs_expr = hl.struct()
+
+    # go through faf_gen_anc_indices, if faf_gen_anc_indices is in enumerate(freq_meta),
+    #     then take the corresponding frequency via freq[faf_gen_anc_indices[i][0]] and
+    #     check if freq > 0.5. if it is then take sorted()[-1].
+    # the flip happens anywhere the total alternate allele is more frequent than the ref
+    # regardless of whatever the pops are looking like
+    # Iterate through faf thresholds, generally 'faf95' and 'faf99', and
+    # take the maximum faf value, '[0]', and its gen_anc from the sorted faf array
+    for threshold in faf[0].keys():
+        sorted_faf = hl.sorted(
+            faf_gen_anc_indices.map(
+                lambda x: {
+                    f"{threshold}_max": hl.or_missing(
+                        faf[x[0]][threshold] > 0,
+                        faf[x[0]][threshold],
+                    ),
+                    f"{threshold}_max_gen_anc": hl.or_missing(
+                        faf[x[0]][threshold] > 0,
+                        x[1][pop_label],
+                    ),
+                },
+            ),
+            key=lambda faf: faf[f"{threshold}_max"],
+            reverse=True,
+        )
+        # If reference allele frequency < 0.5, take last value, else take first
+        faf_struct = hl.if_else(
+            mt.variant_qc.AF[0] < 0.5,
+            sorted_faf[-1],
+            sorted_faf[0],
+        )
+
+        max_fafs_expr = max_fafs_expr.annotate(**faf_struct)
+
+    return max_fafs_expr
+
+
 def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
     logging.info('Computing filtering allele frequencies and popmax...')
     faf, faf_meta = faf_expr(mt.freq, mt.freq_meta, mt.locus, POPS_TO_REMOVE_FOR_POPMAX, pop_label='pop')
@@ -193,7 +267,7 @@ def _compute_filtering_af_and_popmax(mt: hl.MatrixTable) -> hl.MatrixTable:
 
     # TO DO: adjust fafmax expression to correctly handle the case when AF != MAF.
     mt = mt.annotate_rows(
-        fafmax=gen_anc_faf_max_expr(faf=mt.faf, faf_meta=mt.faf_meta, pop_label='pop'),
+        fafmax=gen_anc_faf_max_expr(mt, faf=mt.faf, faf_meta=mt.faf_meta, pop_label='pop'),
         popmax=mt.popmax.annotate(
             faf95=mt.faf[
                 mt.faf_meta.index(
