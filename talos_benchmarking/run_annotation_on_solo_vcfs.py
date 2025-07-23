@@ -1,10 +1,13 @@
 """
 takes the ms VCFs we have available, and runs the Talos annotation pipeline on them.
 """
-
+import logging
 import random
 
 from cpg_utils import hail_batch, to_path
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 random.seed(42)
@@ -43,6 +46,12 @@ image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
 
 for each_count in [5, 10, 25, 50, 100, 250]:
 
+    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_merged_results/{each_count}'
+
+    if to_path(f'{output_folder}/report.html').exists():
+        logging.info(f'{output_folder}/report.html exists, skipping')
+        continue
+
     new_job = hail_batch.get_batch().new_bash_job(f'Run Nextflow for {each_count} MS VCF')
     new_job.cpu(16).memory('32GiB').storage('250GiB')
     new_job.image(image)
@@ -57,9 +66,6 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     # move these into --input_vcf_dir
     for each_vcf in vcf_inputs:
         new_job.command(f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs/ ')
-
-
-    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_merged_results/{each_count}'
 
     new_job.command(f"""
     set -x

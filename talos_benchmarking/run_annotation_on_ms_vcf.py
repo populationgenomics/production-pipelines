@@ -2,8 +2,12 @@
 takes the ms VCFs we have available, and runs the Talos annotation pipeline on them.
 """
 
+import logging
 
-from cpg_utils import hail_batch
+from cpg_utils import hail_batch, to_path
+
+
+logging.basicConfig(level=logging.INFO)
 
 
 # read some reference files to feed into the annotation pipeline
@@ -29,6 +33,13 @@ ensembl_gff = 'gs://cpg-common-main/references/ensembl_113/GRCh38.gff3.gz'
 gff_local = hail_batch.get_batch().read_input(ensembl_gff)
 
 for each_group in [5, 10, 25, 50, 100, 250]:
+
+    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results/{each_group}'
+
+    if to_path(f'{output_folder}/report.html').exists():
+        logging.info(f'{output_folder}/report.html exists, skipping')
+        continue
+
     ms_vcf = f'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs/{each_group}.vcf.bgz'
     local_vcf = hail_batch.get_batch().read_input(ms_vcf)
 
@@ -37,8 +48,6 @@ for each_group in [5, 10, 25, 50, 100, 250]:
     new_job = hail_batch.get_batch().new_bash_job(f'Run Nextflow for {each_group} MS VCF')
     new_job.cpu(16).memory('32GiB').storage('250GiB')
     new_job.image(image)
-
-    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results/{each_group}'
 
     new_job.command(f"""
     set -x
