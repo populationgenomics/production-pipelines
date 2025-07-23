@@ -68,7 +68,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
         new_job.command(f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs/ ')
 
     new_job.command(f"""
-    set -x
+    set -ex
     
     mkdir $BATCH_TMPDIR/output
     
