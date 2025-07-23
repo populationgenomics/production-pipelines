@@ -99,7 +99,7 @@ def impute_sex(
     sampleqc_intervals: str | None = config_retrieve(
         ['large_cohort', 'sampleqc_intervals'],
         default=None,
-    ) 
+    )
     if sampleqc_intervals:
         intervals_path = reference_path(sampleqc_intervals)
     else:
