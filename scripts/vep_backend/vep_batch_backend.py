@@ -43,23 +43,23 @@ def main(vcf_path: str, output_ht: str, to_mt: bool = False):
         out_path=to_path(vep_ht),
         scatter_count=scatter_count,
     )
-    if to_mt:
-        assert vep_ht.endswith('.ht')
-        vep_mt = vep_ht[: -len('.ht')] + '.mt'
-        j = b.new_job('annotate cohort', {'tool': 'hail query'})
-        j.image(image_path('cpg_workflows'))
-        j.command(
-            query_command(
-                seqr_loader,
-                seqr_loader.annotate_cohort.__name__,
-                str(vcf_path),
-                vep_mt,
-                vep_ht,
-                setup_gcp=True,
-            ),
-        )
-        if vep_jobs:
-            j.depends_on(*vep_jobs)
+    # if to_mt:
+    #     assert vep_ht.endswith('.ht')
+    #     vep_mt = vep_ht[: -len('.ht')] + '.mt'
+    #     j = b.new_job('annotate cohort', {'tool': 'hail query'})
+    #     j.image(image_path('cpg_workflows'))
+    #     j.command(
+    #         query_command(
+    #             seqr_loader,
+    #             seqr_loader.annotate_cohort.__name__,
+    #             str(vcf_path),
+    #             vep_mt,
+    #             vep_ht,
+    #             setup_gcp=True,
+    #         ),
+    #     )
+    #     if vep_jobs:
+    #         j.depends_on(*vep_jobs)
     b.run(wait=False)
 
 
