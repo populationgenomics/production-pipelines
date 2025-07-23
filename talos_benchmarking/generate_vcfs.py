@@ -19,7 +19,53 @@ import hail as hl
 from cpg_utils import config, hail_batch, to_path
 from cpg_workflows import utils
 
+
 COMPOSE_COMMAND = 'gcloud storage objects compose'
+GS_GVCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_gvcfs'
+
+# one batch to rule them all
+batch_instance = hail_batch.get_batch()
+# one ...reference to rule them all
+reference = hail_batch.fasta_res_group(batch_instance)
+
+
+def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
+    """
+    Set up a job to run hap.py, generating a VCF from a GVCF.
+    logic borrowed from https://github.com/populationgenomics/production-pipelines/blob/a93c4e5754930bff95f125b1292acbde95f7a777/cpg_workflows/scripts/NA12878_validation.py
+    """
+
+    sample_gvcf = f'{GS_GVCFS}/{input_sample}.g.vcf.gz'
+
+    if not to_path(sample_gvcf).exists():
+        logging.error(f'{sample_gvcf!s} does not exist, skipping')
+
+    prepy_j = batch_instance.new_job(f'Run pre.py on {sample_gvcf!s}')
+    prepy_j.image(config.config_retrieve(['images', 'hap-py'])).memory('10Gi').storage('20Gi')
+
+
+    gvcf_input = batch_instance.read_input_group(gvcf=sample_gvcf, index=f'{sample_gvcf}.tbi')
+    prepy_j.declare_resource_group(
+        vcf_output={
+            'vcf': '{root}.vcf.gz',
+            'index': '{root}.vcf.gz.tbi',
+        },
+    )
+
+    # convert the gVCF to a VCF, filtering to PASS sites and removing any variants genotyped as <NON_REF>
+    prepy_j.command(
+            f"""
+            pre.py \\
+            --convert-gvcf-to-vcf \\
+            --filter-nonref \\
+            --pass-only \\
+            --reference {reference["base"]} \\
+            {gvcf_input["gvcf"]} \\
+            {prepy_j.vcf_output["vcf"]}
+            """,
+    )
+
+    batch_instance.write_output(prepy_j.vcf_output, output_prefix)
 
 
 def compose_object_fragments(obj_folder: str, temp_dir: str, output_final: str):
@@ -100,33 +146,29 @@ random.seed(42)
 hail_batch.init_batch()
 
 # this was the original MT prior to generation of a smaller subset checkpoint
-# input_mt = 'gs://cpg-acute-care-test/mt/bbf37e78fe_5866-acute-care_full_copy.mt'
-# _250_samples = random.sample(samples, 250)
+input_mt = 'gs://cpg-acute-care-test/mt/bbf37e78fe_5866-acute-care_full_copy.mt'
+mt = hl.read_matrix_table(input_mt)
+samples = list(mt.s.collect())
+_250_samples = random.sample(samples, 250)
 
-# this now contains only 250 samples, and limited to variants within that sample subset
-input_mt = 'gs://cpg-acute-care-test/talos_benchmarking/250samples.mt'
+assert len(_250_samples) == 250, f'Expected 250 samples, got {len(_250_samples)}'
 
 output_prefix = 'gs://cpg-acute-care-test/talos_benchmarking/ms_vcfs'
 ss_vcf_prefix = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs'
 
-mt = hl.read_matrix_table(input_mt)
-
-_250_samples = list(mt.s.collect())
-
 tmp_dir = os.path.join(config.config_retrieve(['storage', 'default', 'tmp']), 'talos_benchmarking')
 
+for each_sam in _250_samples:
+    out_path = os.path.join(ss_vcf_prefix, f'{each_sam}.vcf.gz')
+    if utils.exists(out_path):
+        logging.info(f'{out_path} exists, skipping')
+        continue
+    logging.info(f'Creating {out_path}')
+    run_gvcf_to_vcf(input_sample=each_sam, output_prefix=os.path.join(ss_vcf_prefix, f'{each_sam}'))
 
-"""
-replace the vcf extraction with https://github.com/populationgenomics/production-pipelines/pull/1270/files
-"""
+hail_batch.get_batch().run(wait=False)
 
-# for each_sam in _250_samples:
-#     out_path = os.path.join(ss_vcf_prefix, f'{each_sam}.vcf.bgz')
-#     if utils.exists(out_path):
-#         logging.info(f'{out_path} exists, skipping')
-#         continue
-#     sam_mt = mt.filter_cols(mt.s == each_sam)
-#     export_and_condense(sam_mt, each_sam, tmp_dir, out_path)
+hail_batch.reset_batch()
 
 # export the bigboi
 out_path = os.path.join(output_prefix, '250.vcf.bgz')
