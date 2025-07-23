@@ -122,7 +122,7 @@ def impute_sex(
         if interval_table.count() > 0:
             interval_tables.append(interval_table)
 
-    interval_table = hl.Table.union(*interval_tables)
+    interval_table = interval_tables[0].union(*interval_tables[1:])
     vds_tmp_path = tmp_prefix / f'{"-".join(names)}_checkpoint.vds'
     if can_reuse(vds_tmp_path):
         logging.info(f'Loading {"-".join(names)} filtered tmp vds')
