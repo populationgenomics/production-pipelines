@@ -122,22 +122,23 @@ def impute_sex(
         if interval_table.count() > 0:
             interval_tables.append(interval_table)
 
-    interval_table = interval_tables[0].union(*interval_tables[1:])
-    vds_tmp_path = tmp_prefix / f'{"-".join(names)}_checkpoint.vds'
-    if can_reuse(vds_tmp_path):
-        logging.info(f'Loading {"-".join(names)} filtered tmp vds')
-        vds = hl.vds.read_vds(str(vds_tmp_path))
-    else:
-        # remove all rows where the locus falls within a defined interval
-        tmp_variant_data = vds.variant_data.filter_rows(
-            hl.is_defined(interval_table[vds.variant_data.locus]),
-            keep=False,
-        )
-        vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-            str(vds_tmp_path),
-            overwrite=True,
-        )
-    logging.info(f'VDS checkpointed after filtering with {" ".join(names)}. ')
+    if len(interval_tables) > 0:
+        interval_table = interval_tables[0].union(*interval_tables[1:])
+        vds_tmp_path = tmp_prefix / f'{"-".join(names)}_checkpoint.vds'
+        if can_reuse(vds_tmp_path):
+            logging.info(f'Loading {"-".join(names)} filtered tmp vds')
+            vds = hl.vds.read_vds(str(vds_tmp_path))
+        else:
+            # remove all rows where the locus falls within a defined interval
+            tmp_variant_data = vds.variant_data.filter_rows(
+                hl.is_defined(interval_table[vds.variant_data.locus]),
+                keep=False,
+            )
+            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+                str(vds_tmp_path),
+                overwrite=True,
+            )
+        logging.info(f'VDS checkpointed after filtering with {" ".join(names)}. ')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(
