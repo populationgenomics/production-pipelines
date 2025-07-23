@@ -30,6 +30,9 @@ reference_local = hail_batch.get_batch().read_input(unmasked_reference)
 am_tar = 'gs://cpg-common-test/references/alphamissense/alphamissense_38.ht.tar'
 am_local = hail_batch.get_batch().read_input(am_tar)
 
+ensembl_gff = 'gs://cpg-common-main/references/ensembl_113/GRCh38.gff3.gz'
+gff_local = hail_batch.get_batch().read_input(ensembl_gff)
+
 # where are the solo VCFs?
 GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs'
 
@@ -70,6 +73,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
         --cohort_output_dir $BATCH_TMPDIR/output \\
         --ensembl_bed {ensembl_local} \\
         --ensembl_merged_bed {merged_bed_local} \\
+        --ensembl_gff {gff_local} \\
         --gnomad_zip {echtvar_local} \\
         --mane_json {mane_local} \\
         --ref_genome {reference_local} \\
