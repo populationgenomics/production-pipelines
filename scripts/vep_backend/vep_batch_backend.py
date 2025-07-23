@@ -10,7 +10,8 @@ from cpg_utils import to_path
 from cpg_utils.config import get_config, image_path, output_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.vep import add_vep_jobs
-from cpg_workflows.query_modules import seqr_loader
+
+# from cpg_workflows.query_modules import seqr_loader
 
 
 @click.command()
