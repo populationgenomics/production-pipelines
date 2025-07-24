@@ -592,6 +592,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, LoadVqsr)),
+                str(inputs.as_path(cohort, LCAnnotateFragmentedVcfWithVep)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
