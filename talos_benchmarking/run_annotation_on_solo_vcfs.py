@@ -37,7 +37,7 @@ ensembl_gff = 'gs://cpg-common-main/references/ensembl_113/GRCh38.gff3.gz'
 gff_local = hail_batch.get_batch().read_input(ensembl_gff)
 
 # where are the solo VCFs?
-GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs'
+GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs_bcftools'
 
 # grab all the VCFs in the solo_vcfs bucket
 vcf_list = [str(each_vcf) for each_vcf in to_path(GS_VCFS).glob('*.vcf.gz')]
