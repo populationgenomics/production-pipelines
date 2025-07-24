@@ -556,7 +556,7 @@ class LCAnnotateFragmentedVcfWithVep(CohortStage):
         return self.make_outputs(cohort, data=outputs, jobs=vep_jobs)
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr, LCAnnotateFragmentedVcfWithVep])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
