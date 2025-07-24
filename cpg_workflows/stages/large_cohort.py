@@ -4,9 +4,10 @@ from typing import TYPE_CHECKING, Any, Final, Tuple
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.jobs.rd_combiner.vep import add_vep_jobs
 from cpg_workflows.large_cohort.combiner import combiner
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify
+from cpg_workflows.utils import get_all_fragments_from_manifest, slugify
 from cpg_workflows.workflow import (
     CohortStage,
     StageInput,
@@ -21,6 +22,8 @@ if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
 HAIL_QUERY: Final = 'hail query'
+
+SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 # TODO, update analysis_meta here to pull the gvcf.type, and store this in metamist.
@@ -469,6 +472,93 @@ class LoadVqsr(CohortStage):
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[LoadVqsr])
+class ConvertSiteOnlyHTToVcfShards(CohortStage):
+    """
+    Convert the site-only HT to VCF shards.
+    This is used to create the VCF fragments for the VEP stage.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        """
+        The output is a directory with the VCF fragments.
+        """
+        if vep_version := config_retrieve(['large_cohort', 'output_versions', 'vep'], default=None):
+            vep_version = slugify(vep_version)
+
+        vep_version = vep_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / vep_version
+        return {
+            # this will be the write path for fragments of sites-only VCF (header-per-shard)
+            'hps_vcf_dir': str(prefix / 'site_only.vqsr.vcf.bgz'),
+            # this will be the file which contains the name of all fragments (header-per-shard)
+            'hps_shard_manifest': prefix / 'site_only.vqsr.vcf.bgz' / SHARD_MANIFEST,
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import convert_siteonly_ht_to_vcf_shards
+
+        j = get_batch().new_job(
+            'ConvertSiteOnlyHTToVcfShards',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('driver_image'))
+
+        j.command(
+            query_command(
+                convert_siteonly_ht_to_vcf_shards,
+                convert_siteonly_ht_to_vcf_shards.run.__name__,
+                str(inputs.as_path(cohort, LoadVqsr)),
+                str(self.expected_outputs(cohort)['hps_vcf_dir']),
+                str(self.expected_outputs(cohort)['hps_shard_manifest']),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[ConvertSiteOnlyHTToVcfShards])
+class AnnotateFragmentedVcfWithVep(CohortStage):
+    """
+    Annotate VCF with VEP.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        """
+        Should this be in tmp? We'll never use it again maybe?
+        """
+        if vep_version := config_retrieve(['large_cohort', 'output_versions', 'vep'], default=None):
+            vep_version = slugify(vep_version)
+
+        vep_version = vep_version or get_workflow().output_version
+
+        return cohort.analysis_dataset.prefix() / get_workflow().name / vep_version / 'vep.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        outputs = self.expected_outputs(cohort)
+        manifest_file = inputs.as_path(target=cohort, stage=ConvertSiteOnlyHTToVcfShards, key='hps_shard_manifest')
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+            )
+
+        input_vcfs = get_all_fragments_from_manifest(manifest_file)
+
+        if len(input_vcfs) == 0:
+            raise ValueError(f'No VCFs in {manifest_file}')
+
+        vep_jobs = add_vep_jobs(
+            input_vcfs=input_vcfs,
+            final_out_path=outputs,
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            job_attrs=self.get_job_attrs(),
+        )
+
+        return self.make_outputs(cohort, data=outputs, jobs=vep_jobs)
 
 
 @stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
