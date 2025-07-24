@@ -511,8 +511,8 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
                 convert_siteonly_ht_to_vcf_shards,
                 convert_siteonly_ht_to_vcf_shards.run.__name__,
                 str(inputs.as_path(cohort, LoadVqsr)),
+                str(self.tmp_prefix),
                 str(self.expected_outputs(cohort)['hps_vcf_dir']),
-                str(self.expected_outputs(cohort)['hps_shard_manifest']),
                 setup_gcp=True,
             ),
         )
