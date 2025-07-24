@@ -32,30 +32,35 @@ def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
     if not to_path(sample_gvcf).exists():
         logging.error(f'{sample_gvcf!s} does not exist, skipping')
 
-    prepy_j = batch_instance.new_job(f'Run pre.py on {sample_gvcf!s}')
-    prepy_j.image(bcftools_img).memory('10Gi').storage('10Gi')
+    convert_job = batch_instance.new_job(f'Run pre.py on {sample_gvcf!s}')
+    convert_job.image(bcftools_img).memory('10Gi').storage('10Gi')
 
 
     gvcf_input = batch_instance.read_input_group(gvcf=sample_gvcf, index=f'{sample_gvcf}.tbi')
-    prepy_j.declare_resource_group(
+    convert_job.declare_resource_group(
         vcf_output={
             'vcf.gz': '{root}.vcf.gz',
             'vcf.gz.tbi': '{root}.vcf.gz.tbi',
         },
     )
 
-    prepy_j.command(
+    # use bcftools to convert the gVCF to a VCF
+    # - normalise the gVCF to remove any multi-allelic sites (inc. splitting out variants from <NON_ALT> genotypes)
+    # - annotate -x to drop the INFO fields (substantial in these gVCFs)
+    # - convert to VCF using --gvcf2vcf
+    # - compress the VCF and index it with tabix
+    convert_job.command(
         f"""
         set -ex
         bcftools norm -m -any -f {reference["base"]} {gvcf_input["gvcf"]}  | \\
             bcftools annotate -x 'INFO' | \\
             bcftools view -c1 | \\
             bcftools convert --gvcf2vcf --fasta-ref {reference["base"]} \\
-            -Oz -o {prepy_j.vcf_output["vcf.gz"]} -W=tbi
+            -Oz -o {convert_job.vcf_output["vcf.gz"]} -W=tbi
         """
     )
 
-    batch_instance.write_output(prepy_j.vcf_output, output_prefix)
+    batch_instance.write_output(convert_job.vcf_output, output_prefix)
 
 
 logging.basicConfig(level=logging.INFO)
