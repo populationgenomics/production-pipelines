@@ -7,7 +7,6 @@ def run(
     vqsr_siteonly_ht_path: str,
     tmp_dir: str,
     out_vcf_dir: str,
-    out_shard_manifest: str,
 ):
     vqsr_siteonly_ht = hl.read_table(str(vqsr_siteonly_ht_path))
     num_variants = vqsr_siteonly_ht.count()
