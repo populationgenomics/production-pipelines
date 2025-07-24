@@ -51,7 +51,7 @@ def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
             bcftools annotate -x 'INFO' | \\
             bcftools view -c1 | \\
             bcftools convert --gvcf2vcf --fasta-ref {reference["base"]} \\
-            -Oz -o {prepy_j.vcf_output["vcf.gz"]}-W=tbi
+            -Oz -o {prepy_j.vcf_output["vcf.gz"]} -W=tbi
         """
     )
 
