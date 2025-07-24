@@ -504,7 +504,7 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
             'ConvertSiteOnlyHTToVcfShards',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
-        j.image(image_path('driver_image'))
+        j.image(config_retrieve(['workflow', 'driver_image']))
 
         j.command(
             query_command(
