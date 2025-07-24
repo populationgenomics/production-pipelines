@@ -521,7 +521,7 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
 
 
 @stage(required_stages=[ConvertSiteOnlyHTToVcfShards])
-class AnnotateFragmentedVcfWithVep(CohortStage):
+class LCAnnotateFragmentedVcfWithVep(CohortStage):
     """
     Annotate VCF with VEP.
     """
