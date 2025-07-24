@@ -543,7 +543,7 @@ class LCAnnotateFragmentedVcfWithVep(CohortStage):
         if not manifest_file.exists():
             raise ValueError(
                 f'Manifest file {str(manifest_file)} does not exist, '
-                f'run the rd_combiner workflow with workflows.last_stages=[CreateDenseMtFromVdsWithHail]',
+                f'run the stage ConvertSiteOnlyHTToVcfShards first.',
             )
 
         input_vcfs = get_all_fragments_from_manifest(manifest_file)
