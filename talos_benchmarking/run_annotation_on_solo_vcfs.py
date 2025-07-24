@@ -72,7 +72,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     
     mkdir $BATCH_TMPDIR/output
     
-    strace -e 'open,clone,execve' -f nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
+    strace -e 'open,clone,execve' -f nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
         -with-report {new_job.report} \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
@@ -85,9 +85,10 @@ for each_count in [5, 10, 25, 50, 100, 250]:
         --mane_json {mane_local} \\
         --ref_genome {reference_local}
     
-    gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
+    # gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
     """)
 
-    hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
+    hail_batch.get_batch().write_output(new_job.log, f'{output_folder}/nextflow.log')
+    # hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
 
 hail_batch.get_batch().run(wait=False)
