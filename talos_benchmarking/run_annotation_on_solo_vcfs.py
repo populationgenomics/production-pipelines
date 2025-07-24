@@ -72,7 +72,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     
     mkdir $BATCH_TMPDIR/output
     
-    strace -e 'open,clone,exec' -f nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
+    strace -e 'open,clone,execve' -f nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
         -with-report {new_job.report} \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
