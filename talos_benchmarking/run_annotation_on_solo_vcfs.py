@@ -42,6 +42,8 @@ GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/solo_vcfs_bcftools'
 # grab all the VCFs in the solo_vcfs bucket
 vcf_list = [str(each_vcf) for each_vcf in to_path(GS_VCFS).glob('*.vcf.gz')]
 
+vcf_inputs = [batch_instance.read_input_group(gvcf=sample_vcf, index=f'{sample_vcf}.tbi') for sample_vcf in vcf_list]
+
 image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
 
 for each_count in [5, 10, 25, 50, 100, 250]:
@@ -57,14 +59,12 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     new_job.image(image)
 
     # create a subset of VCFs to run
-    vcf_group = random.sample(vcf_list, each_count)
-
-    vcf_inputs = [batch_instance.read_input_group(gvcf=sample_vcf, index=f'{sample_vcf}.tbi') for sample_vcf in vcf_group]
+    vcf_group = random.sample(vcf_inputs, each_count)
 
     new_job.command('mkdir $BATCH_TMPDIR/individual_vcfs')
 
     # move these into --input_vcf_dir
-    for each_vcf in vcf_inputs:
+    for each_vcf in vcf_group:
         new_job.command(f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs/ ')
 
     new_job.command(f"""
@@ -75,7 +75,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     ls $BATCH_TMPDIR/individual_vcfs
     
     nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
-        -with-report {new_job.report} \\
+        -without-docker -with-report {new_job.report} \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
         --cohort {each_count} \\
