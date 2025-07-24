@@ -540,11 +540,6 @@ class LCAnnotateFragmentedVcfWithVep(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         outputs = self.expected_outputs(cohort)
         manifest_file = inputs.as_path(target=cohort, stage=ConvertSiteOnlyHTToVcfShards, key='hps_shard_manifest')
-        if not manifest_file.exists():
-            raise ValueError(
-                f'Manifest file {str(manifest_file)} does not exist, '
-                f'run the stage ConvertSiteOnlyHTToVcfShards first.',
-            )
 
         input_vcfs = get_all_fragments_from_manifest(manifest_file)
 
