@@ -73,6 +73,7 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     mkdir $BATCH_TMPDIR/output
     
     strace -f nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
+        -without-docker -with-report {new_job.report} \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
         --cohort {each_count} \\
