@@ -70,8 +70,6 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         --mane_json {mane_local} \\
         --ref_genome {reference_local}
     
-    wait
-    
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_group}.mt {output_folder}/
     """)
 
