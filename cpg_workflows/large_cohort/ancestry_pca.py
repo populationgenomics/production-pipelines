@@ -158,7 +158,7 @@ def run(
     # Annotate the related samples that are being dropped in the sample QC filters field.
     sample_qc_ht = sample_qc_ht.annotate(
         filters=hl.if_else(
-            hl.array(relateds_to_drop_ht.s.collect()).contains(sample_qc_ht.s),
+            hl.is_defined(relateds_to_drop_ht[sample_qc_ht.s]),
             sample_qc_ht.filters.add("relatedness"),
             sample_qc_ht.filters,
         ),
