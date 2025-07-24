@@ -91,6 +91,6 @@ for each_count in [5, 10, 25, 50, 100, 250]:
     """)
 
     hail_batch.get_batch().write_output(new_job.log, f'{output_folder}/nextflow.log')
-    # hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
+    hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
 
 hail_batch.get_batch().run(wait=False)

@@ -57,7 +57,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
     # index the VCF
     bcftools index -t {local_vcf}
     
-    nextflow -c nextflow/annotation.config run nextflow/annotation.nf \\
+    nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
         -without-docker -with-report {new_job.report} \\
         --merged_vcf {local_vcf} \\
         --alphamissense_tar {am_local} \\
@@ -73,6 +73,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_group}.mt {output_folder}/
     """)
 
+    hail_batch.get_batch().write_output(new_job.log, f'{output_folder}/nextflow.log')
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
 
 hail_batch.get_batch().run(wait=False)
