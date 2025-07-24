@@ -27,7 +27,7 @@ ensembl_local = hail_batch.get_batch().read_input(ensembl_bed)
 merged_bed = 'gs://cpg-common-main/references/ensembl_113/merged_GRCh38.bed'
 merged_bed_local = hail_batch.get_batch().read_input(merged_bed)
 
-unmasked_reference = "gs://cpg-common-main/references/ensembl_113/Homo_sapiens.GRCh38.dna.primary_assembly.fa"
+unmasked_reference = "gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta"
 reference_local = hail_batch.get_batch().read_input(unmasked_reference)
 
 am_tar = 'gs://cpg-common-test/references/alphamissense/alphamissense_38.ht.tar'
