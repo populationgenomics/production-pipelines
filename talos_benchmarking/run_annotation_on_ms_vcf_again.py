@@ -40,7 +40,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         logging.info(f'{output_folder}/report.html exists, skipping')
         continue
 
-    ms_vcf = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results_trimmed/{each_group}.vcf.bgz'
+    ms_vcf = f'gs://cpg-acute-care-test/talos_benchmarking/ms_results_trimmed/{each_group}/{each_group}.vcf.bgz'
     if not to_path(ms_vcf).exists():
         logging.info(f'skipping {each_group}, input doesn\'t exist yet')
         continue
