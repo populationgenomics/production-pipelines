@@ -451,7 +451,7 @@ def run(
         # gencode_path=reference_path('ourdna/browser/gencode_v44'),
         # hgnc_path=reference_path('ourdna/browser/hgnc_gene_info'),  # TODO: Confirm name
         gencode_path='gs://cpg-bioheart-test/browser/gencode.v39.annotation.gtf.gz',
-        hgnc_path='gs://cpg-bioheart-test/browser/hgnc_gene_info',
+        hgnc_path='gs://cpg-bioheart-test/browser/hgnc.tsv',
         reference_genome='GRCh38',
     )
 
