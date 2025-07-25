@@ -355,8 +355,7 @@ def prepare_gene_table_for_release(ds: hl.Table, keep_mane_version_global_annota
     return ds
 
 
-def annotate_table(ht, join_on=None, **annotation_tables) -> hl.Table:
-    ds = hl.read_table(ht)
+def annotate_table(ds: hl.Table, join_on=None, **annotation_tables) -> hl.Table:
 
     for annotation_key, annotation_table in annotation_tables.items():
 
