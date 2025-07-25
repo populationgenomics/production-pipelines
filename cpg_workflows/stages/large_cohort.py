@@ -1,6 +1,8 @@
 import json
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+from numpy import require
+
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
@@ -767,8 +769,45 @@ class MergeCoverageTables(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage(required_stages=[Frequencies])
+class GenerateGeneTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if gene_table_version := config_retrieve(['large_cohort', 'output_versions', 'gene_table'], default=None):
+            gene_table_version = slugify(gene_table_version)
+
+        gene_table_version = gene_table_version or get_workflow().output_version
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / gene_table_version
+        return {
+            'gene_table': prefix / 'gene_table.ht',
+            'base_transcripts_grch38': prefix / 'base_transcripts_grch38.ht',
+            'mane_select_transcripts': prefix / 'mane_select_transcripts.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_gene_table
+
+        j = get_batch().new_job(
+            'GenerateGeneTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                generate_gene_table,
+                generate_gene_table.run.__name__,
+                str(inputs.as_path(cohort, Frequencies)),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
 # @stage(required_stages=[Frequencies])
-@stage()
+@stage(required_stages=[GenerateGeneTable])
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
@@ -809,6 +848,8 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
+                str(inputs.as_path(cohort, GenerateGeneTable, key='base_transcripts_grch38')),
+                str(inputs.as_path(cohort, GenerateGeneTable, key='mane_select_transcripts')),
                 setup_gcp=True,
             ),
         )
