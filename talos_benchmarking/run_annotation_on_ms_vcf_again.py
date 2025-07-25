@@ -55,7 +55,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
 
     new_job.command(f"""
     set -x
-    ~]i]
+    
     mkdir $BATCH_TMPDIR/output
     
     nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
