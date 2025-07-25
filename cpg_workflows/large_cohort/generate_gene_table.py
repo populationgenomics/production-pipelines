@@ -437,10 +437,10 @@ def run(
     # mane_select_transcript_path = reference_path('mane_1.4/summary')
     mane_select_transcript_path = 'gs://cpg-bioheart-test/browser/MANE.GRCh38.v0.95.summary.txt.gz'
     mane_select_transcripts = import_mane_select_transcripts(mane_select_transcript_path)
-    mane_select_transcripts = mane_select_transcripts.checkpoint(
-        mane_select_transcript_path,
-        overwrite=True,
-    )
+    # mane_select_transcripts = mane_select_transcripts.checkpoint(
+    #     mane_select_transcript_path,
+    #     overwrite=True,
+    # )
 
     logging.info("Extracting canonical transcripts from frequency table...")
     canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
