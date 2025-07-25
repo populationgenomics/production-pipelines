@@ -1,3 +1,4 @@
+import logging
 import re
 
 import pandas as pd
@@ -431,6 +432,7 @@ def run(
     freq_ht = hl.read_table(str(genome_freq_ht_path))
     # exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
 
+    logging.info("Importing MANE Select transcripts...")
     # gnomAD v4.1 uses v0.95 TODO: Check if v1.4 is compatible with rest of this pipeline
     # mane_select_transcript_path = reference_path('mane_1.4/summary')
     mane_select_transcript_path = 'gs://cpg-bioheart-test/browser/MANE.GRCh38.v0.95.summary.txt.gz'
@@ -440,8 +442,10 @@ def run(
         overwrite=True,
     )
 
+    logging.info("Extracting canonical transcripts from frequency table...")
     canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
 
+    logging.info("Preparing base gene table from GENCODE and HGNC...")
     # TODO: Confirm gencode v44 is compatible with rest of pipeline
     genes_grch38_base: hl.Table = prepare_genes(
         # gencode_path=reference_path('ourdna/browser/gencode_v44'),
@@ -453,6 +457,7 @@ def run(
 
     genes_grch38_base = genes_grch38_base.checkpoint(tmp_prefix + '/genes_grch38_base.ht', overwrite=True)
 
+    logging.info("Annotating gene table with canonical and MANE Select transcripts...")
     annotate_grch38_genes_step_1 = annotate_table(
         genes_grch38_base,
         canonical_transcript=canonical_transcripts_grch38,
@@ -466,6 +471,7 @@ def run(
 
     # SKIPPING STEP 2: ANNOTATION WITH GTEX
 
+    logging.info("Annotating gene transcripts with RefSeq IDs...")
     genes_grch38_annotated_3 = annotate_gene_transcripts_with_refseq_id(
         annotate_grch38_genes_step_1,
         mane_select_transcripts,
@@ -476,6 +482,7 @@ def run(
         overwrite=True,
     )
 
+    logging.info("Annotating with preferred transcript...")
     annotate_grch38_genes_step_4 = annotate_with_preferred_transcript(
         genes_grch38_annotated_3,
     )
@@ -487,10 +494,12 @@ def run(
 
     # SKIPPING STEP 5: ANNOTATING WITH CONSTRAINT
 
+    logging.info("Filtering out PAR_Y genes...")
     annotate_grch38_genes_step_6 = reject_par_y_genes(
         annotate_grch38_genes_step_4,
     )
 
+    logging.info("Checkpointing step 6 output for PrepareBrowserTable...")
     # Step 6 output is used in PrepareBrowserTable to extract transcripts for browser so is written to non-tmp bucket
     annotate_grch38_genes_step_6 = annotate_grch38_genes_step_6.checkpoint(
         step_six_output_path,
@@ -499,6 +508,7 @@ def run(
 
     # SKIPPING REMOVING CONSTRAINT ANNOTATION BECAUSE WE NEVER ANNOTATED WITH IT
 
+    logging.info("Preparing gene table for public release...")
     prepare_grch38_genes_table_for_public_release = prepare_gene_table_for_release(
         annotate_grch38_genes_step_6,
         True,
