@@ -1,4 +1,5 @@
 import json
+from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from numpy import require
@@ -798,7 +799,10 @@ class GenerateGeneTable(CohortStage):
                 generate_gene_table,
                 generate_gene_table.run.__name__,
                 str(inputs.as_path(cohort, Frequencies)),
-                str(self.expected_outputs(cohort)),
+                str(self.tmp_prefix / 'browser'),
+                str(self.expected_outputs(cohort)['base_transcripts_grch38']),
+                str(self.expected_outputs(cohort)['mane_select_transcripts']),
+                str(self.expected_outputs(cohort)['gene_table']),
                 setup_gcp=True,
             ),
         )
@@ -807,7 +811,7 @@ class GenerateGeneTable(CohortStage):
 
 
 # @stage(required_stages=[Frequencies])
-@stage(required_stages=[GenerateGeneTable])
+@stage()
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
@@ -837,6 +841,14 @@ class PrepareBrowserTable(CohortStage):
 
         exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
         genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        base_transcripts_grch38_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'base_transcripts_grch38'],
+            default=None,
+        )
+        mane_select_transcripts_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'mane_select_transcripts'],
+            default=None,
+        )
 
         j.command(
             query_command(
@@ -848,8 +860,8 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
-                str(inputs.as_path(cohort, GenerateGeneTable, key='base_transcripts_grch38')),
-                str(inputs.as_path(cohort, GenerateGeneTable, key='mane_select_transcripts')),
+                base_transcripts_grch38_path,
+                mane_select_transcripts_path,
                 setup_gcp=True,
             ),
         )
