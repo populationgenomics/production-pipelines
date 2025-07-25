@@ -135,18 +135,25 @@ def flag_related(
 
 def _compute_sample_rankings(ht: hl.Table) -> hl.Table:
     """
-    Orders samples by hard filters and coverage and adds rank, which is the lower,
-    the better.
+    Orders samples by hard filters, dataset priority and coverage, then add a rank (lower rank
+    samples are preferentially retained).
 
-    @param ht: table with a `var_data_chr20_mean_dp` and `filters` fields.
+    @param ht: table with a `var_data_chr20_mean_dp`, `dataset` and `filters` fields.
     @return: table ordered by rank, with the following row fields:
         `rank`, `filtered`
     """
+
+    # Optionally order the samples based on dataset, prioritising the first dataset in the list.
+    dataset_order = config_retrieve(['large_cohort', 'relatedness_dataset_order'], None)
+    if dataset_order:
+        dataset_priority_expr = hl.literal({dataset: i for i, dataset in enumerate(dataset_order)})
+
     ht = ht.drop(*list(ht.globals.dtype.keys()))
     ht = ht.select(
         'var_data_chr20_mean_dp',
+        dataset_priority=(dataset_priority_expr.get(ht.dataset, hl.len(dataset_order)) if dataset_order else 0),
         filtered=hl.len(ht.filters) > 0,
     )
-    ht = ht.order_by(ht.filtered, hl.desc(ht.var_data_chr20_mean_dp))
+    ht = ht.order_by(ht.filtered, ht.dataset_priority, hl.desc(ht.var_data_chr20_mean_dp))
     ht = ht.add_index(name='rank')
     return ht.key_by('s').select('filtered', 'rank')

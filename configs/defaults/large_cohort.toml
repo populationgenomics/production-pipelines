@@ -55,6 +55,8 @@ num_pcs = 4
 
 [large_cohort]
 dense_subset_partitions = 10
+# Optionally rank the samples to remove in related sets based on dataset priority; default is None (no dataset priority).
+# relatedness_dataset_order = ['highest_priority_dataset', ..., 'lowest_priority_dataset']
 relatedness_pcs = 10 # number of PCs to use to control for population substructure in relatedness estimation.
 # Kinship threshold to consider two samples as related. Default is 0.08838835 as per Bycroft et al (2018).
 max_kin = 0.08838835
