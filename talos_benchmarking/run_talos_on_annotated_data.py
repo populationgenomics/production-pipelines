@@ -25,6 +25,8 @@ local_clinvar = batch_instance.read_input('gs://cpg-acute-care-test/talos_benchm
 # the config file generated in main
 local_conf = batch_instance.read_input('gs://cpg-acute-care-test/talos_benchmarking/runtime_conf.toml')
 
+local_panelapp = batch_instance.read_input('gs://cpg-acute-care-test/talos_benchmarking/panelapp.json')
+
 # the image to use
 image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
 
@@ -68,6 +70,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         new_job.command('mkdir $BATCH_TMPDIR/output')
         new_job.command('mkdir $BATCH_TMPDIR/input')
         new_job.command(f'gcloud storage cp -r {mt_path} $BATCH_TMPDIR/input')
+        new_job.command('export TALOS_CONFIG={local_conf}')
 
         new_job.command(f"""
         nextflow -log {new_job.log} -c nextflow/talos.config \\
@@ -77,6 +80,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
               --runtime_config {local_conf} \\
               --matrix_table $BATCH_TMPDIR/input/{each_group}.mt \\
               --pedigree {local_ped} \\
+              --panelapp {local_panelapp} \\
               --phenopackets {local_pp} \\
               --parsed_mane {local_mane} \\
               --phenio_db {local_phenio} \\
