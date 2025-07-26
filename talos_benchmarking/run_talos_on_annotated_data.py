@@ -66,7 +66,8 @@ for each_group in [5, 10, 25, 50, 100, 250]:
 
         new_job.command('set -x')
         new_job.command('mkdir $BATCH_TMPDIR/output')
-        new_job.command(f'gcloud storage cp -r {mt_path} $BATCH_TMPDIR/cohort.mt')
+        new_job.command('mkdir $BATCH_TMPDIR/input')
+        new_job.command(f'gcloud storage cp -r {mt_path} $BATCH_TMPDIR/input')
 
         new_job.command(f"""
         nextflow -log {new_job.log} -c nextflow/talos.config \\
@@ -74,7 +75,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
               run nextflow/talos.nf \\
               --cohort {each_group} \\
               --runtime_config {local_conf} \\
-              --matrix_table $BATCH_TMPDIR/cohort.mt \\
+              --matrix_table $BATCH_TMPDIR/input/{each_group}.mt \\
               --pedigree {local_ped} \\
               --phenopackets {local_pp} \\
               --parsed_mane {local_mane} \\
