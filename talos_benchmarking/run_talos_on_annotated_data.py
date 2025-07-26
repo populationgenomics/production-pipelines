@@ -15,7 +15,7 @@ local_pp = batch_instance.read_input(phenopackets)
 
 # read in some annotations
 local_hpo = batch_instance.read_input('gs://cpg-common-test/references/aip/hpo_terms.obo')
-local_phenio = batch_instance.read_input('gs://cpg-acute-care-test/talos_benchmarking/phenio.db.gz')
+local_phenio = batch_instance.read_input('gs://cpg-common-test/references/aip/phenotype.db')
 local_g2p = batch_instance.read_input('gs://cpg-common-test/references/aip/genes_to_phenotype.txt')
 local_mane = batch_instance.read_input('gs://cpg-common-main/references/mane_1.4/mane_1.4.json')
 
