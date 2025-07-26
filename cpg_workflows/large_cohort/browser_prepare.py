@@ -852,8 +852,6 @@ def prepare_v4_variants(
         ),
     )
 
-    variants = variants.checkpoint(browser_outpath, overwrite=True)
-
     logging.info('Annotating transcript consequences...')
     base_transcripts_grch38 = hl.read_table(transcript_table_path)
 
