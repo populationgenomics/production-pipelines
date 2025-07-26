@@ -409,7 +409,19 @@ def hgvsp_from_consequence_amino_acids(csq):
     )
 
 
-def annotate_transcript_consequences(ds, transcripts_path, mane_transcripts_path=None):
+def extract_transcripts(ds: hl.Table) -> hl.Table:
+    ds = ds.key_by()
+    ds = ds.select(gene=ds.row_value)
+    ds = ds.annotate(transcripts=ds.gene.transcripts)
+    ds = ds.explode(ds.transcripts)
+    ds = ds.annotate(**ds.transcripts).drop("transcripts")
+    ds = ds.key_by("transcript_id")
+    ds = ds.repartition(2000, shuffle=True)
+
+    return ds
+
+
+def annotate_transcript_consequences(ds: hl.Table, transcripts: hl.Table, mane_transcripts_path=None):
 
     most_severe_consequence = ds.vep.most_severe_consequence
 
@@ -462,8 +474,6 @@ def annotate_transcript_consequences(ds, transcripts_path, mane_transcripts_path
             consequences.append(csq)
 
     transcript_consequences = transcript_consequences.map(lambda c: c.select(*consequences))
-
-    transcripts = hl.read_table(transcripts_path)
 
     # TODO: This can potentially be improved by removing Table.collect
     # See https://hail.zulipchat.com/#narrow/stream/123010-Hail-0.2E2.20support/topic/Optimize.20annotation.20with.20small.20dataset
@@ -845,9 +855,13 @@ def prepare_v4_variants(
     variants = variants.checkpoint(browser_outpath, overwrite=True)
 
     logging.info('Annotating transcript consequences...')
+    base_transcripts_grch38 = hl.read_table(transcript_table_path)
+
+    transcripts = extract_transcripts(base_transcripts_grch38)
+
     variants = annotate_transcript_consequences(
         variants,
-        transcript_table_path,
+        transcripts,
         mane_transcripts_path,
     )
 
