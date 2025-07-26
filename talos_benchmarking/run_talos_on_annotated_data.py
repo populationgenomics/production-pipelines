@@ -71,8 +71,8 @@ for each_group in [5, 10, 25, 50, 100, 250]:
 
         new_job.command(f"""
         nextflow -log {new_job.log} -c nextflow/talos.config \\
-            -without-docker -with-report {new_job.report} \\
               run nextflow/talos.nf \\
+              -without-docker -with-report {new_job.report} \\
               --cohort {each_group} \\
               --runtime_config {local_conf} \\
               --matrix_table $BATCH_TMPDIR/input/{each_group}.mt \\
@@ -86,5 +86,8 @@ for each_group in [5, 10, 25, 50, 100, 250]:
               --output_dir $BATCH_TMPDIR/output
         """)
         new_job.command(f'gcloud storage cp -r $BATCH_TMPDIR/output {output_path}')
+
+        hail_batch.get_batch().write_output(new_job.log, f'{output_path}/nextflow.log')
+        hail_batch.get_batch().write_output(new_job.report, f'{output_path}/report.html')
 
 batch_instance.run(wait=False)
