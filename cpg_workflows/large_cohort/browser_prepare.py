@@ -689,7 +689,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
 
     # Summarise the carrier age distribution for each variant.
     logging.info('Summarising the age distribution for variant carriers...')
-    ds = ds.annotate(expanded_age_distribution=hl.struct(het=ds.age_hist_het, hom=ds.age_hist_hom))
+    # ds = ds.annotate(expanded_age_distribution=hl.struct(het=ds.age_hist_het, hom=ds.age_hist_hom))
 
     # Summarise the site quality metrics.
     logging.info('Summarising the site quality metrics...')
@@ -772,7 +772,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
             'flags',
             'expanded_freq',
             'fafmax',
-            'expanded_age_distribution',
+            # 'expanded_age_distribution',
             'vep',
             'filters',
             'quality_metrics',
