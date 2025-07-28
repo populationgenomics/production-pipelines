@@ -421,8 +421,8 @@ def annotate_with_preferred_transcript(ds: hl.Table) -> hl.Table:
 
 
 def run(
-    genome_freq_ht_path: str,
-    # exome_freq_ht_path: str,
+    genome_freq_ht_path: str | None,
+    # exome_freq_ht_path: str | None,
     tmp_prefix: str,
     step_six_output_path: str,
     mane_select_transcripts_ht_path: str,
@@ -432,10 +432,7 @@ def run(
     # exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
 
     logging.info("Importing MANE Select transcripts...")
-    # gnomAD v4.1 uses v0.95 TODO: Check if v1.4 is compatible with rest of this pipeline
-    # mane_select_transcript_path = reference_path('mane_1.4/summary')
-    mane_select_transcript_path = 'gs://cpg-bioheart-test/browser/MANE.GRCh38.v0.95.summary.txt.gz'
-    mane_select_transcripts = import_mane_select_transcripts(mane_select_transcript_path)
+    mane_select_transcripts = import_mane_select_transcripts(reference_path('mane_1.4/summary'))
     mane_select_transcripts = mane_select_transcripts.checkpoint(
         mane_select_transcripts_ht_path,
         overwrite=True,
@@ -445,12 +442,9 @@ def run(
     canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
 
     logging.info("Preparing base gene table from GENCODE and HGNC...")
-    # TODO: Confirm gencode v44 is compatible with rest of pipeline
     genes_grch38_base: hl.Table = prepare_genes(
-        # gencode_path=reference_path('ourdna/browser/gencode_v44'),
-        # hgnc_path=reference_path('ourdna/browser/hgnc_gene_info'),  # TODO: Confirm name
-        gencode_path='gs://cpg-bioheart-test/browser/gencode.v39.annotation.gtf.gz',
-        hgnc_path='gs://cpg-bioheart-test/browser/hgnc.tsv',
+        gencode_path=reference_path('gencode_v44'),
+        hgnc_path=reference_path('hgnc_labels'),
         reference_genome='GRCh38',
     )
 
