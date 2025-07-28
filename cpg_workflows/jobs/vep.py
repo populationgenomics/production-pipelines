@@ -117,7 +117,7 @@ def gather_vep_json_to_ht(
             vep_json_to_ht.vep_json_to_ht.__name__,
             [str(p) for p in vep_results_paths],
             str(out_path),
-            True,
+            config_retrieve(['workflow', 'spliceai_plugin'], False),
             setup_gcp=True,
         ),
     )
