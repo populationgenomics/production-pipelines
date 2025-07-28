@@ -734,7 +734,7 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
                     "AS_MQ",
                     "AS_FS",
                     "AS_MQRankSum",
-                    # "AS_pab_max",
+                    "AS_pab_max",
                     "AS_QUALapprox",
                     "AS_QD",
                     "AS_ReadPosRankSum",
