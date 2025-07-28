@@ -30,7 +30,7 @@ from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
 
-def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
+def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: bool = False):
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table
@@ -56,8 +56,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
     # - frequencies, Dict[str, Dict[str, Float]], new struct in colocated_variants
     #   - this is being ignored, cannot be processed using fixed schema
     # - removal of all exac_* fields
-    json_schema = hl.dtype(
-        """
+    json_schema = """
         struct{
             minimised:int32,
             assembly_name:str,
@@ -201,8 +200,29 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str):
             }>,
             variant_class:str
         }
-    """,
-    )
+    """
+
+    if use_spliceai:
+        # Add spliceai struct field
+        json_schema_str: str = (
+            json_schema_str.rstrip("}")
+            + """,
+            spliceai:struct{
+                DP_DL:int32,
+                DS_AL:float64,
+                DP_AG:int32,
+                DS_DL:float64,
+                SYMBOL:str,
+                DS_AG:float64,
+                DP_AL:int32,
+                DP_DG:int32,
+                DS_DG:float64
+            }
+        }
+        """
+        )
+
+    json_schema = hl.dtype(json_schema_str)
 
     ht = hl.import_table(paths=vep_result_paths, no_header=True, types={'f0': json_schema})
     ht = ht.transmute(vep=ht.f0)
@@ -225,6 +245,7 @@ def cli_main():
     parser = ArgumentParser()
     parser.add_argument('--input', help='VEP results JSON', required=True, nargs='+')
     parser.add_argument('--output', help='Output Hail table', required=True)
+    parser.add_argument('--use_spliceai', action='store_true', help='Include SpliceAI annotations in schema')
     args = parser.parse_args()
 
-    vep_json_to_ht(vep_result_paths=args.input, out_path=args.output)
+    vep_json_to_ht(vep_result_paths=args.input, out_path=args.output, use_spliceai=args.use_spliceai)

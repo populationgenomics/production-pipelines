@@ -16,6 +16,7 @@ from cpg_utils.config import config_retrieve, get_config, image_path, reference_
 from cpg_utils.hail_batch import query_command
 from cpg_workflows.jobs.vcf import gather_vcfs
 from cpg_workflows.query_modules import vep
+from cpg_workflows.scripts import vep_json_to_ht
 from cpg_workflows.utils import can_reuse
 
 
@@ -112,11 +113,11 @@ def gather_vep_json_to_ht(
     j.image(image_path('cpg_workflows'))
     j.command(
         query_command(
-            vep,
-            vep.vep_json_to_ht.__name__,
+            vep_json_to_ht,
+            vep_json_to_ht.vep_json_to_ht.__name__,
             [str(p) for p in vep_results_paths],
             str(out_path),
-            vep_version,
+            True,
             setup_gcp=True,
         ),
     )
@@ -187,7 +188,7 @@ def vep_one(
             f'--plugin SpliceAI,snv={vep_dir}/spliceai_scores.raw.snv.hg38.vcf.gz,'
             f'indel={vep_dir}/spliceai_scores.raw.indel.hg38.vcf.gz '
         )
-        if (use_splice_ai and vep_version == '110' and out_format == 'vcf')
+        if (use_splice_ai and vep_version == '110')
         else ''
     )
 
