@@ -425,7 +425,7 @@ def run(
     # exome_freq_ht_path: str,
     tmp_prefix: str,
     step_six_output_path: str,
-    mane_select_transcripts_path: str,
+    mane_select_transcripts_ht_path: str,
     output_path: str,
 ):
     freq_ht = hl.read_table(str(genome_freq_ht_path))
@@ -436,10 +436,10 @@ def run(
     # mane_select_transcript_path = reference_path('mane_1.4/summary')
     mane_select_transcript_path = 'gs://cpg-bioheart-test/browser/MANE.GRCh38.v0.95.summary.txt.gz'
     mane_select_transcripts = import_mane_select_transcripts(mane_select_transcript_path)
-    # mane_select_transcripts = mane_select_transcripts.checkpoint(
-    #     mane_select_transcript_path,
-    #     overwrite=True,
-    # )
+    mane_select_transcripts = mane_select_transcripts.checkpoint(
+        mane_select_transcripts_ht_path,
+        overwrite=True,
+    )
 
     logging.info("Extracting canonical transcripts from frequency table...")
     canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
