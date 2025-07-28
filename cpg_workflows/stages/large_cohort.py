@@ -563,9 +563,16 @@ class LCAnnotateFragmentedVcfWithVep(CohortStage):
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
         output = self.expected_outputs(cohort)
-        manifest_file = inputs.as_path(target=cohort, stage=ConvertSiteOnlyHTToVcfShards, key='hps_shard_manifest')
+        manifest_file: Path = inputs.as_path(
+            target=cohort,
+            stage=ConvertSiteOnlyHTToVcfShards,
+            key='hps_shard_manifest',
+        )
 
-        input_vcfs = get_all_fragments_from_manifest(manifest_file)
+        with open(manifest_file, 'r') as f:
+            manifest = f.read().strip().splitlines()
+
+        input_vcfs = [to_path(manifest_file.parent / vcf) for vcf in manifest]
 
         if len(input_vcfs) == 0:
             raise ValueError(f'No VCFs in {manifest_file}')
