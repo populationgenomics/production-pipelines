@@ -509,11 +509,11 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
         """
         The output is a directory with the VCF fragments.
         """
-        if vep_version := config_retrieve(['large_cohort', 'output_versions', 'vep'], default=None):
-            vep_version = slugify(vep_version)
+        if ht_to_vcf_version := config_retrieve(['large_cohort', 'output_versions', 'ht_to_vcf_version'], default=None):
+            ht_to_vcf_version = slugify(ht_to_vcf_version)
 
-        vep_version = vep_version or get_workflow().output_version
-        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / vep_version
+        ht_to_vcf_version = ht_to_vcf_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ht_to_vcf_version
         return {
             # this will be the write path for fragments of sites-only VCF (header-per-shard)
             'hps_vcf_dir': str(prefix / 'site_only.vqsr.vcf.bgz'),
