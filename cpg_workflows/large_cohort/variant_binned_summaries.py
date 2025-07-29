@@ -86,7 +86,7 @@ def create_binned_summary(
     happy_vcf_path: str,
     binned_summary_outpath: str,
     n_bins: int,
-    fam_stats_ht_path: str,
+    fam_stats_ht_path: str | None,
     use_truth_sample_concordance: bool,
 ) -> hl.Table:
     """

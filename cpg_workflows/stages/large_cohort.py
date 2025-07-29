@@ -707,7 +707,7 @@ class VariantBinnedSummaries(CohortStage):
                 str(happy_vcf_path),
                 str(self.expected_outputs(cohort)),
                 int(n_bins),
-                str(fam_stats_ht_path),
+                fam_stats_ht_path,
                 str(use_truth_sample_concordance),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
