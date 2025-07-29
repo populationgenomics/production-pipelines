@@ -208,15 +208,15 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
             json_schema_str.rstrip("}")
             + """,
             spliceai:struct{
-                DP_DL:int32,
-                DS_AL:float64,
                 DP_AG:int32,
-                DS_DL:float64,
-                SYMBOL:str,
-                DS_AG:float64,
-                DP_AL:int32,
+                DP_DL:int32,
                 DP_DG:int32,
-                DS_DG:float64
+                DP_AL:int32,
+                DS_AL:float64,
+                DS_DG:float64,
+                SYMBOL:str,
+                DS_DL:float64,
+                DS_AG:float64
             }
         }
         """
