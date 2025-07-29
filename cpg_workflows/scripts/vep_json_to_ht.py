@@ -196,26 +196,25 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 am_class:str,
                 am_pathogenicity:float64,
                 source:str,
-                flags:array<str>
+                flags:array<str>"""
+    if use_spliceai:
+        json_schema += """,
+                spliceai:struct{
+                    DP_AG:int32,
+                    DP_DL:int32,
+                    DP_DG:int32,
+                    DP_AL:int32,
+                    DS_AL:float64,
+                    DS_DG:float64,
+                    SYMBOL:str,
+                    DS_DL:float64,
+                    DS_AG:float64
+                }"""
+    json_schema += """
             }>,
             variant_class:str
+        }
     """
-
-    if use_spliceai:
-        # Add spliceai struct field
-        json_schema += """,
-            spliceai:struct{
-                DP_AG:int32,
-                DP_DL:int32,
-                DP_DG:int32,
-                DP_AL:int32,
-                DS_AL:float64,
-                DS_DG:float64,
-                SYMBOL:str,
-                DS_DL:float64,
-                DS_AG:float64
-            }"""
-    json_schema += "\n}"
 
     json_schema = hl.dtype(json_schema)
 
