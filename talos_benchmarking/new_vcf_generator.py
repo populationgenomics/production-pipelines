@@ -94,7 +94,7 @@ hail_batch.init_batch()
 mt = hl.read_matrix_table(input_mt)
 samples = sorted(mt.s.collect())
 
-for chunk_num, sg_chunk in utils.chunks(samples, 52):
+for chunk_num, sg_chunk in enumerate(utils.chunks(samples, 52)):
     out_path = os.path.join(output_ms_vcfs, f'chunk_{chunk_num}.vcf.bgz')
     sam_mt = mt.filter_cols(hl.literal(sg_chunk).contains(mt.s))
     sam_mt = sam_mt.filter_rows(hl.agg.any(sam_mt.GT.is_non_ref()))
