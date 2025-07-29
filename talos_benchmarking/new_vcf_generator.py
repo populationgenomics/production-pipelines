@@ -92,6 +92,9 @@ logging.basicConfig(level=logging.INFO)
 hail_batch.init_batch()
 
 mt = hl.read_matrix_table(input_mt)
+
+mt = mt.select_rows()
+
 samples = sorted(mt.s.collect())
 
 for chunk_num, sg_chunk in enumerate(utils.chunks(samples, 52)):
