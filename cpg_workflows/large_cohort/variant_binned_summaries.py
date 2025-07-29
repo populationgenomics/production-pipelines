@@ -86,7 +86,7 @@ def create_binned_summary(
     happy_vcf_path: str,
     binned_summary_outpath: str,
     n_bins: int,
-    fam_stats_ht: str,
+    fam_stats_ht_path: str,
     use_truth_sample_concordance: bool,
 ) -> hl.Table:
     """
@@ -135,8 +135,16 @@ def create_binned_summary(
     binned_ht = create_binned_ht(vqsr_ht, n_bins)
     grouped_binned_ht = compute_grouped_binned_ht(binned_ht)
 
-    # Construct the aggregation functions; if no fam_stats_ht is provided
+    # Construct the aggregation functions; if no fam_stats_ht_path is provided
     # then exclude the de novo and transmitted singleton aggregations.
+
+    # Hacky addition to read in fam_stats_ht if path provided
+    if fam_stats_ht_path:
+        fam_stats_ht = hl.read_table(fam_stats_ht_path)
+
+    else:
+        fam_stats_ht = None
+
     if fam_stats_ht is None:
         fam_stats_ht = hl.Table.parallelize(
             [],
