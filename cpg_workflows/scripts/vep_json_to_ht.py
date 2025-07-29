@@ -30,7 +30,12 @@ from cpg_utils.config import config_retrieve
 from cpg_utils.hail_batch import init_batch
 
 
-def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: bool = False):
+def vep_json_to_ht(
+    vep_result_paths: list[str],
+    out_path: str,
+    use_spliceai: bool = False,
+    use_cadd: bool = False,
+) -> None:
     """
     Parse results from VEP with annotations formatted in JSON,
     and write into a Hail Table
@@ -85,12 +90,20 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
             intergenic_consequences:array<struct{
                 allele_num:int32,
                 consequence_terms:array<str>,
-                impact:str,minimised:int32,
+                impact:str,
+                minimised:int32,
                 variant_allele:str
             }>,
             most_severe_consequence:str,
             motif_feature_consequences:array<struct{
-                allele_num:int32,
+                allele_num:int32,"""
+
+    if use_cadd:
+        json_schema += """
+                cadd_raw:float64,
+                cadd_phred:float64,"""
+
+    json_schema += """
                 consequence_terms:array<str>,
                 high_inf_pos:str,
                 impact:str,
@@ -104,7 +117,14 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 variant_allele:str
             }>,
             regulatory_feature_consequences:array<struct{
-                allele_num:int32,
+                allele_num:int32,"""
+
+    if use_cadd:
+        json_schema += """
+                cadd_phred:float64,
+                cadd_raw:float64,"""
+
+    json_schema += """
                 biotype:str,
                 consequence_terms:array<str>,
                 impact:str,
@@ -119,7 +139,14 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 allele_num:int32,
                 amino_acids:str,
                 appris:str,
-                biotype:str,
+                biotype:str,"""
+
+    if use_cadd:
+        json_schema += """
+                cadd_raw:float64,
+                cadd_phred:float64,"""
+
+    json_schema += """
                 canonical:int32,
                 mane_select:str,
                 mane_plus_clinical:str,
@@ -197,6 +224,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 am_pathogenicity:float64,
                 source:str,
                 flags:array<str>"""
+
     if use_spliceai:
         json_schema += """,
                 spliceai:struct{
@@ -210,6 +238,7 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                     DS_DL:float64,
                     DS_AG:float64
                 }"""
+
     json_schema += """
             }>,
             variant_class:str
@@ -240,6 +269,12 @@ def cli_main():
     parser.add_argument('--input', help='VEP results JSON', required=True, nargs='+')
     parser.add_argument('--output', help='Output Hail table', required=True)
     parser.add_argument('--use_spliceai', action='store_true', help='Include SpliceAI annotations in schema')
+    parser.add_argument('--use_cadd', action='store_true', help='Include CADD annotations in schema')
     args = parser.parse_args()
 
-    vep_json_to_ht(vep_result_paths=args.input, out_path=args.output, use_spliceai=args.use_spliceai)
+    vep_json_to_ht(
+        vep_result_paths=args.input,
+        out_path=args.output,
+        use_spliceai=args.use_spliceai,
+        use_cadd=args.use_cadd,
+    )
