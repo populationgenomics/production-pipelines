@@ -199,14 +199,11 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 flags:array<str>
             }>,
             variant_class:str
-        }
     """
 
     if use_spliceai:
         # Add spliceai struct field
-        json_schema_str: str = (
-            json_schema_str.rstrip("}")
-            + """,
+        json_schema += """,
             spliceai:struct{
                 DP_AG:int32,
                 DP_DL:int32,
@@ -217,12 +214,10 @@ def vep_json_to_ht(vep_result_paths: list[str], out_path: str, use_spliceai: boo
                 SYMBOL:str,
                 DS_DL:float64,
                 DS_AG:float64
-            }
-        }
-        """
-        )
+            }"""
+    json_schema += "\n}"
 
-    json_schema = hl.dtype(json_schema_str)
+    json_schema = hl.dtype(json_schema)
 
     ht = hl.import_table(paths=vep_result_paths, no_header=True, types={'f0': json_schema})
     ht = ht.transmute(vep=ht.f0)
