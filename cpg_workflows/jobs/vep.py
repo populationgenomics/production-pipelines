@@ -192,6 +192,14 @@ def vep_one(
         else ''
     )
 
+    # CADD plugin
+    use_cadd = config_retrieve(['workflow', 'cadd_plugin'], False)
+    vcf_plugins += (
+        (f'--plugin CADD,snv={vep_dir}/whole_genome_SNVs.tsv.gz,indels={vep_dir}/gnomad.genomes.r3.0.indel.tsv.gz ')
+        if (use_cadd and vep_version == '110')
+        else ''
+    )
+
     # VEP 105 installs plugins in non-standard locations
     loftee_plugin_path = '--dir_plugins $MAMBA_ROOT_PREFIX/share/ensembl-vep '
 
