@@ -3,6 +3,7 @@ from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
 from numpy import require
+from requests import get
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
@@ -813,6 +814,43 @@ class GenerateGeneTable(CohortStage):
                 str(self.expected_outputs(cohort)['mane_select_transcripts']),
                 str(self.expected_outputs(cohort)['gene_table']),
                 setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class GenerateInsilicoPredictors(CohortStage):
+    """
+    Generate insilico predictors for the cohort.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if insilico_predictors_version := config_retrieve(
+            ['large_cohort', 'output_versions', 'insilico_predictors'],
+            default=None,
+        ):
+            insilico_predictors_version = slugify(insilico_predictors_version)
+
+        insilico_predictors_version = insilico_predictors_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / insilico_predictors_version
+        return prefix / 'insilico_predictors.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import insilico_predictors
+
+        j = get_batch().new_job(
+            'GenerateInsilicoPredictors',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                insilico_predictors,
+                insilico_predictors.create_cadd_grch38_ht.__name__,
             ),
         )
 
