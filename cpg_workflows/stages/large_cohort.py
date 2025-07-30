@@ -505,7 +505,7 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
     This is used to create the VCF fragments for the VEP stage.
     """
 
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         """
         The output is a directory with the VCF fragments.
         """
@@ -516,7 +516,7 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ht_to_vcf_version
         return {
             # this will be the write path for fragments of sites-only VCF (header-per-shard)
-            'hps_vcf_dir': str(prefix / 'site_only.vqsr.vcf.bgz'),
+            'hps_vcf_dir': prefix / 'site_only.vqsr.vcf.bgz',
             # this will be the file which contains the name of all fragments (header-per-shard)
             'hps_shard_manifest': prefix / 'site_only.vqsr.vcf.bgz' / SHARD_MANIFEST,
         }
@@ -535,7 +535,7 @@ class ConvertSiteOnlyHTToVcfShards(CohortStage):
                 convert_siteonly_ht_to_vcf_shards,
                 convert_siteonly_ht_to_vcf_shards.run.__name__,
                 str(inputs.as_path(cohort, LoadVqsr)),
-                str(self.tmp_prefix),
+                str(self.expected_outputs(cohort)['hps_vcf_dir'].parent / 'repartitioned'),
                 str(self.expected_outputs(cohort)['hps_vcf_dir']),
                 setup_gcp=True,
             ),
