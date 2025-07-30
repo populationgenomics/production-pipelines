@@ -35,7 +35,7 @@ for proj, ms_vcf_source in [
 
     for vcf_num, vcf_path in enumerate(all_files):
         this_job = batch_instance.new_job(f'Extracting chunk #{vcf_num} for proj {proj}')
-        this_job.storage('200GiB').memory('32GiB').cpu(4)
+        this_job.storage('50GiB').memory('32GiB').cpu(4)
         this_job.image(image)
 
         # localise the MS VCF
