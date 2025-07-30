@@ -76,10 +76,10 @@ def export_and_condense(mt: hl.MatrixTable, sample: str, tmp_dir: str, output_fi
         output_final=output_final,
     )
 
-    new_job = hail_batch.get_batch().new_bash_job(f'Compose VCF for {sample}')
+    new_job = batch_instance.new_bash_job(f'Compose VCF for {sample}')
     new_job.image(config.config_retrieve(['workflow', 'driver_image']))
 
-    localised_script = hail_batch.get_batch().read_input(command_script)
+    localised_script = batch_instance.read_input(command_script)
     new_job.command(f'bash {localised_script}')
 
 
@@ -103,4 +103,4 @@ for chunk_num, sg_chunk in enumerate(utils.chunks(samples, 52)):
     sam_mt = sam_mt.filter_rows(hl.agg.any(sam_mt.GT.is_non_ref()))
     export_and_condense(sam_mt, f'chunk_{chunk_num}', tmp_dir, out_path)
 
-hail_batch.get_batch().run(wait=False)
+batch_instance.run(wait=False)
