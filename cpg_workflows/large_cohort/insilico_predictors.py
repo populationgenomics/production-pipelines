@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def create_cadd_grch38_ht(outpath: str) -> hl.Table:
+def create_cadd_grch38_ht(outpath: str, tmp_dir: str) -> hl.Table:
     """
     Create a Hail Table with CADD scores for GRCh38.
 
@@ -47,7 +47,7 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
     :return: Hail Table with CADD scores for GRCh38.
     """
 
-    def _load_cadd_raw(cadd_tsv) -> hl.Table:
+    def _load_cadd_raw(cadd_tsv, tmp_dir: str, tmp_file: str) -> hl.Table:
         """Functions to load CADD raw data in TSV format to Hail Table."""
         column_names = {
             "f0": "chr",
@@ -75,16 +75,21 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
         ht = ht.select("locus", "alleles", "RawScore", "PHRED")
         ht = ht.key_by("locus", "alleles")
         # ht = ht.checkpoint(new_temp_file("cadd", "ht"))
-        return ht
+        logger.info(f'Checkpointing to {tmp_dir}/{tmp_file}')
+        return ht.checkpoint(tmp_dir + '/' + tmp_file, overwrite=True)
 
     logging.info(f'CADD path: {reference_path("CADD_v1.7_snvs")}')
     snvs = _load_cadd_raw(
         reference_path('CADD_v1.7_snvs'),
+        tmp_dir,
+        'snvs.ht',
     )
 
     logging.info(f'gnomad v3.0 indels path: {reference_path("exomiser_cadd/indel_tsv")}')
     indel3_0 = _load_cadd_raw(
         reference_path('exomiser_cadd/indel_tsv'),
+        tmp_dir,
+        'indels3_0.ht',
     )
 
     # TODO: Not sure if these are actually released, so not using them for now.
@@ -102,6 +107,8 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
     logging.info(f'gnomad v4.0 genomes indels path: {reference_path("CADD_v1.7_indels")}')
     indel4_g = _load_cadd_raw(
         reference_path('CADD_v1.7_indels'),
+        tmp_dir,
+        'indels4_g.ht',
     )
 
     # Merge the CADD predictions run for v3 versions.
