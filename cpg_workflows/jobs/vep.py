@@ -196,7 +196,7 @@ def vep_one(
     # CADD plugin
     use_cadd = config_retrieve(['workflow', 'cadd_plugin'], False)
     vcf_plugins += (
-        (f'--plugin CADD,snv={vep_dir}/whole_genome_SNVs.tsv.gz,indels={vep_dir}/gnomad.genomes.r3.0.indel.tsv.gz ')
+        (f'--plugin CADD,snv={vep_dir}/whole_genome_SNVs.tsv.gz,indels={vep_dir}/gnomad.genomes.r4.0.indel.tsv.gz ')
         if (use_cadd and vep_version == '110')
         else ''
     )
