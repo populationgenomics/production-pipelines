@@ -1,6 +1,7 @@
 """
 takes the ms VCFs we have available, and runs the Talos annotation pipeline on them.
 """
+
 import logging
 import random
 
@@ -48,6 +49,8 @@ image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
 
 for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
 
+    logging.info(f'Considering batch size {each_count}')
+
     output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/new_ms_merged_results/{each_count}'
 
     if to_path(f'{output_folder}/report.html').exists():
@@ -59,7 +62,9 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     new_job.image(image)
 
     # create a subset of VCFs to run
-    vcf_group = random.sample(vcf_inputs, each_count)
+    vcf_group = random.sample(vcf_inputs, min(each_count, len(vcf_inputs)))
+
+    logging.info(f'Detected {len(vcf_group)} input vcfs, of the expected {each_count}')
 
     new_job.command('mkdir $BATCH_TMPDIR/individual_vcfs')
 
@@ -67,13 +72,14 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     for each_vcf in vcf_group:
         new_job.command(f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs/ ')
 
-    new_job.command(f"""
+    new_job.command(
+        f"""
     set -ex
-    
+
     mkdir $BATCH_TMPDIR/output
-    
+
     ls $BATCH_TMPDIR/individual_vcfs
-    
+
     nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
         -without-docker -with-report {new_job.report} \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
@@ -86,9 +92,10 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
         --gnomad_zip {echtvar_local} \\
         --mane_json {mane_local} \\
         --ref_genome {reference_local}
-    
+
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
-    """)
+    """
+    )
 
     hail_batch.get_batch().write_output(new_job.log, f'{output_folder}/nextflow.log')
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
