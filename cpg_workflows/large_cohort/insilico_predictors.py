@@ -1,6 +1,15 @@
+import logging
+
 import hail as hl
 
 from cpg_utils.config import reference_path
+
+logging.basicConfig(
+    format='%(asctime)s (%(name)s %(lineno)s): %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 
 def create_cadd_grch38_ht(outpath: str) -> hl.Table:
@@ -68,9 +77,12 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
         # ht = ht.checkpoint(new_temp_file("cadd", "ht"))
         return ht
 
+    logging.info(f'CADD path: {reference_path("CADD_v1.7")}')
     snvs = _load_cadd_raw(
         reference_path('CADD_v1.7_snvs'),
     )
+
+    logging.info(f'gnomad v3.0 indels path: {reference_path("exomiser_cadd/indel_tsv")}')
     indel3_0 = _load_cadd_raw(
         reference_path('exomiser_cadd/indel_tsv'),
     )
@@ -87,6 +99,7 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
     # indel4_e = _load_cadd_raw(
     #     reference_path('gnomad.exomes.v4.0.indels.new.tsv.bgz'),
     # )
+    logging.info(f'gnomad v4.0 genomes indels path: {reference_path("CADD_v1.7_indels")}')
     indel4_g = _load_cadd_raw(
         reference_path('CADD_v1.7_indels'),
     )
@@ -104,4 +117,6 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
 
     ht = ht.select(cadd=hl.struct(phred=ht.PHRED, raw_score=ht.RawScore))
     ht = ht.annotate_globals(cadd_version="v1.7")
-    return ht.checkpoint(outpath, overwrite=True)
+
+    ht = ht.checkpoint(outpath, overwrite=True)
+    return ht
