@@ -77,7 +77,7 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
         # ht = ht.checkpoint(new_temp_file("cadd", "ht"))
         return ht
 
-    logging.info(f'CADD path: {reference_path("CADD_v1.7")}')
+    logging.info(f'CADD path: {reference_path("CADD_v1.7_snvs")}')
     snvs = _load_cadd_raw(
         reference_path('CADD_v1.7_snvs'),
     )
