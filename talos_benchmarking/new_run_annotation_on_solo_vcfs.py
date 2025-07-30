@@ -58,7 +58,10 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
         continue
 
     new_job = hail_batch.get_batch().new_bash_job(f'Run Nextflow for {each_count} MS VCF')
-    new_job.cpu(16).memory('32GiB').storage('250GiB')
+
+    # some arbitrary calculation, plus a buffer
+    storage_required = (each_count // 1.5) + 10
+    new_job.cpu(16).memory('32GiB').storage(f'{storage_required}GiB')
     new_job.image(image)
 
     # create a subset of VCFs to run
