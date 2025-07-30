@@ -61,8 +61,8 @@ def create_spliceai_grch38_ht(output_path: str) -> hl.Table:
 
     :return: Hail Table with SpliceAI scores for GRCh38.
     """
-    snvs_path = reference_path('vep_110_mount') + 'spliceai_scores.raw.snv.hg38.vcf.gz'
-    indels_path = reference_path('vep_110_mount') + 'spliceai_scores.raw.indel.hg38.vcf.gz'
+    snvs_path = reference_path('vep_110_mount') + '/spliceai_scores.raw.snv.hg38.vcf.gz'
+    indels_path = reference_path('vep_110_mount') + '/spliceai_scores.raw.indel.hg38.vcf.gz'
     # v3_indels_path = "gs://gnomad-insilico/spliceai/spliceai_scores.masked.gnomad_v3_indel.hg38.vcf.bgz"
     # v4_indels_path = "gs://gnomad-insilico/spliceai/spliceai_scores.masked.gnomad_v4_new_indels.hg38.vcf.bgz"
     # v3_v4_unscored_path = (
