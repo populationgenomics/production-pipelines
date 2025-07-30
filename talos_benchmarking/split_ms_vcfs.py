@@ -9,7 +9,6 @@ locally I needed to set a higher concurrent open-file limit
   - ulimit -n 10240
 """
 
-
 import hail as hl
 
 from cpg_utils import to_path, hail_batch
@@ -41,11 +40,13 @@ for proj, ms_vcf_source in [
         # localise the MS VCF
         ms_local = batch_instance.read_input(str(vcf_path))
 
-        this_job.command(f"""
+        this_job.command(
+            f"""
         mkdir $BATCH_TMPDIR/ss_outputs
         bcftools +split -Oz -W=tbi -o $BATCH_TMPDIR/ss_outputs {ms_local}
-        
+
         gcloud storage cp "$BATCH_TMPDIR/ss_outputs/*" {output_vcfs}
-        """)
+        """
+        )
 
 batch_instance.run(wait=False)

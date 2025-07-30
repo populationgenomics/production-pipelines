@@ -35,7 +35,6 @@ def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
     convert_job = batch_instance.new_job(f'Run pre.py on {sample_gvcf!s}')
     convert_job.image(bcftools_img).memory('10Gi').storage('10Gi')
 
-
     gvcf_input = batch_instance.read_input_group(gvcf=sample_gvcf, index=f'{sample_gvcf}.tbi')
     convert_job.declare_resource_group(
         vcf_output={

@@ -43,7 +43,6 @@ def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
     prepy_j = batch_instance.new_job(f'Run pre.py on {sample_gvcf!s}')
     prepy_j.image(config.config_retrieve(['images', 'hap-py'])).memory('10Gi').storage('20Gi')
 
-
     gvcf_input = batch_instance.read_input_group(gvcf=sample_gvcf, index=f'{sample_gvcf}.tbi')
     prepy_j.declare_resource_group(
         vcf_output={
@@ -54,7 +53,7 @@ def run_gvcf_to_vcf(input_sample: str, output_prefix: str):
 
     # convert the gVCF to a VCF, filtering to PASS sites and removing any variants genotyped as <NON_REF>
     prepy_j.command(
-            f"""
+        f"""
             pre.py \\
             --convert-gvcf-to-vcf \\
             --filter-nonref \\

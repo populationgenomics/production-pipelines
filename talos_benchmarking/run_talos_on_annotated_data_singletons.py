@@ -42,7 +42,7 @@ for each_group in [5, 10, 25, 50, 100, 250]:
 
     for run_type, input_dir, output_name in [
         ('nf_merged', 'ms_merged_results', 'solo_vcfs_merged'),
-        ('joint_called', 'ms_results_trimmed', 'joint_call_from_hail')
+        ('joint_called', 'ms_results_trimmed', 'joint_call_from_hail'),
     ]:
 
         # create this input directory
@@ -72,7 +72,8 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         new_job.command(f'gcloud storage cp -r {mt_path} $BATCH_TMPDIR/input')
         new_job.command('export TALOS_CONFIG={local_conf}')
 
-        new_job.command(f"""
+        new_job.command(
+            f"""
         nextflow -log {new_job.log} -c nextflow/talos.config \\
               run nextflow/talos.nf \\
               -without-docker -with-report {new_job.report} \\
@@ -88,7 +89,8 @@ for each_group in [5, 10, 25, 50, 100, 250]:
               --clinvar {local_clinvar} \\
               --hpo {local_hpo} \\
               --output_dir $BATCH_TMPDIR/output
-        """)
+        """
+        )
         new_job.command(f'gcloud storage cp -r $BATCH_TMPDIR/output {output_path}')
 
         hail_batch.get_batch().write_output(new_job.log, f'{output_path}/nextflow.log')

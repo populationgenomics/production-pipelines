@@ -46,12 +46,14 @@ for each_group in [5, 10, 25, 50, 100, 250]:
         },
     )
 
-    new_job.command(f"""
+    new_job.command(
+        f"""
     set -x
-    
+
     bcftools annotate -x 'INFO' {local_vcf} | \\
         bcftools view -c1 -Oz -o {new_job.vcf_output["vcf.gz"]} -W=tbi
-    """)
+    """
+    )
 
     hail_batch.get_batch().write_output(new_job.vcf_output, f'{output_folder}/{each_group}')
 
