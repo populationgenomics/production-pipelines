@@ -69,6 +69,7 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     logging.info(f'Detected {len(vcf_group)} input vcfs, of the expected {each_count}')
 
     new_job.command('mkdir $BATCH_TMPDIR/individual_vcfs')
+    new_job.command('mkdir $BATCH_TMPDIR/work')
 
     # move these into --input_vcf_dir
     for each_vcf in vcf_group:
@@ -83,7 +84,7 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     ls $BATCH_TMPDIR/individual_vcfs
 
     nextflow -log {new_job.log} -c nextflow/annotation.config run nextflow/annotation.nf \\
-        -without-docker -with-report {new_job.report} \\
+        -without-docker -with-report {new_job.report} -w $BATCH_TMPDIR/work \\
         --input_vcf_dir $BATCH_TMPDIR/individual_vcfs \\
         --alphamissense_tar {am_local} \\
         --cohort {each_count} \\
