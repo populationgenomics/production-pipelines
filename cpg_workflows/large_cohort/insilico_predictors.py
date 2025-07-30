@@ -104,4 +104,4 @@ def create_cadd_grch38_ht(outpath: str) -> hl.Table:
 
     ht = ht.select(cadd=hl.struct(phred=ht.PHRED, raw_score=ht.RawScore))
     ht = ht.annotate_globals(cadd_version="v1.7")
-    return ht.checkpoint()
+    return ht.checkpoint(outpath, overwrite=True)
