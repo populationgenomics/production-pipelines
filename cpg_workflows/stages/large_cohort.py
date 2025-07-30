@@ -858,6 +858,44 @@ class GenerateInsilicoPredictors(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage()
+class GenerateSpliceAiHT(CohortStage):
+    """
+    Generate SpliceAI HT for the cohort.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if spliceai_version := config_retrieve(
+            ['large_cohort', 'output_versions', 'spliceai'],
+            default=None,
+        ):
+            spliceai_version = slugify(spliceai_version)
+
+        spliceai_version = spliceai_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / spliceai_version
+        return prefix / 'spliceai.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_spliceai_table
+
+        j = get_batch().new_job(
+            'GenerateSpliceAiHT',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+
+        j.image(image_path('cpg_workflows'))
+
+        j.command(
+            query_command(
+                generate_spliceai_table,
+                generate_spliceai_table.create_spliceai_grch38_ht.__name__,
+                str(self.expected_outputs(cohort)),
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
 # @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):
