@@ -32,6 +32,7 @@ from cpg_workflows.stages.large_cohort import (
     Frequencies,
     GenerateGeneTable,
     GenerateInsilicoPredictors,
+    GenerateSpliceAiHT,
     LCAnnotateFragmentedVcfWithVep,
     LoadVqsr,
     MergeCoverageTables,
@@ -109,6 +110,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         LCAnnotateFragmentedVcfWithVep,
         GenerateGeneTable,
         GenerateInsilicoPredictors,
+        GenerateSpliceAiHT,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,
