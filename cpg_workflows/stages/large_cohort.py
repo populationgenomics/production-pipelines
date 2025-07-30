@@ -851,6 +851,7 @@ class GenerateInsilicoPredictors(CohortStage):
             query_command(
                 insilico_predictors,
                 insilico_predictors.create_cadd_grch38_ht.__name__,
+                str(self.expected_outputs(cohort)),
             ),
         )
 

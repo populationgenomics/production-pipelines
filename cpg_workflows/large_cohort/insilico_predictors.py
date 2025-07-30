@@ -3,7 +3,7 @@ import hail as hl
 from cpg_utils.config import reference_path
 
 
-def create_cadd_grch38_ht() -> hl.Table:
+def create_cadd_grch38_ht(outpath: str) -> hl.Table:
     """
     Create a Hail Table with CADD scores for GRCh38.
 
@@ -104,4 +104,4 @@ def create_cadd_grch38_ht() -> hl.Table:
 
     ht = ht.select(cadd=hl.struct(phred=ht.PHRED, raw_score=ht.RawScore))
     ht = ht.annotate_globals(cadd_version="v1.7")
-    return ht
+    return ht.checkpoint()
