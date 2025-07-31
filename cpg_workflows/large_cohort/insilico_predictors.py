@@ -62,7 +62,7 @@ def create_cadd_grch38_ht(outpath: str, tmp_dir: str) -> hl.Table:
             cadd_tsv,
             types=types,
             no_header=True,
-            force_bgz=True,
+            force_bgz=False,
             comment="#",
             min_partitions=1000,
         )
@@ -78,14 +78,14 @@ def create_cadd_grch38_ht(outpath: str, tmp_dir: str) -> hl.Table:
         logger.info(f'Checkpointing to {tmp_dir}/{tmp_file}')
         return ht.checkpoint(tmp_dir + '/' + tmp_file, overwrite=True)
 
-    logging.info(f'CADD path: {reference_path("CADD_v1.7_snvs")}')
+    logger.info(f'CADD path: {reference_path("CADD_v1.7_snvs")}')
     snvs = _load_cadd_raw(
         reference_path('CADD_v1.7_snvs'),
         tmp_dir,
         'snvs.ht',
     )
 
-    logging.info(f'gnomad v3.0 indels path: {reference_path("exomiser_cadd/indel_tsv")}')
+    logger.info(f'gnomad v3.0 indels path: {reference_path("exomiser_cadd/indel_tsv")}')
     indel3_0 = _load_cadd_raw(
         reference_path('exomiser_cadd/indel_tsv'),
         tmp_dir,
@@ -104,7 +104,7 @@ def create_cadd_grch38_ht(outpath: str, tmp_dir: str) -> hl.Table:
     # indel4_e = _load_cadd_raw(
     #     reference_path('gnomad.exomes.v4.0.indels.new.tsv.bgz'),
     # )
-    logging.info(f'gnomad v4.0 genomes indels path: {reference_path("CADD_v1.7_indels")}')
+    logger.info(f'gnomad v4.0 genomes indels path: {reference_path("CADD_v1.7_indels")}')
     indel4_g = _load_cadd_raw(
         reference_path('CADD_v1.7_indels'),
         tmp_dir,

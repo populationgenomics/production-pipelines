@@ -121,6 +121,6 @@ def create_spliceai_grch38_ht(output_path: str) -> hl.Table:
     logger.info("Getting the max SpliceAI score for each variant across genes...")
     ht = ht.collect_by_key()
     ht = ht.select(spliceai_ds_max=hl.max(ht.values.ds_max))
-    ht = ht.annotate_globals(spliceai_version="v1.3")
+    ht = ht.annotate_globals(spliceai_version="v1.3")  # TODO: Check what version 'masked' is
     ht = ht.checkpoint(output_path, overwrite=True)
     return ht
