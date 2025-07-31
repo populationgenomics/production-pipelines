@@ -847,6 +847,8 @@ class GenerateInsilicoPredictors(CohortStage):
 
         j.image(image_path('cpg_workflows'))
 
+        j.storage('160Gi')
+
         j.command(
             query_command(
                 insilico_predictors,
