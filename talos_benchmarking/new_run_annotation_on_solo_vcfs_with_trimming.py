@@ -70,6 +70,8 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     logging.info(f'Detected {len(vcf_group)} input vcfs, of the expected {each_count}')
 
     new_job.command('set -ex')
+    new_job.command('Inputs copied in')
+    new_job.command('date +%Y-%m-%d-%H:%M:%S')
     new_job.command('mkdir $BATCH_TMPDIR/individual_vcfs')
     new_job.command('mkdir $BATCH_TMPDIR/work')
 
@@ -77,6 +79,9 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     for enum_count, each_vcf in enumerate(vcf_group):
         new_job.command(f'bcftools view -c1 -W=tbi -Oz -o $BATCH_TMPDIR/individual_vcfs/{enum_count}.vcf.gz {each_vcf.gvcf}')
         new_job.command(f'rm {each_vcf.gvcf} {each_vcf.index}')
+
+    new_job.command('VCFs finished processing')
+    new_job.command('date +%Y-%m-%d-%H:%M:%S')
 
     new_job.command(
         f"""
@@ -98,6 +103,8 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     gcloud storage cp -r $BATCH_TMPDIR/output/{each_count}.mt {output_folder}/
     """
     )
+    new_job.command('Completed')
+    new_job.command('date +%Y-%m-%d-%H:%M:%S')
 
     hail_batch.get_batch().write_output(new_job.log, f'{output_folder}/nextflow.log')
     hail_batch.get_batch().write_output(new_job.report, f'{output_folder}/report.html')
