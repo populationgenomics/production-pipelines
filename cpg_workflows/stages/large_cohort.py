@@ -570,6 +570,12 @@ class LCAnnotateFragmentedVcfWithVep(CohortStage):
             key='hps_shard_manifest',
         )
 
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the large_cohort workflow with workflows.last_stages=[ConvertSiteOnlyHTToVcfShards]',
+            )
+
         with open(manifest_file, 'r') as f:
             manifest = f.read().strip().splitlines()
 
