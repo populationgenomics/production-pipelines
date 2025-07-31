@@ -40,7 +40,10 @@ ensembl_gff = 'gs://cpg-common-main/references/ensembl_113/GRCh38.gff3.gz'
 gff_local = hail_batch.get_batch().read_input(ensembl_gff)
 
 # where are the solo VCFs? This is a combination of GHFM-kidgen and acute-care
-GS_VCFS = 'gs://cpg-seqr-test/talos_benchmarking/solo_vcfs'
+# thsi folder was for the 'chunkier' VCFs
+# GS_VCFS = 'gs://cpg-seqr-test/talos_benchmarking/solo_vcfs'
+# this is the slimmed down version
+GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/new_slim_vcfs'
 
 # grab all the VCFs in the solo_vcfs bucket
 vcf_list = [str(each_vcf) for each_vcf in to_path(GS_VCFS).glob('*.vcf.gz')]
@@ -53,7 +56,7 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
 
     logging.info(f'Considering batch size {each_count}')
 
-    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/new_trimmed_ms_merged_results/{each_count}'
+    output_folder = f'gs://cpg-acute-care-test/talos_benchmarking/new_trimmed_ms_merged_results_new_final/{each_count}'
 
     if to_path(f'{output_folder}/report.html').exists():
         logging.info(f'{output_folder}/report.html exists, skipping')
@@ -70,17 +73,14 @@ for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
     logging.info(f'Detected {len(vcf_group)} input vcfs, of the expected {each_count}')
 
     new_job.command('set -ex')
-    new_job.command('echo "Inputs copied in"')
-    new_job.command('date')
     new_job.command('mkdir $BATCH_TMPDIR/individual_vcfs')
     new_job.command('mkdir $BATCH_TMPDIR/work')
 
     # move these into --input_vcf_dir, via a bcftools trim (might take way longer?)
     for enum_count, each_vcf in enumerate(vcf_group):
-        new_job.command(f'bcftools view -c1 -W=tbi -Oz -o $BATCH_TMPDIR/individual_vcfs/{enum_count}.vcf.gz {each_vcf.gvcf}')
-        new_job.command(f'rm {each_vcf.gvcf} {each_vcf.index}')
+        new_job.command(f'mv {each_vcf.gvcf} {each_vcf.index} $BATCH_TMPDIR/individual_vcfs')
 
-    new_job.command('echo "VCFs finished processing"')
+    new_job.command('echo "Inputs copied in and moved"')
     new_job.command('date')
 
     new_job.command(
