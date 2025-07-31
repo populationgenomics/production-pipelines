@@ -196,7 +196,7 @@ def run(
 def build_info_ht(ht: hl.Table, extra_field: str) -> hl.Table:
     ht = ht.select('AC_info', extra_field, 'site_info', 'lowqual', 'AS_lowqual')
     ht = ht.annotate(
-        info=hl.struct(**ht.AC_info, **ht[extra_field], **ht.site_info),
+        info=hl.struct(**ht.AC_info, **ht[extra_field], **ht.site_info, lowqual=ht.lowqual, AS_lowqual=ht.AS_lowqual),
     )
     ht = ht.drop(
         'AC_info',
