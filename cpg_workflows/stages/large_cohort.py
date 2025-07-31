@@ -883,6 +883,7 @@ class GenerateSpliceAiHT(CohortStage):
             'GenerateSpliceAiHT',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
+        j.storage('160Gi')
 
         j.image(image_path('cpg_workflows'))
 
