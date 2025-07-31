@@ -62,7 +62,7 @@ def create_cadd_grch38_ht(outpath: str, tmp_dir: str) -> hl.Table:
             cadd_tsv,
             types=types,
             no_header=True,
-            force_bgz=False,
+            force_bgz=True,
             comment="#",
             min_partitions=1000,
         )
