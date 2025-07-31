@@ -830,6 +830,10 @@ class GenerateGeneTable(CohortStage):
 class GenerateInsilicoPredictors(CohortStage):
     """
     Generate insilico predictors for the cohort.
+
+    We do not run CADD and SpliceAI during VEP as it blows out run times. gnomAD also does not run these predictors
+    during VEP, so we follow suit. We follow the gnomAD approach of building Hail Tables for CADD and SpliceAI so
+    they can be annotated later in PrepareBrowserTable.
     """
 
     def expected_outputs(self, cohort: Cohort) -> Path:
