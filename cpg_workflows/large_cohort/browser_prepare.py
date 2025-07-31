@@ -505,7 +505,7 @@ def prepare_gnomad_v4_variants_helper(
     snv_indel_expr = {'snv': hl.is_snp(ds.alleles[0], ds.alleles[1])}
     snv_indel_expr['indel'] = ~snv_indel_expr['snv']
     for var_type, score_cut in score_cutoffs.items():
-        filters['AS_VQSLOD'] = filters['AS_VQSLOD'] | (
+        filters['AS_VQSR'] = filters['AS_VQSR'] | (
             snv_indel_expr[var_type] & (ds.info.AS_VQSLOD < score_cut.min_score)
         )
 
