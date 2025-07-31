@@ -500,7 +500,7 @@ def prepare_gnomad_v4_variants_helper(
         "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_lowqual": ds.AS_lowqual,
-        "AS_VQSLOD": hl.is_missing(ds.info["AS_VQSLOD"]),
+        "AS_VQSR": hl.is_missing(ds.info["AS_VQSLOD"]),
     }
     snv_indel_expr = {'snv': hl.is_snp(ds.alleles[0], ds.alleles[1])}
     snv_indel_expr['indel'] = ~snv_indel_expr['snv']
