@@ -835,7 +835,10 @@ class GenerateInsilicoPredictors(CohortStage):
 
         insilico_predictors_version = insilico_predictors_version or get_workflow().output_version
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / insilico_predictors_version
-        return prefix / 'insilico_predictors.ht'
+        return {
+            'cadd': prefix / 'cadd.ht',
+            'spliceai': prefix / 'spliceai.ht',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import insilico_predictors
@@ -863,8 +866,9 @@ class GenerateInsilicoPredictors(CohortStage):
         j.command(
             query_command(
                 insilico_predictors,
-                insilico_predictors.create_cadd_grch38_ht.__name__,
-                str(self.expected_outputs(cohort)),
+                insilico_predictors.run.__name__,
+                str(self.expected_outputs(cohort)['cadd']),
+                str(self.expected_outputs(cohort)['spliceai']),
                 str(self.tmp_prefix),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
@@ -874,47 +878,8 @@ class GenerateInsilicoPredictors(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage()
-class GenerateSpliceAiHT(CohortStage):
-    """
-    Generate SpliceAI HT for the cohort.
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if spliceai_version := config_retrieve(
-            ['large_cohort', 'output_versions', 'spliceai'],
-            default=None,
-        ):
-            spliceai_version = slugify(spliceai_version)
-
-        spliceai_version = spliceai_version or get_workflow().output_version
-        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / spliceai_version
-        return prefix / 'spliceai.ht'
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_spliceai_table
-
-        j = get_batch().new_job(
-            'GenerateSpliceAiHT',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
-        j.storage('160Gi')
-
-        j.image(image_path('cpg_workflows'))
-
-        j.command(
-            query_command(
-                generate_spliceai_table,
-                generate_spliceai_table.create_spliceai_grch38_ht.__name__,
-                str(self.expected_outputs(cohort)),
-            ),
-        )
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
-
-
 # @stage(required_stages=[Frequencies])
-@stage()
+@stage(required_stages=[GenerateInsilicoPredictors])
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
@@ -965,6 +930,8 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['genome_variants']),
                 transcripts_grch38_base_path,
                 mane_select_transcripts_path,
+                str(inputs.as_path(cohort, GenerateInsilicoPredictors, key='cadd')),
+                str(inputs.as_path(cohort, GenerateInsilicoPredictors, key='spliceai')),
                 setup_gcp=True,
             ),
         )

@@ -799,6 +799,15 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     return ds
 
 
+def annotate_insilico(ds, cadd_ht, spliceai_ht):
+    return ds.annotate(
+        insilico_predictors=hl.struct(
+            cadd=cadd_ht[ds.locus, ds.alleles].cadd,
+            spliceai_ds_max=spliceai_ht[ds.locus, ds.alleles].spliceai_ds_max,
+        ),
+    )
+
+
 def prepare_v4_variants(
     exome_ds_path: str,
     genome_ds_path: str,
@@ -807,6 +816,8 @@ def prepare_v4_variants(
     genome_variants_outpath: str | None,
     transcript_table_path: str | None,
     mane_transcripts_path: str | None,
+    cadd_path: str | None,
+    spliceai_path: str | None,
 ) -> hl.Table:
 
     # Generate the browser output tables for each data type.
@@ -816,6 +827,12 @@ def prepare_v4_variants(
     # checkpoint datasets
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
     genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
+
+    # Add CADD and SpliceAI annotations before adding 'variant_id' and 'rsids' keys.
+    cadd_ht = hl.read_table(cadd_path)
+    spliceai_ht = hl.read_table(spliceai_path)
+    exome_variants = annotate_insilico(exome_variants, cadd_ht, spliceai_ht)
+    genome_variants = annotate_insilico(genome_variants, cadd_ht, spliceai_ht)
 
     # Add the key so that variant_id and rsid gets considered in the join
     genome_variants = genome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
@@ -828,7 +845,7 @@ def prepare_v4_variants(
         # "rsids",
         # "segdup",
         "vep",
-        # "in_silico_predictors",
+        "in_silico_predictors",
         # "variant_id",
     ]
     variants = variants.annotate(
