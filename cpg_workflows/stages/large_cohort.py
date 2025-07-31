@@ -848,6 +848,17 @@ class GenerateInsilicoPredictors(CohortStage):
         j.image(image_path('cpg_workflows'))
 
         j.storage('160Gi')
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            if workflow_config.get(key):
+                init_batch_args[key] = workflow_config[key]
 
         j.command(
             query_command(
@@ -855,6 +866,8 @@ class GenerateInsilicoPredictors(CohortStage):
                 insilico_predictors.create_cadd_grch38_ht.__name__,
                 str(self.expected_outputs(cohort)),
                 str(self.tmp_prefix),
+                init_batch_args=init_batch_args,
+                setup_gcp=True,
             ),
         )
 
