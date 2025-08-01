@@ -775,8 +775,14 @@ class MergeCoverageTables(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Frequencies])
+@stage()
 class GenerateGeneTable(CohortStage):
+    """
+    Generate a release-ready gene table of genome and exome variants.
+
+    This stage also outputs an intermediate transcripts table for PrepareBrowserTable stage.
+    """
+
     def expected_outputs(self, cohort: Cohort) -> Path:
         if gene_table_version := config_retrieve(['large_cohort', 'output_versions', 'gene_table'], default=None):
             gene_table_version = slugify(gene_table_version)
@@ -799,11 +805,15 @@ class GenerateGeneTable(CohortStage):
         )
         j.image(image_path('cpg_workflows'))
 
+        genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+
         j.command(
             query_command(
                 generate_gene_table,
                 generate_gene_table.run.__name__,
-                str(inputs.as_path(cohort, Frequencies)),
+                str(genome_freq_ht),
+                str(exome_freq_ht),
                 str(self.tmp_prefix / 'browser'),
                 str(self.expected_outputs(cohort)['transcripts_grch38_base']),
                 str(self.expected_outputs(cohort)['mane_select_transcripts']),

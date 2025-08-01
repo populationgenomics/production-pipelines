@@ -436,14 +436,14 @@ def annotate_with_preferred_transcript(ds: hl.Table) -> hl.Table:
 
 def run(
     genome_freq_ht_path: str | None,
-    # exome_freq_ht_path: str | None,
+    exome_freq_ht_path: str | None,
     tmp_prefix: str,
     step_six_output_path: str,
     mane_select_transcripts_ht_path: str,
     output_path: str,
 ):
     freq_ht = hl.read_table(str(genome_freq_ht_path))
-    # exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
+    exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
 
     logger.info("Importing MANE Select transcripts...")
     mane_select_transcripts = import_mane_select_transcripts(reference_path('mane_1.4/summary'))
@@ -453,7 +453,7 @@ def run(
     )
 
     logger.info("Extracting canonical transcripts from frequency table...")
-    canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
+    canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht, exomes=exome_freq_ht)
 
     logger.info("Preparing base gene table from GENCODE and HGNC...")
     genes_grch38_base: hl.Table = prepare_genes(
