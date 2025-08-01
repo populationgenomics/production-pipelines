@@ -1,12 +1,17 @@
 import json
+from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
+
+from numpy import require
+from requests import get
 
 from cpg_utils import Path, to_path
 from cpg_utils.config import config_retrieve, get_config, image_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.large_cohort.combiner import combiner
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify
+from cpg_workflows.utils import get_all_fragments_from_manifest, slugify
 from cpg_workflows.workflow import (
     CohortStage,
     StageInput,
@@ -21,6 +26,8 @@ if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
 HAIL_QUERY: Final = 'hail query'
+
+SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 # TODO, update analysis_meta here to pull the gvcf.type, and store this in metamist.
@@ -180,6 +187,11 @@ class Relatedness(CohortStage):
 @stage(required_stages=[SampleQC, DenseSubset, Relatedness])
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if ancestry_version := config_retrieve(['large_cohort', 'output_versions', 'ancestry'], default=None):
+            ancestry_version = slugify(ancestry_version)
+
+        ancestry_version = ancestry_version or get_workflow().output_version
+
         return dict(
             scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
             eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
@@ -476,7 +488,104 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
+@stage(required_stages=[LoadVqsr])
+class ConvertSiteOnlyHTToVcfShards(CohortStage):
+    """
+    Convert the site-only HT to VCF shards.
+    This is used to create the VCF fragments for the VEP stage.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        The output is a directory with the VCF fragments.
+        """
+        if ht_to_vcf_version := config_retrieve(['large_cohort', 'output_versions', 'ht_to_vcf_version'], default=None):
+            ht_to_vcf_version = slugify(ht_to_vcf_version)
+
+        ht_to_vcf_version = ht_to_vcf_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ht_to_vcf_version
+        return {
+            # this will be the write path for fragments of sites-only VCF (header-per-shard)
+            'hps_vcf_dir': prefix / 'site_only.vqsr.vcf.bgz',
+            # this will be the file which contains the name of all fragments (header-per-shard)
+            'hps_shard_manifest': prefix / 'site_only.vqsr.vcf.bgz' / SHARD_MANIFEST,
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import convert_siteonly_ht_to_vcf_shards
+
+        j = get_batch().new_job(
+            'ConvertSiteOnlyHTToVcfShards',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(config_retrieve(['workflow', 'driver_image']))
+
+        j.command(
+            query_command(
+                convert_siteonly_ht_to_vcf_shards,
+                convert_siteonly_ht_to_vcf_shards.run.__name__,
+                str(inputs.as_path(cohort, LoadVqsr)),
+                str(self.expected_outputs(cohort)['hps_vcf_dir'].parent / 'repartitioned'),
+                str(self.expected_outputs(cohort)['hps_vcf_dir']),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[ConvertSiteOnlyHTToVcfShards])
+class LCAnnotateFragmentedVcfWithVep(CohortStage):
+    """
+    Annotate VCF with VEP.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        """
+        Should this be in tmp? We'll never use it again maybe?
+        """
+        if vep_version := config_retrieve(['large_cohort', 'output_versions', 'vep'], default=None):
+            vep_version = slugify(vep_version)
+
+        vep_version = vep_version or get_workflow().output_version
+
+        return cohort.analysis_dataset.prefix() / get_workflow().name / vep_version / 'vep.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(cohort)
+        manifest_file: Path = inputs.as_path(
+            target=cohort,
+            stage=ConvertSiteOnlyHTToVcfShards,
+            key='hps_shard_manifest',
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the large_cohort workflow with workflows.last_stages=[ConvertSiteOnlyHTToVcfShards]',
+            )
+
+        with open(manifest_file, 'r') as f:
+            manifest = f.read().strip().splitlines()
+
+        input_vcfs = [to_path(manifest_file.parent / vcf) for vcf in manifest]
+
+        if len(input_vcfs) == 0:
+            raise ValueError(f'No VCFs in {manifest_file}')
+
+        vep_jobs = add_vep_jobs(
+            b=get_batch(),
+            input_vcfs=input_vcfs,
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            scatter_count=len(input_vcfs),
+            out_path=output,
+            job_attrs=self.get_job_attrs(),
+        )
+
+        return self.make_outputs(cohort, data=output, jobs=vep_jobs)
+
+
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr, LCAnnotateFragmentedVcfWithVep])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
@@ -512,6 +621,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, LoadVqsr)),
+                str(inputs.as_path(cohort, LCAnnotateFragmentedVcfWithVep)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
@@ -721,6 +831,55 @@ class VariantBinnedSummaries(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage()
+class GenerateGeneTable(CohortStage):
+    """
+    Generate a release-ready gene table of genome and exome variants.
+    This stage also outputs an intermediate transcripts table for PrepareBrowserTable stage.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if gene_table_version := config_retrieve(['large_cohort', 'output_versions', 'gene_table'], default=None):
+            gene_table_version = slugify(gene_table_version)
+
+        gene_table_version = gene_table_version or get_workflow().output_version
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / gene_table_version
+        return {
+            'gene_table': prefix / 'gene_table.ht',
+            'transcripts_grch38_base': prefix / 'transcripts_grch38_base.ht',
+            'mane_select_transcripts': prefix / 'mane_select_transcripts.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_gene_table
+
+        j = get_batch().new_job(
+            'GenerateGeneTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+
+        j.command(
+            query_command(
+                generate_gene_table,
+                generate_gene_table.run.__name__,
+                str(genome_freq_ht),
+                str(exome_freq_ht),
+                str(self.tmp_prefix / 'browser'),
+                str(self.expected_outputs(cohort)['transcripts_grch38_base']),
+                str(self.expected_outputs(cohort)['mane_select_transcripts']),
+                str(self.expected_outputs(cohort)['gene_table']),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
 # @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):
@@ -752,6 +911,14 @@ class PrepareBrowserTable(CohortStage):
 
         exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
         genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        transcripts_grch38_base_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'transcripts_grch38_base'],
+            default=None,
+        )
+        mane_select_transcripts_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'mane_select_transcripts'],
+            default=None,
+        )
 
         j.command(
             query_command(
@@ -763,6 +930,8 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
+                transcripts_grch38_base_path,
+                mane_select_transcripts_path,
                 setup_gcp=True,
             ),
         )
