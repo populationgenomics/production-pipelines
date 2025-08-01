@@ -442,76 +442,76 @@ def run(
     mane_select_transcripts_ht_path: str,
     output_path: str,
 ):
-    freq_ht = hl.read_table(str(genome_freq_ht_path))
-    exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
-
-    logger.info("Importing MANE Select transcripts...")
-    mane_select_transcripts = import_mane_select_transcripts(reference_path('mane_1.4/summary'))
-    mane_select_transcripts = mane_select_transcripts.checkpoint(
-        mane_select_transcripts_ht_path,
-        overwrite=True,
-    )
-
-    logger.info("Extracting canonical transcripts from frequency table...")
-    canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht, exomes=exome_freq_ht)
-
-    logger.info("Preparing base gene table from GENCODE and HGNC...")
-    genes_grch38_base: hl.Table = prepare_genes(
-        gencode_path=reference_path('gencode_v44'),
-        hgnc_path=reference_path('hgnc_labels'),
-        reference_genome='GRCh38',
-    )
-
-    genes_grch38_base = genes_grch38_base.checkpoint(tmp_prefix + '/genes_grch38_base.ht', overwrite=True)
-
-    logger.info("Annotating gene table with canonical and MANE Select transcripts...")
-    annotate_grch38_genes_step_1 = annotate_table(
-        genes_grch38_base,
-        canonical_transcript=canonical_transcripts_grch38,
-        mane_select_transcript=mane_select_transcripts,
-    )
-
-    annotate_grch38_genes_step_1 = annotate_grch38_genes_step_1.checkpoint(
-        tmp_prefix + '/genes_grch38_annotated_step_1.ht',
-        overwrite=True,
-    )
-
-    # SKIPPING STEP 2: ANNOTATION WITH GTEX
-
-    logger.info("Annotating gene transcripts with RefSeq IDs...")
-    genes_grch38_annotated_3 = annotate_gene_transcripts_with_refseq_id(
-        annotate_grch38_genes_step_1,
-        mane_select_transcripts,
-    )
-
-    genes_grch38_annotated_3 = genes_grch38_annotated_3.checkpoint(
-        tmp_prefix + '/genes_grch38_annotated_step_3.ht',
-        overwrite=True,
-    )
-
-    logger.info("Annotating with preferred transcript...")
-    annotate_grch38_genes_step_4 = annotate_with_preferred_transcript(
-        genes_grch38_annotated_3,
-    )
-
-    annotate_grch38_genes_step_4 = annotate_grch38_genes_step_4.checkpoint(
-        tmp_prefix + '/genes_grch38_annotated_step_4.ht',
-        overwrite=True,
-    )
-
-    # SKIPPING STEP 5: ANNOTATING WITH CONSTRAINT
-
-    logger.info("Filtering out PAR_Y genes...")
-    annotate_grch38_genes_step_6 = reject_par_y_genes(
-        annotate_grch38_genes_step_4,
-    )
-
-    logger.info("Checkpointing step 6 output for PrepareBrowserTable...")
-    # Step 6 output is used in PrepareBrowserTable to extract transcripts for browser so is written to non-tmp bucket
     if can_reuse(step_six_output_path):
         logger.info(f"Reusing step 6 output from {step_six_output_path}")
         annotate_grch38_genes_step_6 = hl.read_table(str(step_six_output_path))
     else:
+        freq_ht = hl.read_table(str(genome_freq_ht_path))
+        exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
+
+        logger.info("Importing MANE Select transcripts...")
+        mane_select_transcripts = import_mane_select_transcripts(reference_path('mane_1.4/summary'))
+        mane_select_transcripts = mane_select_transcripts.checkpoint(
+            mane_select_transcripts_ht_path,
+            overwrite=True,
+        )
+
+        logger.info("Extracting canonical transcripts from frequency table...")
+        canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht, exomes=exome_freq_ht)
+
+        logger.info("Preparing base gene table from GENCODE and HGNC...")
+        genes_grch38_base: hl.Table = prepare_genes(
+            gencode_path=reference_path('gencode_v44'),
+            hgnc_path=reference_path('hgnc_labels'),
+            reference_genome='GRCh38',
+        )
+
+        genes_grch38_base = genes_grch38_base.checkpoint(tmp_prefix + '/genes_grch38_base.ht', overwrite=True)
+
+        logger.info("Annotating gene table with canonical and MANE Select transcripts...")
+        annotate_grch38_genes_step_1 = annotate_table(
+            genes_grch38_base,
+            canonical_transcript=canonical_transcripts_grch38,
+            mane_select_transcript=mane_select_transcripts,
+        )
+
+        annotate_grch38_genes_step_1 = annotate_grch38_genes_step_1.checkpoint(
+            tmp_prefix + '/genes_grch38_annotated_step_1.ht',
+            overwrite=True,
+        )
+
+        # SKIPPING STEP 2: ANNOTATION WITH GTEX
+
+        logger.info("Annotating gene transcripts with RefSeq IDs...")
+        genes_grch38_annotated_3 = annotate_gene_transcripts_with_refseq_id(
+            annotate_grch38_genes_step_1,
+            mane_select_transcripts,
+        )
+
+        genes_grch38_annotated_3 = genes_grch38_annotated_3.checkpoint(
+            tmp_prefix + '/genes_grch38_annotated_step_3.ht',
+            overwrite=True,
+        )
+
+        logger.info("Annotating with preferred transcript...")
+        annotate_grch38_genes_step_4 = annotate_with_preferred_transcript(
+            genes_grch38_annotated_3,
+        )
+
+        annotate_grch38_genes_step_4 = annotate_grch38_genes_step_4.checkpoint(
+            tmp_prefix + '/genes_grch38_annotated_step_4.ht',
+            overwrite=True,
+        )
+
+        # SKIPPING STEP 5: ANNOTATING WITH CONSTRAINT
+
+        logger.info("Filtering out PAR_Y genes...")
+        annotate_grch38_genes_step_6 = reject_par_y_genes(
+            annotate_grch38_genes_step_4,
+        )
+
+        logger.info("Checkpointing step 6 output for PrepareBrowserTable...")
+        # Step 6 output is used in PrepareBrowserTable to extract transcripts for browser so is written to non-tmp bucket
         annotate_grch38_genes_step_6 = annotate_grch38_genes_step_6.checkpoint(
             step_six_output_path,
             overwrite=True,
