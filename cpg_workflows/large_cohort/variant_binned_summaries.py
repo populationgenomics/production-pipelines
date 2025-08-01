@@ -116,6 +116,8 @@ def create_binned_summary(
     )
 
     # Hacky addition to generate the truth_sample_concordance table within the function
+    truth_sample_concordance = None
+
     if use_truth_sample_concordance:
         truth_sample_concordance = prepare_truth_sample_concordance(
             happy_vcf_path,

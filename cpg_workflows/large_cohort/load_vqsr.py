@@ -85,6 +85,7 @@ def load_vqsr(
     ht_unsplit = ht_unsplit.annotate(
         info=ht_unsplit.info.annotate(
             AS_SB_TABLE=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_SB_TABLE,
+            AS_pab_max=pre_vcf_adjusted_ht[ht_unsplit.key].info.AS_pab_max,
         ),
         AS_lowqual=pre_vcf_adjusted_ht[ht_unsplit.key].AS_lowqual,
     )

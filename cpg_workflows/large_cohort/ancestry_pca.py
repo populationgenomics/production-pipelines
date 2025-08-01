@@ -15,7 +15,7 @@ from cpg_workflows.utils import can_reuse
 from gnomad.sample_qc.ancestry import assign_population_pcs, run_pca_with_relateds
 
 MIN_N_PCS = 3  # for one PC1 vs PC2 plot
-MIN_N_SAMPLES = 10
+MIN_N_SAMPLES = 5  # increase to 10 once a larger test dataset is available
 
 
 def reorder_columns(ht: hl.Table, reference_table: hl.Table) -> hl.Table:
@@ -155,6 +155,19 @@ def run(
         dense_mt = dense_mt.filter_cols(~hl.literal(sgids_remove).contains(dense_mt.s))
         sample_qc_ht = sample_qc_ht.filter(~hl.literal(sgids_remove).contains(sample_qc_ht.s))
 
+    # Annotate the related samples that are being dropped in the sample QC filters field.
+    sample_qc_ht = sample_qc_ht.annotate(
+        filters=hl.if_else(
+            hl.is_defined(relateds_to_drop_ht[sample_qc_ht.s]),
+            sample_qc_ht.filters.add("relatedness"),
+            sample_qc_ht.filters,
+        ),
+    )
+
+    # Drop the related samples and any low-quality samples from the PCA computation,
+    # but still project them into the results.
+    samples_to_drop = sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0)
+
     pca_background = get_config()['large_cohort'].get('pca_background', {})
     if 'datasets' in pca_background:
         dense_mt_checkpoint_path = tmp_prefix / 'modified_dense_mt.mt'
@@ -175,7 +188,7 @@ def run(
     )
     scores_ht, eigenvalues_ht, loadings_ht = _run_pca_ancestry_analysis(
         mt=dense_mt,
-        sample_to_drop_ht=relateds_to_drop_ht,
+        sample_to_drop_ht=samples_to_drop,
         n_pcs=n_pcs,
         out_scores_ht_path=out_scores_ht_path,
         out_eigenvalues_ht_path=out_eigenvalues_ht_path,
@@ -209,7 +222,7 @@ def _run_pca_ancestry_analysis(
     @param mt: variants usable for PCA analysis, combined with samples
         with known populations (HGDP, 1KG, etc)
     @param sample_to_drop_ht: table with samples to drop based on
-        previous relatedness analysis. With a `rank` row field
+        previous relatedness analysis.
     @param out_eigenvalues_ht_path: path to a txt file to write PCA eigenvalues
     @param out_scores_ht_path: path to write PCA scores
     @param out_loadings_ht_path: path to write PCA loadings
@@ -317,7 +330,7 @@ def _infer_pop_labels(
         )
         pop_ht = scores_ht.annotate(
             training_pop=hl.missing(hl.tstr),
-            pop='Other',
+            pop='Unassigned',
             is_training=False,
             pca_scores=scores_ht.scores,
         )
@@ -337,6 +350,7 @@ def _infer_pop_labels(
             pc_cols=pop_pca_scores_ht_.scores[:n_pcs],
             known_col='training_pop',
             min_prob=min_prob_,
+            missing_label='na',
         )
         n_mislabeled_samples_ = pop_ht_.aggregate(hl.agg.count_where(pop_ht_.training_pop != pop_ht_.pop))
         return pop_ht_, pops_rf_model_, n_mislabeled_samples_
