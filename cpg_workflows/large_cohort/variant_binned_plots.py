@@ -254,7 +254,7 @@ def plot_metric_tabs(
 
 def run(
     binned_summary_ht_path: str,
-    binned_plots_outpath: str,
+    binned_plots_output: dict,
     snp_bin_threshold: int,
     indel_bin_threshold: int,
 ) -> None:
@@ -269,7 +269,7 @@ def run(
     """
     # Read in the binned_summary_ht table and convert to pandas.
     binned_summary_ht = hl.read_table(binned_summary_ht_path)
-    df = binned_summary_ht.to_pandas()  # FIXME refactor df to appropriate name
+    df = binned_summary_ht.to_pandas()
 
     # Ti/Tv ratio
     plot_metric_tabs(
@@ -281,7 +281,7 @@ def run(
         y_func=lambda df: df['n_ti'] / df['n_tv'],
         snp_bin_threshold=snp_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_ti', 'n_tv'],
-    ).save(f"{binned_plots_outpath}/ti_tv.html")
+    ).save(binned_plots_output['ti_tv.html'])
 
     # Proportion singletons
     plot_metric_tabs(
@@ -294,7 +294,7 @@ def run(
         snp_bin_threshold=snp_bin_threshold,
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_singleton'],
-    ).save(f"{binned_plots_outpath}/proportion_singletons.html")
+    ).save(binned_plots_output['proportion_singletons.html'])
 
     # Proportion singletons adjusted
     plot_metric_tabs(
@@ -307,7 +307,7 @@ def run(
         snp_bin_threshold=snp_bin_threshold,
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_singleton'],
-    ).save(f"{binned_plots_outpath}/proportion_singletons_adj.html")
+    ).save(binned_plots_output['proportion_singletons_adj.html'])
 
     # Proportion bi-allelic
     plot_metric_tabs(
@@ -320,7 +320,7 @@ def run(
         snp_bin_threshold=snp_bin_threshold,
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_biallelic'],
-    ).save(f"{binned_plots_outpath}/biallelics.html")
+    ).save(binned_plots_output['biallelics.html'])
 
     # ClinVar variants
     plot_metric_tabs(
@@ -333,7 +333,7 @@ def run(
         snp_bin_threshold=snp_bin_threshold,
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_clinvar'],
-    ).save(f"{binned_plots_outpath}/clinvar.html")
+    ).save(binned_plots_output['clinvar.html'])
 
     # ClinVar pathogenic variants
     plot_metric_tabs(
@@ -346,7 +346,7 @@ def run(
         snp_bin_threshold=snp_bin_threshold,
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_clinvar_path'],
-    ).save(f"{binned_plots_outpath}/clinvar_path.html")
+    ).save(binned_plots_output['clinvar_path.html'])
 
     # INDEL ratios
     plot_metric_tabs(
@@ -358,7 +358,7 @@ def run(
         y_func=lambda df: df['n_ins'] / df['n_del'],
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_ins', 'n_del'],
-    ).save(f"{binned_plots_outpath}/indel_ratios.html")
+    ).save(binned_plots_output['indel_ratios.html'])
 
     # INDEL 1bp ratios
     plot_metric_tabs(
@@ -370,7 +370,7 @@ def run(
         y_func=lambda df: df['n_1bp_ins'] / df['n_1bp_del'],
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_1bp_ins', 'n_1bp_del'],
-    ).save(f"{binned_plots_outpath}/indel_1bp_ratios.html")
+    ).save(binned_plots_output['indel_1bp_ratios.html'])
 
     # INDEL 2bp ratios
     plot_metric_tabs(
@@ -382,7 +382,7 @@ def run(
         y_func=lambda df: df['n_2bp_ins'] / df['n_2bp_del'],
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_2bp_ins', 'n_2bp_del'],
-    ).save(f"{binned_plots_outpath}/indel_2bp_ratios.html")
+    ).save(binned_plots_output['indel_2bp_ratios.html'])
 
     # INDEL 3bp ratios
     plot_metric_tabs(
@@ -394,7 +394,7 @@ def run(
         y_func=lambda df: df['n_3bp_ins'] / df['n_3bp_del'],
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_3bp_ins', 'n_3bp_del'],
-    ).save(f"{binned_plots_outpath}/indel_3bp_ratios.html")
+    ).save(binned_plots_output['indel_3bp_ratios.html'])
 
     # Truth sample precision
     plot_metric_tabs(
@@ -408,7 +408,7 @@ def run(
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_tp', 'n_fp', 'n_fn'],
         cumulative=[False],
-    ).save(f"{binned_plots_outpath}/truth_sample_precision.html")
+    ).save(binned_plots_output['truth_sample_precision.html'])
 
     # Truth sample recall
     plot_metric_tabs(
@@ -422,7 +422,7 @@ def run(
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_tp', 'n_fp', 'n_fn'],
         cumulative=[False],
-    ).save(f"{binned_plots_outpath}/truth_sample_recall.html")
+    ).save(binned_plots_output['truth_sample_recall.html'])
 
     # Truth sample precision x recall
     plot_metric_tabs(
@@ -438,4 +438,4 @@ def run(
         indel_bin_threshold=indel_bin_threshold,
         tooltips=['n', 'min_score', 'max_score', 'n_tp', 'n_fp', 'n_fn', 'bin'],
         cumulative=[False],
-    ).save(f"{binned_plots_outpath}/truth_sample_precision_x_recall.html")
+    ).save(binned_plots_output['truth_sample_precision_x_recall.html'])

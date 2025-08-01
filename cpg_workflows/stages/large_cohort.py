@@ -720,6 +720,21 @@ class VariantBinnedSummaries(CohortStage):
 @stage(required_stages=[VariantBinnedSummaries])
 class VariantBinnedPlots(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        plot_filenames = [
+            "ti_tv.html",
+            "proportion_singletons.html",
+            "proportion_singletons_adj.html",
+            "biallelics.html",
+            "clinvar.html",
+            "clinvar_path.html",
+            "indel_ratios.html",
+            "indel_1bp_ratios.html",
+            "indel_2bp_ratios.html",
+            "indel_3bp_ratios.html",
+            "truth_sample_precision.html",
+            "truth_sample_recall.html",
+            "truth_sample_precision_x_recall.html",
+        ]
         if var_binned_plots_version := config_retrieve(
             ['large_cohort', 'output_versions', 'var_binned_plots'],
             default=None,
@@ -727,10 +742,8 @@ class VariantBinnedPlots(CohortStage):
             var_binned_plots_version = slugify(var_binned_plots_version)
 
         var_binned_plots_version = var_binned_plots_version or get_workflow().output_version
-        return {
-            # FIXME Correct way?
-            cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version / 'ti_tv.html',
-        }
+        path_prefix = cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version
+        return {str(filename): path_prefix / filename for filename in plot_filenames}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import variant_binned_plots
@@ -761,9 +774,9 @@ class VariantBinnedPlots(CohortStage):
                 variant_binned_plots,
                 variant_binned_plots.run.__name__,
                 str(inputs.as_path(cohort, VariantBinnedSummaries)),
-                str(self.expected_outputs(cohort)),
-                int(snp_bin_threshold),
-                int(indel_bin_threshold),
+                self.expected_outputs(cohort),
+                snp_bin_threshold,
+                indel_bin_threshold,
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
