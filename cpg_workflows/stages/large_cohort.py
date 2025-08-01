@@ -717,6 +717,63 @@ class VariantBinnedSummaries(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
+@stage(required_stages=[VariantBinnedSummaries])
+class VariantBinnedPlots(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if var_binned_plots_version := config_retrieve(
+            ['large_cohort', 'output_versions', 'var_binned_plots'],
+            default=None,
+        ):
+            var_binned_plots_version = slugify(var_binned_plots_version)
+
+        var_binned_plots_version = var_binned_plots_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version / 'binned_summary.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import variant_binned_plots
+
+        j = get_batch().new_job(
+            'VariantBinnedPlots',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            if workflow_config.get(key):
+                init_batch_args[key] = workflow_config[key]
+
+        # happy_vcf_path = config_retrieve(['large_cohort', 'happy_vcf_path'])
+        # n_bins = config_retrieve(['large_cohort', 'n_bins'], default=100)  # FIXME default also set in function
+        # fam_stats_ht_path = config_retrieve(['large_cohort', 'fam_stats_ht_path'], default=None)
+        # use_truth_sample_concordance = config_retrieve(['large_cohort', 'truth_sample_concordance_path'], default=False)
+
+        j.command(
+            query_command(
+                variant_binned_plots,
+                variant_binned_plots.run.__name__,
+                # str(inputs.as_path(cohort, LoadVqsr)),
+                # # "gs://cpg-bioheart-test/large_cohort/browser-testing-data/vqsr.ht",
+                # str(happy_vcf_path),
+                # str(self.expected_outputs(cohort)),
+                # int(n_bins),
+                # fam_stats_ht_path,
+                # str(use_truth_sample_concordance),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
 # @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):
