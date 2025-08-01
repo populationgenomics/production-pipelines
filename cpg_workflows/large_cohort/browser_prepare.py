@@ -179,7 +179,7 @@ def process_score_cutoffs(
     indel_bin_cutoff: int | None = None,
     snv_score_cutoff: float | None = None,
     indel_score_cutoff: float | None = None,
-    aggregated_bin_ht: hl.Table = None,
+    aggregated_bin_ht_path: hl.Table = None,
     snv_bin_id: str = 'bin',
     indel_bin_id: str = 'bin',
 ) -> dict[str, hl.expr.StructExpression]:
@@ -217,6 +217,8 @@ def process_score_cutoffs(
         determine the indel score cutoff.
     :return: Finalized random forest Table annotated with variant filters.
     """
+    aggregated_bin_ht = hl.read_table(aggregated_bin_ht_path)
+
     if snv_bin_cutoff is not None and snv_score_cutoff is not None:
         raise ValueError(
             "snv_bin_cutoff and snv_score_cutoff are mutually exclusive, please only"
@@ -505,9 +507,7 @@ def prepare_gnomad_v4_variants_helper(
     snv_indel_expr = {'snv': hl.is_snp(ds.alleles[0], ds.alleles[1])}
     snv_indel_expr['indel'] = ~snv_indel_expr['snv']
     for var_type, score_cut in score_cutoffs.items():
-        filters['AS_VQSR'] = filters['AS_VQSR'] | (
-            snv_indel_expr[var_type] & (ds.info.AS_VQSLOD < score_cut.min_score)
-        )
+        filters['AS_VQSR'] = filters['AS_VQSR'] | (snv_indel_expr[var_type] & (ds.info.AS_VQSLOD < score_cut.min_score))
 
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
@@ -545,22 +545,21 @@ def prepare_v4_variants(
     genome_variants_outpath: str | None,
 ) -> hl.Table:
 
-    aggregated_bin_ht_path = config_retrieve(['large_cohorts', 'browser', 'aggregated_bin_ht_path'])
-    aggregated_bin_ht = hl.read_table(aggregated_bin_ht_path)
-
     # Process the score cutoffs.
-    score_cutoffs = process_score_cutoffs(
-        snv_bin_cutoff=config_retrieve(['large_cohorts', 'browser', 'snp_bin_threshold']),
-        indel_bin_cutoff=config_retrieve(['large_cohorts', 'browser', 'indel_bin_threshold']),
-        snv_score_cutoff=None,
-        indel_score_cutoff=None,
-        aggregated_bin_ht=aggregated_bin_ht,
-        snv_bin_id='bin',
-        indel_bin_id='bin',
-    )
+    score_cutoffs = {
+        seq_type: process_score_cutoffs(
+            snv_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'snp_bin_threshold_{seq_type}']),
+            indel_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'indel_bin_threshold_{seq_type}']),
+            aggregated_bin_ht_path=config_retrieve(['large_cohorts', 'browser', f'aggregated_bin_ht_path_{seq_type}']),
+        )
+        for seq_type in ['exome', 'genome']
+    }
+
+    exome_score_cutoffs = score_cutoffs['exome']
+    genome_score_cutoffs = score_cutoffs['genome']
     # Generate the browser output tables for each data type.
-    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', score_cutoffs)
-    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', score_cutoffs)
+    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
+    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
 
     # checkpoint datasets
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
