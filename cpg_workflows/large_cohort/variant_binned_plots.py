@@ -63,7 +63,7 @@ def plot_binned_metric(
 
     if variant_type not in ["SNPs", "Indels"]:
         raise ValueError(f"Variant type must be either 'SNPs' or 'Indels', got '{variant_type}'")
-    snv = True if variant_type == "SNPs" else False
+    snv = variant_type == "SNPs"  # True if variant_type == SNPs
 
     if cumulative and x_func != "bin":
         raise ValueError("Cumulative plots can only be generated when 'bin' is on the x-axis")
@@ -140,7 +140,7 @@ def plot_binned_metric(
                 line_dash='dashed',
                 line_width=2,
                 line_alpha=0.7,
-            )
+            ),
         )
 
     # Style the plot
