@@ -6,6 +6,14 @@ import pandas as pd
 import hail as hl
 
 from cpg_utils.config import reference_path
+from cpg_workflows.utils import can_reuse
+
+logging.basicConfig(
+    format='%(asctime)s (%(name)s %(lineno)s): %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
 HGNC_COLUMNS = [
     "gd_hgnc_id",
@@ -420,17 +428,17 @@ def run(
     freq_ht = hl.read_table(str(genome_freq_ht_path))
     # exome_freq_ht = hl.read_table(str(exome_freq_ht_path))
 
-    logging.info("Importing MANE Select transcripts...")
+    logger.info("Importing MANE Select transcripts...")
     mane_select_transcripts = import_mane_select_transcripts(reference_path('mane_1.4/summary'))
     mane_select_transcripts = mane_select_transcripts.checkpoint(
         mane_select_transcripts_ht_path,
         overwrite=True,
     )
 
-    logging.info("Extracting canonical transcripts from frequency table...")
+    logger.info("Extracting canonical transcripts from frequency table...")
     canonical_transcripts_grch38 = get_canonical_transcripts(genomes=freq_ht)  # , 'exomes': exome_freq_ht})
 
-    logging.info("Preparing base gene table from GENCODE and HGNC...")
+    logger.info("Preparing base gene table from GENCODE and HGNC...")
     genes_grch38_base: hl.Table = prepare_genes(
         gencode_path=reference_path('gencode_v44'),
         hgnc_path=reference_path('hgnc_labels'),
@@ -439,7 +447,7 @@ def run(
 
     genes_grch38_base = genes_grch38_base.checkpoint(tmp_prefix + '/genes_grch38_base.ht', overwrite=True)
 
-    logging.info("Annotating gene table with canonical and MANE Select transcripts...")
+    logger.info("Annotating gene table with canonical and MANE Select transcripts...")
     annotate_grch38_genes_step_1 = annotate_table(
         genes_grch38_base,
         canonical_transcript=canonical_transcripts_grch38,
@@ -453,7 +461,7 @@ def run(
 
     # SKIPPING STEP 2: ANNOTATION WITH GTEX
 
-    logging.info("Annotating gene transcripts with RefSeq IDs...")
+    logger.info("Annotating gene transcripts with RefSeq IDs...")
     genes_grch38_annotated_3 = annotate_gene_transcripts_with_refseq_id(
         annotate_grch38_genes_step_1,
         mane_select_transcripts,
@@ -464,7 +472,7 @@ def run(
         overwrite=True,
     )
 
-    logging.info("Annotating with preferred transcript...")
+    logger.info("Annotating with preferred transcript...")
     annotate_grch38_genes_step_4 = annotate_with_preferred_transcript(
         genes_grch38_annotated_3,
     )
@@ -476,21 +484,25 @@ def run(
 
     # SKIPPING STEP 5: ANNOTATING WITH CONSTRAINT
 
-    logging.info("Filtering out PAR_Y genes...")
+    logger.info("Filtering out PAR_Y genes...")
     annotate_grch38_genes_step_6 = reject_par_y_genes(
         annotate_grch38_genes_step_4,
     )
 
-    logging.info("Checkpointing step 6 output for PrepareBrowserTable...")
+    logger.info("Checkpointing step 6 output for PrepareBrowserTable...")
     # Step 6 output is used in PrepareBrowserTable to extract transcripts for browser so is written to non-tmp bucket
-    annotate_grch38_genes_step_6 = annotate_grch38_genes_step_6.checkpoint(
-        step_six_output_path,
-        overwrite=True,
-    )
+    if can_reuse(step_six_output_path):
+        logger.info(f"Reusing step 6 output from {step_six_output_path}")
+        annotate_grch38_genes_step_6 = hl.read_table(str(step_six_output_path))
+    else:
+        annotate_grch38_genes_step_6 = annotate_grch38_genes_step_6.checkpoint(
+            step_six_output_path,
+            overwrite=True,
+        )
 
     # SKIPPING REMOVING CONSTRAINT ANNOTATION BECAUSE WE NEVER ANNOTATED WITH IT
 
-    logging.info("Preparing gene table for public release...")
+    logger.info("Preparing gene table for public release...")
     prepare_grch38_genes_table_for_public_release = prepare_gene_table_for_release(
         annotate_grch38_genes_step_6,
         True,
