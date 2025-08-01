@@ -38,9 +38,7 @@ def import_mane_select_transcripts(path, version: str = 'v1.4') -> hl.Table:
         refseq_version=ds.RefSeq_nuc.split("\\.")[1],
     )
 
-    ds = ds.key_by("gene_id")
-
-    return ds
+    return ds.key_by("gene_id")
 
 
 def get_canonical_transcripts(**sites_tables) -> hl.Table:
