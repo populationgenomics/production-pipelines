@@ -719,7 +719,7 @@ class VariantBinnedSummaries(CohortStage):
 
 @stage(required_stages=[VariantBinnedSummaries])
 class VariantBinnedPlots(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Any]:
         plot_filenames = [
             "ti_tv.html",
             "proportion_singletons.html",
@@ -743,7 +743,7 @@ class VariantBinnedPlots(CohortStage):
 
         var_binned_plots_version = var_binned_plots_version or get_workflow().output_version
         path_prefix = cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version
-        return {str(filename): path_prefix / filename for filename in plot_filenames}
+        return {str(filename): str(path_prefix / filename) for filename in plot_filenames}
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import variant_binned_plots
