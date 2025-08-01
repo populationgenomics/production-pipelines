@@ -35,6 +35,7 @@ from cpg_workflows.stages.large_cohort import (
     LoadVqsr,
     MergeCoverageTables,
     PrepareBrowserTable,
+    VariantBinnedPlots,
     VariantBinnedSummaries,
 )
 from cpg_workflows.stages.mito import MitoReport
@@ -109,6 +110,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         LCAnnotateFragmentedVcfWithVep,
         GenerateGeneTable,
         VariantBinnedSummaries,
+        VariantBinnedPlots,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,
