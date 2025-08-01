@@ -7,15 +7,15 @@ import hail as hl
 import hailtop.batch as hb
 
 from cpg_utils import to_path
-from cpg_utils.config import config_retrieve
+from cpg_utils.config import config_retrieve, dataset_path
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse, exists
 from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
 
 logging.basicConfig(
-    format="%(asctime)s (%(name)s %(lineno)s): %(message)s",
-    datefmt="%m/%d/%Y %I:%M:%S %p",
+    format='%(asctime)s (%(name)s %(lineno)s): %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
 )
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -39,15 +39,15 @@ def merge_coverage_tables(
 
     merged_tables = []
     for i in range(n_chunks):
-        chunk_path = str(to_path(tmp_path) / f"merged_coverage_table_{i}.ht")
+        chunk_path = str(to_path(tmp_path) / f'merged_coverage_table_{i}.ht')
         if exists(chunk_path):
-            logger.info(f"Chunk {i} already exists at {chunk_path}, skipping.")
+            logger.info(f'Chunk {i} already exists at {chunk_path}, skipping.')
             merged = hl.read_table(chunk_path)
         else:
             chunk = coverage_table_paths[i * chunk_size : (i + 1) * chunk_size]
             tables = [hl.read_table(str(path)) for path in chunk]
             merged = hl.Table.union(*tables)
-            logger.info(f"Writing chunk {i} to {chunk_path}")
+            logger.info(f'Writing chunk {i} to {chunk_path}')
             merged = merged.checkpoint(chunk_path, overwrite=True)
         chunk_paths.append(chunk_path)
 
@@ -93,7 +93,7 @@ def compute_coverage_stats(
     reference_ht: hl.Table,
     intervals: list[hl.Interval] = [],
     coverage_over_x_bins: list[int] = [1, 5, 10, 15, 20, 25, 30, 50, 100],
-    row_key_fields: list[str] = ["locus"],
+    row_key_fields: list[str] = ['locus'],
     strata_expr: Optional[list[dict[str, hl.expr.StringExpression]]] = None,
     split_reference_blocks: bool = False,
 ) -> hl.Table:
@@ -156,9 +156,9 @@ def compute_coverage_stats(
     n_samples = group_membership_ht.count()
     sample_counts = group_membership_ht.index_globals().freq_meta_sample_count
 
-    logger.info("Computing coverage stats on %d samples.", n_samples)
+    logger.info('Computing coverage stats on %d samples.', n_samples)
     # Filter datasets to interval list
-    if intervals is not None:
+    if intervals:
         # Building reference_ht based off of interavls so don't need to filter it
         # reference_ht = reference_ht.filter(
         #     hl.is_defined(intervals[reference_ht.locus]),
@@ -169,6 +169,9 @@ def compute_coverage_stats(
             intervals=intervals,
             split_reference_blocks=split_reference_blocks,
         )
+    vds.variant_data = vds.variant_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+    vds.reference_data = vds.reference_data.repartition(config_retrieve(['workflow', 'n_partitions']))
+    vds = vds.checkpoint(dataset_path(suffix='coverage/exome_interval_repartition', category='tmp'))
 
     # Create an outer join with the reference Table
     def join_with_ref(mt: hl.MatrixTable) -> hl.MatrixTable:
@@ -180,19 +183,19 @@ def compute_coverage_stats(
         :param mt: Input MatrixTable.
         :return: MatrixTable with 'in_ref' annotation added.
         """
-        keep_entries = ["DP"]
-        if "END" in mt.entry:
-            keep_entries.append("END")
-        if "LGT" in mt.entry:
-            keep_entries.append("LGT")
-        if "GT" in mt.entry:
-            keep_entries.append("GT")
+        keep_entries = ['DP']
+        if 'END' in mt.entry:
+            keep_entries.append('END')
+        if 'LGT' in mt.entry:
+            keep_entries.append('LGT')
+        if 'GT' in mt.entry:
+            keep_entries.append('GT')
         mt_col_key_fields = list(mt.col_key)
         mt_row_key_fields = list(mt.row_key)
         t = mt.select_entries(*keep_entries).select_cols().select_rows()
         time_before = datetime.now()
         logger.info(f'Time starting _localize_entries() data at {time_before}')
-        t = t._localize_entries("__entries", "__cols")
+        t = t._localize_entries('__entries', '__cols')
         time_after = datetime.now()
         logger.info(f'Time finished _localize_entries() data at {time_after}')
         logger.info(f'Time taken to _localize_entries() data: {time_after - time_before}')
@@ -200,7 +203,7 @@ def compute_coverage_stats(
             t.key_by(*row_key_fields)
             .join(
                 reference_ht.key_by(*row_key_fields).select(_in_ref=True),
-                how="outer",
+                how='outer',
             )
             .key_by(*mt_row_key_fields)
         )
@@ -213,7 +216,7 @@ def compute_coverage_stats(
             ),
         )
 
-        return t._unlocalize_entries("__entries", "__cols", mt_col_key_fields)
+        return t._unlocalize_entries('__entries', '__cols', mt_col_key_fields)
 
     keep_entries = ['END', 'DP']
     # vds objects created from Hail >= 0.2.134 have additional 'LEN' entry field
@@ -267,7 +270,7 @@ def compute_coverage_stats(
             mt.group_membership,
         ),
     ).rows()
-    ht = ht.checkpoint(hl.utils.new_temp_file("coverage_stats", "ht"))
+    ht = ht.checkpoint(hl.utils.new_temp_file('coverage_stats', 'ht'))
 
     # This expression aggregates the DP counter in reverse order of the
     # coverage_over_x_bins and computes the cumulative sum over them.
@@ -298,14 +301,14 @@ def compute_coverage_stats(
         coverage_stats=hl.map(
             lambda c, g, n: c.annotate(
                 **{
-                    f"over_{x}": g[i] / n
+                    f'over_{x}': g[i] / n
                     for i, x in zip(
                         range(len(coverage_over_x_bins) - 1, -1, -1),
                         # Reverse the bin index as count_array_expr has reverse order.
                         coverage_over_x_bins,
                     )
                 },
-            ).drop("coverage_counter"),
+            ).drop('coverage_counter'),
             ht.coverage_stats,
             count_array_expr,
             sample_counts,
@@ -323,7 +326,7 @@ def compute_coverage_stats(
         ht = ht.annotate_globals(
             coverage_stats_meta=(
                 group_membership_ht.index_globals().freq_meta.map(
-                    lambda x: hl.dict(x.items().filter(lambda m: m[0] != "group")),
+                    lambda x: hl.dict(x.items().filter(lambda m: m[0] != 'group')),
                 )
             ),
             coverage_stats_meta_sample_count=(group_membership_ht.index_globals().freq_meta_sample_count),
@@ -348,7 +351,7 @@ def run(
     from gnomad.utils.reference_genome import add_reference_sequence
 
     if can_reuse(out_path):
-        logger.info(f"Reusing existing coverage table at {out_path}.")
+        logger.info(f'Reusing existing coverage table at {out_path}.')
         return None
 
     rg: hl.ReferenceGenome = hl.get_reference(genome_build())
@@ -366,8 +369,8 @@ def run(
     intervals = intervals_ht.interval.collect()
     ref_tables = []
 
+    logger.info('Starting to generate reference coverage tables')
     for interval in intervals:
-        logger.info(f"Generating reference coverage table for interval: {interval}")
         ref_ht = hl.utils.range_table(
             (interval.end.position - interval.start.position),
         )
@@ -378,21 +381,22 @@ def run(
         )
         ref_allele_expr = locus_expr.sequence_context().lower()
         alleles_expr = [ref_allele_expr]
-        ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by("locus", "alleles").drop("idx")
-        ref_ht = ref_ht.filter(ref_ht.alleles[0] == "n", keep=False)
+        ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by('locus', 'alleles').drop('idx')
+        ref_ht = ref_ht.filter(ref_ht.alleles[0] == 'n', keep=False)
         ref_tables.append(ref_ht)
 
+    logger.info('Finished generating reference coverage tables')
     ref_ht_joined = hl.Table.union(*ref_tables)
 
-    logger.info(f"Reading VDS from {vds_path} with intervals: {intervals}")
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
-    num_samples_to_keep = config_retrieve(['workflow', 'num_samples_to_keep'], default=500)
-    samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
-    vds = hl.vds.filter_samples(vds, samples_to_keep)
+    # Sample filter for testing
+    if num_samples_to_keep := config_retrieve(['workflow', 'num_samples_to_keep'], default=False):
+        samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
+        vds = hl.vds.filter_samples(vds, samples_to_keep)
 
     # Generate coverage table
-    logger.info("Computing coverage statistics.")
+    logger.info('Computing coverage statistics.')
     coverage_ht: hl.Table = compute_coverage_stats(
         vds,
         ref_ht_joined,

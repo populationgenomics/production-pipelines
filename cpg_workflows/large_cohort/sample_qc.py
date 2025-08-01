@@ -93,10 +93,20 @@ def impute_sex(
         sex_ht = hl.read_table(str(checkpoint_path))
         return ht.annotate(**sex_ht[ht.s])
 
-    # Load calling intervals
+    # Load calling intervals -> default inferred from seq_type, or user supplied
     seq_type = get_config()['workflow']['sequencing_type']
-    calling_intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
-    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
+
+    sampleqc_intervals: str | None = config_retrieve(
+        ['large_cohort', 'sampleqc_intervals'],
+        default=None,
+    )
+    if sampleqc_intervals:
+        intervals_path = reference_path(sampleqc_intervals)
+    else:
+        intervals_path = reference_path(f'broad/{seq_type}_calling_interval_lists')
+
+    calling_intervals_ht = hl.import_locus_intervals(str(intervals_path), reference_genome=genome_build())
+
     logging.info('Calling intervals table:')
     calling_intervals_ht.describe()
 
@@ -105,24 +115,30 @@ def impute_sex(
 
     # Pre-filter here and setting `variants_filter_lcr` and `variants_filter_segdup`
     # below to `False` to avoid the function calling gnomAD's `resources` module:
-    for name in ['lcr_intervals_ht', 'seg_dup_intervals_ht']:
+    interval_tables = []
+    names = ['lcr_intervals_ht', 'seg_dup_intervals_ht']
+    for name in names:
         interval_table = hl.read_table(reference_path(f'gnomad/{name}'))
         if interval_table.count() > 0:
-            vds_tmp_path = tmp_prefix / f'{name}_checkpoint.vds'
-            if can_reuse(vds_tmp_path):
-                logging.info(f'Loading {name} filtered tmp vds')
-                vds = hl.vds.read_vds(str(vds_tmp_path))
-            else:
-                # remove all rows where the locus falls within a defined interval
-                tmp_variant_data = vds.variant_data.filter_rows(
-                    hl.is_defined(interval_table[vds.variant_data.locus]),
-                    keep=False,
-                )
-                vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
-                    str(vds_tmp_path),
-                    overwrite=True,
-                )
-            logging.info(f'count post {name} filter:{vds.variant_data.count()}')
+            interval_tables.append(interval_table)
+
+    if len(interval_tables) > 0:
+        interval_table = interval_tables[0].union(*interval_tables[1:])
+        vds_tmp_path = tmp_prefix / f'{"-".join(names)}_checkpoint.vds'
+        if can_reuse(vds_tmp_path):
+            logging.info(f'Loading {"-".join(names)} filtered tmp vds')
+            vds = hl.vds.read_vds(str(vds_tmp_path))
+        else:
+            # remove all rows where the locus falls within a defined interval
+            tmp_variant_data = vds.variant_data.filter_rows(
+                hl.is_defined(interval_table[vds.variant_data.locus]),
+                keep=False,
+            )
+            vds = VariantDataset(reference_data=vds.reference_data, variant_data=tmp_variant_data).checkpoint(
+                str(vds_tmp_path),
+                overwrite=True,
+            )
+        logging.info(f'VDS checkpointed after filtering with {" ".join(names)}. ')
 
     # Infer sex (adds row fields: is_female, var_data_chr20_mean_dp, sex_karyotype)
     sex_ht = annotate_sex(

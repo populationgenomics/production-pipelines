@@ -24,7 +24,7 @@ from gnomad.utils.annotations import (
 )
 from gnomad.utils.release import make_faf_index_dict, make_freq_index_dict_from_meta
 
-POPS_TO_REMOVE_FOR_POPMAX = {'Unclassified'}
+POPS_TO_REMOVE_FOR_POPMAX = {'Unassigned'}
 
 
 def run(
