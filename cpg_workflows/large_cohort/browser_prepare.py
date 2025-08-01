@@ -807,8 +807,6 @@ def prepare_v4_variants(
     genome_variants_outpath: str | None,
     transcript_table_path: str | None,
     mane_transcripts_path: str | None,
-    cadd_path: str | None,
-    spliceai_path: str | None,
 ) -> hl.Table:
 
     # Generate the browser output tables for each data type.
@@ -827,11 +825,11 @@ def prepare_v4_variants(
     shared_fields = [
         # "lcr",
         # "nonpar",
-        # "rsids",
+        "rsids",
         # "segdup",
         "vep",
         # "in_silico_predictors",
-        # "variant_id",
+        "variant_id",
     ]
     variants = variants.annotate(
         **{field: hl.or_else(variants.exome[field], variants.genome[field]) for field in shared_fields},
