@@ -687,7 +687,6 @@ def annotate_transcript_consequences(ds: hl.Table, transcripts: hl.Table, mane_t
 
     return ds
 
-
 def prepare_gnomad_v4_variants_helper(
     ds_path: str | None,
     exome_or_genome: str,

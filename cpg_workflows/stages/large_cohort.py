@@ -304,6 +304,10 @@ class MakeSiteOnlyVcf(CohortStage):
             / site_only_version
             / 'quasi_siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            'corrected_mt': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'filtered_and_corrected.mt',
             'pre_adjusted': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / site_only_version
@@ -341,6 +345,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(self.expected_outputs(cohort)['as']),
                 str(self.expected_outputs(cohort)['quasi']),
                 str(self.expected_outputs(cohort)['ht']),
+                str(self.expected_outputs(cohort)['corrected_mt']),
                 str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
