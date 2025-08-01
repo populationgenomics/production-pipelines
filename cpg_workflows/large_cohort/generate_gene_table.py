@@ -249,9 +249,7 @@ def get_transcripts(gencode):
         xstop=x_position(transcripts.interval.end),
     )
 
-    transcripts = transcripts.key_by(transcripts.transcript_id)
-
-    return transcripts
+    return transcripts.key_by(transcripts.transcript_id)
 
 
 def collect_transcript_exons(transcript_exons):
