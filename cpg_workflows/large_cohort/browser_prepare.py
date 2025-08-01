@@ -280,34 +280,6 @@ array<
 >
 """
 
-PROTEIN_LETTERS_1TO3 = hl.dict(
-    {
-        "A": "Ala",
-        "C": "Cys",
-        "D": "Asp",
-        "E": "Glu",
-        "F": "Phe",
-        "G": "Gly",
-        "H": "His",
-        "I": "Ile",
-        "K": "Lys",
-        "L": "Leu",
-        "M": "Met",
-        "N": "Asn",
-        "P": "Pro",
-        "Q": "Gln",
-        "R": "Arg",
-        "S": "Ser",
-        "T": "Thr",
-        "V": "Val",
-        "W": "Trp",
-        "Y": "Tyr",
-        "X": "Ter",
-        "*": "Ter",
-        "U": "Sec",
-    },
-)
-
 
 def _nullify_nan(value):
     return hl.if_else(hl.is_nan(value), hl.missing(value.dtype), value)
