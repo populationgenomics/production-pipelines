@@ -1,9 +1,13 @@
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import pandas as pd
+from bokeh.io import output_notebook
+from bokeh.layouts import gridplot, row
+from bokeh.models import ColumnDataSource, HoverTool, Span, TabPanel, Tabs
+from bokeh.plotting import figure, show
 
 import hail as hl
 import hailtop.batch as hb
