@@ -752,7 +752,7 @@ class VariantBinnedPlots(CohortStage):
             'VariantBinnedPlots',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
-        j.image(image_path('driver_image'))
+        j.image(image_path('cpg_workflows'))
 
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
