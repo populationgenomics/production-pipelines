@@ -3,6 +3,7 @@ import logging
 
 import hail as hl
 
+from cpg_utils.config import config_retrieve
 from gnomad.utils.filtering import add_filters_expr
 
 EMPTY_TABLE_CONFIG = """
@@ -272,48 +273,6 @@ array<
 >
 """
 
-
-def _nullify_nan(value):
-    return hl.if_else(hl.is_nan(value), hl.missing(value.dtype), value)
-
-
-def _normalized_contig(contig: hl.expr.StringExpression) -> hl.expr.StringExpression:
-    return hl.rbind(hl.str(contig).replace("^chr", ""), lambda c: hl.if_else(c == "MT", "M", c))
-
-
-def _variant_id(locus: hl.expr.LocusExpression, alleles: hl.expr.ArrayExpression, max_length: int | None = None):
-    """
-    Expression for computing <chrom>-<pos>-<ref>-<alt>. Assumes alleles were split.
-
-    Args:
-        max_length: (optional) length at which to truncate the <chrom>-<pos>-<ref>-<alt> string
-
-    Return:
-        string: "<chrom>-<pos>-<ref>-<alt>"
-    """
-    contig = _normalized_contig(locus.contig)
-    var_id = contig + "-" + hl.str(locus.position) + "-" + alleles[0] + "-" + alleles[1]
-
-    if max_length is not None:
-        return var_id[0:max_length]
-
-    return var_id
-
-
-def _freq_index_key(subset=None, pop=None, sex=None, raw=False):
-    parts = [s for s in [subset, pop, sex] if s is not None]
-    parts.append("raw" if raw else "adj")
-    return "_".join(parts)
-
-
-def _freq(ds, *args, **kwargs):
-    return ds.freq[ds.freq_index_dict[_freq_index_key(*args, **kwargs)]]
-
-
-def _subset_filter(subset):
-    return lambda variant: variant.ac_adj[subset] > 0
-
-
 OMIT_CONSEQUENCE_TERMS = hl.set(["upstream_gene_variant", "downstream_gene_variant"])
 
 PROTEIN_LETTERS_1TO3 = hl.dict(
@@ -389,6 +348,169 @@ CONSEQUENCE_TERMS = [
 
 # hail DictExpression that maps each CONSEQUENCE_TERM to its rank in the list
 CONSEQUENCE_TERM_RANK_LOOKUP = hl.dict({term: rank for rank, term in enumerate(CONSEQUENCE_TERMS)})
+
+
+def _nullify_nan(value):
+    return hl.if_else(hl.is_nan(value), hl.missing(value.dtype), value)
+
+
+def _normalized_contig(contig: hl.expr.StringExpression) -> hl.expr.StringExpression:
+    return hl.rbind(hl.str(contig).replace("^chr", ""), lambda c: hl.if_else(c == "MT", "M", c))
+
+
+def _variant_id(locus: hl.expr.LocusExpression, alleles: hl.expr.ArrayExpression, max_length: int | None = None):
+    """
+    Expression for computing <chrom>-<pos>-<ref>-<alt>. Assumes alleles were split.
+
+    Args:
+        max_length: (optional) length at which to truncate the <chrom>-<pos>-<ref>-<alt> string
+
+    Return:
+        string: "<chrom>-<pos>-<ref>-<alt>"
+    """
+    contig = _normalized_contig(locus.contig)
+    var_id = contig + "-" + hl.str(locus.position) + "-" + alleles[0] + "-" + alleles[1]
+
+    if max_length is not None:
+        return var_id[0:max_length]
+
+    return var_id
+
+
+def _freq_index_key(subset=None, pop=None, sex=None, raw=False):
+    parts = [s for s in [subset, pop, sex] if s is not None]
+    parts.append("raw" if raw else "adj")
+    return "_".join(parts)
+
+
+def _freq(ds, *args, **kwargs):
+    return ds.freq[ds.freq_index_dict[_freq_index_key(*args, **kwargs)]]
+
+
+def _subset_filter(subset):
+    return lambda variant: variant.ac_adj[subset] > 0
+
+
+def process_score_cutoffs(
+    snv_bin_cutoff: int | None = None,
+    indel_bin_cutoff: int | None = None,
+    snv_score_cutoff: float | None = None,
+    indel_score_cutoff: float | None = None,
+    aggregated_bin_ht_path: hl.Table = None,
+    snv_bin_id: str = 'bin',
+    indel_bin_id: str = 'bin',
+) -> dict[str, hl.expr.StructExpression]:
+    """
+    NOTE: This function was lifted from the gnomad_qc repo `gnomad_qc.v4.variant_qc.final_filter.process_score_cutoffs`.
+        - Changes made:
+            - Removed `ht` parameter, as it is not needed.
+                - Global `min_score` and `max_score` are now calculated from the `aggregated_bin_ht`
+    Determine SNP and indel score cutoffs if given bin instead of score.
+
+    .. note::
+
+        - `snv_bin_cutoff` and `snv_score_cutoff` are mutually exclusive, and one must
+          be supplied.
+        - `indel_bin_cutoff` and `indel_score_cutoff` are mutually exclusive, and one
+          must be supplied.
+        - If a `snv_bin_cutoff` or `indel_bin_cutoff` cutoff is supplied then an
+          `aggregated_bin_ht` and `bin_id` must also be supplied to determine the SNP
+          and indel scores to use as cutoffs from an aggregated bin Table like one
+          created by `compute_grouped_binned_ht` in combination with `score_bin_agg`.
+
+    :param ht: Filtering Table to prepare as the final filter Table.
+    :param snv_bin_cutoff: Bin cutoff to use for SNP variant QC filter. Can't be used
+        with `snv_score_cutoff`.
+    :param indel_bin_cutoff: Bin cutoff to use for indel variant QC filter. Can't be
+        used with `indel_score_cutoff`.
+    :param snv_score_cutoff: Score cutoff (e.g. RF probability or AS_VQSLOD) to use
+        for SNP variant QC filter. Can't be used with `snv_bin_cutoff`.
+    :param indel_score_cutoff: Score cutoff (e.g. RF probability or AS_VQSLOD) to use
+        for indel variant QC filter. Can't be used with `indel_bin_cutoff`.
+    :param aggregated_bin_ht: Table with aggregate counts of variants based on bins
+    :param snv_bin_id: Name of bin to use in 'bin_id' column of `aggregated_bin_ht` to
+        determine the SNP score cutoff.
+    :param indel_bin_id: Name of bin to use in 'bin_id' column of `aggregated_bin_ht` to
+        determine the indel score cutoff.
+    :return: Finalized random forest Table annotated with variant filters.
+    """
+    aggregated_bin_ht = hl.read_table(aggregated_bin_ht_path)
+
+    if snv_bin_cutoff is not None and snv_score_cutoff is not None:
+        raise ValueError(
+            "snv_bin_cutoff and snv_score_cutoff are mutually exclusive, please only"
+            " supply one SNP filtering cutoff.",
+        )
+
+    if indel_bin_cutoff is not None and indel_score_cutoff is not None:
+        raise ValueError(
+            "indel_bin_cutoff and indel_score_cutoff are mutually exclusive, please"
+            " only supply one indel filtering cutoff.",
+        )
+
+    if snv_bin_cutoff is None and snv_score_cutoff is None:
+        raise ValueError(
+            "One (and only one) of the parameters snv_bin_cutoff and snv_score_cutoff" " must be supplied.",
+        )
+
+    if indel_bin_cutoff is None and indel_score_cutoff is None:
+        raise ValueError(
+            "One (and only one) of the parameters indel_bin_cutoff and" " indel_score_cutoff must be supplied.",
+        )
+
+    if (
+        (snv_bin_cutoff is not None and snv_bin_id is None) or (indel_bin_cutoff is not None and indel_bin_id is None)
+    ) and (aggregated_bin_ht is None):
+        raise ValueError(
+            "If using snv_bin_cutoff or indel_bin_cutoff, both aggregated_bin_ht and"
+            " snv_bin_id/indel_bin_id must be supplied",
+        )
+
+    cutoffs = {
+        "snv": {"score": snv_score_cutoff, "bin": snv_bin_cutoff, "bin_id": snv_bin_id},
+        "indel": {
+            "score": indel_score_cutoff,
+            "bin": indel_bin_cutoff,
+            "bin_id": indel_bin_id,
+        },
+    }
+
+    # Calculate min and max scores within each bin.
+    min_score = aggregated_bin_ht.aggregate(hl.agg.min(aggregated_bin_ht.min_score))
+    max_score = aggregated_bin_ht.aggregate(hl.agg.max(aggregated_bin_ht.max_score))
+    aggregated_bin_ht = aggregated_bin_ht.annotate(indel=~aggregated_bin_ht.snv)
+
+    cutoff_globals = {}
+    for variant_type, cutoff in cutoffs.items():
+        if cutoff["bin"] is not None:
+            score_cutoff = aggregated_bin_ht.aggregate(
+                hl.agg.filter(
+                    aggregated_bin_ht[variant_type]
+                    & (aggregated_bin_ht.bin_id == cutoff["bin_id"])
+                    & (aggregated_bin_ht.bin == cutoff["bin"]),
+                    hl.agg.min(aggregated_bin_ht.min_score),
+                ),
+            )
+            cutoff_globals[variant_type] = hl.struct(
+                bin=cutoff["bin"],
+                min_score=score_cutoff,
+                bin_id=cutoff["bin_id"],
+            )
+        else:
+            cutoff_globals[variant_type] = hl.struct(min_score=cutoff["score"])
+
+        score_cutoff = hl.eval(cutoff_globals[variant_type].min_score)
+        if score_cutoff < min_score or score_cutoff > max_score:
+            raise ValueError(
+                f"{variant_type}_score_cutoff is not within the range of score (" f"{min_score, max_score}).",
+            )
+
+    logging.info(
+        f"Using a SNP score cutoff of {hl.eval(cutoff_globals['snv'].min_score)} and an"
+        f" indel score cutoff of {hl.eval(cutoff_globals['indel'].min_score)}.",
+    )
+
+    return cutoff_globals
 
 
 def consequence_term_rank(consequence_term):
@@ -566,7 +688,11 @@ def annotate_transcript_consequences(ds: hl.Table, transcripts: hl.Table, mane_t
     return ds
 
 
-def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str) -> hl.Table:
+def prepare_gnomad_v4_variants_helper(
+    ds_path: str | None,
+    exome_or_genome: str,
+    score_cutoffs: dict[str, hl.expr.StructExpression],
+) -> hl.Table:
 
     if ds_path is None:
         ds = hl.Table.parallelize(hl.literal([], "".join(EMPTY_TABLE_CONFIG.split()))).key_by('locus', 'alleles')
@@ -763,13 +889,18 @@ def prepare_gnomad_v4_variants_helper(ds_path: str | None, exome_or_genome: str)
     # Add the variant filter flags.
     logging.info('Adding the variant filter flags...')
 
-    inbreeding_coeff_cutoff = -0.3
+    inbreeding_coeff_cutoff = config_retrieve(['large_cohorts', 'browser', 'inbreeding_coeff_cutoff'])
     filters = {
         "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
         "AS_lowqual": ds.AS_lowqual,
-        "AS_VQSR": ds.as_vqsr_filters != "PASS",
+        "AS_VQSR": hl.is_missing(ds.info["AS_VQSLOD"]),
     }
+    snv_indel_expr = {'snv': hl.is_snp(ds.alleles[0], ds.alleles[1])}
+    snv_indel_expr['indel'] = ~snv_indel_expr['snv']
+    for var_type, score_cut in score_cutoffs.items():
+        filters['AS_VQSR'] = filters['AS_VQSR'] | (snv_indel_expr[var_type] & (ds.info.AS_VQSLOD < score_cut.min_score))
+
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
     # Drop unnecessary fields.
@@ -809,9 +940,21 @@ def prepare_v4_variants(
     mane_transcripts_path: str | None,
 ) -> hl.Table:
 
+    # Process the score cutoffs.
+    score_cutoffs = {
+        seq_type: process_score_cutoffs(
+            snv_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'snp_bin_threshold_{seq_type}']),
+            indel_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'indel_bin_threshold_{seq_type}']),
+            aggregated_bin_ht_path=config_retrieve(['large_cohorts', 'browser', f'aggregated_bin_ht_path_{seq_type}']),
+        )
+        for seq_type in ['exome', 'genome']
+    }
+
+    exome_score_cutoffs = score_cutoffs['exome']
+    genome_score_cutoffs = score_cutoffs['genome']
     # Generate the browser output tables for each data type.
-    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome')
-    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome')
+    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
+    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
 
     # checkpoint datasets
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
