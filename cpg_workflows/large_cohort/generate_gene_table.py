@@ -60,9 +60,7 @@ def get_canonical_transcripts(**sites_tables) -> hl.Table:
         key="gene_id",
     )
 
-    canonical_transcripts_ht = canonical_transcripts_ht.repartition(32, shuffle=True)
-
-    return canonical_transcripts_ht
+    return canonical_transcripts_ht.repartition(32, shuffle=True)
 
 
 def normalized_contig(contig: hl.expr.StringExpression) -> hl.expr.StringExpression:
