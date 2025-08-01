@@ -255,8 +255,8 @@ def plot_metric_tabs(
 def run(
     binned_summary_ht_path: str,
     binned_plots_outpath: str,
-    snp_bin_threshold: int = 90,
-    indel_bin_threshold: int = 80,
+    snp_bin_threshold: int,
+    indel_bin_threshold: int,
 ) -> None:
     """
     Output plots from the binned_summaries_ht table
