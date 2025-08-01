@@ -267,6 +267,13 @@ array<
                     value: float64
                 }>
             }
+        },
+        insilico_predictors: struct {
+            cadd: struct {
+                phred: float32,
+                raw_score: float32
+            },
+            spliceai_ds_max: float32
         }
     }
 >
