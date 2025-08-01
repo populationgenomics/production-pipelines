@@ -131,6 +131,33 @@ array<
     }
 >
 """
+PROTEIN_LETTERS_1TO3 = hl.dict(
+    {
+        "A": "Ala",
+        "C": "Cys",
+        "D": "Asp",
+        "E": "Glu",
+        "F": "Phe",
+        "G": "Gly",
+        "H": "His",
+        "I": "Ile",
+        "K": "Lys",
+        "L": "Leu",
+        "M": "Met",
+        "N": "Asn",
+        "P": "Pro",
+        "Q": "Gln",
+        "R": "Arg",
+        "S": "Ser",
+        "T": "Thr",
+        "V": "Val",
+        "W": "Trp",
+        "Y": "Tyr",
+        "X": "Ter",
+        "*": "Ter",
+        "U": "Sec",
+    },
+)
 
 
 def _nullify_nan(value):
@@ -537,12 +564,23 @@ def prepare_gnomad_v4_variants_helper(
     return ds
 
 
+def annotate_insilico(ds, cadd_ht, spliceai_ht):
+    return ds.annotate(
+        insilico_predictors=hl.struct(
+            cadd=cadd_ht[ds.locus, ds.alleles].cadd,
+            spliceai_ds_max=spliceai_ht[ds.locus, ds.alleles].spliceai_ds_max,
+        ),
+    )
+
+
 def prepare_v4_variants(
     exome_ds_path: str,
     genome_ds_path: str,
     browser_outpath: str,
     exome_variants_outpath: str | None,
     genome_variants_outpath: str | None,
+    cadd_path: str | None,
+    spliceai_path: str | None,
 ) -> hl.Table:
 
     # Process the score cutoffs.
@@ -557,6 +595,7 @@ def prepare_v4_variants(
 
     exome_score_cutoffs = score_cutoffs['exome']
     genome_score_cutoffs = score_cutoffs['genome']
+
     # Generate the browser output tables for each data type.
     exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
     genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
@@ -565,10 +604,31 @@ def prepare_v4_variants(
     exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
     genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
 
+    # Add CADD and SpliceAI annotations before adding 'variant_id' and 'rsids' keys.
+    cadd_ht = hl.read_table(cadd_path)
+    spliceai_ht = hl.read_table(spliceai_path)
+    exome_variants = annotate_insilico(exome_variants, cadd_ht, spliceai_ht)
+    genome_variants = annotate_insilico(genome_variants, cadd_ht, spliceai_ht)
+
     # Add the key so that variant_id and rsid gets considered in the join
     genome_variants = genome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
     exome_variants = exome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
     variants = exome_variants.join(genome_variants, how="outer")
+
+    shared_fields = [
+        # "lcr",
+        # "nonpar",
+        # "rsids",
+        # "segdup",
+        # "vep",
+        "in_silico_predictors",
+        # "variant_id",
+    ]
+    variants = variants.annotate(
+        **{field: hl.or_else(variants.exome[field], variants.genome[field]) for field in shared_fields},
+    )
+
+    variants = variants.annotate(exome=variants.exome.drop(*shared_fields), genome=variants.genome.drop(*shared_fields))
 
     # Calculate colocated variants across exomes and genomes
     variants = variants.annotate(
