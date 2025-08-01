@@ -21,12 +21,7 @@ HGNC_COLUMNS = [
 ]
 
 
-def import_mane_select_transcripts(path) -> hl.Table:
-    filename = path.split("/")[-1]
-    version_match = re.search(r"v(\d+(\.\d+)+?)", filename)
-    if version_match is None:
-        raise ValueError(f"Could not extract version from filename: {filename}")
-    version = version_match.group(1)
+def import_mane_select_transcripts(path, version: str = 'v1.4') -> hl.Table:
 
     ds = hl.import_table(path, force=True)
 
