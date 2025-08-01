@@ -826,70 +826,8 @@ class GenerateGeneTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage()
-class GenerateInsilicoPredictors(CohortStage):
-    """
-    Generate insilico predictors for the cohort.
-
-    We do not run CADD and SpliceAI during VEP as it blows out run times. gnomAD also does not run these predictors
-    during VEP, so we follow suit. We follow the gnomAD approach of building Hail Tables for CADD and SpliceAI so
-    they can be annotated later in PrepareBrowserTable.
-    """
-
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if insilico_predictors_version := config_retrieve(
-            ['large_cohort', 'output_versions', 'insilico_predictors'],
-            default=None,
-        ):
-            insilico_predictors_version = slugify(insilico_predictors_version)
-
-        insilico_predictors_version = insilico_predictors_version or get_workflow().output_version
-        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / insilico_predictors_version
-        return {
-            'cadd': prefix / 'cadd.ht',
-            'spliceai': prefix / 'spliceai.ht',
-        }
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import insilico_predictors
-
-        j = get_batch().new_job(
-            'GenerateInsilicoPredictors',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
-
-        j.image(image_path('cpg_workflows'))
-
-        j.storage('160Gi')
-        init_batch_args: dict[str, str | int] = {}
-        workflow_config = config_retrieve('workflow')
-
-        # Memory parameters
-        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
-        # Cores parameter
-        for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
-
-        j.command(
-            query_command(
-                insilico_predictors,
-                insilico_predictors.run.__name__,
-                str(self.expected_outputs(cohort)['cadd']),
-                str(self.expected_outputs(cohort)['spliceai']),
-                str(self.tmp_prefix),
-                init_batch_args=init_batch_args,
-                setup_gcp=True,
-            ),
-        )
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
-
-
 # @stage(required_stages=[Frequencies])
-@stage(required_stages=[GenerateInsilicoPredictors])
+@stage()
 class PrepareBrowserTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> Path:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
@@ -940,8 +878,6 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['genome_variants']),
                 transcripts_grch38_base_path,
                 mane_select_transcripts_path,
-                str(inputs.as_path(cohort, GenerateInsilicoPredictors, key='cadd')),
-                str(inputs.as_path(cohort, GenerateInsilicoPredictors, key='spliceai')),
                 setup_gcp=True,
             ),
         )
