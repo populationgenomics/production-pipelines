@@ -719,7 +719,7 @@ class VariantBinnedSummaries(CohortStage):
 
 @stage(required_stages=[VariantBinnedSummaries])
 class VariantBinnedPlots(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if var_binned_plots_version := config_retrieve(
             ['large_cohort', 'output_versions', 'var_binned_plots'],
             default=None,
@@ -727,7 +727,10 @@ class VariantBinnedPlots(CohortStage):
             var_binned_plots_version = slugify(var_binned_plots_version)
 
         var_binned_plots_version = var_binned_plots_version or get_workflow().output_version
-        return cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version / 'binned_summary.ht'
+        return {
+            # FIXME Correct way?
+            cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_plots_version / 'ti_tv.html',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import variant_binned_plots
@@ -750,22 +753,17 @@ class VariantBinnedPlots(CohortStage):
             if workflow_config.get(key):
                 init_batch_args[key] = workflow_config[key]
 
-        # happy_vcf_path = config_retrieve(['large_cohort', 'happy_vcf_path'])
-        # n_bins = config_retrieve(['large_cohort', 'n_bins'], default=100)  # FIXME default also set in function
-        # fam_stats_ht_path = config_retrieve(['large_cohort', 'fam_stats_ht_path'], default=None)
-        # use_truth_sample_concordance = config_retrieve(['large_cohort', 'truth_sample_concordance_path'], default=False)
+        snp_bin_threshold = config_retrieve(['large_cohort', 'snp_bin_threshold'], default=90)
+        indel_bin_threshold = config_retrieve(['large_cohort', 'indel_bin_threshold'], default=80)
 
         j.command(
             query_command(
                 variant_binned_plots,
                 variant_binned_plots.run.__name__,
-                # str(inputs.as_path(cohort, LoadVqsr)),
-                # # "gs://cpg-bioheart-test/large_cohort/browser-testing-data/vqsr.ht",
-                # str(happy_vcf_path),
-                # str(self.expected_outputs(cohort)),
-                # int(n_bins),
-                # fam_stats_ht_path,
-                # str(use_truth_sample_concordance),
+                str(inputs.as_path(cohort, VariantBinnedSummaries)),
+                str(self.expected_outputs(cohort)),
+                int(snp_bin_threshold),
+                int(indel_bin_threshold),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
