@@ -1,5 +1,22 @@
+"""
+This script implements a pipeline for generating a public gene annotation table for GRCh38, suitable for browser and downstream analyses.
+
+It is based on the gnomAD browser's gene pipeline:
+https://github.com/broadinstitute/gnomad-browser/blob/main/data-pipeline/src/data_pipeline/pipelines/genes.py
+with helper functions adapted from:
+https://github.com/broadinstitute/gnomad-browser/blob/main/data-pipeline/src/data_pipeline/data_types/gene.py
+
+Main steps:
+- Imports and processes GENCODE gene, transcript, and exon annotations, and HGNC gene labels.
+- Extracts canonical and MANE Select transcripts from variant frequency tables and MANE summary files.
+- Annotates genes and transcripts with preferred transcript IDs, RefSeq IDs, and other metadata.
+- Merges overlapping exons and organizes exon features for browser display.
+- Filters out pseudoautosomal region Y (PAR_Y) genes.
+- Checkpoints intermediate results for reproducibility and downstream use.
+- Prepares the final gene table for public release, including global annotations.
+"""
+
 import logging
-import re
 
 import pandas as pd
 
