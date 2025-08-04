@@ -889,7 +889,7 @@ def prepare_gnomad_v4_variants_helper(
     # Add the variant filter flags.
     logging.info('Adding the variant filter flags...')
 
-    inbreeding_coeff_cutoff = config_retrieve(['large_cohorts', 'browser', 'inbreeding_coeff_cutoff'])
+    inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
     filters = {
         "InbreedingCoeff": ds.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         "AC0": ds.expanded_freq.all.ac == 0,
