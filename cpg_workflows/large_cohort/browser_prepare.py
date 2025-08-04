@@ -4,6 +4,7 @@ import logging
 import hail as hl
 
 from cpg_utils.config import config_retrieve
+from cpg_workflows.utils import can_reuse
 from gnomad.utils.filtering import add_filters_expr
 
 EMPTY_TABLE_CONFIG = """
@@ -954,13 +955,18 @@ def prepare_v4_variants(
 
     exome_score_cutoffs = score_cutoffs['exome']
     genome_score_cutoffs = score_cutoffs['genome']
-    # Generate the browser output tables for each data type.
-    exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
-    genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
 
-    # checkpoint datasets
-    exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
-    genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
+    if can_reuse(exome_variants_outpath):
+        exome_variants = hl.read_table(exome_variants_outpath)
+    else:
+        exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
+        exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
+
+    if can_reuse(genome_variants_outpath):
+        genome_variants = hl.read_table(genome_variants_outpath)
+    else:
+        genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
+        genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
 
     # Add the key so that variant_id and rsid gets considered in the join
     genome_variants = genome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
