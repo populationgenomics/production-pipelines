@@ -137,8 +137,8 @@ array<
                     existing_inframe_oorfs: int32,
                     existing_outofframe_oorfs: int32,
                     existing_uorfs: int32,
-                    `5utr_consequence`: str,
-                    `5utr_annotation`: dict<str, struct {
+                    5utr_consequence: str,
+                    5utr_annotation: dict<str, struct {
                         type: str,
                         KozakContext: str,
                         KozakStrength: str,
