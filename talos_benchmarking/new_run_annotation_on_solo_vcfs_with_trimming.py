@@ -50,7 +50,7 @@ vcf_list = [str(each_vcf) for each_vcf in to_path(GS_VCFS).glob('*.vcf.gz')]
 
 vcf_inputs = [batch_instance.read_input_group(gvcf=sample_vcf, index=f'{sample_vcf}.tbi') for sample_vcf in vcf_list]
 
-image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_552'
+image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/talos:PR_569'
 
 for each_count in [5, 10, 25, 50, 100, 250, 375, 600, 1000]:
 
