@@ -946,6 +946,8 @@ def prepare_v4_variants(
             snv_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'snp_bin_threshold_{seq_type}']),
             indel_bin_cutoff=config_retrieve(['large_cohorts', 'browser', f'indel_bin_threshold_{seq_type}']),
             aggregated_bin_ht_path=config_retrieve(['large_cohorts', 'browser', f'aggregated_bin_ht_path_{seq_type}']),
+            snv_bin_id=config_retrieve(['large_cohorts', 'browser', f'snp_bin_id_{seq_type}'], 'bin'),
+            indel_bin_id=config_retrieve(['large_cohorts', 'browser', f'indel_bin_id_{seq_type}'], 'bin'),
         )
         for seq_type in ['exome', 'genome']
     }
