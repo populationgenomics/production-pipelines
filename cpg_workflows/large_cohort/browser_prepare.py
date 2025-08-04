@@ -968,13 +968,7 @@ def prepare_v4_variants(
     variants = exome_variants.join(genome_variants, how="outer")
 
     shared_fields = [
-        # "lcr",
-        # "nonpar",
-        "rsids",
-        # "segdup",
         "vep",
-        # "in_silico_predictors",
-        "variant_id",
     ]
     variants = variants.annotate(
         **{field: hl.or_else(variants.exome[field], variants.genome[field]) for field in shared_fields},
