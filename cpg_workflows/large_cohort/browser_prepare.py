@@ -1,6 +1,5 @@
 import itertools
 import logging
-from math import log
 
 import hail as hl
 
