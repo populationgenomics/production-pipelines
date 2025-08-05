@@ -987,7 +987,12 @@ def prepare_v4_variants(
     # Drop rsids from exome_variants to avoid appending during join.
     exome_variants = exome_variants.drop('rsids')
 
+    logger.info(f'Variants in exome: {exome_variants.count()}')
+    logger.info(f'Variants in genome: {genome_variants.count()}')
+
     variants = exome_variants.join(genome_variants, how="outer")
+
+    logger.info(f'Variants after join: {variants.count()}')
 
     shared_fields = [
         "vep",
