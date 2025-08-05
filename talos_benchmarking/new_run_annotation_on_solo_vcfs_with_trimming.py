@@ -40,8 +40,9 @@ ensembl_gff = 'gs://cpg-common-main/references/ensembl_113/GRCh38.gff3.gz'
 gff_local = hail_batch.get_batch().read_input(ensembl_gff)
 
 # where are the solo VCFs? This is a combination of GHFM-kidgen and acute-care
-# thsi folder was for the 'chunkier' VCFs
+# this folder was for the 'chunkier' VCFs
 # GS_VCFS = 'gs://cpg-seqr-test/talos_benchmarking/solo_vcfs'
+
 # this is the slimmed down version
 GS_VCFS = 'gs://cpg-acute-care-test/talos_benchmarking/new_slim_vcfs'
 
