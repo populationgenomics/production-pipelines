@@ -7,6 +7,13 @@ from cpg_utils.config import config_retrieve
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.filtering import add_filters_expr
 
+logging.basicConfig(
+    format='%(asctime)s (%(name)s %(lineno)s): %(message)s',
+    datefmt='%m/%d/%Y %I:%M:%S %p',
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 EMPTY_TABLE_CONFIG = """
 array<
     struct{
@@ -506,7 +513,7 @@ def process_score_cutoffs(
                 f"{variant_type}_score_cutoff is not within the range of score (" f"{min_score, max_score}).",
             )
 
-    logging.info(
+    logger.info(
         f"Using a SNP score cutoff of {hl.eval(cutoff_globals['snv'].min_score)} and an"
         f" indel score cutoff of {hl.eval(cutoff_globals['indel'].min_score)}.",
     )
@@ -711,7 +718,7 @@ def prepare_gnomad_v4_variants_helper(
         ds = ds.rename({'type': exome_or_genome})
         return ds
 
-    logging.info('Preparing the base frequencies table...')
+    logger.info('Preparing the base frequencies table...')
     ds = hl.read_table(ds_path)
 
     subsets = set(m.get("subset", None) for m in ds.freq_meta.collect()[0])
@@ -720,7 +727,7 @@ def prepare_gnomad_v4_variants_helper(
     ds = ds.rename({"rsid": "rsids"})
 
     # Identify co-located variants.
-    logging.info('Identifying co-located variants...')
+    logger.info('Identifying co-located variants...')
     variants_by_locus = ds.select(
         ds.variant_id,
         ac_adj=hl.struct(**{subset or "all": _freq(ds, subset=subset).AC for subset in subsets}),
@@ -753,7 +760,7 @@ def prepare_gnomad_v4_variants_helper(
     )
 
     # Expand the frequencies struct.
-    logging.info('Expanding the frequencies struct...')
+    logger.info('Expanding the frequencies struct...')
 
     # Annotate when a locus is not on the autosomes or in the PAR region, and
     # can therefore have hemizygote calls for XY individuals.
@@ -811,7 +818,7 @@ def prepare_gnomad_v4_variants_helper(
     )
 
     # Flag subsets in which the variant is present
-    logging.info('Identifying the subsets that contain each variant...')
+    logger.info('Identifying the subsets that contain each variant...')
     filtered_subsets = [subset for subset in subsets if subset is not None]
     if not filtered_subsets:
         ds = ds.annotate(subsets=hl.empty_set(hl.tstr))
@@ -825,11 +832,11 @@ def prepare_gnomad_v4_variants_helper(
         )
 
     # Summarise the carrier age distribution for each variant.
-    logging.info('Summarising the age distribution for variant carriers...')
+    logger.info('Summarising the age distribution for variant carriers...')
     ds = ds.annotate(expanded_age_distribution=hl.struct(het=ds.age_hist_het, hom=ds.age_hist_hom))
 
     # Summarise the site quality metrics.
-    logging.info('Summarising the site quality metrics...')
+    logger.info('Summarising the site quality metrics...')
     ds = ds.annotate(
         quality_metrics=hl.struct(
             allele_balance=hl.struct(
@@ -874,7 +881,7 @@ def prepare_gnomad_v4_variants_helper(
     )
 
     # Restructure the region flags.
-    logging.info('Restructuring the region flags...')
+    logger.info('Restructuring the region flags...')
     flags = [
         hl.or_missing(ds.region_flags.lcr, "lcr"),
         hl.or_missing(ds.region_flags.segdup, "segdup"),
@@ -888,7 +895,7 @@ def prepare_gnomad_v4_variants_helper(
     ds = ds.annotate(flags=hl.set(flags).filter(hl.is_defined))
 
     # Add the variant filter flags.
-    logging.info('Adding the variant filter flags...')
+    logger.info('Adding the variant filter flags...')
 
     inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
     filters = {
@@ -905,7 +912,7 @@ def prepare_gnomad_v4_variants_helper(
     ds = ds.annotate(filters=add_filters_expr(filters=filters))
 
     # Drop unnecessary fields.
-    logging.info('Dropping unnecessary fields...')
+    logger.info('Dropping unnecessary fields...')
     summary_dict = {
         name.replace("expanded_", ""): ds[name]
         for name in [
@@ -957,14 +964,18 @@ def prepare_v4_variants(
     genome_score_cutoffs = score_cutoffs['genome']
 
     if can_reuse(exome_variants_outpath):
+        logger.info('Reusing existing exome_variants tables...')
         exome_variants = hl.read_table(exome_variants_outpath)
     else:
+        logger.info('Preparing exome_variants tables...')
         exome_variants = prepare_gnomad_v4_variants_helper(exome_ds_path, 'exome', exome_score_cutoffs)
         exome_variants = exome_variants.checkpoint(exome_variants_outpath, overwrite=True)
 
     if can_reuse(genome_variants_outpath):
+        logger.info('Reusing existing genome_variants tables...')
         genome_variants = hl.read_table(genome_variants_outpath)
     else:
+        logger.info('Preparing genome_variants tables...')
         genome_variants = prepare_gnomad_v4_variants_helper(genome_ds_path, 'genome', genome_score_cutoffs)
         genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
 
@@ -997,7 +1008,7 @@ def prepare_v4_variants(
         ),
     )
 
-    logging.info('Annotating transcript consequences...')
+    logger.info('Annotating transcript consequences...')
     base_transcripts_grch38 = hl.read_table(transcript_table_path)
 
     transcripts = extract_transcripts(base_transcripts_grch38)
