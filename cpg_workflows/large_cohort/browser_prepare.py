@@ -980,9 +980,18 @@ def prepare_v4_variants(
         genome_variants = genome_variants.checkpoint(genome_variants_outpath, overwrite=True)
 
     # Add the key so that variant_id and rsid gets considered in the join
-    genome_variants = genome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
-    exome_variants = exome_variants.key_by('locus', 'alleles', 'variant_id', 'rsids')
+    genome_variants = genome_variants.key_by('locus', 'alleles', 'variant_id')
+    exome_variants = exome_variants.key_by('locus', 'alleles', 'variant_id')
+
+    # Drop rsids from exome_variants to avoid appending during join.
+    exome_variants = exome_variants.drop('rsids')
+
+    logger.info(f'Variants in exome: {exome_variants.count()}')
+    logger.info(f'Variants in genome: {genome_variants.count()}')
+
     variants = exome_variants.join(genome_variants, how="outer")
+
+    logger.info(f'Variants after join: {variants.count()}')
 
     shared_fields = [
         "vep",
@@ -1019,7 +1028,11 @@ def prepare_v4_variants(
         mane_transcripts_path,
     )
 
+    logger.info('Re-keying variants by locus and alleles...')
+    variants = variants.key_by('locus', 'alleles')
+
     # Return the final browser table.
+    logger.info('Writing the final browser table...')
     variants.write(browser_outpath, overwrite=True)
 
     return variants
