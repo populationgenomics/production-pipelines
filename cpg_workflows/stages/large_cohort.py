@@ -705,6 +705,7 @@ class GenerateCoverageTable(CohortStage):
                         ),
                     ),
                     str(outputs[f'index_{idx}']),
+                    str(idx),
                     setup_gcp=True,
                     init_batch_args=init_batch_args,
                 ),

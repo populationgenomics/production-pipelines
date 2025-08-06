@@ -339,6 +339,7 @@ def run(
     vds_path: str,
     interval_list: list[hb.ResourceFile],
     out_path: str,
+    idx: str,
 ) -> hl.Table:
     """
     Generate a coverage table for a given VDS and interval.
@@ -354,11 +355,11 @@ def run(
         logger.info(f'Reusing existing coverage table at {out_path}.')
         return None
 
-    rg: hl.ReferenceGenome = hl.get_reference(genome_build())
-    add_reference_sequence(rg)
+    # rg: hl.ReferenceGenome = hl.get_reference(genome_build())
+    # add_reference_sequence(rg)
 
     # Generate reference coverage table
-    intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=rg)
+    intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=genome_build())
 
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
         logger.info('Adjusting interval padding for exome sequencing.')
@@ -377,7 +378,7 @@ def run(
         locus_expr = hl.locus(
             contig=interval.start.contig,
             pos=ref_ht.idx + interval.start.position,
-            reference_genome=rg,
+            reference_genome=genome_build(),
         )
         ref_allele_expr = locus_expr.sequence_context().lower()
         alleles_expr = [ref_allele_expr]
@@ -387,6 +388,11 @@ def run(
 
     logger.info('Finished generating reference coverage tables')
     ref_ht_joined = hl.Table.union(*ref_tables)
+
+    ref_ht_joined = ref_ht_joined.checkpoint(
+        dataset_path(suffix=f'coverage/ref_ht_joined_{idx}.ht', category='tmp'),
+        overwrite=True,
+    )
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
