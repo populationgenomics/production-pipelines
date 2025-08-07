@@ -631,7 +631,7 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner])
+@stage(required_stages=[Combiner, Ancestry])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
