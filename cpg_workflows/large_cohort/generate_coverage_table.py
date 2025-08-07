@@ -356,7 +356,7 @@ def run(
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
         logger.info('Adjusting interval padding for exome sequencing.')
         # Generate reference coverage table
-        intervals_ht = hl.import_locus_intervals(
+        intervals_ht = hl.import_bed(
             config_retrieve(['large_cohort', 'coverage', 'exome_calling_intervals']),
             reference_genome=genome_build(),
         )
@@ -368,9 +368,11 @@ def run(
 
     ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
     # Retain only 'locus' annotation from context Table.
+    logger.info('Rekeying reference HT to locus.')
     ref_ht = ref_ht.key_by("locus").select().distinct()
 
     # Filter out Telomeres and Centromeres
+    logger.info('Filtering reference HT to intervals.')
     tel_cent_ht = hl.read_table(reference_path('gnomad/telomeres_and_centromeres'))
     ref_ht = hl.filter_intervals(
         ref_ht,
@@ -378,6 +380,7 @@ def run(
         keep=False,
     )
 
+    logger.info('Checkpointing filtered reference HT.')
     ref_ht = ref_ht.checkpoint(
         dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'),
         overwrite=True,
@@ -394,8 +397,11 @@ def run(
         split_reference_blocks=False,
     )
 
+    logger.info('Checkpointing pre-partitioned coverage HT.')
     coverage_ht.checkpoint(dataset_path(suffix='coverage/pre_partitioned_coverage_ht', category='tmp'), overwrite=True)
 
+    logger.info('Repartitioning coverage HT with naive_coalesce.')
     coverage_ht = coverage_ht.naive_coalesce()
 
+    logger.info(f'Writing coverage HT to {out_path}.')
     return coverage_ht.checkpoint(out_path, overwrite=True)
