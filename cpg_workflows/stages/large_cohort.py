@@ -191,7 +191,7 @@ class Ancestry(CohortStage):
             ancestry_version = slugify(ancestry_version)
 
         ancestry_version = ancestry_version or get_workflow().output_version
-        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ancestry_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ancestry_version / 'ancestry'
         return dict(
             scores=prefix / 'scores.ht',
             eigenvalues=prefix / 'eigenvalues.ht',
