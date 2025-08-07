@@ -809,6 +809,11 @@ def run(
                 pop_expr=sample_qc_ht.population,
             ),
         )
+        logger.info('Checkpointing group membership HT.')
+        group_membership_ht = group_membership_ht.checkpoint(
+            dataset_path(suffix='coverage/group_membership_ht', category='tmp'),
+            overwrite=True,
+        )
         # Generate coverage table
         logger.info('Computing coverage statistics.')
         coverage_ht: hl.Table = compute_coverage_stats(
