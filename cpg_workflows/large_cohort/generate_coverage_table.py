@@ -373,7 +373,7 @@ def run(
 
     # Filter out Telomeres and Centromeres
     logger.info('Filtering reference HT to intervals.')
-    tel_cent_ht = hl.read_table(reference_path('gnomad/telomeres_and_centromeres'))
+    tel_cent_ht = hl.read_table(reference_path('gnomad/tel_and_cent_ht'))
     ref_ht = hl.filter_intervals(
         ref_ht,
         tel_cent_ht.interval.collect(),
