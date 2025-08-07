@@ -1,16 +1,17 @@
 import logging
 from datetime import datetime
+from logging import config
 from math import ceil
 from typing import Optional
+from weakref import ref
 
 import hail as hl
 import hailtop.batch as hb
 
 from cpg_utils import to_path
-from cpg_utils.config import config_retrieve, dataset_path
+from cpg_utils.config import config_retrieve, dataset_path, reference_path
 from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse, exists
-from gnomad.utils import reference_genome, sparse_mt
 from gnomad.utils.annotations import generate_freq_group_membership_array
 
 logging.basicConfig(
@@ -337,9 +338,7 @@ def compute_coverage_stats(
 
 def run(
     vds_path: str,
-    interval_list: list[hb.ResourceFile],
     out_path: str,
-    idx: str,
 ) -> hl.Table:
     """
     Generate a coverage table for a given VDS and interval.
@@ -348,66 +347,55 @@ def run(
     :param out_path: Path to save the coverage table.
     :return: Coverage Hail Table.
     """
-    from cpg_utils.hail_batch import init_batch
-    from gnomad.utils.reference_genome import add_reference_sequence
-
     if can_reuse(out_path):
         logger.info(f'Reusing existing coverage table at {out_path}.')
         return None
 
-    # rg: hl.ReferenceGenome = hl.get_reference(genome_build())
-    # add_reference_sequence(rg)
-
-    # Generate reference coverage table
-    intervals_ht = hl.import_locus_intervals(interval_list, reference_genome=genome_build())
+    intervals = []
 
     if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
         logger.info('Adjusting interval padding for exome sequencing.')
-        padding = config_retrieve(['workflow', 'exome_interval_padding'], default=50)
-        intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
-
-    # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
-    intervals = intervals_ht.interval.collect()
-    ref_tables = []
-
-    logger.info('Starting to generate reference coverage tables')
-    for interval in intervals:
-        ref_ht = hl.utils.range_table(
-            (interval.end.position - interval.start.position),
-        )
-        locus_expr = hl.locus(
-            contig=interval.start.contig,
-            pos=ref_ht.idx + interval.start.position,
+        # Generate reference coverage table
+        intervals_ht = hl.import_locus_intervals(
+            config_retrieve(['large_cohort', 'coverage', 'exome_calling_intervals']),
             reference_genome=genome_build(),
         )
-        ref_allele_expr = locus_expr.sequence_context().lower()
-        alleles_expr = [ref_allele_expr]
-        ref_ht = ref_ht.select(locus=locus_expr, alleles=alleles_expr).key_by('locus', 'alleles').drop('idx')
-        ref_ht = ref_ht.filter(ref_ht.alleles[0] == 'n', keep=False)
-        ref_tables.append(ref_ht)
+        padding = config_retrieve(['large_cohort', 'coverage', 'exome_interval_padding'], default=50)
+        intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
-    logger.info('Finished generating reference coverage tables')
-    ref_ht_joined = hl.Table.union(*ref_tables)
+        # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
+        intervals = intervals_ht.interval.collect()
 
-    ref_ht_joined = ref_ht_joined.checkpoint(
-        dataset_path(suffix=f'coverage/ref_ht_joined_{idx}.ht', category='tmp'),
+    ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
+    # Retain only 'locus' annotation from context Table.
+    ref_ht = ref_ht.key_by("locus").select().distinct()
+
+    # Filter out Telomeres and Centromeres
+    tel_cent_ht = hl.read_table(reference_path('gnomad/telomeres_and_centromeres'))
+    ref_ht = hl.filter_intervals(
+        ref_ht,
+        tel_cent_ht.interval.collect(),
+        keep=False,
+    )
+
+    ref_ht = ref_ht.checkpoint(
+        dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'),
         overwrite=True,
     )
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
-    # Sample filter for testing
-    if num_samples_to_keep := config_retrieve(['workflow', 'num_samples_to_keep'], default=False):
-        samples_to_keep = vds.variant_data.s.collect()[:num_samples_to_keep]
-        vds = hl.vds.filter_samples(vds, samples_to_keep)
-
     # Generate coverage table
     logger.info('Computing coverage statistics.')
     coverage_ht: hl.Table = compute_coverage_stats(
         vds,
-        ref_ht_joined,
+        ref_ht,
         intervals=intervals,
         split_reference_blocks=False,
     )
+
+    coverage_ht.checkpoint(dataset_path(suffix='coverage/pre_partitioned_coverage_ht', category='tmp'), overwrite=True)
+
+    coverage_ht = coverage_ht.naive_coalesce()
 
     return coverage_ht.checkpoint(out_path, overwrite=True)
