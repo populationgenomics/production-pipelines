@@ -641,7 +641,10 @@ class GenerateCoverageTable(CohortStage):
         sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
 
-        return prefix / f'{sequencing_type}_coverage.ht'
+        return {
+            'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
+            'an_ht': prefix / f'{sequencing_type}_an.ht',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import generate_coverage_table
@@ -670,7 +673,9 @@ class GenerateCoverageTable(CohortStage):
                 generate_coverage_table,
                 generate_coverage_table.run.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(self.expected_outputs(cohort)),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(self.expected_outputs(cohort)['coverage_ht']),
+                str(self.expected_outputs(cohort)['an_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
