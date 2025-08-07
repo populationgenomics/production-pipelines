@@ -740,8 +740,8 @@ def compute_an_and_qual_hists_per_ref_site(
 
 def run(
     vds_path: str,
-    coverage_out_path: str,
     sample_qc_ht_path: str,
+    coverage_out_path: str,
     an_out_path: str,
 ) -> hl.Table:
     """
