@@ -770,7 +770,27 @@ def run(
         # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
         intervals = intervals_ht.interval.collect()
 
-    if not can_reuse(dataset_path(suffix='coverage/filtered_ref_ht', category='tmp')):
+    # Do we have a repartitioned reference HT we can use?
+    if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned')):
+        logger.info('Reusing repartitioned ref ht')
+        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned'))
+
+    # Do we have a reference ht we can use?
+    elif can_reuse(dataset_path(suffix='coverage/filtered_ref_ht')):
+        logger.info(
+            f'Reusing existing filtered reference HT at {dataset_path(suffix="coverage/filtered_ref_ht")}.',
+        )
+        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht'))
+        if ref_ht.n_partitions() > 5000:
+            logger.info('Repartitioning reference table')
+            ref_ht = ref_ht.naive_coalesce(5000)
+            ref_ht = ref_ht.checkpoint(
+                dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
+                overwrite=True,
+            )
+            logger.info('Checkpointed reference table')
+    else:
+        logger.info('Generating new reference Hail table')
         ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
         # Retain only 'locus' annotation from context Table.
         logger.info('Rekeying reference HT to locus.')
@@ -784,30 +804,14 @@ def run(
             tel_cent_ht.interval.collect(),
             keep=False,
         )
+        # Repartition here as job overhead kills us. No shuffle for now.
+        ref_ht = ref_ht.naive_coalesce(5000)
 
         logger.info('Checkpointing filtered reference HT.')
         ref_ht = ref_ht.checkpoint(
-            dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'),
+            dataset_path(suffix='coverage/filtered_ref_ht_repartitioned'),
             overwrite=True,
         )
-    else:
-        logger.info(
-            f'Reusing existing filtered reference HT at {dataset_path(suffix="coverage/filtered_ref_ht", category="tmp")}.',
-        )
-        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'))
-
-    if ref_ht.n_partitions() > 5000:
-        if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp')):
-            logger.info('Reusing repartitioned ref ht')
-            ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'))
-        else:
-            logger.info('Repartitioning reference table')
-            ref_ht = ref_ht.naive_coalesce(5000)
-            ref_ht = ref_ht.checkpoint(
-                dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
-                overwrite=True,
-            )
-            logger.info('Checkpointed reference table')
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
