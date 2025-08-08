@@ -797,13 +797,17 @@ def run(
         ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'))
 
     if ref_ht.n_partitions() > 5000:
-        logger.info('Repartitioning reference table')
-        ref_ht = ref_ht.naive_coalesce(5000)
-        ref_ht = ref_ht.checkpoint(
-            dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
-            overwrite=True,
-        )
-        logger.info('Checkpointed reference table')
+        logger.info('Reusing repartitioned ref ht')
+        if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp')):
+            ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'))
+        else:
+            logger.info('Repartitioning reference table')
+            ref_ht = ref_ht.naive_coalesce(5000)
+            ref_ht = ref_ht.checkpoint(
+                dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
+                overwrite=True,
+            )
+            logger.info('Checkpointed reference table')
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
