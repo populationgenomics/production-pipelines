@@ -1,5 +1,61 @@
 """
 Standalone script to run the AnnotateCohort process in the seqr_loader workflow.
+
+Annotation with gnomAD 4 is a bit tricky. There is a Hail Table containing all the data, so we're using that as a source
+Within that HT the data is compressed in a cool way
+
+(I haven't found a README to explain this, but I'm recalling a conversation with a member of the Broad Seqr team)
+
+Each row (keyed on [locus, alleles], i.e. 'row_key') contains a schema, e.g.
+`ht[row.key].joint.freq` is the frequency fields in the joint (exome & genome combined) dataset
+
+instead of our current tables where `ref_ht[mt.row_key].gnomad_exomes` is a struct of
+{
+    AC=int32,
+    AN=int32,
+    Af=float64,
+    ...
+}
+
+the gnomad4 data is stored as an array of structs, one for each dataset, e.g.
++------------------------------------------------------------------------------+
+| joint.freq                                                                   |
++------------------------------------------------------------------------------+
+| array<struct{AC: int32, AF: float64, AN: int32, homozygote_count: int32}>    |
++------------------------------------------------------------------------------+
+| [(0,0.00e+00,56642,0),(2,1.65e-05,121094,0),(0,0.00e+00,25546,0),(0,0.00e... |
++------------------------------------------------------------------------------+
+
+Each element of this array is a struct containing the AC, AF, AN, and homozygote_count for a particular gnomAD sub-pop.
+The globals of the HT contain a mapping of the dataset name to the index in this array, which is a massive space saving
+compared to keeping the full struct for each dataset in the row.
+
+For our purposes here, I'm going to assume we want the joint (exomes and genomes) frequency data, linked to the adjusted
+population 'adj' -  genotype calls have been adjusted to account for potential technical artifacts or biases:
+
+1. identify the name(s) of the populations we're interested in:
+    - target_pop = "adj"
+
+2. identify the part of the schema we're interested in:
+    - "joint.freq"
+
+3. use the globals to find the index of the 'adj' population for joint.freq:
+    - "target_index = ht.globals.joint_globals.freq_index_dict[target_pop]"
+
+4. pull out the relevant struct for this population:
+    - "ht[row_key].joint.freq[target_index]"
+
+This same process should be repeated for the "adj_XY" population for hemi counts.
+
+The popmax AF/fafmax should be taken from the separate 'max' fields as they are useful aggregated max values:
+- joint.grpmax.AF: the max AF seen in any sub-population
+- joint.fafmax.faf95_ma: the max filtering allele frequency seen in any sub-population
+
+---
+
+Alternatively, we can just use the `joint.grpmax` struct for everything, which contains AC/AN/AF/Hom for the most
+frequent population I don't think we would want to filter/display just the single population-maximum,
+keen to take a curator lead on this
 """
 
 from argparse import ArgumentParser
@@ -12,6 +68,11 @@ from cpg_utils.config import config_retrieve, reference_path
 from cpg_utils.hail_batch import genome_build, init_batch
 from cpg_workflows.utils import can_reuse, get_logger
 from hail_scripts.computed_fields import variant_id, vep
+
+# adj is the adjusted population, which is the default for gnomAD v4
+# all samples across all groups, adjusted for technical artifacts
+GNOMAD_TARGET_POP = 'adj'
+GNOMAD_XY_TARGET_POP = 'XY_adj'
 
 
 def checkpoint_hail(
@@ -96,6 +157,39 @@ def load_vqsr(vcf_path: str, ht_path: Path) -> hl.Table:
     vqsr_ht = vqsr_ht.annotate(info=vqsr_ht.info.drop(*[f for f in vqsr_ht.info if (f.startswith('AS_') or f == 'SB')]))
     vqsr_ht = vqsr_ht.checkpoint(str(ht_path), overwrite=True)
     return vqsr_ht
+
+
+def annotate_gnomad4(mt: hl.MatrixTable) -> hl.MatrixTable:
+    """
+    All steps relating to the annotation of gnomAD v4(.1) data
+
+    Args:
+        mt (hl.MatrixTable): the input MT
+
+    Returns:
+        same MT, with gnomAD 4 annotations placed into the INFO struct as a nested Struct
+    """
+
+    gnomad4_ht = hl.read_table(reference_path('gnomad_4.1_joint_ht'))
+
+    # the index of the target populations in the joint.freq array
+    target_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_TARGET_POP])
+    target_xy_index = hl.eval(gnomad4_ht.globals.joint_globals.freq_index_dict[GNOMAD_XY_TARGET_POP])
+
+    return mt.annotate_rows(
+        gnomad_genomes=hl.struct(
+            # these are taken explicitly from the adj population (across all of gnomAD)
+            AC=gnomad4_ht[mt.row_key].joint.freq[target_index].AC,
+            AN=gnomad4_ht[mt.row_key].joint.freq[target_index].AN,
+            AF=gnomad4_ht[mt.row_key].joint.freq[target_index].AF,
+            Hom=gnomad4_ht[mt.row_key].joint.freq[target_index].homozygote_count,
+            # a couple of max-value entries
+            FAF_AF=gnomad4_ht[mt.row_key].joint.fafmax.faf95_max,
+            AF_POPMAX_OR_GLOBAL=gnomad4_ht[mt.row_key].joint.grpmax.AF,
+            # not 100% sure about this one... target the `adj_XY` population
+            Hemi=gnomad4_ht[mt.row_key].joint.freq[target_xy_index].AC,
+        ),
+    )
 
 
 def annotate_cohort(
@@ -203,6 +297,9 @@ def annotate_cohort(
         ref_data=ref_ht[mt.row_key],
     )
 
+    # annotate all the gnomAD v4 fields in a separate function
+    mt = annotate_gnomad4(mt)
+
     # this was previously executed in the MtToEs job, as it wasn't possible on QoB
     get_logger().info('Adding GRCh37 coords')
     liftover_path = reference_path('liftover_38_to_37')
@@ -231,10 +328,6 @@ def annotate_cohort(
         cadd=mt.ref_data.cadd,
         dbnsfp=mt.ref_data.dbnsfp,
         geno2mp=mt.ref_data.geno2mp,
-        gnomad_exomes=mt.ref_data.gnomad_exomes,
-        gnomad_exome_coverage=mt.ref_data.gnomad_exome_coverage,
-        gnomad_genomes=mt.ref_data.gnomad_genomes,
-        gnomad_genome_coverage=mt.ref_data.gnomad_genome_coverage,
         eigen=mt.ref_data.eigen,
         exac=mt.ref_data.exac,
         g1k=mt.ref_data.g1k,
