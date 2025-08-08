@@ -129,7 +129,7 @@ def agg_by_strata(
         annotation will have the entry aggregation functions applied to them.
     :return: Table with annotations of stratified aggregations.
     """
-    if group_membership_ht is None and "group_membership" not in mt.col:
+    if group_membership_ht is None and 'group_membership' not in mt.col:
         raise ValueError(
             "The 'group_membership' annotation is not found in the input MatrixTable "
             "and 'group_membership_ht' is not specified.",
@@ -154,54 +154,54 @@ def agg_by_strata(
 
     global_expr = {}
     n_groups = len(mt.group_membership.take(1)[0])
-    if "adj_groups" in group_globals:
-        logger.info("Using the 'adj_groups' global annotation to determine adj filtered " "stratification groups.")
-        global_expr["adj_groups"] = group_globals.adj_groups
-    elif "freq_meta" in group_globals:
+    if 'adj_groups' in group_globals:
+        logger.info("Using the 'adj_groups' global annotation to determine adj filtered stratification groups.")
+        global_expr['adj_groups'] = group_globals.adj_groups
+    elif 'freq_meta' in group_globals:
         logger.info(
             "No 'adj_groups' global annotation found, using the 'freq_meta' global "
-            "annotation to determine adj filtered stratification groups.",
+            'annotation to determine adj filtered stratification groups.',
         )
-        global_expr["adj_groups"] = group_globals.freq_meta.map(lambda x: x.get("group", "NA") == "adj")
+        global_expr['adj_groups'] = group_globals.freq_meta.map(lambda x: x.get('group', 'NA') == 'adj')
     else:
         logger.info(
-            "No 'adj_groups' or 'freq_meta' global annotations found. All groups will " "be considered non-adj.",
+            "No 'adj_groups' or 'freq_meta' global annotations found. All groups will be considered non-adj.",
         )
-        global_expr["adj_groups"] = hl.range(n_groups).map(lambda x: False)
+        global_expr['adj_groups'] = hl.range(n_groups).map(lambda x: False)
 
-    if entry_agg_group_membership is not None and "freq_meta" not in group_globals:
+    if entry_agg_group_membership is not None and 'freq_meta' not in group_globals:
         raise ValueError(
-            "The 'freq_meta' global annotation must be supplied when the" " 'entry_agg_group_membership' is specified.",
+            "The 'freq_meta' global annotation must be supplied when the 'entry_agg_group_membership' is specified.",
         )
 
     entry_agg_group_membership = entry_agg_group_membership or {}
     entry_agg_group_membership = {
-        ann: [group_globals["freq_meta"].index(s) for s in strata] for ann, strata in entry_agg_group_membership.items()
+        ann: [group_globals['freq_meta'].index(s) for s in strata] for ann, strata in entry_agg_group_membership.items()
     }
 
-    n_adj_groups = hl.eval(hl.len(global_expr["adj_groups"]))
+    n_adj_groups = hl.eval(hl.len(global_expr['adj_groups']))
     if n_adj_groups != n_groups:
         raise ValueError(
             f"The number of elements in the 'adj_groups' ({n_adj_groups}) global "
-            "annotation does not match the number of elements in the "
+            'annotation does not match the number of elements in the '
             f"'group_membership' annotation ({n_groups})!",
         )
 
     # Keep only the entries needed for the aggregation functions.
     select_expr = {**{ann: f[0](mt) for ann, f in entry_agg_funcs.items()}}
-    has_adj = hl.eval(hl.any(global_expr["adj_groups"]))
+    has_adj = hl.eval(hl.any(global_expr['adj_groups']))
     if has_adj:
-        select_expr["adj"] = mt.adj
+        select_expr['adj'] = mt.adj
 
     mt = mt.select_entries(**select_expr)
 
     # Convert MT to HT with a row annotation that is an array of all samples entries
     # for that variant.
-    ht = mt.localize_entries("entries", "cols")
+    ht = mt.localize_entries('entries', 'cols')
 
     # For each stratification group in group_membership, determine the indices of the
     # samples that belong to that group.
-    global_expr["indices_by_group"] = hl.range(n_groups).map(
+    global_expr['indices_by_group'] = hl.range(n_groups).map(
         lambda g_i: hl.range(mt.count_cols()).filter(lambda s_i: ht.cols[s_i].group_membership[g_i]),
     )
     ht = ht.annotate_globals(**global_expr)
@@ -251,7 +251,7 @@ def agg_by_strata(
             ann: _agg_by_group(  # type: ignore[misc]
                 *[  # type: ignore[misc]
                     [ht[g][i] for i in entry_agg_group_membership.get(ann, [])] or ht[g]  # type: ignore[misc]
-                    for g in ["indices_by_group", "adj_groups"]  # type: ignore[misc]
+                    for g in ['indices_by_group', 'adj_groups']  # type: ignore[misc]
                 ],  # type: ignore[misc]
                 agg_func=f[1],
                 ann_expr=ht[ann],
@@ -260,10 +260,10 @@ def agg_by_strata(
         },
     )
 
-    return ht.drop("cols")
+    return ht.drop('cols')
 
 
-def get_coverage_agg_func(dp_field: str = "DP", max_cov_bin: int = 100):
+def get_coverage_agg_func(dp_field: str = 'DP', max_cov_bin: int = 100):
     """
     Get a transformation and aggregation function for computing coverage.
 
@@ -294,10 +294,10 @@ def compute_coverage_stats(
     reference_ht: hl.Table,
     interval_ht: Optional[hl.Table] = None,
     coverage_over_x_bins=[1, 5, 10, 15, 20, 25, 30, 50, 100],
-    row_key_fields=["locus"],
+    row_key_fields=['locus'],
     strata_expr=None,
     group_membership_ht: Optional[hl.Table] = None,
-    dp_field: str = "DP",
+    dp_field: str = 'DP',
 ) -> hl.Table:
     """
     Compute coverage statistics for every base of the `reference_ht` provided.
@@ -335,9 +335,9 @@ def compute_coverage_stats(
 
     # Determine the genotype field.
     en = set(mt.entry)
-    gt_field = en & {"GT"} or en & {"LGT"}
+    gt_field = en & {'GT'} or en & {'LGT'}
     if not gt_field:
-        raise ValueError("No genotype field found in entry fields!")
+        raise ValueError('No genotype field found in entry fields!')
 
     gt_field = gt_field.pop()
 
@@ -346,7 +346,7 @@ def compute_coverage_stats(
     rev_cov_bins = list(reversed(cov_bins))
     max_cov_bin = cov_bins[-1]
     cov_bins = hl.array(cov_bins)
-    entry_agg_funcs = {"coverage_stats": get_coverage_agg_func(dp_field=dp_field, max_cov_bin=max_cov_bin)}
+    entry_agg_funcs = {'coverage_stats': get_coverage_agg_func(dp_field=dp_field, max_cov_bin=max_cov_bin)}
 
     ht = compute_stats_per_ref_site(
         mtds,
@@ -375,20 +375,20 @@ def compute_coverage_stats(
         )
         bin_expr = hl.cumulative_sum(hl.array([max_bin_expr]).extend(bin_expr))
 
-        bin_expr = {f"over_{x}": bin_expr[i] / n for i, x in enumerate(rev_cov_bins)}
+        bin_expr = {f'over_{x}': bin_expr[i] / n for i, x in enumerate(rev_cov_bins)}
 
-        return cov_stat.annotate(**bin_expr).drop("coverage_counter")
+        return cov_stat.annotate(**bin_expr).drop('coverage_counter')
 
     ht_globals = ht.index_globals()
     if isinstance(ht.coverage_stats, hl.expr.ArrayExpression):
         ht = ht.select_globals(
             coverage_stats_meta=ht_globals.strata_meta.map(
-                lambda x: hl.dict(x.items().filter(lambda m: m[0] != "group")),
+                lambda x: hl.dict(x.items().filter(lambda m: m[0] != 'group')),
             ),
             coverage_stats_meta_sample_count=ht_globals.strata_sample_count,
         )
         cov_stats_expr = {
-            "coverage_stats": hl.map(
+            'coverage_stats': hl.map(
                 lambda c, n: _cov_stats(c, n),
                 ht.coverage_stats,
                 ht_globals.strata_sample_count,
@@ -406,8 +406,8 @@ def densify_all_reference_sites(
     mtds: hl.vds.VariantDataset,
     reference_ht: hl.Table,
     interval_ht: Optional[hl.Table] = None,
-    row_key_fields=("locus",),
-    entry_keep_fields=("GT",),
+    row_key_fields=('locus',),
+    entry_keep_fields=('GT',),
 ) -> hl.MatrixTable:
     """
     Densify a VariantDataset or Sparse MatrixTable at all sites in a reference Table.
@@ -424,7 +424,7 @@ def densify_all_reference_sites(
 
     if interval_ht is not None and not is_vds:
         raise NotImplementedError(
-            "Filtering to an interval list for a sparse Matrix Table is currently" " not supported.",
+            'Filtering to an interval list for a sparse Matrix Table is currently not supported.',
         )
 
     # Filter datasets to interval list.
@@ -437,7 +437,7 @@ def densify_all_reference_sites(
         mt = mtds.variant_data
     else:
         mt = mtds
-        entry_keep_fields.add("END")
+        entry_keep_fields.add('END')
 
     # Get the total number of samples.
     n_samples = mt.count_cols()
@@ -446,9 +446,9 @@ def densify_all_reference_sites(
     ht = mt.select_entries(*entry_keep_fields).select_cols()
 
     # Localize entries and perform an outer join with the reference HT.
-    ht = ht._localize_entries("__entries", "__cols")
+    ht = ht._localize_entries('__entries', '__cols')
     ht = ht.key_by(*row_key_fields)
-    ht = ht.join(reference_ht.key_by(*row_key_fields).select(_in_ref=True), how="outer")
+    ht = ht.join(reference_ht.key_by(*row_key_fields).select(_in_ref=True), how='outer')
     ht = ht.key_by(*mt_row_key_fields)
 
     # Fill in missing entries with missing values for each entry field.
@@ -460,7 +460,7 @@ def densify_all_reference_sites(
     )
 
     # Unlocalize entries to turn the HT back to a MT.
-    mt = ht._unlocalize_entries("__entries", "__cols", mt_col_key_fields)
+    mt = ht._unlocalize_entries('__entries', '__cols', mt_col_key_fields)
 
     # Densify VDS/sparse MT at all sites.
     if is_vds:
@@ -485,7 +485,7 @@ def compute_stats_per_ref_site(
     mtds,
     reference_ht: hl.Table,
     entry_agg_funcs,
-    row_key_fields=("locus",),
+    row_key_fields=('locus',),
     interval_ht: Optional[hl.Table] = None,
     entry_keep_fields=None,
     row_keep_fields=None,
@@ -537,15 +537,14 @@ def compute_stats_per_ref_site(
 
     if sex_karyotype_field is not None and sex_karyotype_field not in mt.col:
         raise ValueError(
-            f"The supplied 'sex_karyotype_field', {sex_karyotype_field}, is not present"
-            " in the columns of the input!",
+            f"The supplied 'sex_karyotype_field', {sex_karyotype_field}, is not present in the columns of the input!",
         )
 
     if group_membership_ht is not None and strata_expr is not None:
         raise ValueError("Only one of 'group_membership_ht' or 'strata_expr' can be specified.")
 
     g = {} if group_membership_ht is None else group_membership_ht.globals
-    if entry_agg_group_membership is not None and "freq_meta" not in g:
+    if entry_agg_group_membership is not None and 'freq_meta' not in g:
         raise ValueError(
             "The 'freq_meta' annotation must be present in 'group_membership_ht' if "
             "'entry_agg_group_membership' is specified.",
@@ -555,8 +554,8 @@ def compute_stats_per_ref_site(
     # in the globals of the group_membership_ht and any entry is True, or "freq_meta"
     # is in the globals of the group_membership_ht and any entry has "group" == "adj".
     adj = hl.eval(
-        hl.any(g.get("adj_groups", hl.empty_array("bool")))
-        | hl.any(g.get("freq_meta", hl.empty_array("dict<str, str>")).map(lambda x: x.get("group", "NA") == "adj")),
+        hl.any(g.get('adj_groups', hl.empty_array('bool')))
+        | hl.any(g.get('freq_meta', hl.empty_array('dict<str, str>')).map(lambda x: x.get('group', 'NA') == 'adj')),
     )
 
     # Determine the entry fields on mt that should be densified.
@@ -564,16 +563,16 @@ def compute_stats_per_ref_site(
     # If the adj annotation is needed then "adj" must be present on mt, or AD/LAD, DP,
     # and GQ must be present.
     en = set(mt.entry)
-    gt_field = en & {"GT"} or en & {"LGT"}
-    ad_field = en & {"AD"} or en & {"LAD"}
-    adj_fields = en & {"adj"} or ({"DP", "GQ"} | ad_field) if adj else set([])
+    gt_field = en & {'GT'} or en & {'LGT'}
+    ad_field = en & {'AD'} or en & {'LAD'}
+    adj_fields = en & {'adj'} or ({'DP', 'GQ'} | ad_field) if adj else set([])
 
     if not gt_field:
-        raise ValueError("No genotype field found in entry fields!")
+        raise ValueError('No genotype field found in entry fields!')
 
     if adj and not adj_fields.issubset(en):
         raise ValueError(
-            "No 'adj' found in entry fields, and one of AD/LAD, DP, and GQ is missing " "so adj can't be computed!",
+            "No 'adj' found in entry fields, and one of AD/LAD, DP, and GQ is missing so adj can't be computed!",
         )
 
     entry_keep_fields = set(entry_keep_fields or set([])) | gt_field | adj_fields
@@ -582,7 +581,7 @@ def compute_stats_per_ref_site(
     # onto the MT after 'densify_all_reference_sites' removes all column annotations.
     if sex_karyotype_field is not None:
         sex_karyotype_ht = (
-            mt.cols().select(sex_karyotype_field).checkpoint(hl.utils.new_temp_file("sex_karyotype_ht", "ht"))
+            mt.cols().select(sex_karyotype_field).checkpoint(hl.utils.new_temp_file('sex_karyotype_ht', 'ht'))
         )
     else:
         sex_karyotype_ht = None
@@ -616,14 +615,14 @@ def compute_stats_per_ref_site(
         group_membership_ht = generate_freq_group_membership_array(ht, strata_expr, no_raw_group=True)
         group_membership_ht = group_membership_ht.annotate_globals(
             freq_meta=group_membership_ht.freq_meta.map(
-                lambda x: hl.dict(x.items().map(lambda m: hl.if_else(m[0] == "group", ("group", "raw"), m))),
+                lambda x: hl.dict(x.items().map(lambda m: hl.if_else(m[0] == 'group', ('group', 'raw'), m))),
             ),
         )
 
     if is_vds:
         rmt = mtds.reference_data
         mtds = hl.vds.VariantDataset(
-            rmt.select_entries(*((set(entry_keep_fields) & set(rmt.entry)) | {"END", "LEN"})),
+            rmt.select_entries(*((set(entry_keep_fields) & set(rmt.entry)) | {'END', 'LEN'})),
             mtds.variant_data,
         )
 
@@ -636,14 +635,14 @@ def compute_stats_per_ref_site(
     )
 
     if sex_karyotype_ht is not None:
-        logger.info("Adjusting genotype ploidy based on sex karyotype.")
+        logger.info('Adjusting genotype ploidy based on sex karyotype.')
         gt_field = gt_field.pop()
         mt = mt.annotate_cols(sex_karyotype=sex_karyotype_ht[mt.col_key][sex_karyotype_field])
         mt = mt.annotate_entries(**{gt_field: adjusted_sex_ploidy_expr(mt.locus, mt[gt_field], mt.sex_karyotype)})
 
     # Annotate with adj if needed.
-    if adj and "adj" not in mt.entry:
-        logger.info("Annotating the MT with adj.")
+    if adj and 'adj' not in mt.entry:
+        logger.info('Annotating the MT with adj.')
         mt = annotate_adj(mt)
 
     ht = agg_by_strata(
@@ -653,7 +652,7 @@ def compute_stats_per_ref_site(
         select_fields=row_keep_fields,
         entry_agg_group_membership=entry_agg_group_membership,
     )
-    ht = ht.select_globals().checkpoint(hl.utils.new_temp_file("agg_stats", "ht"))
+    ht = ht.select_globals().checkpoint(hl.utils.new_temp_file('agg_stats', 'ht'))
 
     group_globals = group_membership_ht.index_globals()
     global_expr = {}
@@ -661,19 +660,19 @@ def compute_stats_per_ref_site(
         # If there was no stratification, move aggregated annotations to the top
         # level.
         ht = ht.select(**{ann: ht[ann][0] for ann in entry_agg_funcs})
-        global_expr["sample_count"] = group_globals.freq_meta_sample_count[0]
+        global_expr['sample_count'] = group_globals.freq_meta_sample_count[0]
     else:
         # If there was stratification, add the metadata and sample count info for the
         # stratification to the globals.
-        global_expr["strata_meta"] = group_globals.freq_meta
-        global_expr["strata_sample_count"] = group_globals.freq_meta_sample_count
+        global_expr['strata_meta'] = group_globals.freq_meta
+        global_expr['strata_sample_count'] = group_globals.freq_meta_sample_count
 
     ht = ht.annotate_globals(**global_expr)
 
     return ht
 
 
-def get_allele_number_agg_func(gt_field: str = "GT"):
+def get_allele_number_agg_func(gt_field: str = 'GT'):
     """
     Get a transformation and aggregation function for computing the allele number.
 
@@ -710,11 +709,11 @@ def compute_an_and_qual_hists_per_ref_site(
         )
 
     entry_agg_funcs = {
-        "AN": get_allele_number_agg_func("LGT"),
-        "qual_hists": (lambda t: [t.GQ, t.DP, t.adj], _get_hists),
+        'AN': get_allele_number_agg_func('LGT'),
+        'qual_hists': (lambda t: [t.GQ, t.DP, t.adj], _get_hists),
     }
 
-    logger.info("Computing allele number and histograms per reference site...")
+    logger.info('Computing allele number and histograms per reference site...')
     # Below we use just the raw group for qual hist computations because qual hists
     # has its own built-in adj filtering when adj is passed as an argument and will
     # produce both adj and raw histograms.
@@ -729,9 +728,9 @@ def compute_an_and_qual_hists_per_ref_site(
         entry_agg_funcs,
         interval_ht=interval_ht,
         group_membership_ht=group_membership_ht,
-        entry_keep_fields=["GQ", "DP"],
-        entry_agg_group_membership={"qual_hists": [{"group": "raw"}]},
-        sex_karyotype_field="sex_karyotype",
+        entry_keep_fields=['GQ', 'DP'],
+        entry_agg_group_membership={'qual_hists': [{'group': 'raw'}]},
+        sex_karyotype_field='sex_karyotype',
     )
     ht = ht.annotate(qual_hists=ht.qual_hists[0])
 
@@ -775,7 +774,7 @@ def run(
         ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
         # Retain only 'locus' annotation from context Table.
         logger.info('Rekeying reference HT to locus.')
-        ref_ht = ref_ht.key_by("locus").select().distinct()
+        ref_ht = ref_ht.key_by('locus').select().distinct()
 
         # Filter out Telomeres and Centromeres
         logger.info('Filtering reference HT to intervals.')
@@ -796,6 +795,9 @@ def run(
             f'Reusing existing filtered reference HT at {dataset_path(suffix="coverage/filtered_ref_ht", category="tmp")}.',
         )
         ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'))
+
+    if ref_ht.n_partitions() > 5000:
+        ref_ht = ref_ht.naive_coalesce(5000)
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
@@ -839,7 +841,6 @@ def run(
         coverage_ht = hl.read_table(coverage_out_path)
 
     if not can_reuse(an_out_path):
-
         logger.info('Generating allele number and quality histograms per reference site...')
         an_ht = compute_an_and_qual_hists_per_ref_site(
             vds,
