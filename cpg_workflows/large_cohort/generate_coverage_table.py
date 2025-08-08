@@ -800,7 +800,7 @@ def run(
         logger.info('Repartitioning reference table')
         ref_ht = ref_ht.naive_coalesce(5000)
         ref_ht = ref_ht.checkpoint(
-            dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'),
+            dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
             overwrite=True,
         )
         logger.info('Checkpointed reference table')
