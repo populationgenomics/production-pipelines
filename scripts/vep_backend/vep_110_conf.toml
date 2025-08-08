@@ -1,5 +1,6 @@
 [workflow]
 sequencing_type = 'genome'
+vep_image = '110.1-1'
 vep_version = '110'
 
 [vep]

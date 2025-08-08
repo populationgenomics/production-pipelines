@@ -106,7 +106,7 @@ def squash_fragments_to_vcf(vcf_fragment_dir: str, vcf_out: str):
     input_vcf = get_batch().read_input(manifest_paths[0])
     final_job = get_batch().new_bash_job(name='index_final_vcf')
     final_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
-    final_job.image(image_path('bcftools'))
+    final_job.image(image_path('bcftools', '1.16-1'))
     final_job.storage('10Gi')  # make this configurable
     final_job.command(f'mv {input_vcf} {final_job.output["vcf.bgz"]} && tabix {final_job.output["vcf.bgz"]}')
     get_batch().write_output(final_job.output, vcf_out.removesuffix('.vcf.bgz'))

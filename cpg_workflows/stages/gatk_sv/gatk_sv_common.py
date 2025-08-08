@@ -350,7 +350,7 @@ def queue_annotate_strvctvre_job(
     job_attrs = job_attrs or {}
     strv_job = get_batch().new_job('StrVCTVRE', job_attrs | {'tool': 'strvctvre'})
 
-    strv_job.image(image_path('strvctvre'))
+    strv_job.image(image_path('strvctvre', '1.10-1'))
     strv_job.storage(config_retrieve(['resource_overrides', name, 'storage'], '10Gi'))
     strv_job.memory(config_retrieve(['resource_overrides', name, 'memory'], '16Gi'))
 

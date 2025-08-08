@@ -2,10 +2,11 @@
 name = 'long_read_snps_indels_annotation'
 ref_fasta = 'gs://cpg-common-main/references/hg38/v0/dragen_reference/Homo_sapiens_assembly38_masked.fasta'
 status_reporter = 'metamist'
+vep_image = '110.1-1'
 vep_version = '110'
 
 [workflow.merge_vcfs]
-bcftools_image = 'bcftools_121'
+bcftools_image = '1.21-1'
 
 [workflow.annotate_cohort]
 highmem_drivers = false

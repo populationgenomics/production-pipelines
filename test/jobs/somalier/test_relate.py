@@ -22,7 +22,7 @@ def default_config() -> PipelineConfig:
             check_inputs=False,
         ),
         images={
-            'somalier': 'test_image',
+            'somalier': 'test_image/somalier@version',
             'cpg_workflows': 'test_image',
         },
         other={
@@ -146,7 +146,7 @@ class TestSomalierRelate:
         relate_j = pedigree_jobs[0]
 
         assert relate_j is not None
-        assert relate_j._image == config.images['somalier']
+        assert "/somalier@" in relate_j._image
 
     def test_if_verifybamid_exists_for_sg_check_freemix(self, tmp_path: Path):
         _, batch, somalier_path_by_sgid, dataset = setup_pedigree_test(tmp_path)

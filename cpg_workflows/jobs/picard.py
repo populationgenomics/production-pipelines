@@ -17,6 +17,8 @@ from cpg_workflows.resources import (
 )
 from cpg_workflows.utils import can_reuse, exists
 
+PICARD_VERSION = '2.27.4-1'
+
 
 def get_intervals(
     b: hb.Batch,
@@ -73,7 +75,7 @@ def get_intervals(
         f'Make {scatter_count} intervals for {sequencing_type}',
         attributes=(job_attrs or {}) | dict(tool='picard IntervalListTools'),
     )
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
     STANDARD.set_resources(j, storage_gb=16, mem_gb=2)
 
     break_bands_at_multiples_of = {
@@ -144,7 +146,7 @@ def markdup(
     if can_reuse(output_path, overwrite):
         return None
 
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
 
     # check for a memory override for impossible sequencing groups
     # if RAM is overridden, update the memory resource setting
@@ -221,7 +223,7 @@ def vcf_qc(
 
     job_attrs = (job_attrs or {}) | {'tool': 'picard CollectVariantCallingMetrics'}
     j = b.new_job('CollectVariantCallingMetrics', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
     storage_gb = 20 if is_gvcf else storage_for_joint_vcf(sequencing_group_count, site_only=False)
     res = STANDARD.set_resources(j, storage_gb=storage_gb, mem_gb=3)
     reference = fasta_res_group(b)
@@ -289,7 +291,7 @@ def picard_collect_metrics(
 
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectMultipleMetrics'}
     j = b.new_job('Picard CollectMultipleMetrics', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
     res = STANDARD.request_resources(ncpu=2)
     res.attach_disk_storage_gb = storage_for_cram_qc_job()
     res.set_to_job(j)
@@ -358,7 +360,7 @@ def picard_hs_metrics(
 
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectHsMetrics'}
     j = b.new_job('Picard CollectHsMetrics', job_attrs)
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'exome'
     res = STANDARD.request_resources(ncpu=2)
@@ -425,7 +427,7 @@ def picard_wgs_metrics(
     job_attrs = (job_attrs or {}) | {'tool': 'picard_CollectWgsMetrics'}
     j = b.new_job('Picard CollectWgsMetrics', job_attrs)
 
-    j.image(image_path('picard'))
+    j.image(image_path('picard', PICARD_VERSION))
     sequencing_type = get_config()['workflow']['sequencing_type']
     assert sequencing_type == 'genome'
     res = STANDARD.request_resources(ncpu=2)

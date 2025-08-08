@@ -1166,7 +1166,7 @@ class FilterWham(MultiCohortStage):
 
         in_vcf = get_batch().read_input_group(**{'vcf.gz': input_vcf, 'vcf.gz.tbi': f'{input_vcf}.tbi'})['vcf.gz']
         job = get_batch().new_job('Filter Wham', attributes={'tool': 'bcftools'})
-        job.image(image_path('bcftools')).cpu(1).memory('highmem').storage('20Gi')
+        job.image(image_path('bcftools', '1.16-1')).cpu(1).memory('highmem').storage('20Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         job.command(
             'bcftools view -e \'SVTYPE=="DEL" && COUNT(ALGORITHMS)==1 && ALGORITHMS=="wham"\' '
@@ -1270,7 +1270,7 @@ class SpiceUpSVIDs(MultiCohortStage):
 
         # then compress & run tabix on that plain text result
         bcftools_job = get_batch().new_job('bgzip and tabix')
-        bcftools_job.image(image_path('bcftools'))
+        bcftools_job.image(image_path('bcftools', '1.16-1'))
         bcftools_job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
         bcftools_job.command(f'bcftools view {pyjob.output} | bgzip -c > {bcftools_job.output["vcf.bgz"]}')
         bcftools_job.command(f'tabix {bcftools_job.output["vcf.bgz"]}')  # type: ignore
@@ -1451,7 +1451,7 @@ class SplitAnnotatedSvVcfByDataset(DatasetStage):
             name=f'SplitAnnotatedSvVcfByDataset: {dataset}',
             attributes=self.get_job_attrs() | {'tool': 'bcftools'},
         )
-        job.image(image_path('bcftools_120'))
+        job.image(image_path('bcftools', '1.20-1'))
         job.cpu(1).memory('highmem').storage('10Gi')
         job.declare_resource_group(output={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'})
 

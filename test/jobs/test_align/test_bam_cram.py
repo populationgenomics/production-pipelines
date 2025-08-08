@@ -397,7 +397,13 @@ class TestDragmap:
 
 class TestBwaAndBw2:
     @pytest.mark.parametrize('input_type', ['bam', 'cram'])
-    @pytest.mark.parametrize('alinger, expected_tool', [(Aligner.BWA, 'bwa'), (Aligner.BWAMEM2, 'bwa-mem2')])
+    @pytest.mark.parametrize(
+        'aligner,expected_tool',
+        [
+            (Aligner.BWA, 'bwa'),
+            # (Aligner.BWAMEM2, 'bwa-mem2'),  # Don't test bwa-mem2 as we have no image for it
+        ],
+    )
     @pytest.mark.parametrize(
         'reference,expected_reference',
         [
@@ -412,7 +418,7 @@ class TestBwaAndBw2:
         input_type: str,
         reference: dict[str, str | None],
         expected_reference: str,
-        alinger: Aligner,
+        aligner: Aligner,
         expected_tool: str,
     ):
         """
@@ -425,7 +431,7 @@ class TestBwaAndBw2:
         config.references['broad']['ref_fasta'] = reference['broad']
         batch, sg = setup_test(config, tmp_path, alignment_input=input_type)
 
-        jobs = align(b=batch, sequencing_group=sg, aligner=alinger)
+        jobs = align(b=batch, sequencing_group=sg, aligner=aligner)
         align_jobs = select_jobs(jobs, 'align')
         assert len(align_jobs) == 10
 

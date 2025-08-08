@@ -34,6 +34,8 @@ INDEL_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'indel_recal_disc_s
 SNPS_RECAL_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_recal_disc_size'], 20)
 SNPS_GATHER_DISC_SIZE: int = config_retrieve(['rd_combiner', 'snps_gather_disc_size'], 10)
 
+GATK_VERSION = '4.2.6.1-1'
+
 
 @lru_cache(1)
 def get_localised_resources_for_vqsr() -> dict[str, ResourceGroup]:
@@ -89,7 +91,7 @@ def train_vqsr_indels(sites_only_vcf: str, output_prefix: str, job_attrs: dict) 
         'TrainVqsrIndelModelOnCombinerData',
         job_attrs | {'tool': 'gatk VariantRecalibrator'},
     )
-    indel_recalibrator_j.image(image_path('gatk'))
+    indel_recalibrator_j.image(image_path('gatk', GATK_VERSION))
     indel_recalibrator_j.command('set -euo pipefail')
 
     # We run it for the entire dataset in one job, so can take an entire instance.
@@ -152,7 +154,7 @@ def train_vqsr_snps(sites_only_vcf: str, snp_model: str, job_attrs: dict):
         'TrainVqsrSnpModelOnCombinerData',
         job_attrs | {'tool': 'gatk VariantRecalibrator'},
     )
-    snp_recalibrator_j.image(image_path('gatk'))
+    snp_recalibrator_j.image(image_path('gatk', GATK_VERSION))
 
     # We run it for the entire dataset in one job, so can take an entire instance.
     res = HIGHMEM.set_resources(snp_recalibrator_j, fraction=1, storage_gb=SNPS_RECAL_DISC_SIZE)
@@ -237,7 +239,7 @@ def train_vqsr_snp_tranches(
         # candidate splitting is 100-fragments-per-job, for a ~99% cost saving
 
         chunk_job = get_batch().new_job(f'TrainVqsrSnpTranches, Chunk {chunk_counter}', job_attrs)
-        chunk_job.image(image_path('gatk'))
+        chunk_job.image(image_path('gatk', GATK_VERSION))
         chunk_job.command('set -euo pipefail')
 
         # add this job to the list of scatter jobs
@@ -340,7 +342,7 @@ def gather_tranches(manifest_file: Path, temp_path: Path, output_path: str, job_
     ]
 
     gather_tranches_j = get_batch().new_job('GatherTrainedVqsrSnpTranches', job_attrs | {'tool': 'gatk GatherTranches'})
-    gather_tranches_j.image(image_path('gatk'))
+    gather_tranches_j.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(gather_tranches_j, ncpu=2, storage_gb=SNPS_GATHER_DISC_SIZE)
 
     inputs_cmdl = ' '.join([f'--input {t}' for t in snp_tranche_paths])
@@ -404,7 +406,7 @@ def apply_snp_vqsr_to_fragments(
     ):
 
         chunk_job = get_batch().new_bash_job(f'RunTrainedSnpVqsrOnCombinerFragments, Chunk {chunk_counter}', job_attrs)
-        chunk_job.image(image_path('gatk'))
+        chunk_job.image(image_path('gatk', GATK_VERSION))
 
         # stores all the annotated VCFs in this chunk
         chunk_vcfs = []
@@ -489,7 +491,7 @@ def apply_recalibration_indels(
     )
 
     indel_recal_job = get_batch().new_bash_job(f'RunTrainedIndelVqsrOnCombinedVcf on {snp_annotated_vcf}', job_attrs)
-    indel_recal_job.image(image_path('gatk'))
+    indel_recal_job.image(image_path('gatk', GATK_VERSION))
     res = STANDARD.set_resources(indel_recal_job, ncpu=2, storage_gb=INDEL_RECAL_DISC_SIZE)
 
     indel_recal_job.declare_resource_group(output={VCF_GZ: '{root}.vcf.gz', VCF_GZ_TBI: '{root}.vcf.gz.tbi'})

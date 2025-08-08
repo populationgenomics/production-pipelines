@@ -176,7 +176,7 @@ def _relate(
         title += f' [{label}]'
 
     j = b.new_job(title, (job_attrs or {}) | dict(tool='somalier'))
-    j.image(image_path('somalier'))
+    j.image(image_path('somalier', '0.2.15-1'))
     # Size of one somalier file is 212K, so we add another G only if the number of
     # sequencing groups is >4k
     STANDARD.set_resources(j, storage_gb=1 + len(sequencing_group_ids) // 4000 * 1)
@@ -251,7 +251,7 @@ def extract(
     job_attrs = (job_attrs or {}) | {'tool': 'somalier'}
     j = b.new_job('Somalier extract' + (f' {label}' if label else ''), job_attrs)
 
-    j.image(image_path('somalier'))
+    j.image(image_path('somalier', '0.2.15-1'))
     if not cram_path.index_path:
         raise ValueError(f'CRAM for somalier is required to have CRAI index ({cram_path})')
     storage_gb = None  # avoid extra disk by default

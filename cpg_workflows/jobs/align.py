@@ -251,7 +251,7 @@ def align(
                 sharded_align_jobs.append(j)
 
         merge_j = b.new_job('Merge BAMs', (job_attrs or {}) | dict(tool='samtools_merge'))
-        merge_j.image(image_path('samtools'))
+        merge_j.image(image_path('samtools', '1.18-1'))
 
         nthreads = STANDARD.set_resources(
             merge_j,
@@ -445,11 +445,11 @@ def _align_one(
     if aligner in [Aligner.BWAMEM2, Aligner.BWA]:
         if aligner == Aligner.BWAMEM2:
             tool_name = 'bwa-mem2'
-            j.image(image_path('bwamem2'))
+            j.image(image_path('bwamem2', '2.2.1-1'))
             index_exts = BWAMEM2_INDEX_EXTS
         else:
             tool_name = 'bwa'
-            j.image(image_path('bwa'))
+            j.image(image_path('bwa', '0.7.17-1'))
             index_exts = BWA_INDEX_EXTS
         bwa_reference = fasta_res_group(b, index_exts)
         rg_line = f'@RG\\tID:{sequencing_group_name}\\tSM:{sequencing_group_name}'
@@ -467,7 +467,7 @@ def _align_one(
         """
 
     elif aligner == Aligner.DRAGMAP:
-        j.image(image_path('dragmap'))
+        j.image(image_path('dragmap', '1.3.0-tokenizer-next-fix-1'))
         dragmap_index = b.read_input_group(
             **{
                 k.replace('.', '_'): os.path.join(reference_path('broad/dragmap_prefix'), k)
@@ -537,7 +537,7 @@ def extract_fastq(
     Job that converts a BAM or a CRAM file to a pair of compressed fastq files.
     """
     j = b.new_job('Extract fastq', (job_attrs or {}) | dict(tool='samtools'))
-    j.image(image_path('samtools'))
+    j.image(image_path('samtools', '1.18-1'))
     res = STANDARD.request_resources(ncpu=16)
     if get_config()['workflow']['sequencing_type'] == 'genome':
         res.attach_disk_storage_gb = 700

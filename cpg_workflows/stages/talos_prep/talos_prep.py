@@ -188,7 +188,7 @@ class AnnotateGnomadFrequenciesWithEchtvar(DatasetStage):
         gnomad_annotations = get_batch().read_input(config_retrieve(['annotations', 'echtvar_gnomad']))
 
         job = get_batch().new_job(f'AnnotateGnomadFrequenciesWithEchtvar: {dataset.name}')
-        job.image(image_path('echtvar'))
+        job.image(image_path('echtvar', '0.2.1-1'))
         job.command(f'echtvar anno -e {gnomad_annotations} {sites_vcf} {job.output}')
         job.storage('20Gi')
         job.memory('highmem')
@@ -230,7 +230,7 @@ class AnnotateConsequenceWithBcftools(DatasetStage):
         fasta = get_batch().read_input(reference_path('broad/ref_fasta'))
 
         job = get_batch().new_job(f'AnnotateConsequenceWithBcftools: {dataset.name}')
-        job.image(image_path('bcftools_120'))
+        job.image(image_path('bcftools', '1.20-1'))
         job.cpu(4)
         job.storage('20G')
 

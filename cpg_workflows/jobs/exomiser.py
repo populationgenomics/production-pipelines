@@ -33,7 +33,7 @@ def family_vcf_from_gvcf(family_members: list[SequencingGroup], out_path: str) -
 
     family_ids = [sg.id for sg in family_members]
     job = get_batch().new_job(f'Generate VCF {out_path} from {family_ids}')
-    job.image(image_path('bcftools'))
+    job.image(image_path('bcftools', '1.16-1'))
     if get_config()['workflow']['sequencing_type'] == 'genome':
         job.storage('10Gi')
 
@@ -171,7 +171,8 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
     type hint is still wild
     """
 
-    exomiser_version = image_path('exomiser_14').split(':')[-1]
+    exomiser_image_version = '14.0.0-1'
+    exomiser_version = exomiser_image_version.rpartition('-')[0]
     exomiser_dir = f'/exomiser/exomiser-cli-{exomiser_version}'
 
     # localise the compressed exomiser references
@@ -192,7 +193,7 @@ def run_exomiser(content_dict: dict[str, dict[str, Path | dict[str, Path]]]):
         job.storage(config_retrieve(['workflow', 'exomiser_storage'], '100Gi'))
         job.memory(config_retrieve(['workflow', 'exomiser_memory'], '60Gi'))
         job.cpu(config_retrieve(['workflow', 'exomiser_cpu'], 4))
-        job.image(image_path('exomiser_14'))
+        job.image(image_path('exomiser_14', exomiser_image_version))
 
         # unpack references, see linux-install link above
         job.command(f'unzip {inputs}/\* -d "{exomiser_dir}/data"')
