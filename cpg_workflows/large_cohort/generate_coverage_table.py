@@ -798,6 +798,10 @@ def run(
 
     if ref_ht.n_partitions() > 5000:
         ref_ht = ref_ht.naive_coalesce(5000)
+        ref_ht.checkpoint(
+            dataset_path(suffix='coverage/filtered_ref_ht', category='tmp'),
+            overwrite=True,
+        )
 
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
