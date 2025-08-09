@@ -745,59 +745,39 @@ def run(
     an_out_path: str,
 ) -> hl.Table:
     """
-    Generate a coverage table for a given VDS and interval.
+    Generate coverage summary statistics and AN counts for reference sites in a given VDS.
     :param vds_path: Path to the VDS.
-    :interval_list: List of .interval_list files in the form of Hail Batch ResourceFiles objects.
-    :param out_path: Path to save the coverage table.
+    :param sample_qc_ht_path: Path to a hail table containing population and sex_karyotype annotated.
+    :param coverage_out_path: Path to save the coverage table.
+    :param an_out_path: Path to save the allele number table.
     :return: Coverage Hail Table.
     """
-    if can_reuse(coverage_out_path):
-        logger.info(f'Reusing existing coverage table at {coverage_out_path}.')
+    if can_reuse(coverage_out_path) and can_reuse(an_out_path):
+        logger.info(f'Reusing existing coverage table at {coverage_out_path} and AN table at {an_out_path}.')
         return None
 
-    intervals = []
-    intervals_ht = None
+    # Load intervals list to use for exome coverage and AN generation for both exomes and genomes.
+    logger.info('Preparing padded exome intervals.')
+    intervals_ht = hl.import_bed(
+        config_retrieve(['large_cohort', 'coverage', 'exome_calling_intervals']),
+        reference_genome=genome_build(),
+    )
+    padding = config_retrieve(['large_cohort', 'coverage', 'exome_interval_padding'], default=50)
+    intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
-    if config_retrieve(['workflow', 'sequencing_type']) == 'exome':
-        logger.info('Adjusting interval padding for exome sequencing.')
-        # Generate reference coverage table
-        intervals_ht = hl.import_bed(
-            config_retrieve(['large_cohort', 'coverage', 'exome_calling_intervals']),
-            reference_genome=genome_build(),
-        )
-        padding = config_retrieve(['large_cohort', 'coverage', 'exome_interval_padding'], default=50)
-        intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
-
-        # .interval_list files are imported as a Table with two columns: 'interval' and 'target'
-        intervals = intervals_ht.interval.collect()
-
-    # Do we have a repartitioned reference HT we can use?
+    # Load or prepare reference hail table.
     if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned')):
-        logger.info('Reusing repartitioned ref ht')
+        logger.info('Reusing reference hail table')
         ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned'))
-
-    # Do we have a reference ht we can use?
-    elif can_reuse(dataset_path(suffix='coverage/filtered_ref_ht')):
-        logger.info(
-            f'Reusing existing filtered reference HT at {dataset_path(suffix="coverage/filtered_ref_ht")}.',
-        )
-        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht'))
-        if ref_ht.n_partitions() > 5000:
-            logger.info('Repartitioning reference table')
-            ref_ht = ref_ht.naive_coalesce(5000)
-            ref_ht = ref_ht.checkpoint(
-                dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
-                overwrite=True,
-            )
-            logger.info('Checkpointed reference table')
     else:
-        logger.info('Generating new reference Hail table')
+        logger.info('Generating new reference hail table')
         ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
-        # Retain only 'locus' annotation from context Table.
+
+        # Retain only 'locus' annotation from context table.
         logger.info('Rekeying reference HT to locus.')
         ref_ht = ref_ht.key_by('locus').select().distinct()
 
-        # Filter out Telomeres and Centromeres
+        # Filter out telomeres and centromeres.
         logger.info('Filtering reference HT to intervals.')
         tel_cent_ht = hl.read_table(reference_path('gnomad/tel_and_cent_ht'))
         ref_ht = hl.filter_intervals(
@@ -805,8 +785,9 @@ def run(
             tel_cent_ht.interval.collect(),
             keep=False,
         )
-        # Repartition here as job overhead kills us. No shuffle for now.
-        ref_ht = ref_ht.naive_coalesce(5000)
+
+        # Repartition the reference table to reduce job overhead.
+        ref_ht = ref_ht.repartition(5000)
 
         logger.info('Checkpointing filtered reference HT.')
         ref_ht = ref_ht.checkpoint(
@@ -814,11 +795,13 @@ def run(
             overwrite=True,
         )
 
-    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
-
-    if not can_reuse(coverage_out_path):
-        logger.info('Generating frequency group membership array...')
-        sample_qc_ht = hl.read_table(sample_qc_ht_path)
+    # Prepare the group membership hail table.
+    sample_qc_ht = hl.read_table(sample_qc_ht_path)
+    if can_reuse(dataset_path(suffix='coverage/group_membership_ht', category='tmp')):
+        logger.info('Reusing group membership table')
+        group_membership_ht = hl.read_table(dataset_path(suffix='coverage/group_membership_ht', category='tmp'))
+    else:
+        logger.info('Generating frequency group membership table.')
         group_membership_ht = generate_freq_group_membership_array(
             sample_qc_ht,
             build_freq_stratification_list(
@@ -826,11 +809,40 @@ def run(
                 pop_expr=sample_qc_ht.population,
             ),
         )
+
         logger.info('Checkpointing group membership HT.')
         group_membership_ht = group_membership_ht.checkpoint(
             dataset_path(suffix='coverage/group_membership_ht', category='tmp'),
             overwrite=True,
         )
+
+    # Load the VDS.
+    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
+
+    # Compute the AN and quality histograms per reference site in exome calling regions.
+    if not can_reuse(an_out_path):
+        logger.info('Generating allele number and quality histograms per exome reference site...')
+        an_ht = compute_an_and_qual_hists_per_ref_site(
+            vds,
+            ref_ht,
+            sample_qc_ht,
+            interval_ht=intervals_ht,
+            group_membership_ht=group_membership_ht,
+        )
+
+        logger.info('Repartitioning allele number and quality histograms hail table.')
+        an_ht = an_ht.repartition(5000)
+
+        logger.info(f'Checkpointing allele number and quality histograms hail table to {an_ht}.')
+        an_ht = an_ht.checkpoint(an_out_path, overwrite=True)
+
+    # Compute coverage statistics.
+    if not can_reuse(coverage_out_path):
+
+        # Don't subset to exome regions for coverage statistics for genomes.
+        if config_retrieve(['workflow', 'sequencing_type']) == 'genome':
+            intervals_ht = None
+
         # Generate coverage table
         logger.info('Computing coverage statistics.')
         coverage_ht: hl.Table = compute_coverage_stats(
@@ -840,37 +852,10 @@ def run(
             group_membership_ht=group_membership_ht,
         )
 
-        logger.info('Checkpointing pre-partitioned coverage HT.')
-        coverage_ht.checkpoint(
-            dataset_path(suffix='coverage/pre_partitioned_coverage_ht', category='tmp'),
-            overwrite=True,
-        )
+        logger.info('Repartitioning coverage hail table.')
+        coverage_ht = coverage_ht.repartition(5000)
 
-        # logger.info('Repartitioning coverage HT with naive_coalesce.')
-        # coverage_ht = coverage_ht.naive_coalesce()
-
-        logger.info(f'Writing coverage HT to {coverage_out_path}.')
+        logger.info(f'Writing coverage hail table to {coverage_out_path}.')
         coverage_ht = coverage_ht.checkpoint(coverage_out_path, overwrite=True)
-    else:
-        logger.info(f'Reusing existing coverage HT at {coverage_out_path}.')
-        coverage_ht = hl.read_table(coverage_out_path)
-
-    if not can_reuse(an_out_path):
-        logger.info('Generating allele number and quality histograms per reference site...')
-        an_ht = compute_an_and_qual_hists_per_ref_site(
-            vds,
-            ref_ht,
-            sample_qc_ht,
-            interval_ht=intervals_ht,
-            group_membership_ht=group_membership_ht,
-        )
-
-        # logger.info('Repartitioning allele number and quality histograms HT with naive_coalesce.')
-        # an_ht = an_ht.naive_coalesce()
-        logger.info(f'Checkpointing allele number and quality histograms HT to {an_ht}.')
-        an_ht = an_ht.checkpoint(an_out_path, overwrite=True)
-    else:
-        logger.info(f'Reusing existing allele number and quality histograms HT at {an_out_path}.')
-        an_ht = hl.read_table(an_out_path)
 
     return
