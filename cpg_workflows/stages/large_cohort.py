@@ -642,7 +642,7 @@ class GenerateCoverageTable(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
 
         return {
-            'group_membership_ht': prefix / f'{sequencing_type}_coverage.ht',
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
             'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
         }
 
@@ -755,7 +755,7 @@ class GenerateAlleleNumberTable(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / an_version
 
         return {
-            'group_membership_ht': prefix / f'{sequencing_type}_allele_number.ht',
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
             'an_ht': prefix / f'{sequencing_type}_allele_number.ht',
         }
 
