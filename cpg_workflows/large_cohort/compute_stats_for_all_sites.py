@@ -876,10 +876,10 @@ def run_an_calculation(
         group_membership_ht=group_membership_ht,
     )
 
-    logger.info('Repartitioning coverage hail table.')
-    an_ht = an_ht.repartition(config_retrieve(['large_cohort', 'coverage', 'n_partitions']))
+    logger.info('Repartitioning allele number hail table.')
+    an_ht = an_ht.repartition(config_retrieve(['large_cohort', 'allele_number', 'n_partitions']))
 
-    logger.info(f'Writing coverage hail table to {an_out_path}.')
+    logger.info(f'Writing allele number hail table to {an_out_path}.')
     an_ht = an_ht.checkpoint(an_out_path, overwrite=True)
 
     return
