@@ -642,12 +642,12 @@ class GenerateCoverageTable(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
 
         return {
+            'group_membership_ht': prefix / f'{sequencing_type}_coverage.ht',
             'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
-            'an_ht': prefix / f'{sequencing_type}_an.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_coverage_table
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
 
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
@@ -670,12 +670,12 @@ class GenerateCoverageTable(CohortStage):
         coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
         coverage_table_j.command(
             query_command(
-                generate_coverage_table,
-                generate_coverage_table.run.__name__,
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_coverage.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
                 str(self.expected_outputs(cohort)['coverage_ht']),
-                str(self.expected_outputs(cohort)['an_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
@@ -700,7 +700,7 @@ class MergeCoverageTables(CohortStage):
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_coverage_table
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
 
         j = get_batch().new_job(
             'MergeCoverageTables',
@@ -731,8 +731,8 @@ class MergeCoverageTables(CohortStage):
 
         j.command(
             query_command(
-                generate_coverage_table,
-                generate_coverage_table.merge_coverage_tables.__name__,
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.merge_coverage_tables.__name__,
                 [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
                 str(self.expected_outputs(cohort)),
                 str(tmp_path),
@@ -742,6 +742,59 @@ class MergeCoverageTables(CohortStage):
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[Combiner, Ancestry])
+class GenerateAlleleNumberTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if an_version := config_retrieve(['large_cohort', 'output_versions', 'allele_number'], default=None):
+            an_version = slugify(an_version)
+
+        an_version = an_version or get_workflow().output_version
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / an_version
+
+        return {
+            'group_membership_ht': prefix / f'{sequencing_type}_allele_number.ht',
+            'an_ht': prefix / f'{sequencing_type}_allele_number.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            if workflow_config.get(config_key):
+                init_batch_args[batch_key] = 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            if workflow_config.get(key):
+                init_batch_args[key] = workflow_config[key]
+
+        allele_number_j = get_batch().new_job(
+            'GenerateAlleleNumber',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        allele_number_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+
+        allele_number_j.image(config_retrieve(['workflow', 'driver_image']))
+        allele_number_j.command(
+            query_command(
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_an_calculation.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
+                str(self.expected_outputs(cohort)['an_ht']),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[allele_number_j])
 
 
 @stage(required_stages=[LoadVqsr])
