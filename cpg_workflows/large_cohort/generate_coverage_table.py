@@ -766,9 +766,9 @@ def run(
     intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
     # Load or prepare reference hail table.
-    if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned')):
+    if can_reuse(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp')):
         logger.info('Reusing reference hail table')
-        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned'))
+        ref_ht = hl.read_table(dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'))
     else:
         logger.info('Generating new reference hail table')
         ref_ht = hl.read_table(reference_path('seqr_combined_reference_data'))
@@ -791,7 +791,7 @@ def run(
 
         logger.info('Checkpointing filtered reference HT.')
         ref_ht = ref_ht.checkpoint(
-            dataset_path(suffix='coverage/filtered_ref_ht_repartitioned'),
+            dataset_path(suffix='coverage/filtered_ref_ht_repartitioned', category='tmp'),
             overwrite=True,
         )
 
