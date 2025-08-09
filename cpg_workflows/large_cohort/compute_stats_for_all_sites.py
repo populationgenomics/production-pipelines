@@ -799,9 +799,15 @@ def run_coverage(
         group_membership_ht=group_membership_ht,
     )
 
+    # Repartition.
     logger.info('Repartitioning coverage hail table.')
     coverage_ht = coverage_ht.repartition(config_retrieve(['large_cohort', 'coverage', 'n_partitions']))
 
+    # Explode the coverage stats struct out to top level.
+    coverage_ht = coverage_ht.explode(coverage_ht.coverage_stats)
+    coverage_ht = coverage_ht.annotate(**coverage_ht.coverage_stats).drop("coverage_stats")
+
+    # Write to file.
     logger.info(f'Writing coverage hail table to {coverage_out_path}.')
     coverage_ht = coverage_ht.checkpoint(coverage_out_path, overwrite=True)
 
