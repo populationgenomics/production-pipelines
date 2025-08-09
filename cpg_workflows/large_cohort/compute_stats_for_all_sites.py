@@ -768,7 +768,7 @@ def run_coverage(
         intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
     # Load the sites to compute coverage for.
-    sites_ht = (hl.read_table(config_retrieve(['large_cohort', 'coverage', 'sites_table'])),)
+    sites_ht = hl.read_table(config_retrieve(['large_cohort', 'coverage', 'sites_table']))
 
     # Prepare the group membership hail table.
     sample_qc_ht = hl.read_table(sample_qc_ht_path)
@@ -838,7 +838,7 @@ def run_an_calculation(
         intervals_ht = adjust_interval_padding(intervals_ht, padding=padding)
 
     # Load the sites to compute allele numbers for.
-    sites_ht = (hl.read_table(config_retrieve(['large_cohort', 'allele_number', 'sites_table'])),)
+    sites_ht = hl.read_table(config_retrieve(['large_cohort', 'allele_number', 'sites_table']))
 
     # Prepare the group membership hail table.
     sample_qc_ht = hl.read_table(sample_qc_ht_path)
