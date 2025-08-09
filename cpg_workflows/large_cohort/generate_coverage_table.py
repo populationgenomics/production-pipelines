@@ -687,6 +687,7 @@ def get_allele_number_agg_func(gt_field: str = 'GT'):
 def compute_an_and_qual_hists_per_ref_site(
     vds: hl.vds.VariantDataset,
     ref_ht: hl.Table,
+    sample_qc_ht: hl.Table,
     interval_ht: Optional[hl.Table] = None,
     group_membership_ht: Optional[hl.Table] = None,
 ) -> hl.Table:
@@ -719,7 +720,7 @@ def compute_an_and_qual_hists_per_ref_site(
     # produce both adj and raw histograms.
 
     vmt = vds.variant_data
-    vmt = vmt.annotate_cols(sex_karyotype=vmt.meta.sex_imputation.sex_karyotype)
+    vmt = vmt.annotate_cols(sex_karyotype=sample_qc_ht[vmt.s].sex_karyotype)
     vds = hl.vds.VariantDataset(vds.reference_data, vmt)
 
     ht = compute_stats_per_ref_site(
@@ -859,6 +860,7 @@ def run(
         an_ht = compute_an_and_qual_hists_per_ref_site(
             vds,
             ref_ht,
+            sample_qc_ht,
             interval_ht=intervals_ht,
             group_membership_ht=group_membership_ht,
         )
