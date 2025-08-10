@@ -581,7 +581,9 @@ def compute_stats_per_ref_site(
     # onto the MT after 'densify_all_reference_sites' removes all column annotations.
     if sex_karyotype_field is not None:
         sex_karyotype_ht = (
-            mt.cols().select(sex_karyotype_field).checkpoint(hl.utils.new_temp_file('sex_karyotype_ht', 'ht'))
+            mt.cols()
+            .select(sex_karyotype_field)
+            .checkpoint(dataset_path(suffix='compute_ref_stats/sex_karyotype.ht', category='tmp'), overwrite=True)
         )
     else:
         sex_karyotype_ht = None
@@ -652,7 +654,10 @@ def compute_stats_per_ref_site(
         select_fields=row_keep_fields,
         entry_agg_group_membership=entry_agg_group_membership,
     )
-    ht = ht.select_globals().checkpoint(hl.utils.new_temp_file('agg_stats', 'ht'))
+    ht = ht.select_globals().checkpoint(
+        dataset_path(suffix='compute_ref_stats/agg_stats.ht', category='tmp'),
+        overwrite=True,
+    )
 
     group_globals = group_membership_ht.index_globals()
     global_expr = {}
