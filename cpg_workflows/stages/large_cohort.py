@@ -654,12 +654,14 @@ class GenerateCoverageTable(CohortStage):
 
         # Memory parameters
         for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
         # Cores parameter
         for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
 
         coverage_table_j = get_batch().new_job(
             'GenerateCoverageTable',
@@ -768,12 +770,14 @@ class GenerateAlleleNumberTable(CohortStage):
 
         # Memory parameters
         for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
         # Cores parameter
         for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
 
         allele_number_j = get_batch().new_job(
             'GenerateAlleleNumber',
