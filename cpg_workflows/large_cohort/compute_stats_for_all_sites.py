@@ -786,6 +786,9 @@ def run_coverage(
     )
     vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
 
+    # Subset the QC table to QC-pass samples only prior to calculating group membership.
+    sample_qc_ht = sample_qc_ht.filter(~hl.is_defined(samples_to_remove[sample_qc_ht.s]))
+
     # Prepare the group membership hail table.
     if can_reuse(group_membership_out_path):
         logger.info('Reusing group membership table')
@@ -867,6 +870,9 @@ def run_an_calculation(
         sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0).select().union(relateds_to_drop_ht.select()).distinct()
     )
     vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
+
+    # Subset the QC table to QC-pass samples only prior to calculating group membership.
+    sample_qc_ht = sample_qc_ht.filter(~hl.is_defined(samples_to_remove[sample_qc_ht.s]))
 
     # Prepare the group membership hail table.
     if can_reuse(group_membership_out_path):
