@@ -745,6 +745,8 @@ def compute_an_and_qual_hists_per_ref_site(
 
 def run_coverage(
     vds_path: str,
+    sample_qc_ht_path: str,
+    relateds_to_drop_ht_path: str,
     coverage_out_path: str,
 ) -> hl.Table:
     """
@@ -775,6 +777,14 @@ def run_coverage(
     # Load the VDS.
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
+    # Subset to QC-pass samples only.
+    sample_qc_ht = hl.read_table(sample_qc_ht_path)
+    relateds_to_drop_ht = hl.read_table(relateds_to_drop_ht_path)
+    samples_to_remove = (
+        sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0).select().union(relateds_to_drop_ht.select()).distinct()
+    )
+    vds = vds.filter_samples(samples_to_remove, keep=False)
+
     # Compute coverage statistics.
     logger.info('Computing coverage statistics.')
     coverage_ht: hl.Table = compute_coverage_stats(
@@ -797,6 +807,7 @@ def run_coverage(
 def run_an_calculation(
     vds_path: str,
     sample_qc_ht_path: str,
+    relateds_to_drop_ht_path: str,
     group_membership_out_path: str,
     an_out_path: str,
 ) -> hl.Table:
@@ -826,8 +837,18 @@ def run_an_calculation(
     # Load the sites to compute allele numbers for.
     sites_ht = hl.read_table(config_retrieve(['large_cohort', 'allele_number', 'sites_table']))
 
-    # Prepare the group membership hail table.
+    # Load the VDS.
+    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
+
+    # Subset to QC-pass samples only.
     sample_qc_ht = hl.read_table(sample_qc_ht_path)
+    relateds_to_drop_ht = hl.read_table(relateds_to_drop_ht_path)
+    samples_to_remove = (
+        sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0).select().union(relateds_to_drop_ht.select()).distinct()
+    )
+    vds = vds.filter_samples(samples_to_remove, keep=False)
+
+    # Prepare the group membership hail table.
     if can_reuse(group_membership_out_path):
         logger.info('Reusing group membership table')
         group_membership_ht = hl.read_table(group_membership_out_path)
@@ -842,9 +863,6 @@ def run_an_calculation(
         )
         logger.info(f'Writing group membership hail table to {group_membership_out_path}.')
         group_membership_ht = group_membership_ht.checkpoint(group_membership_out_path, overwrite=True)
-
-    # Load the VDS.
-    vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
     # Compute the AN and quality histograms per reference site in exome calling regions.
     logger.info('Generating allele number and quality histograms per provided site.')

@@ -631,7 +631,7 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner])
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
@@ -672,6 +672,8 @@ class GenerateCoverageTable(CohortStage):
                 compute_stats_for_all_sites,
                 compute_stats_for_all_sites.run_coverage.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['coverage_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
@@ -741,7 +743,7 @@ class MergeCoverageTables(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Ancestry])
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
 class GenerateAlleleNumberTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if an_version := config_retrieve(['large_cohort', 'output_versions', 'allele_number'], default=None):
@@ -784,6 +786,7 @@ class GenerateAlleleNumberTable(CohortStage):
                 compute_stats_for_all_sites.run_an_calculation.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(self.expected_outputs(cohort)['group_membership_ht']),
                 str(self.expected_outputs(cohort)['an_ht']),
                 setup_gcp=True,
