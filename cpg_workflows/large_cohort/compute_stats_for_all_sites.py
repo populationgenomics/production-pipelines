@@ -791,15 +791,11 @@ def run_coverage(
         vds,
         sites_ht,
         interval_ht=intervals_ht,
-        strata_expr=[{'all_samples': hl.literal(True)}],
     )
 
     # Repartition.
     logger.info('Repartitioning coverage hail table.')
     coverage_ht = coverage_ht.repartition(config_retrieve(['large_cohort', 'coverage', 'n_partitions']))
-
-    # Extract the coverage stats out to the top level.
-    coverage_ht = coverage_ht.annotate(**coverage_ht.coverage_stats[0]).drop("coverage_stats")
 
     # Write to file.
     logger.info(f'Writing coverage hail table to {coverage_out_path}.')
@@ -868,7 +864,7 @@ def run_an_calculation(
         logger.info(f'Writing group membership hail table to {group_membership_out_path}.')
         group_membership_ht = group_membership_ht.checkpoint(group_membership_out_path, overwrite=True)
 
-    # Compute the AN and quality histograms per reference site in exome calling regions.
+    # Compute the AN and quality histograms per reference site in the specified intervals.
     logger.info('Generating allele number and quality histograms per provided site.')
     an_ht = compute_an_and_qual_hists_per_ref_site(
         vds,
