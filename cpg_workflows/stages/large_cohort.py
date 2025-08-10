@@ -631,7 +631,7 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Ancestry])
+@stage(required_stages=[Combiner])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
@@ -642,7 +642,6 @@ class GenerateCoverageTable(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
 
         return {
-            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
             'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
         }
 
@@ -673,8 +672,6 @@ class GenerateCoverageTable(CohortStage):
                 compute_stats_for_all_sites,
                 compute_stats_for_all_sites.run_coverage.__name__,
                 str(inputs.as_path(cohort, Combiner, key='vds')),
-                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
-                str(self.expected_outputs(cohort)['group_membership_ht']),
                 str(self.expected_outputs(cohort)['coverage_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,

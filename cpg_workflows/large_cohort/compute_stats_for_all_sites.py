@@ -740,14 +740,11 @@ def compute_an_and_qual_hists_per_ref_site(
 
 def run_coverage(
     vds_path: str,
-    sample_qc_ht_path: str,
-    group_membership_out_path: str,
     coverage_out_path: str,
 ) -> hl.Table:
     """
     Generate coverage summary statistics for all provided sites in a VDS.
     :param vds_path: Path to the VDS.
-    :param sample_qc_ht_path: Path to a hail table containing population and sex_karyotype annotations.
     :param coverage_out_path: Path to save the coverage table.
     :return: Coverage Hail Table.
     """
@@ -770,23 +767,6 @@ def run_coverage(
     # Load the sites to compute coverage for.
     sites_ht = hl.read_table(config_retrieve(['large_cohort', 'coverage', 'sites_table']))
 
-    # Prepare the group membership hail table.
-    sample_qc_ht = hl.read_table(sample_qc_ht_path)
-    if can_reuse(group_membership_out_path):
-        logger.info('Reusing group membership table')
-        group_membership_ht = hl.read_table(group_membership_out_path)
-    else:
-        logger.info('Generating frequency group membership table.')
-        group_membership_ht = generate_freq_group_membership_array(
-            sample_qc_ht,
-            build_freq_stratification_list(
-                sex_expr=sample_qc_ht.sex_karyotype,
-                pop_expr=sample_qc_ht.population,
-            ),
-        )
-        logger.info(f'Writing group membership hail table to {group_membership_out_path}.')
-        group_membership_ht = group_membership_ht.checkpoint(group_membership_out_path, overwrite=True)
-
     # Load the VDS.
     vds: hl.vds.VariantDataset = hl.vds.read_vds(vds_path)
 
@@ -796,16 +776,11 @@ def run_coverage(
         vds,
         sites_ht,
         interval_ht=intervals_ht,
-        group_membership_ht=group_membership_ht,
     )
 
     # Repartition.
     logger.info('Repartitioning coverage hail table.')
     coverage_ht = coverage_ht.repartition(config_retrieve(['large_cohort', 'coverage', 'n_partitions']))
-
-    # Explode the coverage stats struct out to top level.
-    coverage_ht = coverage_ht.explode(coverage_ht.coverage_stats)
-    coverage_ht = coverage_ht.annotate(**coverage_ht.coverage_stats).drop("coverage_stats")
 
     # Write to file.
     logger.info(f'Writing coverage hail table to {coverage_out_path}.')
