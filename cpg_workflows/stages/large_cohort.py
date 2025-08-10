@@ -642,6 +642,7 @@ class GenerateCoverageTable(CohortStage):
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
 
         return {
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
             'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
         }
 
@@ -674,6 +675,7 @@ class GenerateCoverageTable(CohortStage):
                 str(inputs.as_path(cohort, Combiner, key='vds')),
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
                 str(self.expected_outputs(cohort)['coverage_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,

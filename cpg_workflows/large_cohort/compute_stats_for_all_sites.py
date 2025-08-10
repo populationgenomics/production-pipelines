@@ -747,6 +747,7 @@ def run_coverage(
     vds_path: str,
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
+    group_membership_out_path: str,
     coverage_out_path: str,
 ) -> hl.Table:
     """
@@ -785,13 +786,28 @@ def run_coverage(
     )
     vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
 
+    # Prepare the group membership hail table.
+    if can_reuse(group_membership_out_path):
+        logger.info('Reusing group membership table')
+        group_membership_ht = hl.read_table(group_membership_out_path)
+    else:
+        logger.info('Generating frequency group membership table.')
+        group_membership_ht = generate_freq_group_membership_array(
+            sample_qc_ht,
+            build_freq_stratification_list(
+                sex_expr=sample_qc_ht.sex_karyotype,
+            ),
+        )
+        logger.info(f'Writing group membership hail table to {group_membership_out_path}.')
+        group_membership_ht = group_membership_ht.checkpoint(group_membership_out_path, overwrite=True)
+
     # Compute coverage statistics.
     logger.info('Computing coverage statistics.')
     coverage_ht: hl.Table = compute_coverage_stats(
         vds,
         sites_ht,
         interval_ht=intervals_ht,
-        strata_expr=[{'all_samples': hl.literal(True)}],
+        group_membership_ht=group_membership_ht,
     )
 
     # Repartition.
