@@ -783,7 +783,7 @@ def run_coverage(
     samples_to_remove = (
         sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0).select().union(relateds_to_drop_ht.select()).distinct()
     )
-    vds = vds.filter_samples(samples_to_remove, keep=False)
+    vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
 
     # Compute coverage statistics.
     logger.info('Computing coverage statistics.')
@@ -846,7 +846,7 @@ def run_an_calculation(
     samples_to_remove = (
         sample_qc_ht.filter(hl.len(sample_qc_ht.filters) > 0).select().union(relateds_to_drop_ht.select()).distinct()
     )
-    vds = vds.filter_samples(samples_to_remove, keep=False)
+    vds = hl.vds.filter_samples(vds, samples_to_remove, keep=False)
 
     # Prepare the group membership hail table.
     if can_reuse(group_membership_out_path):
