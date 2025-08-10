@@ -791,11 +791,15 @@ def run_coverage(
         vds,
         sites_ht,
         interval_ht=intervals_ht,
+        strata_expr=[{'all_samples': hl.literal(True)}],
     )
 
     # Repartition.
     logger.info('Repartitioning coverage hail table.')
     coverage_ht = coverage_ht.repartition(config_retrieve(['large_cohort', 'coverage', 'n_partitions']))
+
+    # Extract the coverage stats out to the top level.
+    coverage_ht = coverage_ht.annotate(**coverage_ht.coverage_stats[0]).drop("coverage_stats")
 
     # Write to file.
     logger.info(f'Writing coverage hail table to {coverage_out_path}.')
