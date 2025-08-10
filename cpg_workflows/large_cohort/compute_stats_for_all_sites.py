@@ -26,42 +26,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-def merge_coverage_tables(
-    coverage_table_paths: list[str],
-    out_path: str,
-    tmp_path: str,
-) -> hl.Table:
-    """
-    Merge coverage tables.
-
-    :param coverage_tables: List of coverage tables.
-    :return: Merged coverage table.
-    """
-
-    chunk_size = 10
-    n_chunks = ceil(len(coverage_table_paths) / chunk_size)
-    chunk_paths = []
-
-    merged_tables = []
-    for i in range(n_chunks):
-        chunk_path = str(to_path(tmp_path) / f'merged_coverage_table_{i}.ht')
-        if exists(chunk_path):
-            logger.info(f'Chunk {i} already exists at {chunk_path}, skipping.')
-            merged = hl.read_table(chunk_path)
-        else:
-            chunk = coverage_table_paths[i * chunk_size : (i + 1) * chunk_size]
-            tables = [hl.read_table(str(path)) for path in chunk]
-            merged = hl.Table.union(*tables)
-            logger.info(f'Writing chunk {i} to {chunk_path}')
-            merged = merged.checkpoint(chunk_path, overwrite=True)
-        chunk_paths.append(chunk_path)
-
-    # Merge all chunked coverage tables
-    merged_tables = [hl.read_table(str(path)) for path in chunk_paths]
-    merged_coverage_table = hl.Table.union(*merged_tables)
-    return merged_coverage_table.checkpoint(out_path, overwrite=True)
-
-
 def adjust_interval_padding(ht: hl.Table, padding: int) -> hl.Table:
     """
     Function copied from `gnomad_qc` v4
