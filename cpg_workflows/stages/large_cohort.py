@@ -687,66 +687,6 @@ class GenerateCoverageTable(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[coverage_table_j])
 
 
-@stage(required_stages=[GenerateCoverageTable])
-class MergeCoverageTables(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        return (
-            cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / coverage_version
-            / 'merged_coverage'
-            / 'merged_coverage.ht'
-        )
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import compute_stats_for_all_sites
-
-        j = get_batch().new_job(
-            'MergeCoverageTables',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
-        j.image(image_path('cpg_workflows'))
-        j.storage('50Gi')
-
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        tmp_path = (
-            cohort.analysis_dataset.prefix(category='tmp') / get_workflow().name / coverage_version / 'merged_coverage'
-        )
-
-        init_batch_args: dict[str, str | int] = {}
-        workflow_config = config_retrieve('workflow')
-
-        # Memory parameters
-        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
-        # Cores parameter
-        for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
-
-        j.command(
-            query_command(
-                compute_stats_for_all_sites,
-                compute_stats_for_all_sites.merge_coverage_tables.__name__,
-                [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
-                str(self.expected_outputs(cohort)),
-                str(tmp_path),
-                setup_gcp=True,
-                init_batch_args=init_batch_args,
-            ),
-        )
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
-
-
 @stage(required_stages=[Combiner, Ancestry, Relatedness])
 class GenerateAlleleNumberTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
