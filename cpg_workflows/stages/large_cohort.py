@@ -800,6 +800,51 @@ class VariantBinnedSummaries(CohortStage):
 
 
 @stage()
+class JointFrequencyTable(CohortStage):
+    """
+    Generate a joint frequency table for genome and exome variants.
+    This stage outputs the frequency table in Hail Table format.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if joint_freq_version := config_retrieve(['large_cohort', 'output_versions', 'joint_frequency'], default=None):
+            joint_freq_version = slugify(joint_freq_version)
+        joint_freq_version = joint_freq_version or get_workflow().output_version
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / joint_freq_version
+        return prefix / 'joint_frequency.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import joint_frequencies
+
+        j = get_batch().new_job(
+            'JointFrequencyTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+        genome_all_sites_path = config_retrieve(['large_cohort', 'output_versions', 'genome_all_sites'], default=None)
+        exome_all_sites_path = config_retrieve(['large_cohort', 'output_versions', 'exome_all_sites'], default=None)
+
+        j.command(
+            query_command(
+                joint_frequencies,
+                joint_frequencies.run.__name__,
+                str(genome_freq_ht),
+                str(exome_freq_ht),
+                str(genome_all_sites_path),
+                str(exome_all_sites_path),
+                str(self.expected_outputs(cohort)),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
 class GenerateGeneTable(CohortStage):
     """
     Generate a release-ready gene table of genome and exome variants.
