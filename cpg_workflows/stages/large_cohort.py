@@ -812,7 +812,11 @@ class JointFrequencyTable(CohortStage):
         joint_freq_version = joint_freq_version or get_workflow().output_version
 
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / joint_freq_version
-        return prefix / 'joint_frequency.ht'
+        return {
+            'joint_freq': prefix / 'joint_frequency.ht',
+            'contingency_ht': prefix / 'contingency_table_test.ht',
+            'cmh_ht': prefix / 'cmh.ht',
+        }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import joint_frequencies
@@ -836,7 +840,9 @@ class JointFrequencyTable(CohortStage):
                 str(exome_freq_ht),
                 str(genome_all_sites_path),
                 str(exome_all_sites_path),
-                str(self.expected_outputs(cohort)),
+                str(self.expected_outputs(cohort)['joint_freq']),
+                str(self.expected_outputs(cohort)['contingency_ht']),
+                str(self.expected_outputs(cohort)['cmh_ht']),
                 setup_gcp=True,
             ),
         )
@@ -932,6 +938,12 @@ class PrepareBrowserTable(CohortStage):
             ['large_cohort', 'output_versions', 'mane_select_transcripts'],
             default=None,
         )
+        joint_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'joint_frequency'], default=None)
+        contingency_ht_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'contingency_table_test'],
+            default=None,
+        )
+        chm_ht_path = config_retrieve(['large_cohort', 'output_versions', 'cmh'], default=None)
 
         j.command(
             query_command(
@@ -940,6 +952,9 @@ class PrepareBrowserTable(CohortStage):
                 # hard-coding Frequencies tables for now
                 exome_freq_ht_path,
                 genome_freq_ht_path,
+                str(joint_freq_ht_path),
+                str(contingency_ht_path),
+                str(chm_ht_path),
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),

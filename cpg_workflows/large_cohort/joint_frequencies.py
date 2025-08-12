@@ -1,16 +1,15 @@
 import logging
-from typing import Callable, Dict, List, Optional, Set, Tuple, Union
-
-from large_cohort.frequencies import POPS_TO_REMOVE_FOR_POPMAX
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import hail as hl
 
-from cpg_workflows.utils import can_reuse, config_retrieve
-from gnomad.utils import filter_arrays_by_meta, make_freq_index_dict_from_meta
+from cpg_workflows.utils import can_reuse
 from gnomad.utils.annotations import (
     merge_freq_arrays,
     merge_histograms,
 )
+from gnomad.utils.filtering import filter_arrays_by_meta
+from gnomad.utils.release import make_freq_index_dict_from_meta
 
 logging.basicConfig(format="%(levelname)s (%(name)s %(lineno)s): %(message)s")
 logger = logging.getLogger("compute_combined_faf")
@@ -707,12 +706,14 @@ def run(
     exome_freq_ht_path: str,
     genome_all_sites_path: str,
     exome_all_sites_path: str,
-    out_ht_path: str,
+    joint_freq_ht_outpath: str,
+    contingency_table_test_outpath: str,
+    cmh_outpath: str,
 ):
     """
     Run the joint frequencies workflow.
     """
-    if can_reuse(out_ht_path):
+    if can_reuse(joint_freq_ht_outpath):
         return None
 
     genome_freq_ht = hl.read_table(str(genome_freq_ht_path))
@@ -737,12 +738,6 @@ def run(
         genome_all_sites_ht,
         exome_all_sites_ht,
     )
-    ht = ht.annotate_globals(
-        versions=hl.struct(
-            exomes='1.0',
-            genomes='1.0',
-        ),
-    )
 
     # Perform contingency table test for joint frequencies.
     # NOTE: Do we need to filter out any joint frequencies that are missing?
@@ -759,6 +754,12 @@ def run(
         ),
     )
 
+    contingency_table_test_ht = ht.select('contingency_table_test')
+    contingency_table_test_ht = contingency_table_test_ht.checkpoint(
+        contingency_table_test_outpath,
+        overwrite=True,
+    )
+
     # Perform Cochran-Mantel-Haenszel test for joint frequencies.
     ht = ht.filter(hl.is_defined(ht.genomes_freq) & hl.is_defined(ht.exomes_freq))
     ht = ht.annotate(
@@ -772,4 +773,7 @@ def run(
         ),
     )
 
-    return ht.checkpoint(out_ht_path, overwrite=True)
+    cmh_ht = ht.select('cochran_mantel_haenszel_test')
+    cmh_ht = cmh_ht.checkpoint(cmh_outpath, overwrite=True)
+
+    return ht.checkpoint(joint_freq_ht_outpath, overwrite=True)
