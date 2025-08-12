@@ -1003,14 +1003,14 @@ def create_final_combined_faf_release(
     #     (f"{c}_calling", adjust_interval_padding(i, 150)) for c, i in intervals
     # ]
 
-    # region_expr = {
-    #     "fail_interval_qc": (~interval_qc_pass(all_platforms=True).ht()[ht.locus].pass_interval_qc),
-    #     **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
-    #     **{
-    #         f"not_called_in_{d}": hl.is_missing(ht[f"{d}_freq"]) | hl.is_missing(ht[f"{d}_freq"][1].AN)
-    #         for d in DATA_TYPES
-    #     },
-    # }
+    region_expr = {
+        #     "fail_interval_qc": (~interval_qc_pass(all_platforms=True).ht()[ht.locus].pass_interval_qc),
+        #     **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
+        **{
+            f"not_called_in_{d}": hl.is_missing(ht[f"{d}_freq"]) | hl.is_missing(ht[f"{d}_freq"][1].AN)
+            for d in ['exomes', 'genomes']
+        },
+    }
 
     # Get the stats expressions for the final Table.
     def _prep_stats_annotation(ht: hl.Table, stat_ht: hl.Table, stat_field: str):
@@ -1059,7 +1059,7 @@ def create_final_combined_faf_release(
     # Select the final columns for the Table, grouping all annotations from the same
     # data type into a struct.
     ht = ht.select(
-        # region_flags=hl.struct(**region_expr),
+        region_flags=hl.struct(**region_expr),
         **_get_struct_by_data_type(ht),
         freq_comparison_stats=hl.struct(**stats_expr),
     )
