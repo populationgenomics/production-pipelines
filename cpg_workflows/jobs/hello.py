@@ -15,7 +15,7 @@ def hello_job(
     job_attrs: dict[str, str],
     output_base_path: Path,
 ) -> list[Job]:
-    j = get_batch().new_job('Say hello', job_attrs | {'tool': 'echo'})
+    j = get_batch().new_job('Say hello', job_attrs)
 
     cmd = f"""
     echo Hello > {j.greet}
@@ -24,4 +24,9 @@ def hello_job(
     j.command(command(cmd))
     j.image(image_path('samtools'))
     get_batch().write_output(j.greet, str(output_base_path) + '.hello')
-    return [j]
+
+    j2 = get_batch().new_job('No-op', job_attrs)
+    j2.command(command('echo hi there'))
+    j2.image(image_path('samtools'))
+
+    return [j, j2]
