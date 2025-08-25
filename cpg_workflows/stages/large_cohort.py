@@ -191,13 +191,13 @@ class Ancestry(CohortStage):
             ancestry_version = slugify(ancestry_version)
 
         ancestry_version = ancestry_version or get_workflow().output_version
-
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ancestry_version / 'ancestry'
         return dict(
-            scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
-            eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
-            loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
-            inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
+            scores=prefix / 'scores.ht',
+            eigenvalues=prefix / 'eigenvalues.ht',
+            loadings=prefix / 'loadings.ht',
+            inferred_pop=prefix / 'inferred_pop.ht',
+            sample_qc_ht=prefix / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -631,148 +631,116 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner])
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
-        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
         coverage_version = coverage_version or get_workflow().output_version
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
+
         return {
-            f'index_{idx}': cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / coverage_version
-            / 'split_coverage_tables'
-            / f'coverage_{idx}.ht'
-            for idx in range(1, scatter_count + 1)
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
+            'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.jobs.picard import get_intervals
-        from cpg_workflows.large_cohort import generate_coverage_table
-
-        coverage_jobs = []
-
-        b = get_batch()
-
-        outputs: dict[str, Path] = self.expected_outputs(cohort)
-
-        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
 
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
 
         # Memory parameters
         for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
         # Cores parameter
         for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
-
-        # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
-        for idx in range(1, scatter_count + 1):
-            coverage_table_j = get_batch().new_job(
-                f'GenerateCoverageTable_{idx}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-            )
-            coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
-
-            if scatter_count == 1:
-                interval_list_path = config_retrieve(['workflow', 'intervals_path'], default=None)
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
             else:
-                intervals_j, intervals = get_intervals(
-                    b=b,
-                    scatter_count=scatter_count,
-                    source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
-                    output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
-                )
-                coverage_jobs.append(intervals_j)
+                init_batch_args[key] = workflow_config.get(key)
 
-            coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
-            coverage_table_j.command(
-                query_command(
-                    generate_coverage_table,
-                    generate_coverage_table.run.__name__,
-                    str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(
-                        (
-                            interval_list_path
-                            if scatter_count == 1
-                            else self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'
-                        ),
-                    ),
-                    str(outputs[f'index_{idx}']),
-                    setup_gcp=True,
-                    init_batch_args=init_batch_args,
-                ),
-            )
-
-            coverage_jobs.append(coverage_table_j)
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
-
-
-@stage(required_stages=[GenerateCoverageTable])
-class MergeCoverageTables(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        return (
-            cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / coverage_version
-            / 'merged_coverage'
-            / 'merged_coverage.ht'
-        )
-
-    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_coverage_table
-
-        j = get_batch().new_job(
-            'MergeCoverageTables',
+        coverage_table_j = get_batch().new_job(
+            'GenerateCoverageTable',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
-        j.image(image_path('cpg_workflows'))
-        j.storage('50Gi')
+        coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
 
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        tmp_path = (
-            cohort.analysis_dataset.prefix(category='tmp') / get_workflow().name / coverage_version / 'merged_coverage'
-        )
-
-        init_batch_args: dict[str, str | int] = {}
-        workflow_config = config_retrieve('workflow')
-
-        # Memory parameters
-        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
-        # Cores parameter
-        for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
-
-        j.command(
+        coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
+        coverage_table_j.command(
             query_command(
-                generate_coverage_table,
-                generate_coverage_table.merge_coverage_tables.__name__,
-                [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
-                str(self.expected_outputs(cohort)),
-                str(tmp_path),
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_coverage.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
+                str(self.expected_outputs(cohort)['coverage_ht']),
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
             ),
         )
 
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[coverage_table_j])
+
+
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
+class GenerateAlleleNumberTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if an_version := config_retrieve(['large_cohort', 'output_versions', 'allele_number'], default=None):
+            an_version = slugify(an_version)
+
+        an_version = an_version or get_workflow().output_version
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / an_version
+
+        return {
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
+            'an_ht': prefix / f'{sequencing_type}_allele_number.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
+        allele_number_j = get_batch().new_job(
+            'GenerateAlleleNumber',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        allele_number_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+
+        allele_number_j.image(config_retrieve(['workflow', 'driver_image']))
+        allele_number_j.command(
+            query_command(
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_an_calculation.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
+                str(self.expected_outputs(cohort)['an_ht']),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[allele_number_j])
 
 
 @stage(required_stages=[LoadVqsr])

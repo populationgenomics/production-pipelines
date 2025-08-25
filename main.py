@@ -30,10 +30,11 @@ from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, Validati
 from cpg_workflows.stages.large_cohort import (
     AncestryPlots,
     Frequencies,
+    GenerateAlleleNumberTable,
+    GenerateCoverageTable,
     GenerateGeneTable,
     LCAnnotateFragmentedVcfWithVep,
     LoadVqsr,
-    MergeCoverageTables,
     PrepareBrowserTable,
     VariantBinnedSummaries,
 )
@@ -105,7 +106,8 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         CohortCramMultiQC,
-        MergeCoverageTables,
+        GenerateCoverageTable,
+        GenerateAlleleNumberTable,
         LCAnnotateFragmentedVcfWithVep,
         GenerateGeneTable,
         VariantBinnedSummaries,
