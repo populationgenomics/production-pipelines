@@ -1083,8 +1083,8 @@ def prepare_gnomad_v4_variants_joint_frequency_helper(ds):
 
     flags = [
         hl.or_missing(ds.freq_comparison_stats.cochran_mantel_haenszel_test.p_value < 10e-4, "discrepant_frequencies"),
-        # hl.or_missing(ds.region_flags.not_called_in_exomes, "not_called_in_exomes"),
-        # hl.or_missing(ds.region_flags.not_called_in_genomes, "not_called_in_genomes"),
+        hl.or_missing(ds.region_flags.not_called_in_exomes, "not_called_in_exomes"),
+        hl.or_missing(ds.region_flags.not_called_in_genomes, "not_called_in_genomes"),
     ]
 
     ancestry_groups = set(m.get("gen_anc", None) for m in globals.joint_globals.freq_meta)
