@@ -696,6 +696,34 @@ def annotate_transcript_consequences(ds: hl.Table, transcripts: hl.Table, mane_t
     return ds
 
 
+def adjust_interval_padding(ht: hl.Table, padding: int) -> hl.Table:
+    """
+    Adjust interval padding in HT.
+
+    .. warning::
+
+        This function can lead to overlapping intervals, so it is not recommended for
+        most applications. For example, it can be used to filter a variant list to all
+        variants within the returned interval list, but would not work for getting an
+        aggregate statistic for each interval if the desired output is independent
+        statistics.
+
+    :param ht: HT to adjust.
+    :param padding: Padding to use.
+    :return: HT with adjusted interval padding.
+    """
+    return ht.key_by(
+        interval=hl.locus_interval(
+            ht.interval.start.contig,
+            ht.interval.start.position - padding,
+            ht.interval.end.position + padding,
+            # Include the end of the intervals to capture all variants.
+            reference_genome=ht.interval.start.dtype.reference_genome,
+            includes_end=True,
+        ),
+    )
+
+
 def prepare_gnomad_v4_variants_helper(
     ds_path: str | None,
     exome_or_genome: str,
@@ -938,9 +966,229 @@ def prepare_gnomad_v4_variants_helper(
     return ds
 
 
+def create_final_combined_faf_release(
+    ht,
+    contingency_table_ht: hl.Table,
+    cmh_ht: hl.Table,
+) -> hl.Table:
+    """
+    Create the final combined FAF release Table.
+
+    :param ht: Table with joint exomes and genomes frequency and FAF information.
+    :param contingency_table_ht: Table with contingency table test results to include
+        on the final Table.
+    :param cmh_ht: Table with Cochran–Mantel–Haenszel test results to include on the
+        final Table.
+    :return: Table with final combined FAF release information.
+    """
+    logger.info("Creating final combined FAF release Table...")
+
+    def _get_struct_by_data_type(
+        ht: hl.Table,
+        annotation_expr=None,
+        condition_func=None,
+        postfix: str = "",
+    ) -> hl.expr.StructExpression:
+        """
+        Group all annotations from the same data type into a struct.
+
+        :param ht: Table with annotations to loop through.
+        :param annotation_expr: StructExpression with annotations to loop through. If
+            None, use ht.row.
+        :param condition_func: Function that returns a BooleanExpression for a
+            condition to check in addition to data type.
+        :param postfix: String to add to the end of the new annotation following data
+            type.
+        :return: StructExpression of joint data type and the corresponding data type
+            struct.
+        """
+        if condition_func is None:
+            condition_func = lambda x: True
+        if annotation_expr is None:
+            annotation_expr = ht.row
+
+        return hl.struct(
+            **{
+                f"{data_type}{postfix}": hl.struct(
+                    **{
+                        x.replace(f"{data_type}_", ""): ht[x]
+                        for x in annotation_expr
+                        if x.startswith(data_type) and condition_func(x)
+                    },
+                )
+                for data_type in ['exomes', 'genomes', 'joint']
+            },
+        )
+
+    # Group all the histograms into a single struct per data type.
+    ht = ht.transmute(
+        **_get_struct_by_data_type(ht, condition_func=lambda x: x.endswith("_hists"), postfix="_histograms"),
+    )
+
+    # Add capture and calling intervals as region flags
+    capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser_prep', 'capture_intervals'])
+    # Merge capture regions
+    capture_tables = [hl.read_table(path) for path in capture_intervals_paths]
+    if len(capture_intervals_paths) > 1:
+        # Deduplicate keys, keeping exactly one row for each unique key (key='interval').
+        capture_intervals_ht = hl.Table.union(*capture_tables)
+    else:
+        capture_intervals_ht = capture_tables[0]
+
+    calling_intervals_ht = hl.read_table(config_retrieve(['large_cohort', 'browser_prep', 'calling_intervals']))
+    intervals: list[tuple[str, hl.Table]] = [('calling', adjust_interval_padding(calling_intervals_ht, 150))] + [
+        ('capture', capture_intervals_ht),
+    ]
+
+    region_expr = {
+        **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
+        **{
+            f"not_called_in_{d}": hl.is_missing(ht[f"{d}_freq"]) | hl.is_missing(ht[f"{d}_freq"][1].AN)
+            for d in ['exomes', 'genomes']
+        },
+    }
+
+    # Get the stats expressions for the final Table.
+    def _prep_stats_annotation(ht: hl.Table, stat_ht: hl.Table, stat_field: str):
+        """
+        Prepare stats expressions for the final Table.
+
+        :param ht: Table to add stats to.
+        :param stat_ht: Table with stats to add to the final Table.
+        :param stat_field: Field to add to the final Table.
+        :return: Dictionary of stats expressions for the final Table.
+        """
+        stat_expr = stat_ht[ht.key][stat_field]
+        is_struct = False
+        if isinstance(stat_expr, hl.expr.StructExpression):
+            is_struct = True
+            stat_expr = hl.array([stat_expr])
+
+        stat_expr = stat_expr.map(
+            lambda x: x.select(**{a: hl.or_missing(~hl.is_nan(x[a]), x[a]) for a in x if a != "gen_ancs"}),
+        )
+
+        if is_struct:
+            stat_expr = stat_expr[0]
+
+        return stat_expr
+
+    # Prepare stats annotations for the final Table.
+    ct_expr = _prep_stats_annotation(ht, contingency_table_ht, "contingency_table_test")
+    cmh_expr = _prep_stats_annotation(ht, cmh_ht, "cochran_mantel_haenszel_test")
+    anc_expr = cmh_ht[ht.key]["cochran_mantel_haenszel_test"].gen_ancs
+    ct_union_expr = ct_expr[ht.joint_freq_index_dict[anc_expr[0] + "_adj"]]
+
+    # Create a union stats annotation that uses the contingency table test if there is
+    # only one genetic ancestry group, otherwise use the CMH test.
+    union_expr = hl.if_else(
+        hl.len(anc_expr) == 1,
+        ct_union_expr.select("p_value").annotate(stat_test_name="contingency_table_test", gen_ancs=anc_expr),
+        cmh_expr.select("p_value").annotate(stat_test_name="cochran_mantel_haenszel_test", gen_ancs=anc_expr),
+    )
+    stats_expr = {
+        "contingency_table_test": ct_expr,
+        "cochran_mantel_haenszel_test": cmh_expr,
+        "stat_union": union_expr,
+    }
+
+    # Select the final columns for the Table, grouping all annotations from the same
+    # data type into a struct.
+    ht = ht.select(
+        region_flags=hl.struct(**region_expr),
+        **_get_struct_by_data_type(ht),
+        freq_comparison_stats=hl.struct(**stats_expr),
+    )
+
+    # Group all global annotations from the same data type into a struct.
+    ht = ht.transmute_globals(**_get_struct_by_data_type(ht, annotation_expr=ht.globals, postfix="_globals"))
+
+    return ht
+
+
+def prepare_gnomad_v4_variants_joint_frequency_helper(ds):
+    globals = hl.eval(ds.globals)
+
+    def joint_freq_index_key(subset=None, pop=None, sex=None, raw=False):
+        parts = [s for s in [subset, pop, sex] if s is not None]
+        parts.append("raw" if raw else "adj")
+        return "_".join(parts)
+
+    def freq_joint(ds, subset=None, pop=None, sex=None, raw=False):
+        return ds.joint.freq[globals.joint_globals.freq_index_dict[joint_freq_index_key(subset, pop, sex, raw)]]
+
+    flags = [
+        hl.or_missing(ds.freq_comparison_stats.cochran_mantel_haenszel_test.p_value < 10e-4, "discrepant_frequencies"),
+        hl.or_missing(ds.region_flags.not_called_in_exomes, "not_called_in_exomes"),
+        hl.or_missing(ds.region_flags.not_called_in_genomes, "not_called_in_genomes"),
+    ]
+
+    ancestry_groups = set(m.get("gen_anc", None) for m in globals.joint_globals.freq_meta)
+
+    ds = ds.annotate(
+        joint=hl.struct(
+            freq=hl.struct(
+                all=hl.struct(
+                    ac=freq_joint(ds).AC,
+                    ac_raw=freq_joint(ds, raw=True).AC,
+                    an=freq_joint(ds).AN,
+                    hemizygote_count=hl.if_else(
+                        ds.locus.in_autosome_or_par(),
+                        0,
+                        hl.or_else(freq_joint(ds, sex="XY").AC, 0),
+                    ),
+                    homozygote_count=freq_joint(ds).homozygote_count,
+                    ancestry_groups=[
+                        hl.struct(
+                            id="_".join(filter(bool, [pop, sex])),
+                            ac=hl.or_else(freq_joint(ds, pop=pop, sex=sex).AC, 0),
+                            an=hl.or_else(freq_joint(ds, pop=pop, sex=sex).AN, 0),
+                            hemizygote_count=(
+                                0
+                                if sex == "XX"
+                                else hl.if_else(
+                                    ds.locus.in_autosome_or_par(),
+                                    0,
+                                    hl.or_else(freq_joint(ds, pop=pop, sex="XY").AC, 0),
+                                )
+                            ),
+                            homozygote_count=hl.or_else(freq_joint(ds, pop=pop, sex=sex).homozygote_count, 0),
+                        )
+                        for pop, sex in list(itertools.product(ancestry_groups, [None, "XX", "XY"]))
+                        + [(None, "XX"), (None, "XY")]
+                    ],
+                ),
+            ),
+            faf=ds.joint.faf,
+            fafmax=ds.joint.fafmax,
+            grpmax=ds.joint.grpmax,
+            histograms=ds.joint.histograms,
+            flags=hl.set(flags).filter(hl.is_defined),
+            faf95_joint=hl.struct(
+                grpmax=ds.joint.fafmax.faf95_max,
+                grpmax_gen_anc=ds.joint.fafmax.faf95_max_gen_anc,
+            ),
+            faf99_joint=hl.struct(
+                grpmax=ds.joint.fafmax.faf99_max,
+                grpmax_gen_anc=ds.joint.fafmax.faf99_max_gen_anc,
+            ),
+            freq_comparison_stats=ds.freq_comparison_stats,
+        ),
+    )
+
+    ds = ds.select(
+        "joint",
+    )
+
+    return ds
+
+
 def prepare_v4_variants(
     exome_ds_path: str,
     genome_ds_path: str,
+    joint_freq_ht_path: str,
+    contingency_ht_path: str,
+    chm_ht_path: str,
     browser_outpath: str,
     exome_variants_outpath: str | None,
     genome_variants_outpath: str | None,
@@ -1016,6 +1264,18 @@ def prepare_v4_variants(
             all=hl.array(hl.set(hl.flatten([value for value in variants.colocated_variants.values()]))),
         ),
     )
+
+    logger.info('Preparing joint frequency table...')
+    joint_freq_ht = hl.read_table(joint_freq_ht_path)
+    contingency_table_ht = hl.read_table(contingency_ht_path)
+    chm_ht = hl.read_table(chm_ht_path)
+
+    joint_freq_ht = create_final_combined_faf_release(joint_freq_ht, contingency_table_ht, chm_ht)
+
+    joint_freq_ht = prepare_gnomad_v4_variants_joint_frequency_helper(joint_freq_ht)
+
+    logger.info('Annotating variants with joint frequencies...')
+    variants = variants.annotate(**joint_freq_ht[variants.locus, variants.alleles])
 
     logger.info('Annotating transcript consequences...')
     base_transcripts_grch38 = hl.read_table(transcript_table_path)
