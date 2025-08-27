@@ -146,8 +146,12 @@ def frequency_annotations(
         histograms=hl.struct(
             qual_hists=qual_hist_ht[mt.row_key].qual_hists,
             raw_qual_hists=qual_hist_ht[mt.row_key].raw_qual_hists,
+            age_hists=hl.struct(
+                age_hist_het=mt.age_hist_het,
+                age_hist_hom=mt.age_hist_hom,
+            ),
         ),
-    )
+    ).drop('age_hist_het', 'age_hist_hom')
 
     return mt.rows()
 
