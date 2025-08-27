@@ -696,6 +696,34 @@ def annotate_transcript_consequences(ds: hl.Table, transcripts: hl.Table, mane_t
     return ds
 
 
+def adjust_interval_padding(ht: hl.Table, padding: int) -> hl.Table:
+    """
+    Adjust interval padding in HT.
+
+    .. warning::
+
+        This function can lead to overlapping intervals, so it is not recommended for
+        most applications. For example, it can be used to filter a variant list to all
+        variants within the returned interval list, but would not work for getting an
+        aggregate statistic for each interval if the desired output is independent
+        statistics.
+
+    :param ht: HT to adjust.
+    :param padding: Padding to use.
+    :return: HT with adjusted interval padding.
+    """
+    return ht.key_by(
+        interval=hl.locus_interval(
+            ht.interval.start.contig,
+            ht.interval.start.position - padding,
+            ht.interval.end.position + padding,
+            # Include the end of the intervals to capture all variants.
+            reference_genome=ht.interval.start.dtype.reference_genome,
+            includes_end=True,
+        ),
+    )
+
+
 def prepare_gnomad_v4_variants_helper(
     ds_path: str | None,
     exome_or_genome: str,
@@ -997,15 +1025,23 @@ def create_final_combined_faf_release(
         **_get_struct_by_data_type(ht, condition_func=lambda x: x.endswith("_hists"), postfix="_histograms"),
     )
 
-    # Add capture and calling intervals as region flags.
-    # intervals = [(c, calling_intervals(c, 0).ht()) for c in ["broad", "ukb"]]
-    # intervals = [(f"{c}_capture", i) for c, i in intervals] + [
-    #     (f"{c}_calling", adjust_interval_padding(i, 150)) for c, i in intervals
-    # ]
+    # Add capture and calling intervals as region flags
+    capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser_prep', 'capture_intervals'])
+    # Merge capture regions
+    capture_tables = [hl.read_table(path) for path in capture_intervals_paths]
+    if len(capture_intervals_paths) > 1:
+        # Deduplicate keys, keeping exactly one row for each unique key (key='interval').
+        capture_intervals_ht = hl.Table.union(*capture_tables)
+    else:
+        capture_intervals_ht = capture_tables[0]
+
+    calling_intervals_ht = hl.read_table(config_retrieve(['large_cohort', 'browser_prep', 'calling_intervals']))
+    intervals: list[tuple[str, hl.Table]] = [('calling', adjust_interval_padding(calling_intervals_ht, 150))] + [
+        ('capture', capture_intervals_ht),
+    ]
 
     region_expr = {
-        #     "fail_interval_qc": (~interval_qc_pass(all_platforms=True).ht()[ht.locus].pass_interval_qc),
-        #     **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
+        **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
         **{
             f"not_called_in_{d}": hl.is_missing(ht[f"{d}_freq"]) | hl.is_missing(ht[f"{d}_freq"][1].AN)
             for d in ['exomes', 'genomes']
