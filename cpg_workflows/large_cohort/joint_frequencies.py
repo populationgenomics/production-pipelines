@@ -18,7 +18,6 @@ logger.setLevel(logging.INFO)
 
 GEN_ANC_GROUPS_TO_REMOVE_FOR_GRPMAX = {"Unassigned"}
 DATA_TYPES = ["exomes", "genomes"]
-FAF_POPS = ['CSA', 'EAS', 'EUR']  # We can only perform this test for populations in both datasets
 
 
 def gen_anc_faf_max_expr(
@@ -761,6 +760,9 @@ def run(
     )
 
     # Perform Cochran-Mantel-Haenszel test for joint frequencies.
+    # Note: We can only perform this test for populations in both datasets
+    faf_pops = list({d.get('pop') for d in ht.joint_faf_meta.collect()[0] if d.get('pop')})
+
     ht = ht.filter(hl.is_defined(ht.genomes_freq) & hl.is_defined(ht.exomes_freq))
     ht = ht.annotate(
         cochran_mantel_haenszel_test=perform_cmh_test(
@@ -769,7 +771,7 @@ def run(
             ht.exomes_freq,
             ht.genomes_freq_meta,
             ht.exomes_freq_meta,
-            pops=FAF_POPS,
+            pops=faf_pops,
         ),
     )
 
