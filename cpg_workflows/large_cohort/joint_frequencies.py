@@ -720,14 +720,6 @@ def run(
     genome_all_sites_ht = hl.read_table(str(genome_all_sites_path))
     exome_all_sites_ht = hl.read_table(str(exome_all_sites_path))
 
-    # TODO (from gnomad): Need to resolve the type difference.
-    genome_freq_ht = genome_freq_ht.annotate(
-        freq=genome_freq_ht.freq.map(lambda x: x.annotate(homozygote_count=hl.int32(x.homozygote_count))),
-    )
-    exome_freq_ht = exome_freq_ht.annotate(
-        freq=exome_freq_ht.freq.map(lambda x: x.annotate(homozygote_count=hl.int32(x.homozygote_count))),
-    )
-
     exome_freq_ht = extract_freq_info(exome_freq_ht, "exomes", apply_release_filters=False)
     genome_freq_ht = extract_freq_info(genome_freq_ht, "genomes", apply_release_filters=False)
 
