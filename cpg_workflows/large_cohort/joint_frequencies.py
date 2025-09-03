@@ -720,6 +720,26 @@ def run(
     genome_all_sites_ht = hl.read_table(str(genome_all_sites_path))
     exome_all_sites_ht = hl.read_table(str(exome_all_sites_path))
 
+    # Nest `age_hists` within `histograms` struct prior to `extract_freq_info()`
+    # NOTE: To be refactored to `frequencies.py` where age histograms are generated
+    genome_freq_ht = genome_freq_ht.annotate(
+        histograms=genome_freq_ht.histograms.annotate(
+            age_hists=hl.struct(
+                age_hist_het=genome_freq_ht.age_hist_het,
+                age_hist_hom=genome_freq_ht.age_hist_hom,
+            ),
+        ),
+    )
+
+    exome_freq_ht = exome_freq_ht.annotate(
+        histograms=exome_freq_ht.histograms.annotate(
+            age_hists=hl.struct(
+                age_hist_het=exome_freq_ht.age_hist_het,
+                age_hist_hom=exome_freq_ht.age_hist_hom,
+            ),
+        ),
+    )
+
     exome_freq_ht = extract_freq_info(exome_freq_ht, "exomes", apply_release_filters=False)
     genome_freq_ht = extract_freq_info(genome_freq_ht, "genomes", apply_release_filters=False)
 
