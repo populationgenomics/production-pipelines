@@ -668,6 +668,7 @@ class GenerateCoverageTable(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+        coverage_table_j.spot(config_retrieve(['workflow', 'preemptible_driver'], False))
 
         coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
         coverage_table_j.command(
@@ -724,6 +725,7 @@ class GenerateAlleleNumberTable(CohortStage):
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         allele_number_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+        allele_number_j.spot(config_retrieve(['workflow', 'preemptible_driver'], False))
 
         allele_number_j.image(config_retrieve(['workflow', 'driver_image']))
         allele_number_j.command(
