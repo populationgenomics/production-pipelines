@@ -843,10 +843,6 @@ class JointFrequencyTable(CohortStage):
         )
         j.image(image_path('cpg_workflows'))
 
-        j = get_batch().new_job(
-            'GenerateAlleleNumber',
-            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-        )
         j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
 
         genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
