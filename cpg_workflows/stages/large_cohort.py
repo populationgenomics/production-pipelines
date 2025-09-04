@@ -866,6 +866,7 @@ class JointFrequencyTable(CohortStage):
                 str(self.expected_outputs(cohort)['contingency_ht']),
                 str(self.expected_outputs(cohort)['cmh_ht']),
                 setup_gcp=True,
+                init_batch_args=init_batch_args,
             ),
         )
 
