@@ -823,11 +823,31 @@ class JointFrequencyTable(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort import joint_frequencies
 
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
         j = get_batch().new_job(
             'JointFrequencyTable',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
+
+        j = get_batch().new_job(
+            'GenerateAlleleNumber',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
 
         genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
         exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
@@ -846,6 +866,7 @@ class JointFrequencyTable(CohortStage):
                 str(self.expected_outputs(cohort)['contingency_ht']),
                 str(self.expected_outputs(cohort)['cmh_ht']),
                 setup_gcp=True,
+                init_batch_args=init_batch_args,
             ),
         )
 
