@@ -96,12 +96,12 @@ class GvcfHappy(SequencingGroupStage):
             return self.make_outputs(sequencing_group, self.expected_outputs(sequencing_group), jobs)
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
+def _update_meta(output_paths: dict[str, str | Path]) -> dict[str, Any]:
     import json
 
     from cloudpathlib import CloudPath
 
-    with CloudPath(output_path).open() as f:
+    with CloudPath(output_paths['json']).open() as f:
         d = json.load(f)
     return {'multiqc': d['report_general_stats_data']}
 
@@ -112,7 +112,7 @@ def _update_meta(output_path: str) -> dict[str, Any]:
         GvcfHappy,
     ],
     analysis_type='qc',
-    analysis_keys=['json'],
+    analysis_keys=['html', 'json'],
     update_analysis_meta=_update_meta,
 )
 class GvcfMultiQC(DatasetStage):
