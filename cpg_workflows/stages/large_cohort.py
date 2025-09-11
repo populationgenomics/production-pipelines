@@ -936,6 +936,10 @@ class PrepareBrowserTable(CohortStage):
             / get_workflow().name
             / browser_version
             / 'genome_variants.ht',
+            'joint_freq': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'joint_freq_release.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -977,6 +981,7 @@ class PrepareBrowserTable(CohortStage):
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
+                str(self.expected_outputs(cohort)['joint_freq']),
                 transcripts_grch38_base_path,
                 mane_select_transcripts_path,
                 setup_gcp=True,

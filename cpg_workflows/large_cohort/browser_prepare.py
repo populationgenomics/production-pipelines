@@ -1192,6 +1192,7 @@ def prepare_v4_variants(
     browser_outpath: str,
     exome_variants_outpath: str | None,
     genome_variants_outpath: str | None,
+    joint_freq_outpath: str | None,
     transcript_table_path: str | None,
     mane_transcripts_path: str | None,
 ) -> hl.Table:
@@ -1265,12 +1266,16 @@ def prepare_v4_variants(
         ),
     )
 
-    logger.info('Preparing joint frequency table...')
-    joint_freq_ht = hl.read_table(joint_freq_ht_path)
-    contingency_table_ht = hl.read_table(contingency_ht_path)
-    chm_ht = hl.read_table(chm_ht_path)
+    if can_reuse(joint_freq_outpath):
+        joint_freq_ht = hl.read_table(joint_freq_outpath)
+    else:
+        logger.info('Preparing joint frequency table...')
+        joint_freq_ht = hl.read_table(joint_freq_ht_path)
+        contingency_table_ht = hl.read_table(contingency_ht_path)
+        chm_ht = hl.read_table(chm_ht_path)
 
-    joint_freq_ht = create_final_combined_faf_release(joint_freq_ht, contingency_table_ht, chm_ht)
+        joint_freq_ht = create_final_combined_faf_release(joint_freq_ht, contingency_table_ht, chm_ht)
+        joint_freq_ht = joint_freq_ht.checkpoint(joint_freq_outpath, overwrite=True)
 
     joint_freq_ht = prepare_gnomad_v4_variants_joint_frequency_helper(joint_freq_ht)
 
