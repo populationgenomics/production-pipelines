@@ -1026,7 +1026,7 @@ def create_final_combined_faf_release(
     )
 
     # Add capture and calling intervals as region flags
-    capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser_prep', 'capture_intervals'])
+    capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser', 'capture_intervals'])
     # Merge capture regions
     capture_tables = [hl.read_table(path) for path in capture_intervals_paths]
     if len(capture_intervals_paths) > 1:
@@ -1035,7 +1035,7 @@ def create_final_combined_faf_release(
     else:
         capture_intervals_ht = capture_tables[0]
 
-    calling_intervals_ht = hl.read_table(config_retrieve(['large_cohort', 'browser_prep', 'calling_intervals']))
+    calling_intervals_ht = hl.read_table(config_retrieve(['large_cohort', 'browser', 'calling_intervals']))
     intervals: list[tuple[str, hl.Table]] = [('calling', adjust_interval_padding(calling_intervals_ht, 150))] + [
         ('capture', capture_intervals_ht),
     ]
