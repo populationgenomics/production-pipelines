@@ -4,6 +4,7 @@ import logging
 import hail as hl
 
 from cpg_utils.config import config_retrieve
+from cpg_utils.hail_batch import genome_build
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.filtering import add_filters_expr
 
@@ -1025,18 +1026,24 @@ def create_final_combined_faf_release(
         **_get_struct_by_data_type(ht, condition_func=lambda x: x.endswith("_hists"), postfix="_histograms"),
     )
 
-    # Add capture and calling intervals as region flags
+    logger.info('Annotating capture and calling intervals.')
     capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser', 'capture_intervals'])
-    # Merge capture regions
-    capture_tables = [hl.read_table(path) for path in capture_intervals_paths]
+    capture_tables = [
+        hl.import_locus_intervals(str(path), reference_genome=genome_build()) for path in capture_intervals_paths
+    ]
     if len(capture_intervals_paths) > 1:
         # Deduplicate keys, keeping exactly one row for each unique key (key='interval').
         capture_intervals_ht = hl.Table.union(*capture_tables)
     else:
         capture_intervals_ht = capture_tables[0]
 
-    calling_intervals_ht = hl.read_table(config_retrieve(['large_cohort', 'browser', 'calling_intervals']))
-    intervals: list[tuple[str, hl.Table]] = [('calling', adjust_interval_padding(calling_intervals_ht, 150))] + [
+    calling_intervals_path = config_retrieve(['large_cohort', 'browser', 'calling_intervals'])
+    calling_interval_padding = config_retrieve(['large_cohort', 'browser', 'calling_interval_padding'], default=150)
+    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
+
+    intervals: list[tuple[str, hl.Table]] = [
+        ('calling', adjust_interval_padding(calling_intervals_ht, calling_interval_padding)),
+    ] + [
         ('capture', capture_intervals_ht),
     ]
 
