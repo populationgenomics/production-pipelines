@@ -1130,7 +1130,7 @@ def prepare_gnomad_v4_variants_joint_frequency_helper(ds):
         hl.or_missing(ds.region_flags.not_called_in_genomes, "not_called_in_genomes"),
     ]
 
-    ancestry_groups = set(m.get("gen_anc", None) for m in globals.joint_globals.freq_meta)
+    ancestry_groups = set(m.get("pop", None) for m in globals.joint_globals.freq_meta)
 
     ds = ds.annotate(
         joint=hl.struct(
