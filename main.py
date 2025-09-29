@@ -37,6 +37,7 @@ from cpg_workflows.stages.large_cohort import (
     LCAnnotateFragmentedVcfWithVep,
     LoadVqsr,
     PrepareBrowserTable,
+    PrepareBrowserVcfDataDownload,
     VariantBinnedSummaries,
 )
 from cpg_workflows.stages.mito import MitoReport
@@ -113,6 +114,7 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         JointFrequencyTable,
         GenerateGeneTable,
         VariantBinnedSummaries,
+        PrepareBrowserVcfDataDownload,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,

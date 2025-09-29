@@ -989,3 +989,25 @@ class PrepareBrowserTable(CohortStage):
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class PrepareBrowserVcfDataDownload(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if browser_vcf_version := config_retrieve(
+            ['large_cohort', 'output_versions', 'preparebrowservcfdata'],
+            default=None,
+        ):
+            browser_vcf_version = slugify(browser_vcf_version)
+
+        browser_vcf_version = browser_vcf_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
+        seq_type = config_retrieve(['workflow', 'sequencing_type'], default='exome')
+        chroms = [f'chr{i}' for i in range(1, 23)]
+        return {
+            **{f'{chrom}_vcf': prefix / f'{seq_type}_{chrom}_variants.vcf.bgz' for chrom in chroms},
+            **{f'{chrom}_tbi': prefix / f'{seq_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        pass
