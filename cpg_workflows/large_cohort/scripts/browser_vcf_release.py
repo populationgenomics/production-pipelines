@@ -102,17 +102,11 @@ JOINT_REGION_FLAGS_INFO_DICT = {
             " chromosomes X and Y."
         ),
     },
-    "outside_ukb_capture_region": {
-        "Description": "Variant falls outside of the UK Biobank exome capture regions.",
+    "outside_capture_region": {
+        "Description": "Variant falls outside of the OurDNA exome capture regions.",
     },
-    "outside_broad_capture_region": {
-        "Description": "Variant falls outside of the Broad exome capture regions.",
-    },
-    "outside_ukb_calling_region": {
-        "Description": ("Variant falls outside of the UK Biobank exome capture regions plus 150 bp" " padding."),
-    },
-    "outside_broad_calling_region": {
-        "Description": ("Variant falls outside of the Broad exome capture regions plus 150 bp" " padding."),
+    "outside_calling_region": {
+        "Description": ("Variant falls outside of the OurDNA exome capture regions plus 150 bp" " padding."),
     },
     "not_called_in_exomes": {
         "Description": "Variant was not called in the gnomAD exomes.",
@@ -137,10 +131,8 @@ SORT_ORDER = [
 
 JOINT_REGION_FLAG_FIELDS = [
     "fail_interval_qc",
-    "outside_broad_capture_region",
-    "outside_ukb_capture_region",
-    "outside_broad_calling_region",
-    "outside_ukb_calling_region",
+    "outside_capture_region",
+    "outside_calling_region",
     "not_called_in_exomes",
     "not_called_in_genomes",
 ]
@@ -149,8 +141,8 @@ REGION_FLAG_FIELDS = {
     "exomes": REGION_FLAG_FIELDS_FLAT
     + [
         "fail_interval_qc",
-        # "outside_ukb_capture_region",
-        # "outside_broad_capture_region",
+        "outside_capture_region",
+        "outside_calling_region",
     ],
     "genomes": REGION_FLAG_FIELDS_FLAT,
     "joint": JOINT_REGION_FLAG_FIELDS,
@@ -673,7 +665,7 @@ def unfurl_nested_annotations(
     # changed their labelling and now uses the structurally identical `grpmax_expr()`. The only difference is that
     # `pop_max_expr` looks for entries with keys {"group", "pop"} while `grpmax_expr` looks for entries with keys {"group", "gen_anc"}
     # NOTE: Additionally, our exomes and genomes frequency tables us `ht.popmax` while our joint table uses `ht.grpmax`
-    grpmax_idx = ht.grpmax if data_type == "joint" else ht.popmax
+    grpmax_idx = ht.grpmax if for_joint_validation else ht.popmax
 
     # NOTE: Our "exomes" and "genomes" data types have the same grpmax structure with no subsets, so no need to differentiate between them
     # if data_type == "exomes" and not for_joint_validation:
@@ -2264,22 +2256,24 @@ def main(
 
     ht = hl.read_table(ht_path)
 
-    if vqsr_ht_path:
+    if vqsr_ht_path and data_type != 'joint':
         # genomes and exomes frequency tables have allele_info dropped
         # Annotating back allele_info to have allele_info fields in info dict
         vqsr_ht = hl.read_table(vqsr_ht_path)
         ht = ht.annotate(allele_info=vqsr_ht[ht.key].allele_info)
 
-    score_cutoffs = {
-        seq_type: process_score_cutoffs(
-            snv_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'snp_bin_threshold_{seq_type}']),
-            indel_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'indel_bin_threshold_{seq_type}']),
-            aggregated_bin_ht_path=config_retrieve(['large_cohort', 'browser', f'aggregated_bin_ht_path_{seq_type}']),
-            snv_bin_id=config_retrieve(['large_cohort', 'browser', f'snp_bin_id_{seq_type}'], 'bin'),
-            indel_bin_id=config_retrieve(['large_cohort', 'browser', f'indel_bin_id_{seq_type}'], 'bin'),
-        )
-        for seq_type in ['exome', 'genome']
-    }
+        score_cutoffs = {
+            seq_type: process_score_cutoffs(
+                snv_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'snp_bin_threshold_{seq_type}']),
+                indel_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'indel_bin_threshold_{seq_type}']),
+                aggregated_bin_ht_path=config_retrieve(
+                    ['large_cohort', 'browser', f'aggregated_bin_ht_path_{seq_type}'],
+                ),
+                snv_bin_id=config_retrieve(['large_cohort', 'browser', f'snp_bin_id_{seq_type}'], 'bin'),
+                indel_bin_id=config_retrieve(['large_cohort', 'browser', f'indel_bin_id_{seq_type}'], 'bin'),
+            )
+            for seq_type in ['exome', 'genome']
+        }
     # NOTE: No longer needed
     # if data_type == 'joint':
     #     ht = reshape_to_gnomad_schema(ht)
@@ -2295,40 +2289,40 @@ def main(
     else:
         iter_data_types = [data_type]
 
-        for dt in iter_data_types:
-            if for_joint:
-                dt_ht = select_type_from_joint_ht(ht, dt)
-            else:
-                dt_ht = ht
+    for dt in iter_data_types:
+        if for_joint:
+            dt_ht = select_type_from_joint_ht(ht, dt)
+        else:
+            dt_ht = ht
 
-            logger.info("Preparing %s HT for validity checks and export...", dt)
-            dt_ht, rename_dict = prepare_ht_for_validation(
-                dt_ht,
-                data_type=dt,
-                joint_included=joint_included,
-                freq_comparison_included=(dt == "joint"),
-                for_joint_validation=for_joint,
-                score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
-            )
-            if data_type != "joint":
-                site_gt_check_expr = {
-                    "monoallelic": dt_ht.info.monoallelic,
-                    # NOTE: We do not have "only_het" annotation in our tables
-                    # "only_het": dt_ht.info.only_het,
-                }
-            if for_joint:
-                ordered_rename_dict = {key: rename_dict.get(key, key) for key in dt_ht.info.keys()}
-                dt_ht = dt_ht.annotate(info=dt_ht.info.rename(ordered_rename_dict))
-                if dt != "joint":
-                    dt_ht = dt_ht.annotate(
-                        info=dt_ht.info.annotate(**{f"{dt}_filters": dt_ht.filters}),
-                    )
-                    dt_ht = dt_ht.select("info")
-
-                dt_ht = dt_ht.select_globals(
-                    **{f"{dt}_{f}": dt_ht[f] for f in dt_ht.globals},
+        logger.info("Preparing %s HT for validity checks and export...", dt)
+        dt_ht, rename_dict = prepare_ht_for_validation(
+            dt_ht,
+            data_type=dt,
+            joint_included=joint_included,
+            freq_comparison_included=(dt == "joint"),
+            for_joint_validation=for_joint,
+            score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
+        )
+        if data_type != "joint":
+            site_gt_check_expr = {
+                "monoallelic": dt_ht.info.monoallelic,
+                # NOTE: We do not have "only_het" annotation in our tables
+                # "only_het": dt_ht.info.only_het,
+            }
+        if for_joint:
+            ordered_rename_dict = {key: rename_dict.get(key, key) for key in dt_ht.info.keys()}
+            dt_ht = dt_ht.annotate(info=dt_ht.info.rename(ordered_rename_dict))
+            if dt != "joint":
+                dt_ht = dt_ht.annotate(
+                    info=dt_ht.info.annotate(**{f"{dt}_filters": dt_ht.filters}),
                 )
-            validate_hts[dt] = dt_ht
+                dt_ht = dt_ht.select("info")
+
+            dt_ht = dt_ht.select_globals(
+                **{f"{dt}_{f}": dt_ht[f] for f in dt_ht.globals},
+            )
+        validate_hts[dt] = dt_ht
 
     ht = validate_hts[data_type]
     if for_joint:
