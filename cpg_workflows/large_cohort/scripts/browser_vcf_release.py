@@ -847,6 +847,7 @@ def make_info_expr(
     if for_joint_validation:
         data_type = "joint"
 
+    # NOTE: Check region flags for joint table are properly formatted i.e. `"fail_interval_qc"`
     if "region_flags" in t.row:
         # Add region_flag to info dict
         for field in REGION_FLAG_FIELDS[data_type]:
@@ -886,6 +887,10 @@ def make_info_expr(
 
     # Add vep annotations to info dict
     vcf_info_dict["vep"] = t["vep"]
+
+    # NOTE: Check if this gets properly added ti info_dict
+    # Add monoallelic field to info dict
+    vcf_info_dict["monoallelic"] = t["monoallelic"]
 
     return vcf_info_dict
 
@@ -2307,7 +2312,7 @@ def main(
             )
             if data_type != "joint":
                 site_gt_check_expr = {
-                    "monoallelic": dt_ht.monoallelic,
+                    "monoallelic": dt_ht.info.monoallelic,
                     # NOTE: We do not have "only_het" annotation in our tables
                     # "only_het": dt_ht.info.only_het,
                 }
