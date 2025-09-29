@@ -2303,7 +2303,7 @@ def main(
                 joint_included=joint_included,
                 freq_comparison_included=(dt == "joint"),
                 for_joint_validation=for_joint,
-                score_cutoffs=score_cutoffs,
+                score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
             )
             if data_type != "joint":
                 site_gt_check_expr = {
