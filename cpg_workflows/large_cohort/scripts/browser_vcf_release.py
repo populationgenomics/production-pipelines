@@ -2256,10 +2256,7 @@ def run_browser_vcf_data_download(
             for_joint_validation=for_joint,
             score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
         )
-        if data_type != 'joint':
-            site_gt_check_expr = {
-                'monoallelic': dt_ht.info.monoallelic,
-            }
+
         if for_joint:
             ordered_rename_dict = {key: rename_dict.get(key, key) for key in dt_ht.info.keys()}
             dt_ht = dt_ht.annotate(info=dt_ht.info.rename(ordered_rename_dict))
