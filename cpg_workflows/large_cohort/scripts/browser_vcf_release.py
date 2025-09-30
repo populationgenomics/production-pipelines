@@ -26,25 +26,25 @@ logger.setLevel(logging.INFO)
 
 joint_included = False
 LEN_COMP_GLOBAL_ROWS = {
-    "freq": ["freq_meta", "freq_index_dict", "freq_meta_sample_count"],
-    "faf": ["faf_meta", "faf_index_dict"],
+    'freq': ['freq_meta', 'freq_index_dict', 'freq_meta_sample_count'],
+    'faf': ['faf_meta', 'faf_index_dict'],
 }
 LEN_COMP_JOINT_GLOBAL_ROWS = {
-    "joint_freq": [
-        "joint_freq_meta",
-        "joint_freq_index_dict",
-        "joint_freq_meta_sample_count",
+    'joint_freq': [
+        'joint_freq_meta',
+        'joint_freq_index_dict',
+        'joint_freq_meta_sample_count',
     ],
-    "joint_faf": ["joint_faf_meta", "joint_faf_index_dict"],
+    'joint_faf': ['joint_faf_meta', 'joint_faf_index_dict'],
 }
 
-GROUPS = ["adj", "raw"]
-SEXES = ["XX", "XY"]
-SUBSETS = {"v1": [""]}
+GROUPS = ['adj', 'raw']
+SEXES = ['XX', 'XY']
+SUBSETS = {'v1': ['']}
 SUBSETS = {
-    "exomes": deepcopy(SUBSETS["v1"]),
-    "genomes": deepcopy(SUBSETS["v1"]),
-    "joint": [""],
+    'exomes': deepcopy(SUBSETS['v1']),
+    'genomes': deepcopy(SUBSETS['v1']),
+    'joint': [''],
 }
 IN_SILICO_ANNOTATIONS_INFO_DICT = None
 VRS_FIELDS_DICT = None
@@ -55,162 +55,162 @@ GEN_ANC_NAMES = {
     'FIL': 'Filipino',
 }
 FAF_GEN_ANC_GROUPS = {
-    "v1": ["CSA", "EAS", "EUR", "FIL"],
+    'v1': ['CSA', 'EAS', 'EUR', 'FIL'],
 }
 GEN_ANC_GROUPS = {
-    "genomes": [
-        "CSA",
-        "EAS",
-        "EUR",
-        "FIL",
+    'genomes': [
+        'CSA',
+        'EAS',
+        'EUR',
+        'FIL',
     ],
-    "exomes": [
-        "CSA",
-        "EAS",
-        "EUR",
-        "FIL",
+    'exomes': [
+        'CSA',
+        'EAS',
+        'EUR',
+        'FIL',
     ],
 }
-GEN_ANC_GROUPS["joint"] = list(set(GEN_ANC_GROUPS["exomes"]) | set(GEN_ANC_GROUPS["genomes"]))
+GEN_ANC_GROUPS['joint'] = list(set(GEN_ANC_GROUPS['exomes']) | set(GEN_ANC_GROUPS['genomes']))
 GEN_ANC_GROUPS = {d: {pop: GEN_ANC_NAMES[pop] for pop in pops} for d, pops in GEN_ANC_GROUPS.items()}  # type: ignore
 FAF_GEN_ANC_GROUPS = {
-    "v1": ['CSA', 'EAS', 'EUR', 'FIL'],
+    'v1': ['CSA', 'EAS', 'EUR', 'FIL'],
 }
 JOINT_FILTERS_INFO_DICT = {
-    "exomes_filters": {"Description": "Filters' values from the exomes dataset."},
-    "genomes_filters": {"Description": "Filters' values from the genomes dataset."},
+    'exomes_filters': {'Description': "Filters' values from the exomes dataset."},
+    'genomes_filters': {'Description': "Filters' values from the genomes dataset."},
 }
 VCF_INFO_REORDER = [
-    "AC",
-    "AN",
-    "AF",
-    "grpmax",
-    "fafmax_faf95_max",
-    "fafmax_faf95_max_gen_anc",
+    'AC',
+    'AN',
+    'AF',
+    'grpmax',
+    'fafmax_faf95_max',
+    'fafmax_faf95_max_gen_anc',
 ]
 INFO_VCF_AS_PIPE_DELIMITED_FIELDS = [
-    "AS_QUALapprox",
-    "AS_VarDP",
-    "AS_MQ_DP",
-    "AS_RAW_MQ",
-    "AS_SB_TABLE",
+    'AS_QUALapprox',
+    'AS_VarDP',
+    'AS_MQ_DP',
+    'AS_RAW_MQ',
+    'AS_SB_TABLE',
 ]
 
 JOINT_REGION_FLAGS_INFO_DICT = {
-    "fail_interval_qc": {
-        "Description": (
-            "Less than 85 percent of samples meet 20X coverage if variant is in"
-            " autosomal or PAR regions or 10X coverage for non-PAR regions of"
-            " chromosomes X and Y."
+    'fail_interval_qc': {
+        'Description': (
+            'Less than 85 percent of samples meet 20X coverage if variant is in'
+            ' autosomal or PAR regions or 10X coverage for non-PAR regions of'
+            ' chromosomes X and Y.'
         ),
     },
-    "outside_capture_region": {
+    'outside_capture_region': {
         # NOTE: Ask Josh what probeset so we can be more specific
-        "Description": "Variant falls outside of the OurDNA exome capture regions.",
+        'Description': 'Variant falls outside of the OurDNA exome capture regions.',
     },
-    "outside_calling_region": {
-        "Description": ("Variant falls outside of the OurDNA exome capture regions plus 150 bp" " padding."),
+    'outside_calling_region': {
+        'Description': ('Variant falls outside of the OurDNA exome capture regions plus 150 bp' ' padding.'),
     },
-    "not_called_in_exomes": {
-        "Description": "Variant was not called in the OurDNA exomes.",
+    'not_called_in_exomes': {
+        'Description': 'Variant was not called in the OurDNA exomes.',
     },
-    "not_called_in_genomes": {
-        "Description": "Variant was not called in the OurDNA genomes.",
+    'not_called_in_genomes': {
+        'Description': 'Variant was not called in the OurDNA genomes.',
     },
 }
 
 SORT_ORDER = [
-    "subset",
-    "downsampling",
-    "grpmax",
-    "popmax",
-    "gen_anc",
-    "pop",
-    "subgrp",
-    "subpop",
-    "sex",
-    "group",
+    'subset',
+    'downsampling',
+    'grpmax',
+    'popmax',
+    'gen_anc',
+    'pop',
+    'subgrp',
+    'subpop',
+    'sex',
+    'group',
 ]
 
 JOINT_REGION_FLAG_FIELDS = [
-    # "fail_interval_qc",
-    "outside_capture_region",
-    "outside_calling_region",
-    "not_called_in_exomes",
-    "not_called_in_genomes",
+    # 'fail_interval_qc',
+    'outside_capture_region',
+    'outside_calling_region',
+    'not_called_in_exomes',
+    'not_called_in_genomes',
 ]
-REGION_FLAG_FIELDS_FLAT = ["lcr", "non_par", "segdup"]  # "nonpar" and "decoy" are not in our region_flags field
+REGION_FLAG_FIELDS_FLAT = ['lcr', 'non_par', 'segdup']  # 'nonpar' and 'decoy' are not in our region_flags field
 REGION_FLAG_FIELDS = {
-    "exomes": REGION_FLAG_FIELDS_FLAT
+    'exomes': REGION_FLAG_FIELDS_FLAT
     + [
-        # "fail_interval_qc",
-        "outside_capture_region",
-        "outside_calling_region",
+        # 'fail_interval_qc',
+        'outside_capture_region',
+        'outside_calling_region',
     ],
-    "genomes": REGION_FLAG_FIELDS_FLAT,
-    "joint": JOINT_REGION_FLAG_FIELDS,
+    'genomes': REGION_FLAG_FIELDS_FLAT,
+    'joint': JOINT_REGION_FLAG_FIELDS,
 }
 
 SITE_FIELDS_FLAT = [
-    "FS",
-    "MQ",
-    "MQRankSum",
-    "QUALapprox",
-    "QD",
-    "ReadPosRankSum",
-    "SB",
-    "SOR",
-    "VarDP",
+    'FS',
+    'MQ',
+    'MQRankSum',
+    'QUALapprox',
+    'QD',
+    'ReadPosRankSum',
+    'SB',
+    'SOR',
+    'VarDP',
 ]
 SITE_FIELDS = {
-    "exomes": SITE_FIELDS_FLAT + ["sibling_singleton"],
-    "genomes": SITE_FIELDS_FLAT,
-    "joint": SITE_FIELDS_FLAT + ["sibling_singleton"],
+    'exomes': SITE_FIELDS_FLAT + ['sibling_singleton'],
+    'genomes': SITE_FIELDS_FLAT,
+    'joint': SITE_FIELDS_FLAT + ['sibling_singleton'],
 }
 AS_FIELDS = [
-    "AS_FS",
-    "AS_MQ",
-    "AS_MQRankSum",
-    "AS_pab_max",
-    "AS_QUALapprox",
-    "AS_QD",
-    "AS_ReadPosRankSum",
-    "AS_SB_TABLE",
-    "AS_SOR",
-    "AS_VarDP",
-    # "InbreedingCoeff",
+    'AS_FS',
+    'AS_MQ',
+    'AS_MQRankSum',
+    'AS_pab_max',
+    'AS_QUALapprox',
+    'AS_QD',
+    'AS_ReadPosRankSum',
+    'AS_SB_TABLE',
+    'AS_SOR',
+    'AS_VarDP',
+    # 'InbreedingCoeff',
     # NOTE: Figure out if our inbreed_coeff is site-level or AS. Also, should it be
     # inside the info field. At the moment we lose it during the above code.
-    # "inbreeding_coeff",
+    # 'inbreeding_coeff',
 ]
-AS_VQSR_FIELDS = ["AS_culprit", "AS_VQSLOD"]
+AS_VQSR_FIELDS = ['AS_culprit', 'AS_VQSLOD']
 
-VQSR_FIELDS = AS_VQSR_FIELDS + ["NEGATIVE_TRAIN_SITE", "POSITIVE_TRAIN_SITE"]
+VQSR_FIELDS = AS_VQSR_FIELDS + ['NEGATIVE_TRAIN_SITE', 'POSITIVE_TRAIN_SITE']
 
 # These fields are not in our genome/exome frequency tables - they come from vqsr_ht.allele_info
 ALLELE_TYPE_FIELDS_FLAT = [
-    "allele_type",
-    "has_star",
-    "n_alt_alleles",
-    "variant_type",
-    "was_mixed",
+    'allele_type',
+    'has_star',
+    'n_alt_alleles',
+    'variant_type',
+    'was_mixed',
 ]
 ALLELE_TYPE_FIELDS = {
-    "exomes": ALLELE_TYPE_FIELDS_FLAT,
-    "genomes": ALLELE_TYPE_FIELDS_FLAT,
-    "joint": ALLELE_TYPE_FIELDS_FLAT,
+    'exomes': ALLELE_TYPE_FIELDS_FLAT,
+    'genomes': ALLELE_TYPE_FIELDS_FLAT,
+    'joint': ALLELE_TYPE_FIELDS_FLAT,
 }
 
-HISTS = ["gq_hist_alt", "gq_hist_all", "dp_hist_alt", "dp_hist_all", "ab_hist_alt"]
+HISTS = ['gq_hist_alt', 'gq_hist_all', 'dp_hist_alt', 'dp_hist_all', 'ab_hist_alt']
 
 # NOTE: ASSUMING VEP_CSQ_FIELDS HAVEN'T CHANGED IN VERSION 110
 CURRENT_VEP_VERSION = '105'  # it's actually 110
 VEP_CSQ_FIELDS = {
-    "101": "Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|VARIANT_CLASS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|LoF|LoF_filter|LoF_flags|LoF_info",
-    "105": "Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|UNIPROT_ISOFORM|SOURCE|SIFT|PolyPhen|DOMAINS|miRNA|HGVS_OFFSET|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS|LoF|LoF_filter|LoF_flags|LoF_info",
+    '101': 'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|VARIANT_CLASS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|LoF|LoF_filter|LoF_flags|LoF_info',
+    '105': 'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|UNIPROT_ISOFORM|SOURCE|SIFT|PolyPhen|DOMAINS|miRNA|HGVS_OFFSET|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS|LoF|LoF_filter|LoF_flags|LoF_info',
 }
 
-VEP_CSQ_HEADER = "Consequence annotations from Ensembl VEP. Format:" f" {VEP_CSQ_FIELDS[CURRENT_VEP_VERSION]}"
+VEP_CSQ_HEADER = 'Consequence annotations from Ensembl VEP. Format:' f' {VEP_CSQ_FIELDS[CURRENT_VEP_VERSION]}'
 
 ####
 # From our large cohorts vqsr.py
@@ -242,147 +242,147 @@ INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
 ####
 
 INFO_DICT = {
-    "FS": {
-        "Description": "Phred-scaled p-value of Fisher's exact test for strand bias",
+    'FS': {
+        'Description': 'Phred-scaled p-value of Fisher"s exact test for strand bias',
     },
-    "InbreedingCoeff": {
-        "Number": "A",
-        "Description": (
-            "Inbreeding coefficient, the excess heterozygosity at a variant site,"
-            " computed as 1 - (the number of heterozygous genotypes)/(the number of"
-            " heterozygous genotypes expected under Hardy-Weinberg equilibrium)"
+    'InbreedingCoeff': {
+        'Number': 'A',
+        'Description': (
+            'Inbreeding coefficient, the excess heterozygosity at a variant site,'
+            ' computed as 1 - (the number of heterozygous genotypes)/(the number of'
+            ' heterozygous genotypes expected under Hardy-Weinberg equilibrium)'
         ),
     },
-    "inbreeding_coeff": {
-        "Number": "A",
-        "Description": (
-            "Inbreeding coefficient, the excess heterozygosity at a variant site,"
-            " computed as 1 - (the number of heterozygous genotypes)/(the number of"
-            " heterozygous genotypes expected under Hardy-Weinberg equilibrium)"
+    'inbreeding_coeff': {
+        'Number': 'A',
+        'Description': (
+            'Inbreeding coefficient, the excess heterozygosity at a variant site,'
+            ' computed as 1 - (the number of heterozygous genotypes)/(the number of'
+            ' heterozygous genotypes expected under Hardy-Weinberg equilibrium)'
         ),
     },
-    "MQ": {
-        "Description": ("Root mean square of the mapping quality of reads across all samples"),
+    'MQ': {
+        'Description': ('Root mean square of the mapping quality of reads across all samples'),
     },
-    "MQRankSum": {
-        "Description": ("Z-score from Wilcoxon rank sum test of alternate vs. reference read" " mapping qualities"),
+    'MQRankSum': {
+        'Description': ('Z-score from Wilcoxon rank sum test of alternate vs. reference read' ' mapping qualities'),
     },
-    "QD": {
-        "Description": ("Variant call confidence normalized by depth of sample reads supporting a" " variant"),
+    'QD': {
+        'Description': ('Variant call confidence normalized by depth of sample reads supporting a' ' variant'),
     },
-    "ReadPosRankSum": {
-        "Description": ("Z-score from Wilcoxon rank sum test of alternate vs. reference read" " position bias"),
+    'ReadPosRankSum': {
+        'Description': ('Z-score from Wilcoxon rank sum test of alternate vs. reference read' ' position bias'),
     },
-    "SOR": {"Description": "Strand bias estimated by the symmetric odds ratio test"},
-    "POSITIVE_TRAIN_SITE": {
-        "Description": ("Variant was used to build the positive training set of high-quality" " variants for VQSR"),
+    'SOR': {'Description': 'Strand bias estimated by the symmetric odds ratio test'},
+    'POSITIVE_TRAIN_SITE': {
+        'Description': ('Variant was used to build the positive training set of high-quality' ' variants for VQSR'),
     },
-    "NEGATIVE_TRAIN_SITE": {
-        "Description": ("Variant was used to build the negative training set of low-quality" " variants for VQSR"),
+    'NEGATIVE_TRAIN_SITE': {
+        'Description': ('Variant was used to build the negative training set of low-quality' ' variants for VQSR'),
     },
-    "positive_train_site": {
-        "Description": ("Variant was used to build the positive training set of high-quality" " variants for VQSR"),
+    'positive_train_site': {
+        'Description': ('Variant was used to build the positive training set of high-quality' ' variants for VQSR'),
     },
-    "negative_train_site": {
-        "Description": ("Variant was used to build the negative training set of low-quality" " variants for VQSR"),
+    'negative_train_site': {
+        'Description': ('Variant was used to build the negative training set of low-quality' ' variants for VQSR'),
     },
-    "BaseQRankSum": {
-        "Description": ("Z-score from Wilcoxon rank sum test of alternate vs. reference base" " qualities"),
+    'BaseQRankSum': {
+        'Description': ('Z-score from Wilcoxon rank sum test of alternate vs. reference base' ' qualities'),
     },
-    "VarDP": {
-        "Description": ("Depth over variant genotypes (does not include depth of reference samples)"),
+    'VarDP': {
+        'Description': ('Depth over variant genotypes (does not include depth of reference samples)'),
     },
-    "VQSLOD": {
-        "Description": (
-            "Log-odds ratio of being a true variant versus being a false positive under"
-            " the trained VQSR Gaussian mixture model"
+    'VQSLOD': {
+        'Description': (
+            'Log-odds ratio of being a true variant versus being a false positive under'
+            ' the trained VQSR Gaussian mixture model'
         ),
     },
-    "culprit": {
-        "Description": "Worst-performing annotation in the VQSR Gaussian mixture model",
+    'culprit': {
+        'Description': 'Worst-performing annotation in the VQSR Gaussian mixture model',
     },
-    "decoy": {"Description": "Variant falls within a reference decoy region"},
-    "lcr": {"Description": "Variant falls within a low complexity region"},
-    "nonpar": {
-        "Description": ("Variant (on sex chromosome) falls outside a pseudoautosomal region"),
+    'decoy': {'Description': 'Variant falls within a reference decoy region'},
+    'lcr': {'Description': 'Variant falls within a low complexity region'},
+    'nonpar': {
+        'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
-    "non_par": {
-        "Description": ("Variant (on sex chromosome) falls outside a pseudoautosomal region"),
+    'non_par': {
+        'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
-    "segdup": {"Description": "Variant falls within a segmental duplication region"},
-    "fail_interval_qc": {
-        "Description": (
-            "Less than 85 percent of samples meet 20X coverage if variant is in"
-            " autosomal or PAR regions or 10X coverage for non-PAR regions of"
-            " chromosomes X and Y."
+    'segdup': {'Description': 'Variant falls within a segmental duplication region'},
+    'fail_interval_qc': {
+        'Description': (
+            'Less than 85 percent of samples meet 20X coverage if variant is in'
+            ' autosomal or PAR regions or 10X coverage for non-PAR regions of'
+            ' chromosomes X and Y.'
         ),
     },
-    "outside_ukb_capture_region": {
-        "Description": "Variant falls outside of UK Biobank exome capture regions.",
+    'outside_ukb_capture_region': {
+        'Description': 'Variant falls outside of UK Biobank exome capture regions.',
     },
-    "outside_broad_capture_region": {
-        "Description": "Variant falls outside of Broad exome capture regions.",
+    'outside_broad_capture_region': {
+        'Description': 'Variant falls outside of Broad exome capture regions.',
     },
-    "rf_positive_label": {
-        "Description": ("Variant was labelled as a positive example for training of random forest" " model"),
+    'rf_positive_label': {
+        'Description': ('Variant was labelled as a positive example for training of random forest' ' model'),
     },
-    "rf_negative_label": {
-        "Description": ("Variant was labelled as a negative example for training of random forest" " model"),
+    'rf_negative_label': {
+        'Description': ('Variant was labelled as a negative example for training of random forest' ' model'),
     },
-    "rf_label": {"Description": "Random forest training label"},
-    "rf_train": {"Description": "Variant was used in training random forest model"},
-    "rf_tp_probability": {
-        "Description": ("Probability of a called variant being a true variant as determined by" " random forest model"),
+    'rf_label': {'Description': 'Random forest training label'},
+    'rf_train': {'Description': 'Variant was used in training random forest model'},
+    'rf_tp_probability': {
+        'Description': ('Probability of a called variant being a true variant as determined by' ' random forest model'),
     },
-    "transmitted_singleton": {
-        "Description": (
-            "Variant was a callset-wide doubleton that was transmitted within a family"
-            " from a parent to a child (i.e., a singleton amongst unrelated samples in"
-            " cohort)"
+    'transmitted_singleton': {
+        'Description': (
+            'Variant was a callset-wide doubleton that was transmitted within a family'
+            ' from a parent to a child (i.e., a singleton amongst unrelated samples in'
+            ' cohort)'
         ),
     },
-    "sibling_singleton": {
-        "Description": (
-            "Variant was a callset-wide doubleton that was present only in two siblings"
-            " (i.e., a singleton amongst unrelated samples in cohort)."
+    'sibling_singleton': {
+        'Description': (
+            'Variant was a callset-wide doubleton that was present only in two siblings'
+            ' (i.e., a singleton amongst unrelated samples in cohort).'
         ),
     },
-    "original_alleles": {"Description": "Alleles before splitting multiallelics"},
-    "variant_type": {
-        "Description": "Variant type (snv, indel, multi-snv, multi-indel, or mixed)",
+    'original_alleles': {'Description': 'Alleles before splitting multiallelics'},
+    'variant_type': {
+        'Description': 'Variant type (snv, indel, multi-snv, multi-indel, or mixed)',
     },
-    "allele_type": {
-        "Description": "Allele type (snv, insertion, deletion, or mixed)",
+    'allele_type': {
+        'Description': 'Allele type (snv, insertion, deletion, or mixed)',
     },
-    "n_alt_alleles": {
-        "Number": "1",
-        "Description": "Total number of alternate alleles observed at variant locus",
+    'n_alt_alleles': {
+        'Number': '1',
+        'Description': 'Total number of alternate alleles observed at variant locus',
     },
-    "was_mixed": {"Description": "Variant type was mixed"},
-    "has_star": {
-        "Description": (
-            "Variant locus coincides with a spanning deletion (represented by a star)"
-            " observed elsewhere in the callset"
+    'was_mixed': {'Description': 'Variant type was mixed'},
+    'has_star': {
+        'Description': (
+            'Variant locus coincides with a spanning deletion (represented by a star)'
+            ' observed elsewhere in the callset'
         ),
     },
-    "AS_pab_max": {
-        "Number": "A",
-        "Description": (
-            "Maximum p-value over callset for binomial test of observed allele balance"
-            " for a heterozygous genotype, given expectation of 0.5"
+    'AS_pab_max': {
+        'Number': 'A',
+        'Description': (
+            'Maximum p-value over callset for binomial test of observed allele balance'
+            ' for a heterozygous genotype, given expectation of 0.5'
         ),
     },
-    "monoallelic": {
-        "Description": "All samples are homozygous alternate for the variant",
+    'monoallelic': {
+        'Description': 'All samples are homozygous alternate for the variant',
     },
-    "only_het": {"Description": "All samples are heterozygous for the variant"},
-    "QUALapprox": {
-        "Number": "1",
-        "Description": "Sum of PL[0] values; used to approximate the QUAL score",
+    'only_het': {'Description': 'All samples are heterozygous for the variant'},
+    'QUALapprox': {
+        'Number': '1',
+        'Description': 'Sum of PL[0] values; used to approximate the QUAL score',
     },
-    "AS_SB_TABLE": {
-        "Number": ".",
-        "Description": ("Allele-specific forward/reverse read counts for strand bias tests"),
+    'AS_SB_TABLE': {
+        'Number': '.',
+        'Description': ('Allele-specific forward/reverse read counts for strand bias tests'),
     },
 }
 
@@ -404,19 +404,18 @@ def adjust_vcf_incompatible_types(
     """
 
     def get_pipe_expr(array_expr: hl.expr.ArrayExpression) -> hl.expr.StringExpression:
-        return hl.delimit(array_expr.map(lambda x: hl.or_else(hl.str(x), "")), "|")
+        return hl.delimit(array_expr.map(lambda x: hl.or_else(hl.str(x), '')), '|')
 
     # Make sure the HT is keyed by locus, alleles
-    ht = ht.key_by("locus", "alleles")
+    ht = ht.key_by('locus', 'alleles')
 
     info_type_convert_expr = {}
     # Convert int64 fields to int32 (int64 isn't supported by VCF)
     for f, ft in ht.info.dtype.items():
-        if ft == hl.dtype("int64"):
+        if ft == hl.dtype('int64'):
             logger.warning(
-                "Coercing field info.%s from int64 to int32 for VCF output. Value"
-                " will be capped at int32 max value.",
-                f,
+                f'Coercing field info.{f} from int64 to int32 for VCF output. Value'
+                ' will be capped at int32 max value.',
             )
             info_type_convert_expr.update(
                 {
@@ -426,11 +425,10 @@ def adjust_vcf_incompatible_types(
                     ),
                 },
             )
-        elif ft == hl.dtype("array<int64>"):
+        elif ft == hl.dtype('array<int64>'):
             logger.warning(
-                "Coercing field info.%s from array<int64> to array<int32> for VCF"
-                " output. Array values will be capped at int32 max value.",
-                f,
+                f'Coercing field info.{f} from array<int64> to array<int32> for VCF'
+                f' output. Array values will be capped at int32 max value.',
             )
             info_type_convert_expr.update(
                 {
@@ -452,16 +450,16 @@ def adjust_vcf_incompatible_types(
     # Note2: this doesn't produce the correct annotation for AS_SB_TABLE, it
     # is handled below
     for f in pipe_delimited_annotations:
-        if f in ht.info and f != "AS_SB_TABLE":
-            info_expr[f] = "|" + get_pipe_expr(ht.info[f])
+        if f in ht.info and f != 'AS_SB_TABLE':
+            info_expr[f] = '|' + get_pipe_expr(ht.info[f])
 
     # Flatten SB if it is an array of arrays
-    if "SB" in ht.info and not isinstance(ht.info.SB, hl.expr.ArrayNumericExpression):
-        info_expr["SB"] = ht.info.SB[0].extend(ht.info.SB[1])
+    if 'SB' in ht.info and not isinstance(ht.info.SB, hl.expr.ArrayNumericExpression):
+        info_expr['SB'] = ht.info.SB[0].extend(ht.info.SB[1])
 
-    if "AS_SB_TABLE" in ht.info:
-        info_expr["AS_SB_TABLE"] = get_pipe_expr(
-            ht.info.AS_SB_TABLE.map(lambda x: hl.delimit(x, ",")),
+    if 'AS_SB_TABLE' in ht.info:
+        info_expr['AS_SB_TABLE'] = get_pipe_expr(
+            ht.info.AS_SB_TABLE.map(lambda x: hl.delimit(x, ',')),
         )
 
     # Annotate with new expression
@@ -472,7 +470,7 @@ def adjust_vcf_incompatible_types(
 
 def format_validated_ht_for_export(
     ht: hl.Table,
-    data_type: str = "exomes",
+    data_type: str = 'exomes',
     vcf_info_reorder: List[str] = VCF_INFO_REORDER,
     info_fields_to_drop: Optional[List[str]] = None,
 ) -> Tuple[hl.Table, List[str]]:
@@ -492,37 +490,37 @@ def format_validated_ht_for_export(
     """
     if info_fields_to_drop is None:
         info_fields_to_drop = []
-    logger.info("Dropping fields from info struct...")
+    logger.info('Dropping fields from info struct...')
 
-    if data_type == "joint":
-        for dt in ["exomes", "genomes", "joint"]:
+    if data_type == 'joint':
+        for dt in ['exomes', 'genomes', 'joint']:
             info_fields_to_drop.extend(
                 [
-                    f"age_hist_het_bin_edges_{dt}",
-                    f"age_hist_hom_bin_edges_{dt}",
+                    f'age_hist_het_bin_edges_{dt}',
+                    f'age_hist_hom_bin_edges_{dt}',
                 ],
             )
     else:
-        logger.info("Add age_histogram bin edges to info fields to drop...")
-        info_fields_to_drop.extend(["age_hist_het_bin_edges", "age_hist_hom_bin_edges"])
+        logger.info('Add age_histogram bin edges to info fields to drop...')
+        info_fields_to_drop.extend(['age_hist_het_bin_edges', 'age_hist_hom_bin_edges'])
 
-        logger.info("Adding 'SB' to info fields to drop...")
-        info_fields_to_drop.append("SB")
+        logger.info('Adding "SB" to info fields to drop...')
+        info_fields_to_drop.append('SB')
 
-    logger.info("Dropping the following fields from info struct:")
+    logger.info('Dropping the following fields from info struct:')
     pprint(info_fields_to_drop)
     ht = ht.annotate(info=ht.info.drop(*info_fields_to_drop))
 
-    logger.info("Dropping _'adj' from info fields...")
+    logger.info('Dropping _"adj" from info fields...')
     row_annots = list(ht.info)
-    new_row_annots = [x.replace("_adj", "") for x in row_annots]
+    new_row_annots = [x.replace('_adj', '') for x in row_annots]
     info_annot_mapping = dict(
-        zip(new_row_annots, [ht.info[f"{x}"] for x in row_annots]),
+        zip(new_row_annots, [ht.info[f'{x}'] for x in row_annots]),
     )
     ht = ht.transmute(info=hl.struct(**info_annot_mapping))
 
-    logger.info("Adjusting VCF incompatible types...")
-    if data_type != "joint":
+    logger.info('Adjusting VCF incompatible types...')
+    if data_type != 'joint':
         # Reformat AS_SB_TABLE for use in adjust_vcf_incompatible_types
         ht = ht.annotate(
             info=ht.info.annotate(
@@ -533,12 +531,12 @@ def format_validated_ht_for_export(
     # pipe delimited.
     ht = adjust_vcf_incompatible_types(ht, pipe_delimited_annotations=[])
 
-    logger.info("Rearranging fields to desired order...")
-    if data_type == "joint":
-        special_items = {"exomes": "exomes_filters", "genomes": "genomes_filters"}
+    logger.info('Rearranging fields to desired order...')
+    if data_type == 'joint':
+        special_items = {'exomes': 'exomes_filters', 'genomes': 'genomes_filters'}
         new_vcf_info_reorder = []
-        for dt in ["joint", "exomes", "genomes"]:
-            new_vcf_info_reorder += [f"{f}_{dt}" for f in vcf_info_reorder]
+        for dt in ['joint', 'exomes', 'genomes']:
+            new_vcf_info_reorder += [f'{f}_{dt}' for f in vcf_info_reorder]
             if dt in special_items:
                 new_vcf_info_reorder.append(special_items[dt])
         vcf_info_reorder = new_vcf_info_reorder
@@ -558,13 +556,13 @@ def select_type_from_joint_ht(ht: hl.Table, data_type: str) -> hl.Table:
         "joint".
     :return: Joint HT with fields relevant to `data_type`.
     """
-    global_fields = [f"{data_type}_globals"]
-    row_fields = [data_type, "region_flags"]
-    if data_type == "joint":
-        row_fields.append("freq_comparison_stats")
+    global_fields = [f'{data_type}_globals']
+    row_fields = [data_type, 'region_flags']
+    if data_type == 'joint':
+        row_fields.append('freq_comparison_stats')
     ht = ht.select_globals(*global_fields)
     ht = ht.select(*row_fields)
-    ht = ht.transmute_globals(**ht[f"{data_type}_globals"])
+    ht = ht.transmute_globals(**ht[f'{data_type}_globals'])
     ht = ht.transmute(**ht[data_type])
     return ht
 
@@ -572,9 +570,9 @@ def select_type_from_joint_ht(ht: hl.Table, data_type: str) -> hl.Table:
 def unfurl_nested_annotations(
     ht: hl.Table,
     entries_to_remove: Set[str] | None = None,
-    data_type: str = "exomes",
+    data_type: str = 'exomes',
     joint_included: bool = False,
-    hist_prefix: str = "",
+    hist_prefix: str = '',
     freq_comparison_included: bool = False,
     for_joint_validation: bool = False,
 ) -> tuple[hl.expr.StructExpression, Set[str] | None, Dict[str, str]]:
@@ -604,57 +602,57 @@ def unfurl_nested_annotations(
 
     # Unfurl freq index dict
     # Cycles through each key and index (e.g., k=afr_XX, i=31)
-    logger.info("Unfurling freq data...")
+    logger.info('Unfurling freq data...')
     freq_idx = hl.eval(ht.freq_index_dict)
     for k, i in freq_idx.items():
         for f in ht.freq[0].keys():
-            field_name = f if f != "homozygote_count" else "nhomalt"
-            expr_dict[f"{field_name}_{k}"] = ht.freq[i][f]
+            field_name = f if f != 'homozygote_count' else 'nhomalt'
+            expr_dict[f'{field_name}_{k}'] = ht.freq[i][f]
             if for_joint_validation:
-                rename_dict[f"{field_name}_{k}"] = f"{field_name}_{data_type}_{k}"
+                rename_dict[f'{field_name}_{k}'] = f'{field_name}_{data_type}_{k}'
 
     if joint_included:
-        logger.info("Unfurling joint freq data...")
+        logger.info('Unfurling joint freq data...')
         joint_freq_idx = hl.eval(ht.joint_freq_index_dict)
         expr_dict.update(
             {
-                f"{f if f != 'homozygote_count' else 'nhomalt'}_joint_{k}": (ht.joint_freq[i][f])
+                f'{f if f != "homozygote_count" else "nhomalt"}_joint_{k}': (ht.joint_freq[i][f])
                 for k, i in joint_freq_idx.items()
                 for f in ht.joint_freq[0].keys()
             },
         )
 
     # This creates fields like grpmax, AC_grpmax_non_ukb...
-    logger.info("Adding grpmax data...")
-    # Our tables use popmax (exomes/genomes) vs grpmax (joint) with "pop" vs "gen_anc" keys respectively.
-    # Our pipeline uses pop_max_expr() with {"group", "pop"} keys, while gnomAD v4 uses the equivalent
-    # grpmax_expr() with {"group", "gen_anc"} keys.
+    logger.info('Adding grpmax data...')
+    # Our tables use popmax (exomes/genomes) vs grpmax (joint) with 'pop' vs 'gen_anc' keys respectively.
+    # Our pipeline uses pop_max_expr() with {'group', 'pop'} keys, while gnomAD v4 uses the equivalent
+    # grpmax_expr() with {'group', 'gen_anc'} keys.
     grpmax_idx = ht.grpmax if for_joint_validation else ht.popmax
-    grpmax_dict = {"grpmax": grpmax_idx.pop}
-    grpmax_rename = {f: f if f != "homozygote_count" else "nhomalt" for f in grpmax_idx.keys() if f != "pop"}
+    grpmax_dict = {'grpmax': grpmax_idx.pop}
+    grpmax_rename = {f: f if f != 'homozygote_count' else 'nhomalt' for f in grpmax_idx.keys() if f != 'pop'}
     grpmax_dict.update(
-        {f"{v}_grpmax": grpmax_idx[k] for k, v in grpmax_rename.items()},
+        {f'{v}_grpmax': grpmax_idx[k] for k, v in grpmax_rename.items()},
     )
     if for_joint_validation:
-        rename_dict["grpmax"] = f"grpmax_{data_type}"
+        rename_dict['grpmax'] = f'grpmax_{data_type}'
         rename_dict.update(
-            {f"{v}_grpmax": f"{v}_grpmax_{data_type}" for v in grpmax_rename.values()},
+            {f'{v}_grpmax': f'{v}_grpmax_{data_type}' for v in grpmax_rename.values()},
         )
     expr_dict.update(grpmax_dict)
 
     if joint_included:
-        logger.info("Adding joint grpmax data...")
+        logger.info('Adding joint grpmax data...')
         joint_grpmax_idx = ht.joint_grpmax
-        joint_grpmax_dict = {"grpmax_joint": joint_grpmax_idx.pop}
+        joint_grpmax_dict = {'grpmax_joint': joint_grpmax_idx.pop}
         joint_grpmax_dict.update(
             {
-                f"{f if f != 'homozygote_count' else 'nhomalt'}_grpmax_joint": (joint_grpmax_idx[f])
-                for f in [f for f in joint_grpmax_idx._fields if f != "pop"]
+                f'{f if f != "homozygote_count" else "nhomalt"}_grpmax_joint': (joint_grpmax_idx[f])
+                for f in [f for f in joint_grpmax_idx._fields if f != 'pop']
             },
         )
         expr_dict.update(joint_grpmax_dict)
 
-    logger.info("Unfurling faf data...")
+    logger.info('Unfurling faf data...')
     faf_idx = hl.eval(ht.faf_index_dict)
     for k, i in faf_idx.items():
         for f in ht.faf[0].keys():
@@ -662,44 +660,44 @@ def unfurl_nested_annotations(
             if for_joint_validation:
                 rename_dict[f"{f}_{k}"] = f"{f}_{data_type}_{k}"
 
-    logger.info("Unfurling fafmax data...")
+    logger.info('Unfurling fafmax data...')
     fafmax_idx = ht.fafmax
 
-    fafmax_dict = {f"fafmax_{f}": fafmax_idx[f] for f in fafmax_idx.keys()}
+    fafmax_dict = {f'fafmax_{f}': fafmax_idx[f] for f in fafmax_idx.keys()}
     if for_joint_validation:
         rename_dict.update(
-            {f"fafmax_{f}": f"fafmax_{f}_{data_type}" for f in fafmax_idx.keys()},
+            {f'fafmax_{f}': f'fafmax_{f}_{data_type}' for f in fafmax_idx.keys()},
         )
     expr_dict.update(fafmax_dict)
 
     if joint_included:
-        logger.info("Unfurling joint faf data...")
+        logger.info('Unfurling joint faf data...')
         joint_faf_idx = hl.eval(ht.joint_faf_index_dict)
         expr_dict.update(
-            {f"{f}_joint_{k}": ht.joint_faf[i][f] for f in ht.joint_faf[0].keys() for k, i in joint_faf_idx.items()},
+            {f'{f}_joint_{k}': ht.joint_faf[i][f] for f in ht.joint_faf[0].keys() for k, i in joint_faf_idx.items()},
         )
 
-        logger.info("Unfurling joint fafmax data...")
+        logger.info('Unfurling joint fafmax data...')
         joint_fafmax_idx = ht.joint_fafmax
         joint_fafmax_dict = {
-            f"fafmax_{f if f != 'joint_fafmax_data_type' else 'data_type'}_joint": (joint_fafmax_idx[f])
+            f'fafmax_{f if f != "joint_fafmax_data_type" else "data_type"}_joint': (joint_fafmax_idx[f])
             for f in joint_fafmax_idx.keys()
         }
         expr_dict.update(joint_fafmax_dict)
 
-    logger.info("Unfurling age hists...")
-    age_hists = ["age_hist_het", "age_hist_hom"]
+    logger.info('Unfurling age hists...')
+    age_hists = ['age_hist_het', 'age_hist_hom']
     hist_idx = ht.histograms.age_hists if for_joint_validation else ht
     for hist in age_hists:
         for f in hist_idx[hist].keys():
-            expr_dict[f"{hist}_{f}"] = hl.delimit(hist_idx[hist][f], delimiter="|") if "bin" in f else hist_idx[hist][f]
+            expr_dict[f'{hist}_{f}'] = hl.delimit(hist_idx[hist][f], delimiter='|') if 'bin' in f else hist_idx[hist][f]
             if for_joint_validation:
-                rename_dict[f"{hist}_{f}"] = f"{hist}_{f}_{data_type}"
+                rename_dict[f'{hist}_{f}'] = f'{hist}_{f}_{data_type}'
 
-    logger.info("Unfurling variant quality histograms...")
+    logger.info('Unfurling variant quality histograms...')
     # Add underscore to hist_prefix if it isn't empty
-    if hist_prefix != "":
-        hist_prefix += "_"
+    if hist_prefix != '':
+        hist_prefix += '_'
 
     # Histograms to export are:
     # gq_hist_alt, gq_hist_all, dp_hist_alt, dp_hist_all, ab_hist_alt
@@ -709,49 +707,49 @@ def unfurl_nested_annotations(
     # _n_larger for all hists EXCEPT DP hists
     for hist in HISTS:
         hist_dict = {
-            f"{hist}_bin_freq": hl.delimit(
+            f'{hist}_bin_freq': hl.delimit(
                 ht.histograms.qual_hists[hist].bin_freq,
-                delimiter="|",
+                delimiter='|',
             ),
         }
         expr_dict.update(hist_dict)
         if for_joint_validation:
             rename_dict.update(
-                {f"{hist}_bin_freq": f"{hist_prefix}{hist}_bin_freq_{data_type}"},
+                {f'{hist}_bin_freq': f'{hist_prefix}{hist}_bin_freq_{data_type}'},
             )
 
-        if "dp" in hist:
+        if 'dp' in hist:
             expr_dict.update(
-                {f"{hist}_n_larger": ht.histograms.qual_hists[hist].n_larger},
+                {f'{hist}_n_larger': ht.histograms.qual_hists[hist].n_larger},
             )
             if for_joint_validation:
                 rename_dict.update(
-                    {f"{hist}_n_larger": f"{hist_prefix}{hist}_n_larger_{data_type}"},
+                    {f'{hist}_n_larger': f'{hist_prefix}{hist}_n_larger_{data_type}'},
                 )
 
     if freq_comparison_included:
-        logger.info("Unfurling contingency table test results...")
+        logger.info('Unfurling contingency table test results...')
         contingency_idx = hl.eval(ht.freq_index_dict)
         for k, i in contingency_idx.items():
             for f in ht.freq_comparison_stats.contingency_table_test[0].keys():
-                key = f"CTT_{f}_{k}"
+                key = f'CTT_{f}_{k}'
                 expr = ht.freq_comparison_stats.contingency_table_test[i][f]
                 expr_dict[key] = expr
 
-        logger.info("Unfurling Cochran-Mantel-Haenszel test results...")
-        expr_dict["CMH_chisq"] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.chisq
-        expr_dict["CMH_p_value"] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.p_value
-        logger.info("Unfurling unionized stats...")
-        expr_dict["stat_union_p_value"] = ht.freq_comparison_stats.stat_union.p_value
-        expr_dict["stat_union_test_name"] = ht.freq_comparison_stats.stat_union.stat_test_name
-        expr_dict["stat_union_gen_ancs"] = ht.freq_comparison_stats.stat_union.gen_ancs
+        logger.info('Unfurling Cochran-Mantel-Haenszel test results...')
+        expr_dict['CMH_chisq'] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.chisq
+        expr_dict['CMH_p_value'] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.p_value
+        logger.info('Unfurling unionized stats...')
+        expr_dict['stat_union_p_value'] = ht.freq_comparison_stats.stat_union.p_value
+        expr_dict['stat_union_test_name'] = ht.freq_comparison_stats.stat_union.stat_test_name
+        expr_dict['stat_union_gen_ancs'] = ht.freq_comparison_stats.stat_union.gen_ancs
 
     return hl.struct(**expr_dict), entries_to_remove, rename_dict
 
 
 def make_info_expr(
     t: hl.Table,
-    data_type: str = "exomes",
+    data_type: str = 'exomes',
     for_joint_validation: bool = False,
 ) -> Dict[str, hl.expr.Expression]:
     """
@@ -768,35 +766,35 @@ def make_info_expr(
     # Set data type to joint if for_joint_validation is True so the correct region flag
     # fields are used.
     if for_joint_validation:
-        data_type = "joint"
+        data_type = 'joint'
 
-    if "region_flags" in t.row:
+    if 'region_flags' in t.row:
         # Add region_flag to info dict
         for field in REGION_FLAG_FIELDS[data_type]:
-            vcf_info_dict[field] = t["region_flags"][f"{field}"]
+            vcf_info_dict[field] = t['region_flags'][f'{field}']
 
     if for_joint_validation:
         return vcf_info_dict
 
     # Add site-level annotations and AS annotations to vcf_info_dict
     for field in SITE_FIELDS[data_type] + AS_FIELDS:
-        vcf_info_dict[field] = t["release_ht_info"][f"{field}"]
+        vcf_info_dict[field] = t['release_ht_info'][f'{field}']
 
     for field in AS_VQSR_FIELDS:
-        # NOTE: VQSR results are nested in the info struct (and not "vqsr_results") and are also
+        # NOTE: VQSR results are nested in the info struct (and not 'vqsr_results') and are also
         # quasi-AS not true-AS in our release tables.
         # We also moved the info fields to `release_ht_info` field.
-        vcf_info_dict[field] = t.release_ht_info[f"{field}"]
+        vcf_info_dict[field] = t.release_ht_info[f'{field}']
 
     # Add allele_info fields to info dict
     for field in ALLELE_TYPE_FIELDS[data_type]:
-        vcf_info_dict[field] = t["allele_info"][f"{field}"]
+        vcf_info_dict[field] = t['allele_info'][f'{field}']
 
     # Add vep annotations to info dict
-    vcf_info_dict["vep"] = t["vep"]
+    vcf_info_dict['vep'] = t['vep']
 
     # Add monoallelic field to info dict
-    vcf_info_dict["monoallelic"] = t["monoallelic"]
+    vcf_info_dict['monoallelic'] = t['monoallelic']
 
     return vcf_info_dict
 
@@ -823,7 +821,7 @@ def vep_struct_to_csq(
     :param has_polyphen_sift: Whether the input VEP Struct has PolyPhen and SIFT annotations. Default is True.
     :return: The corresponding CSQ strings
     """
-    _csq_fields = [f.lower() for f in csq_fields.split("|")]
+    _csq_fields = [f.lower() for f in csq_fields.split('|')]
 
     def get_csq_from_struct(
         element: hl.expr.StructExpression,
@@ -835,94 +833,94 @@ def vep_struct_to_csq(
         # Add general exceptions
         fields.update(
             {
-                "allele": element.variant_allele,
-                "consequence": hl.delimit(element.consequence_terms, delimiter="&"),
-                "feature_type": feature_type,
-                "feature": (
+                'allele': element.variant_allele,
+                'consequence': hl.delimit(element.consequence_terms, delimiter='&'),
+                'feature_type': feature_type,
+                'feature': (
                     element.transcript_id
-                    if "transcript_id" in element
+                    if 'transcript_id' in element
                     else (
                         element.regulatory_feature_id
-                        if "regulatory_feature_id" in element
-                        else (element.motif_feature_id if "motif_feature_id" in element else "")
+                        if 'regulatory_feature_id' in element
+                        else (element.motif_feature_id if 'motif_feature_id' in element else '')
                     )
                 ),
-                "variant_class": vep_expr.variant_class,
+                'variant_class': vep_expr.variant_class,
             },
         )
 
         # Add exception for transcripts
-        if feature_type == "Transcript":
+        if feature_type == 'Transcript':
             transcript_dict = {
-                "canonical": hl.if_else(element.canonical == 1, "YES", ""),
-                "ensp": element.protein_id,
-                "gene": element.gene_id,
-                "symbol": element.gene_symbol,
-                "symbol_source": element.gene_symbol_source,
-                "cdna_position": hl.str(element.cdna_start)
+                'canonical': hl.if_else(element.canonical == 1, 'YES', ''),
+                'ensp': element.protein_id,
+                'gene': element.gene_id,
+                'symbol': element.gene_symbol,
+                'symbol_source': element.gene_symbol_source,
+                'cdna_position': hl.str(element.cdna_start)
                 + hl.if_else(
                     element.cdna_start == element.cdna_end,
-                    "",
-                    "-" + hl.str(element.cdna_end),
+                    '',
+                    '-' + hl.str(element.cdna_end),
                 ),
-                "cds_position": hl.str(element.cds_start)
+                'cds_position': hl.str(element.cds_start)
                 + hl.if_else(
                     element.cds_start == element.cds_end,
-                    "",
-                    "-" + hl.str(element.cds_end),
+                    '',
+                    '-' + hl.str(element.cds_end),
                 ),
-                "mirna": hl.delimit(element.mirna, "&") if "mirna" in element else None,
-                "protein_position": hl.str(element.protein_start)
+                'mirna': hl.delimit(element.mirna, '&') if 'mirna' in element else None,
+                'protein_position': hl.str(element.protein_start)
                 + hl.if_else(
                     element.protein_start == element.protein_end,
-                    "",
-                    "-" + hl.str(element.protein_end),
+                    '',
+                    '-' + hl.str(element.protein_end),
                 ),
-                "uniprot_isoform": (hl.delimit(element.uniprot_isoform, "&") if "uniprot_isoform" in element else None),
+                'uniprot_isoform': (hl.delimit(element.uniprot_isoform, '&') if 'uniprot_isoform' in element else None),
             }
             # Retain transcript dict updates only for fields that exist in the csq
             # fields.
             transcript_dict = {
-                k: v for k, v in transcript_dict.items() if k in [x.lower() for x in csq_fields.split("|")]
+                k: v for k, v in transcript_dict.items() if k in [x.lower() for x in csq_fields.split('|')]
             }
             fields.update(transcript_dict)
 
             if has_polyphen_sift:
                 fields.update(
                     {
-                        "sift": (element.sift_prediction + "(" + hl.format("%.3f", element.sift_score) + ")"),
-                        "polyphen": (
-                            element.polyphen_prediction + "(" + hl.format("%.3f", element.polyphen_score) + ")"
+                        'sift': (element.sift_prediction + '(' + hl.format('%.3f', element.sift_score) + ')'),
+                        'polyphen': (
+                            element.polyphen_prediction + '(' + hl.format('%.3f', element.polyphen_score) + ')'
                         ),
                     },
                 )
             fields.update(
                 {
-                    "domains": hl.delimit(
-                        element.domains.map(lambda d: d.db + ":" + d.name),
-                        "&",
+                    'domains': hl.delimit(
+                        element.domains.map(lambda d: d.db + ':' + d.name),
+                        '&',
                     ),
                 },
             )
-        elif feature_type == "MotifFeature":
-            fields["motif_score_change"] = hl.format("%.3f", element.motif_score_change)
-            if "transcription_factors" in element:
-                fields["transcription_factors"] = hl.delimit(
+        elif feature_type == 'MotifFeature':
+            fields['motif_score_change'] = hl.format('%.3f', element.motif_score_change)
+            if 'transcription_factors' in element:
+                fields['transcription_factors'] = hl.delimit(
                     element.transcription_factors,
-                    "&",
+                    '&',
                 )
 
         return hl.delimit(
-            [hl.or_else(hl.str(fields.get(f, "")), "") for f in _csq_fields],
-            "|",
+            [hl.or_else(hl.str(fields.get(f, '')), '') for f in _csq_fields],
+            '|',
         )
 
     csq = hl.empty_array(hl.tstr)
     for feature_field, feature_type in [
-        ("transcript_consequences", "Transcript"),
-        ("regulatory_feature_consequences", "RegulatoryFeature"),
-        ("motif_feature_consequences", "MotifFeature"),
-        ("intergenic_consequences", "Intergenic"),
+        ('transcript_consequences', 'Transcript'),
+        ('regulatory_feature_consequences', 'RegulatoryFeature'),
+        ('motif_feature_consequences', 'MotifFeature'),
+        ('intergenic_consequences', 'Intergenic'),
     ]:
         csq = csq.extend(
             hl.or_else(
@@ -943,10 +941,10 @@ def process_vep_csq_header(vep_csq_header: str = VEP_CSQ_HEADER) -> str:
     :param vep_csq_header: VEP CSQ header.
     :return: Processed VEP CSQ header.
     """
-    logger.info("Processing VEP CSQ header...")
-    csq_fields = vep_csq_header.split("|")
-    csq_fields = [f for f in csq_fields if f not in ["PolyPhen", "SIFT"]]
-    vep_csq_header = "|".join(csq_fields)
+    logger.info('Processing VEP CSQ header...')
+    csq_fields = vep_csq_header.split('|')
+    csq_fields = [f for f in csq_fields if f not in ['PolyPhen', 'SIFT']]
+    vep_csq_header = '|'.join(csq_fields)
     return vep_csq_header
 
 
@@ -954,9 +952,9 @@ def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
     inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
 
     filters = {
-        "InbreedingCoeff": ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
-        "AS_lowqual": ht.AS_lowqual,
-        "AS_VQSR": hl.is_missing(ht.info["AS_VQSLOD"]),
+        'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        'AS_lowqual': ht.AS_lowqual,
+        'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
     }
     # NOTE: `score_cutoffs` are accessed during browser prep, need to read in stage output.
     snv_indel_expr = {'snv': hl.is_snp(ht.alleles[0], ht.alleles[1])}
@@ -971,7 +969,7 @@ def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
 
 def prepare_ht_for_validation(
     ht: hl.Table,
-    data_type: str = "exomes",
+    data_type: str = 'exomes',
     freq_entries_to_remove: Optional[Set[str]] = None,
     vcf_info_reorder: Optional[List[str]] = None,
     joint_included: bool = False,
@@ -1000,7 +998,7 @@ def prepare_ht_for_validation(
         fields to rename when `for_joint_validation` is True.
     """
     logger.info(
-        "Unfurling nested gnomAD frequency annotations and add to INFO field...",
+        'Unfurling nested gnomAD frequency annotations and add to INFO field...',
     )
     info_struct, freq_entries_to_remove, rename_dict = unfurl_nested_annotations(
         ht,
@@ -1011,25 +1009,25 @@ def prepare_ht_for_validation(
         for_joint_validation=for_joint_validation,
     )
 
-    logger.info("Constructing INFO field")
+    logger.info('Constructing INFO field')
     # Remove SIFT and Polyphen from CSQ fields or they will be inserted with
     # missing values by vep_struct_to_csq. These fields are processed separately
     # as in silico annotations.
-    csq_fields = "|".join(
-        [c for c in VEP_CSQ_FIELDS[CURRENT_VEP_VERSION].split("|") if c != "PolyPhen" and c != "SIFT"],
+    csq_fields = '|'.join(
+        [c for c in VEP_CSQ_FIELDS[CURRENT_VEP_VERSION].split('|') if c != 'PolyPhen' and c != 'SIFT'],
     )
 
     if for_joint_validation:
-        ann_expr = {"info": info_struct}
-        if "region_flags" in ht.row:
-            ann_expr["region_flags"] = ht.region_flags
+        ann_expr = {'info': info_struct}
+        if 'region_flags' in ht.row:
+            ann_expr['region_flags'] = ht.region_flags
     else:
         ann_expr = {
-            "region_flag": ht.region_flags,
-            "release_ht_info": ht.info,
-            "info": info_struct,
-            "rsid": ht.rsid,  # NOTE: In exomes/genomes tables rsid field is not an array
-            "vep": vep_struct_to_csq(
+            'region_flag': ht.region_flags,
+            'release_ht_info': ht.info,
+            'info': info_struct,
+            'rsid': ht.rsid,  # NOTE: In exomes/genomes tables rsid field is not an array
+            'vep': vep_struct_to_csq(
                 ht.vep,
                 csq_fields=csq_fields,
                 has_polyphen_sift=False,
@@ -1070,20 +1068,20 @@ def prepare_ht_for_validation(
 
     # Select relevant fields for VCF export
     if for_joint_validation:
-        if "filters" in ht.row:
+        if 'filters' in ht.row:
             filters_expr = ht.filters
         else:
             filters_expr = hl.empty_set(hl.tstr)
-        ht = ht.select("info", filters=filters_expr)
+        ht = ht.select('info', filters=filters_expr)
     else:
         # Our frequencies tables do not have a `filters` field. This is only annotated during browser prep. Doing it here.
         inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
         ac = _freq(ht, subset=None).AC
         filters = {
-            "InbreedingCoeff": ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
-            "AC0": ac == 0,
-            "AS_lowqual": ht.AS_lowqual,
-            "AS_VQSR": hl.is_missing(ht.info["AS_VQSLOD"]),
+            'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+            'AC0': ac == 0,
+            'AS_lowqual': ht.AS_lowqual,
+            'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
         }
         # NOTE: `score_cutoffs` are accessed during browser prep, need to read in stage output.
         snv_indel_expr = {'snv': hl.is_snp(ht.alleles[0], ht.alleles[1])}
@@ -1095,10 +1093,10 @@ def prepare_ht_for_validation(
                 )
         ht = ht.annotate(filters=add_filters_expr(filters=filters))
 
-        ht = ht.select("info", "filters", "rsid")
+        ht = ht.select('info', 'filters', 'rsid')
 
     if vcf_info_reorder:
-        logger.info("Rearranging fields to desired order...")
+        logger.info('Rearranging fields to desired order...')
         ht = ht.annotate(
             info=ht.info.select(*vcf_info_reorder, *ht.info.drop(*vcf_info_reorder)),
         )
@@ -1126,21 +1124,21 @@ def get_joint_filters(ht: hl.Table) -> hl.Table:
             .when(
                 ((hl.len(exomes_filters) == 0) | hl.is_missing(exomes_filters))
                 & ((hl.len(genomes_filters) == 0) | hl.is_missing(genomes_filters)),
-                ["PASS"],
+                ['PASS'],
             )
             .when(
                 (hl.len(exomes_filters) != 0) & ((hl.len(genomes_filters) == 0) | hl.is_missing(genomes_filters)),
-                ["EXOMES_FILTERED"],
+                ['EXOMES_FILTERED'],
             )
             .when(
                 ((hl.len(exomes_filters) == 0) | hl.is_missing(exomes_filters)) & (hl.len(genomes_filters) != 0),
-                ["GENOMES_FILTERED"],
+                ['GENOMES_FILTERED'],
             )
             .when(
                 (hl.len(exomes_filters) != 0) & (hl.len(genomes_filters) != 0),
-                ["BOTH_FILTERED"],
+                ['BOTH_FILTERED'],
             )
-            .default(["MISSING_FILTERS"]),
+            .default(['MISSING_FILTERS']),
         ),
     )
     return ht
@@ -1150,7 +1148,7 @@ def make_vcf_filter_dict(
     snp_cutoff: Optional[float] = None,
     indel_cutoff: Optional[float] = None,
     inbreeding_cutoff: Optional[float] = None,
-    variant_qc_filter: str = "RF",
+    variant_qc_filter: str = 'RF',
     joint: bool = False,
 ) -> Dict[str, Dict[str, str]]:
     """
@@ -1170,67 +1168,67 @@ def make_vcf_filter_dict(
     :return: Dictionary keyed by VCF FILTER annotations, where values are Dictionaries of Number and Description attributes.
     """
     variant_qc_filter_dict = {
-        "RF": {
-            "Description": (
-                f"Failed random forest filtering thresholds of {snp_cutoff} for SNPs"
-                f" and {indel_cutoff} for indels (probabilities of being a true"
-                " positive variant)"
+        'RF': {
+            'Description': (
+                f'Failed random forest filtering thresholds of {snp_cutoff} for SNPs'
+                f' and {indel_cutoff} for indels (probabilities of being a true'
+                ' positive variant)'
             ),
         },
-        "AS_VQSR": {
-            "Description": (
-                f"Failed VQSR filtering thresholds of {snp_cutoff} for SNPs and" f" {indel_cutoff} for indels"
+        'AS_VQSR': {
+            'Description': (
+                f'Failed VQSR filtering thresholds of {snp_cutoff} for SNPs and' f' {indel_cutoff} for indels'
             ),
         },
     }
 
     if variant_qc_filter not in variant_qc_filter_dict:
         raise ValueError(
-            f"{variant_qc_filter} is not a valid value for 'variant_qc_filter'. It must" " be 'RF' or 'AS_VQSR'",
+            f'{variant_qc_filter} is not a valid value for "variant_qc_filter". It must be "RF" or "AS_VQSR"',
         )
     if not joint and (snp_cutoff is None or indel_cutoff is None or inbreeding_cutoff is None):
         raise ValueError(
-            "snp_cutoff, indel_cutoff, and inbreeding_cutoff must be specified to generate filter descriptions.",
+            'snp_cutoff, indel_cutoff, and inbreeding_cutoff must be specified to generate filter descriptions.',
         )
 
     if joint:
         filter_dict = {
-            "PASS": {
-                "Description": "Either passed all variant filters in both exomes and "
-                "genomes, or passed all variant filters in either "
-                "exomes or genomes while being absent from the other "
-                "dataset",
+            'PASS': {
+                'Description': 'Either passed all variant filters in both exomes and '
+                'genomes, or passed all variant filters in either '
+                'exomes or genomes while being absent from the other '
+                'dataset',
             },
-            "EXOMES_FILTERED": {
-                "Description": "Failed variant filters in the exomes dataset and either "
-                "passed all variant filters in the genomes dataset or the variant was "
-                "not present in the genomes dataset. Refer to 'exomes_filters' within "
-                "INFO for more information",
+            'EXOMES_FILTERED': {
+                'Description': 'Failed variant filters in the exomes dataset and either '
+                'passed all variant filters in the genomes dataset or the variant was '
+                'not present in the genomes dataset. Refer to "exomes_filters" within '
+                'INFO for more information',
             },
-            "GENOMES_FILTERED": {
-                "Description": "Failed variant filters in the genomes dataset and either "
-                "passed all variant filters in the exomes dataset or the variant was "
-                "not present in the exomes dataset. Refer to 'genomes_filters' within "
-                "INFO for more information",
+            'GENOMES_FILTERED': {
+                'Description': 'Failed variant filters in the genomes dataset and either '
+                'passed all variant filters in the exomes dataset or the variant was '
+                'not present in the exomes dataset. Refer to "genomes_filters" within '
+                'INFO for more information',
             },
-            "BOTH_FILTERED": {
-                "Description": "Failed variant filters in both exomes and genomes datasets. "
-                "Refer to 'exomes_filters' and 'genomes_filters' within INFO for more information",
+            'BOTH_FILTERED': {
+                'Description': 'Failed variant filters in both exomes and genomes datasets. '
+                'Refer to "exomes_filters" and "genomes_filters" within INFO for more information',
             },
         }
     else:
         # NOTE: Are these accurate?
         filter_dict = {
-            "AC0": {
-                "Description": (
-                    "Allele count is zero after filtering out low-confidence genotypes (GQ"
-                    " < 20; DP < 10; and AB < 0.2 for het calls)"
+            'AC0': {
+                'Description': (
+                    'Allele count is zero after filtering out low-confidence genotypes (GQ'
+                    ' < 20; DP < 10; and AB < 0.2 for het calls)'
                 ),
             },
-            "InbreedingCoeff": {
-                "Description": f"Inbreeding coefficient < {inbreeding_cutoff}",
+            'InbreedingCoeff': {
+                'Description': f'Inbreeding coefficient < {inbreeding_cutoff}',
             },
-            "PASS": {"Description": "Passed all variant filters"},
+            'PASS': {'Description': 'Passed all variant filters'},
             variant_qc_filter: variant_qc_filter_dict[variant_qc_filter],
         }
 
@@ -1245,7 +1243,7 @@ def prepare_vcf_header_dict(
     age_hist_distribution: str,
     subset_list: List[str],
     pops: Dict[str, str],
-    data_type: str = "exomes",
+    data_type: str = 'exomes',
     joint_included: bool = False,
     freq_comparison_included: bool = False,
     extra_suffix: str | None = None,
@@ -1271,19 +1269,19 @@ def prepare_vcf_header_dict(
     :param extra_description_text: Extra description text to add to INFO field.
     :return: Prepared VCF header dictionary.
     """
-    if data_type != "joint":
-        logger.info("Making FILTER dict for VCF...")
+    if data_type != 'joint':
+        logger.info('Making FILTER dict for VCF...')
         filter_dict = make_vcf_filter_dict(
             hl.eval(ht.filtering_model.snv_cutoff.min_score),
             hl.eval(ht.filtering_model.indel_cutoff.min_score),
             inbreeding_cutoff=hl.eval(ht.inbreeding_coeff_cutoff),
             variant_qc_filter=hl.eval(ht.filtering_model.filter_name),
         )
-        # subset = "" represents full dataset in VCF header construction, the
+        # subset = '' represents full dataset in VCF header construction, the
         # logic in gnomad_methods is built around this.
-        subset_list.extend(["", "joint"] if joint_included else [""])
+        subset_list.extend(['', 'joint'] if joint_included else [''])
 
-    logger.info("Making INFO dict for VCF...")
+    logger.info('Making INFO dict for VCF...')
     vcf_info_dict = populate_info_dict(
         info_fields=info_fields,
         bin_edges=bin_edges,
@@ -1296,22 +1294,22 @@ def prepare_vcf_header_dict(
         extra_description_text=extra_description_text,
     )
 
-    if data_type != "joint":
+    if data_type != 'joint':
         if validated_ht is not None:
             vcf_info_dict.update(
                 # NOTE: Check that the consequences in validated_ht.vep_csq_header are all in our dataset!
-                {"vep": {"Description": hl.eval(validated_ht.vep_csq_header)}},
+                {'vep': {'Description': hl.eval(validated_ht.vep_csq_header)}},
             )
 
     # Adjust keys to remove adj tags before exporting to VCF.
-    new_vcf_info_dict = {i.replace("_adj", ""): j for i, j in vcf_info_dict.items()}
+    new_vcf_info_dict = {i.replace('_adj', ''): j for i, j in vcf_info_dict.items()}
 
-    if data_type == "joint":
+    if data_type == 'joint':
         header_dict = new_vcf_info_dict
     else:
         header_dict = {
-            "info": new_vcf_info_dict,  # type: ignore[dict-item]
-            "filter": filter_dict,  # type: ignore[dict-item]
+            'info': new_vcf_info_dict,  # type: ignore[dict-item]
+            'filter': filter_dict,  # type: ignore[dict-item]
         }
 
     return header_dict
@@ -1321,7 +1319,7 @@ def create_label_groups(
     gen_ancs: List[str],
     sexes: List[str] = SEXES,
     all_groups: List[str] = GROUPS,
-    gen_anc_sex_groups: List[str] = ["adj"],
+    gen_anc_sex_groups: List[str] = ['adj'],
 ) -> List[Dict[str, List[str]]]:
     """
     Generate a list of label group dictionaries needed to populate info dictionary.
@@ -1348,11 +1346,11 @@ def create_label_groups(
 def populate_subset_info_dict(
     subset: str,
     description_text: str,
-    data_type: str = "exomes",
-    pops: Dict[str, str] = GEN_ANC_GROUPS["exomes"],  # type: ignore[assignment]
+    data_type: str = 'exomes',
+    pops: Dict[str, str] = GEN_ANC_GROUPS['exomes'],  # type: ignore[assignment]
     faf_pops: Dict[str, List[str]] = FAF_GEN_ANC_GROUPS,
     sexes: List[str] = SEXES,
-    label_delimiter: str = "_",
+    label_delimiter: str = '_',
     freq_comparison_included: bool = False,
 ) -> Dict[str, Dict[str, str]]:
     """
@@ -1380,7 +1378,7 @@ def populate_subset_info_dict(
     vcf_info_dict = {}
     # Remove unnecessary pop names from FAF_GEN_ANC_GROUPS dict depending on data type
     # and version of FAF_GEN_ANC_GROUPS.
-    # Hardcoding faf_pops_version to be "v1"
+    # Hardcoding faf_pops_version to be 'v1'
     faf_pops_version = 'v1'
     faf_pops_transformed = {pop: GEN_ANC_NAMES[pop] for pop in faf_pops[faf_pops_version]}
 
@@ -1388,7 +1386,7 @@ def populate_subset_info_dict(
     faf_label_groups = create_label_groups(
         gen_ancs=list(faf_pops_transformed.keys()),
         sexes=sexes,
-        all_groups=["adj"],
+        all_groups=['adj'],
     )
     for label_group in faf_label_groups:
         vcf_info_dict.update(
@@ -1464,7 +1462,7 @@ def populate_subset_info_dict(
 def make_label_combos(
     label_groups: Dict[str, List[str]],
     sort_order: List[str] = SORT_ORDER,
-    label_delimiter: str = "_",
+    label_delimiter: str = '_',
 ) -> List[str]:
     """
     Make combinations of all possible labels for a supplied dictionary of label groups.
@@ -1488,7 +1486,7 @@ def make_label_combos(
         anchor_val,
         make_label_combos(copy_label_groups, label_delimiter=label_delimiter),
     ):
-        combos.append(f"{x}{label_delimiter}{y}")
+        combos.append(f'{x}{label_delimiter}{y}')
     return combos
 
 
@@ -1510,38 +1508,38 @@ def make_combo_header_text(
     :param gen_anc_names: Dict with global genetic ancestry group names (keys) and genetic ancestry group descriptions (values).
     :return: String with automatically generated description text for a given set of combo fields.
     """
-    header_text = " " + preposition
+    header_text = ' ' + preposition
 
     if len(combo_dict) == 1:
-        if combo_dict["group"] == "adj":
-            return ""
+        if combo_dict['group'] == 'adj':
+            return ''
 
-    if "sex" in combo_dict:
-        header_text = header_text + " " + combo_dict["sex"]
+    if 'sex' in combo_dict:
+        header_text = header_text + ' ' + combo_dict['sex']
 
-    header_text = header_text + " samples"
+    header_text = header_text + ' samples'
 
-    if "subgrp" in combo_dict or "gen_anc" in combo_dict:
-        if "subgrp" in combo_dict:
-            header_text = header_text + f" in the {gen_anc_names[combo_dict['subgrp']]} genetic ancestry subgroup"
+    if 'subgrp' in combo_dict or 'gen_anc' in combo_dict:
+        if 'subgrp' in combo_dict:
+            header_text = header_text + f' in the {gen_anc_names[combo_dict["subgrp"]]} genetic ancestry subgroup'
 
         else:
-            header_text = header_text + f" in the {gen_anc_names[combo_dict['gen_anc']]} genetic ancestry group"
+            header_text = header_text + f' in the {gen_anc_names[combo_dict["gen_anc"]]} genetic ancestry group'
 
-    if "group" in combo_dict:
-        if combo_dict["group"] == "raw":
-            header_text = header_text + ", before removing low-confidence genotypes"
+    if 'group' in combo_dict:
+        if combo_dict["group"] == 'raw':
+            header_text = header_text + ', before removing low-confidence genotypes'
 
     return header_text
 
 
 def make_info_dict(
-    prefix: str = "",
-    suffix: str | None = "",
+    prefix: str = '',
+    suffix: str | None = '',
     prefix_before_metric: bool = True,
     gen_anc_names: Dict[str, str] = GEN_ANC_NAMES,
     label_groups: Dict[str, List[str]] | None = None,
-    label_delimiter: str = "_",
+    label_delimiter: str = '_',
     bin_edges: Dict[str, str] | None = None,
     faf: bool = False,
     grpmax: bool = False,
@@ -1550,7 +1548,7 @@ def make_info_dict(
     freq_ctt: bool = False,
     freq_cmh: bool = False,
     freq_stat_union: bool = False,
-    description_text: str = "",
+    description_text: str = '',
     age_hist_distribution: str | None = None,
     sort_order: List[str] = SORT_ORDER,
 ) -> Dict[str, Dict[str, str]]:
@@ -1585,58 +1583,58 @@ def make_info_dict(
     :param sort_order: List containing order to sort label group combinations. Default is SORT_ORDER.
     :return: Dictionary keyed by VCF INFO annotations, where values are dictionaries of Number and Description attributes.
     """
-    if prefix != "":
-        prefix = f"{prefix}{label_delimiter}"
-    if suffix != "":
-        suffix = f"{label_delimiter}{suffix}"
+    if prefix != '':
+        prefix = f'{prefix}{label_delimiter}'
+    if suffix != '':
+        suffix = f'{label_delimiter}{suffix}'
 
     info_dict = dict()
 
     if age_hist_distribution and bin_edges is not None:  # Add bin_edges check:
         age_hist_dict = {
-            f"{prefix}age_hist_het_bin_freq{suffix}": {
-                "Number": "A",
-                "Description": (
-                    f"Histogram of ages of heterozygous individuals{description_text};"
-                    f" bin edges are: {bin_edges['het']}; total number of individuals"
-                    f" of any genotype bin: {age_hist_distribution}"
+            f'{prefix}age_hist_het_bin_freq{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    f'Histogram of ages of heterozygous individuals{description_text};'
+                    f' bin edges are: {bin_edges["het"]}; total number of individuals'
+                    f' of any genotype bin: {age_hist_distribution}'
                 ),
             },
-            f"{prefix}age_hist_het_n_smaller{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Count of age values falling below lowest histogram bin edge for"
-                    f" heterozygous individuals{description_text}"
+            f'{prefix}age_hist_het_n_smaller{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Count of age values falling below lowest histogram bin edge for'
+                    f' heterozygous individuals{description_text}'
                 ),
             },
-            f"{prefix}age_hist_het_n_larger{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Count of age values falling above highest histogram bin edge for"
-                    f" heterozygous individuals{description_text}"
+            f'{prefix}age_hist_het_n_larger{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Count of age values falling above highest histogram bin edge for'
+                    f' heterozygous individuals{description_text}'
                 ),
             },
-            f"{prefix}age_hist_hom_bin_freq{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Histogram of ages of homozygous alternate"
-                    f" individuals{description_text}; bin edges are:"
-                    f" {bin_edges['hom']}; total number of individuals of any genotype"
-                    f" bin: {age_hist_distribution}"
+            f'{prefix}age_hist_hom_bin_freq{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Histogram of ages of homozygous alternate'
+                    f' individuals{description_text}; bin edges are:'
+                    f' {bin_edges["hom"]}; total number of individuals of any genotype'
+                    f' bin: {age_hist_distribution}'
                 ),
             },
-            f"{prefix}age_hist_hom_n_smaller{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Count of age values falling below lowest histogram bin edge for"
-                    f" homozygous alternate individuals{description_text}"
+            f'{prefix}age_hist_hom_n_smaller{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Count of age values falling below lowest histogram bin edge for'
+                    f' homozygous alternate individuals{description_text}'
                 ),
             },
-            f"{prefix}age_hist_hom_n_larger{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Count of age values falling above highest histogram bin edge for"
-                    f" homozygous alternate individuals{description_text}"
+            f'{prefix}age_hist_hom_n_larger{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Count of age values falling above highest histogram bin edge for'
+                    f' homozygous alternate individuals{description_text}'
                 ),
             },
         }
@@ -1644,32 +1642,32 @@ def make_info_dict(
 
     if grpmax:
         grpmax_dict = {
-            f"{prefix}grpmax{suffix}": {
-                "Number": "A",
-                "Description": ("Genetic ancestry group with the maximum allele" f" frequency{description_text}"),
+            f'{prefix}grpmax{suffix}': {
+                'Number': 'A',
+                'Description': ('Genetic ancestry group with the maximum allele' f' frequency{description_text}'),
             },
-            f"{prefix}AC{label_delimiter}grpmax{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Allele count in the genetic ancestry group with the maximum allele" f" frequency{description_text}"
+            f'{prefix}AC{label_delimiter}grpmax{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Allele count in the genetic ancestry group with the maximum allele' f' frequency{description_text}'
                 ),
             },
-            f"{prefix}AN{label_delimiter}grpmax{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Total number of alleles in the genetic ancestry group with the"
-                    f" maximum allele frequency{description_text}"
+            f'{prefix}AN{label_delimiter}grpmax{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Total number of alleles in the genetic ancestry group with the'
+                    f' maximum allele frequency{description_text}'
                 ),
             },
-            f"{prefix}AF{label_delimiter}grpmax{suffix}": {
-                "Number": "A",
-                "Description": ("Maximum allele frequency across genetic ancestry" f" groups{description_text}"),
+            f'{prefix}AF{label_delimiter}grpmax{suffix}': {
+                'Number': 'A',
+                'Description': ('Maximum allele frequency across genetic ancestry' f' groups{description_text}'),
             },
-            f"{prefix}nhomalt{label_delimiter}grpmax{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Count of homozygous individuals in the genetic ancestry group"
-                    f" with the maximum allele frequency{description_text}"
+            f'{prefix}nhomalt{label_delimiter}grpmax{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Count of homozygous individuals in the genetic ancestry group'
+                    f' with the maximum allele frequency{description_text}'
                 ),
             },
         }
@@ -1677,32 +1675,32 @@ def make_info_dict(
 
     if fafmax:
         fafmax_dict = {
-            f"{prefix}fafmax{label_delimiter}faf95{label_delimiter}max{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Maximum filtering allele frequency (using Poisson 95% CI)"
-                    f" across genetic ancestry groups{description_text}"
+            f'{prefix}fafmax{label_delimiter}faf95{label_delimiter}max{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Maximum filtering allele frequency (using Poisson 95% CI)'
+                    f' across genetic ancestry groups{description_text}'
                 ),
             },
-            f"{prefix}fafmax{label_delimiter}faf95{label_delimiter}max{label_delimiter}gen{label_delimiter}anc{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Genetic ancestry group with maximum filtering allele"
-                    f" frequency (using Poisson 95% CI){description_text}"
+            f'{prefix}fafmax{label_delimiter}faf95{label_delimiter}max{label_delimiter}gen{label_delimiter}anc{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Genetic ancestry group with maximum filtering allele'
+                    f' frequency (using Poisson 95% CI){description_text}'
                 ),
             },
-            f"{prefix}fafmax{label_delimiter}faf99{label_delimiter}max{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Maximum filtering allele frequency (using Poisson 99% CI)"
-                    f" across genetic ancestry groups{description_text}"
+            f'{prefix}fafmax{label_delimiter}faf99{label_delimiter}max{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Maximum filtering allele frequency (using Poisson 99% CI)'
+                    f' across genetic ancestry groups{description_text}'
                 ),
             },
-            f"{prefix}fafmax{label_delimiter}faf99{label_delimiter}max{label_delimiter}gen{label_delimiter}anc{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Genetic ancestry group with maximum filtering allele"
-                    f" frequency (using Poisson 99% CI){description_text}"
+            f'{prefix}fafmax{label_delimiter}faf99{label_delimiter}max{label_delimiter}gen{label_delimiter}anc{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Genetic ancestry group with maximum filtering allele'
+                    f' frequency (using Poisson 99% CI){description_text}'
                 ),
             },
         }
@@ -1710,7 +1708,7 @@ def make_info_dict(
         info_dict.update(fafmax_dict)
 
     if callstats or faf or freq_ctt:
-        assert label_groups is not None, "label_groups must be provided if callstats, faf, or freq_ctt is True"
+        assert label_groups is not None, 'label_groups must be provided if callstats, faf, or freq_ctt is True'
         group_types = sorted(label_groups.keys(), key=lambda x: sort_order.index(x))
         combos = make_label_combos(label_groups, label_delimiter=label_delimiter)
 
@@ -1718,113 +1716,113 @@ def make_info_dict(
             combo_fields = combo.split(label_delimiter)
             group_dict = dict(zip(group_types, combo_fields))
 
-            for_combo = make_combo_header_text("for", group_dict, gen_anc_names)
-            in_combo = make_combo_header_text("in", group_dict, gen_anc_names)
+            for_combo = make_combo_header_text('for', group_dict, gen_anc_names)
+            in_combo = make_combo_header_text('in', group_dict, gen_anc_names)
 
-            metrics = ["AC", "AN", "AF", "nhomalt", "faf95", "faf99"]
+            metrics = ['AC', 'AN', 'AF', 'nhomalt', 'faf95', 'faf99']
             if freq_ctt:
-                metrics += ["CTT_odds_ratio", "CTT_p_value"]
+                metrics += ['CTT_odds_ratio', 'CTT_p_value']
             if prefix_before_metric:
-                metric_label_dict = {metric: f"{prefix}{metric}{label_delimiter}{combo}{suffix}" for metric in metrics}
+                metric_label_dict = {metric: f'{prefix}{metric}{label_delimiter}{combo}{suffix}' for metric in metrics}
             else:
-                metric_label_dict = {metric: f"{metric}{label_delimiter}{prefix}{combo}{suffix}" for metric in metrics}
+                metric_label_dict = {metric: f'{metric}{label_delimiter}{prefix}{combo}{suffix}' for metric in metrics}
 
             if callstats:
                 combo_dict = {
-                    metric_label_dict["AC"]: {
-                        "Number": "A",
-                        "Description": (f"Alternate allele count{for_combo}{description_text}"),
+                    metric_label_dict['AC']: {
+                        'Number': 'A',
+                        'Description': (f'Alternate allele count{for_combo}{description_text}'),
                     },
-                    metric_label_dict["AN"]: {
-                        "Number": "1",
-                        "Description": (f"Total number of alleles{in_combo}{description_text}"),
+                    metric_label_dict['AN']: {
+                        'Number': '1',
+                        'Description': (f'Total number of alleles{in_combo}{description_text}'),
                     },
-                    metric_label_dict["AF"]: {
-                        "Number": "A",
-                        "Description": (f"Alternate allele frequency{in_combo}{description_text}"),
+                    metric_label_dict['AF']: {
+                        'Number': 'A',
+                        'Description': (f'Alternate allele frequency{in_combo}{description_text}'),
                     },
-                    metric_label_dict["nhomalt"]: {
-                        "Number": "A",
-                        "Description": ("Count of homozygous" f" individuals{in_combo}{description_text}"),
+                    metric_label_dict['nhomalt']: {
+                        'Number': 'A',
+                        'Description': ('Count of homozygous' f' individuals{in_combo}{description_text}'),
                     },
                 }
             elif faf:
-                if ("XX" in combo_fields) | ("XY" in combo_fields):
-                    faf_description_text = description_text + " in non-PAR regions of sex chromosomes only"
+                if ('XX' in combo_fields) | ('XY' in combo_fields):
+                    faf_description_text = description_text + ' in non-PAR regions of sex chromosomes only'
                 else:
                     faf_description_text = description_text
                 combo_dict = {
-                    metric_label_dict["faf95"]: {
-                        "Number": "A",
-                        "Description": (
-                            "Filtering allele frequency (using Poisson 95%" f" CI){for_combo}{faf_description_text}"
+                    metric_label_dict['faf95']: {
+                        'Number': 'A',
+                        'Description': (
+                            'Filtering allele frequency (using Poisson 95%' f' CI){for_combo}{faf_description_text}'
                         ),
                     },
-                    metric_label_dict["faf99"]: {
-                        "Number": "A",
-                        "Description": (
-                            "Filtering allele frequency (using Poisson 99%" f" CI){for_combo}{faf_description_text}"
+                    metric_label_dict['faf99']: {
+                        'Number': 'A',
+                        'Description': (
+                            'Filtering allele frequency (using Poisson 99%' f' CI){for_combo}{faf_description_text}'
                         ),
                     },
                 }
             else:
                 combo_dict = {
-                    metric_label_dict["CTT_odds_ratio"]: {
-                        "Number": "A",
-                        "Description": (
+                    metric_label_dict['CTT_odds_ratio']: {
+                        'Number': 'A',
+                        'Description': (
                             "Odds ratio from from Hail's contingency_table_test with"
-                            " `min_cell_count=100` comparing allele frequencies"
-                            f" between exomes and genomes{for_combo}{description_text}"
+                            ' `min_cell_count=100` comparing allele frequencies'
+                            f' between exomes and genomes{for_combo}{description_text}'
                         ),
                     },
-                    metric_label_dict["CTT_p_value"]: {
-                        "Number": "A",
-                        "Description": (
+                    metric_label_dict['CTT_p_value']: {
+                        'Number': 'A',
+                        'Description': (
                             "P-value from Hail's contingency_table_test with"
-                            " `min_cell_count=100` comparing allele frequencies"
-                            f" between exomes and genomes{for_combo}{description_text}"
+                            ' `min_cell_count=100` comparing allele frequencies'
+                            f' between exomes and genomes{for_combo}{description_text}'
                         ),
                     },
                 }
             info_dict.update(combo_dict)
     if freq_cmh:
         cmh_dict = {
-            f"{prefix}CMH_chisq{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Chi-squared test statistic from the Cochran-Mantel-Haenszel test"
-                    " comparing allele frequencies between exomes and genomes"
-                    f" stratified by genetic ancestry group{description_text}"
+            f'{prefix}CMH_chisq{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Chi-squared test statistic from the Cochran-Mantel-Haenszel test'
+                    ' comparing allele frequencies between exomes and genomes'
+                    f' stratified by genetic ancestry group{description_text}'
                 ),
             },
-            f"{prefix}CMH_p_value{suffix}": {
-                "Number": "A",
-                "Description": (
-                    "Odds ratio from Cochran-Mantel-Haenszel test comparing allele"
-                    " frequencies between exomes and genomes stratified by genetic"
-                    f" ancestry group{description_text}"
+            f'{prefix}CMH_p_value{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    'Odds ratio from Cochran-Mantel-Haenszel test comparing allele'
+                    ' frequencies between exomes and genomes stratified by genetic'
+                    f' ancestry group{description_text}'
                 ),
             },
         }
         info_dict.update(cmh_dict)
     if freq_stat_union:
         freq_stat_union_dict = {
-            f"{prefix}stat_union_p_value{suffix}": {
-                "Number": "A",
-                "Description": (
-                    f"p-value from the contingency table or Cochran-Mantel-Haenszel tests{description_text}"
+            f'{prefix}stat_union_p_value{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    f'p-value from the contingency table or Cochran-Mantel-Haenszel tests{description_text}'
                 ),
             },
-            f"{prefix}stat_union_test_name{suffix}": {
-                "Number": "A",
-                "Description": (
-                    f"Name of the test, either contingency_table_test or cochran_mantel_haenszel_test, used to compare allele frequencies between exomes and genomes{description_text}"
+            f'{prefix}stat_union_test_name{suffix}': {
+                'Number': 'A',
+                'Description': (
+                    f'Name of the test, either contingency_table_test or cochran_mantel_haenszel_test, used to compare allele frequencies between exomes and genomes{description_text}'
                 ),
             },
-            f"{prefix}stat_union_gen_ancs{suffix}": {
-                "Number": ".",
-                "Description": (
-                    f"List of genetic ancestry groups included in the test. If stat_union_test_name is contingency_table_test, the length of gen_ancs is one and if stat_union_test_name is 'cochran_mantel_haenszel_test', the length of 'gen_ancs' is greater than one{description_text}"
+            f'{prefix}stat_union_gen_ancs{suffix}': {
+                'Number': '.',
+                'Description': (
+                    f'List of genetic ancestry groups included in the test. If stat_union_test_name is contingency_table_test, the length of gen_ancs is one and if stat_union_test_name is "cochran_mantel_haenszel_test", the length of "gen_ancs" is greater than one{description_text}'
                 ),
             },
         }
@@ -1837,9 +1835,9 @@ def make_hist_bin_edges_expr(
     ht: hl.Table,
     hists: List[str] = HISTS,
     ann_with_hists: Optional[str] = None,
-    prefix: str = "",
-    label_delimiter: str = "_",
-    data_type: str = "exomes",
+    prefix: str = '',
+    label_delimiter: str = '_',
+    data_type: str = 'exomes',
     include_age_hists: bool = True,
     for_joint: bool = False,
 ) -> Dict[str, str]:
@@ -1867,15 +1865,15 @@ def make_hist_bin_edges_expr(
     # separate top-level structs not under `histograms`
     # NOTE: I think `ann_with_hists` is redundant for our exomes, genomes, and joint tables, since `histograms` is a top-level struct
     if include_age_hists:
-        for call_type in ["het", "hom"]:
+        for call_type in ['het', 'hom']:
             if ann_with_hists:
                 bin_edges = (
                     ht.filter(
                         hl.is_defined(
-                            ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                            ht[ann_with_hists].histograms.age_hists[f'age_hist_{call_type}'].bin_edges,
                         ),
                     )[ann_with_hists]
-                    .histograms.age_hists[f"age_hist_{call_type}"]
+                    .histograms.age_hists[f'age_hist_{call_type}']
                     .bin_edges.take(1)[0]
                 )
             else:
@@ -1883,30 +1881,30 @@ def make_hist_bin_edges_expr(
                     bin_edges = (
                         ht.filter(
                             hl.is_defined(
-                                ht.histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                                ht.histograms.age_hists[f'age_hist_{call_type}'].bin_edges,
                             ),
                         )
-                        .histograms.age_hists[f"age_hist_{call_type}"]
+                        .histograms.age_hists[f'age_hist_{call_type}']
                         .bin_edges.take(1)[0]
                     )
                 else:
                     bin_edges = ht.filter(
                         hl.is_defined(
-                            ht[f"age_hist_{call_type}"].bin_edges,
+                            ht[f'age_hist_{call_type}'].bin_edges,
                         ),
                     )[
-                        f"age_hist_{call_type}"
+                        f'age_hist_{call_type}'
                     ].bin_edges.take(1)[0]
 
             if bin_edges:
-                edges_dict[f"{prefix}{call_type}"] = "|".join(
-                    map(lambda x: f"{x:.1f}", bin_edges),
+                edges_dict[f'{prefix}{call_type}'] = '|'.join(
+                    map(lambda x: f'{x:.1f}', bin_edges),
                 )
 
     for hist in hists:
         # Parse hists calculated on both raw and adj-filtered data
-        for hist_type in [f"{prefix}raw_qual_hists", f"{prefix}qual_hists"]:
-            hist_name = hist if "raw" not in hist_type else f"{prefix}{hist}_raw"
+        for hist_type in [f'{prefix}raw_qual_hists', f'{prefix}qual_hists']:
+            hist_name = hist if 'raw' not in hist_type else f'{prefix}{hist}_raw'
 
             # This if-statement isn't going to matter because neither of our exomes
             # or genomes have histograms stored under ht.exomes/genomes/joint
@@ -1928,9 +1926,9 @@ def make_hist_bin_edges_expr(
                     .bin_edges.take(1)[0]
                 )
             if bin_edges:
-                edges_dict[hist_name] = "|".join(
+                edges_dict[hist_name] = '|'.join(
                     map(
-                        lambda x: f"{x:.2f}" if "ab" in hist else str(int(x)),
+                        lambda x: f'{x:.2f}' if 'ab' in hist else str(int(x)),
                         bin_edges,
                     ),
                 )
@@ -1942,11 +1940,11 @@ def make_hist_dict(
     bin_edges: Dict[str, str],
     adj: bool,
     hist_metric_list: List[str] = HISTS,
-    label_delimiter: str = "_",
+    label_delimiter: str = '_',
     drop_n_smaller_larger: bool = False,
-    prefix: str = "",
-    suffix: str = "",
-    description_text: str = "",
+    prefix: str = '',
+    suffix: str = '',
+    description_text: str = '',
 ) -> Dict[str, Dict[str, str]]:
     """
     Generate dictionary of Number and Description attributes to be used in the VCF header, specifically for histogram annotations.
@@ -1961,31 +1959,31 @@ def make_hist_dict(
     :param description_text: Optional text to append to the end of descriptions. Needs to start with a space if specified.
     :return: Dictionary keyed by VCF INFO annotations, where values are Dictionaries of Number and Description attributes.
     """
-    if prefix != "":
-        prefix = f"{prefix}{label_delimiter}"
-    if suffix != "":
-        suffix = f"{label_delimiter}{suffix}"
+    if prefix != '':
+        prefix = f'{prefix}{label_delimiter}'
+    if suffix != '':
+        suffix = f'{label_delimiter}{suffix}'
 
     header_hist_dict = {}
     for hist in hist_metric_list:
         # Get hists for both raw and adj data
-        # Add "_raw" to quality histograms calculated on raw data
+        # Add '_raw' to quality histograms calculated on raw data
         if not adj:
-            hist = f"{hist}_raw"
+            hist = f'{hist}_raw'
 
         edges = bin_edges[hist]
         hist_fields = hist.split(label_delimiter)
         hist_text = hist_fields[0].upper()
 
-        if hist_fields[2] == "alt":
-            hist_text = hist_text + " in heterozygous individuals"
+        if hist_fields[2] == 'alt':
+            hist_text = hist_text + ' in heterozygous individuals'
         if adj:
-            hist_text = hist_text + " calculated on high quality genotypes"
+            hist_text = hist_text + ' calculated on high quality genotypes'
 
         hist_dict = {
-            f"{prefix}{hist}_bin_freq{suffix}": {
-                "Number": "A",
-                "Description": (f"Histogram for {hist_text}{description_text}; bin edges are:" f" {edges}"),
+            f'{prefix}{hist}_bin_freq{suffix}': {
+                'Number': 'A',
+                'Description': (f'Histogram for {hist_text}{description_text}; bin edges are:' f' {edges}'),
             },
         }
         # These annotations are frequently zero and are dropped from gnomad
@@ -1993,31 +1991,31 @@ def make_hist_dict(
         if not drop_n_smaller_larger:
             hist_dict.update(
                 {
-                    f"{prefix}{hist}_n_smaller{suffix}": {
-                        "Number": "A",
-                        "Description": (
-                            f"Count of {hist_fields[0].upper()} values falling below"
-                            f" lowest histogram bin edge {hist_text}{description_text}"
+                    f'{prefix}{hist}_n_smaller{suffix}': {
+                        'Number': 'A',
+                        'Description': (
+                            f'Count of {hist_fields[0].upper()} values falling below'
+                            f' lowest histogram bin edge {hist_text}{description_text}'
                         ),
                     },
-                    f"{prefix}{hist}_n_larger{suffix}": {
-                        "Number": "A",
-                        "Description": (
-                            f"Count of {hist_fields[0].upper()} values falling above"
-                            f" highest histogram bin edge {hist_text}{description_text}"
+                    f'{prefix}{hist}_n_larger{suffix}': {
+                        'Number': 'A',
+                        'Description': (
+                            f'Count of {hist_fields[0].upper()} values falling above'
+                            f' highest histogram bin edge {hist_text}{description_text}'
                         ),
                     },
                 },
             )
         # Only add n_larger for dp qual histograms.
-        if "dp" in hist:
+        if 'dp' in hist:
             hist_dict.update(
                 {
-                    f"{prefix}{hist}_n_larger{suffix}": {
-                        "Number": "A",
-                        "Description": (
-                            f"Count of {hist_fields[0].upper()} values falling above"
-                            f" highest histogram bin edge {hist_text}{description_text}"
+                    f'{prefix}{hist}_n_larger{suffix}': {
+                        'Number': 'A',
+                        'Description': (
+                            f'Count of {hist_fields[0].upper()} values falling above'
+                            f' highest histogram bin edge {hist_text}{description_text}'
                         ),
                     },
                 },
@@ -2048,15 +2046,15 @@ def add_as_info_dict(
             site_field = field[3:]
 
             # Get site description from info dictionary and make first letter lower case
-            first_letter = info_dict[site_field]["Description"][0].lower()
-            rest_of_description = info_dict[site_field]["Description"][1:]
+            first_letter = info_dict[site_field]['Description'][0].lower()
+            rest_of_description = info_dict[site_field]['Description'][1:]
 
             as_dict[field] = {}
-            as_dict[field]["Number"] = "A"
-            as_dict[field]["Description"] = f"Allele-specific {first_letter}{rest_of_description}"
+            as_dict[field]['Number'] = 'A'
+            as_dict[field]['Description'] = f'Allele-specific {first_letter}{rest_of_description}'
 
         except KeyError:
-            logger.warning("%s is not present in input info dictionary!", field)
+            logger.warning(f'{field} is not present in input info dictionary!')
 
     return as_dict
 
@@ -2066,14 +2064,14 @@ def populate_info_dict(
     bin_edges: Dict[str, str],
     age_hist_distribution: str | None = None,
     info_dict: Dict[str, Dict[str, str]] = INFO_DICT,
-    subset_list: List[str] = SUBSETS["exomes"],
-    pops: Dict[str, str] = GEN_ANC_GROUPS["exomes"],  # type: ignore[assignment]
+    subset_list: List[str] = SUBSETS['exomes'],
+    pops: Dict[str, str] = GEN_ANC_GROUPS['exomes'],  # type: ignore[assignment]
     faf_pops: Dict[str, List[str]] = FAF_GEN_ANC_GROUPS,
     sexes: List[str] = SEXES,
     in_silico_dict: Dict[str, Dict[str, str]] | None = IN_SILICO_ANNOTATIONS_INFO_DICT,
     vrs_fields_dict: Dict[str, Dict[str, str]] | None = VRS_FIELDS_DICT,
-    label_delimiter: str = "_",
-    data_type: str = "exomes",
+    label_delimiter: str = '_',
+    data_type: str = 'exomes',
     freq_comparison_included: bool = False,
     extra_suffix: str | None = None,
     extra_description_text: str | None = None,
@@ -2116,9 +2114,9 @@ def populate_info_dict(
     :return: Updated INFO dictionary for VCF export.
     """
     vcf_info_dict = {}
-    if data_type == "joint":
-        # vcf_info_dict stays empty if data_type is "joint" and subset is not "joint"
-        if "joint" in subset_list:
+    if data_type == 'joint':
+        # vcf_info_dict stays empty if data_type is 'joint' and subset is not 'joint'
+        if 'joint' in subset_list:
             vcf_info_dict.update(JOINT_REGION_FLAGS_INFO_DICT)
     else:
         # Get existing info fields from predefined info_dict, e.g. `FS`,
@@ -2132,10 +2130,10 @@ def populate_info_dict(
 
     for subset in subset_list:
         subset_pops = deepcopy(pops)
-        if data_type == "joint":
-            description_text = f" in {subset} dataset" if subset != "" else ""
+        if data_type == 'joint':
+            description_text = f' in {subset} dataset' if subset != '' else ''
         else:
-            description_text = "" if subset == "" else f" in {subset} subset"
+            description_text = '' if subset == '' else f' in {subset} subset'
 
         vcf_info_dict.update(
             populate_subset_info_dict(
@@ -2151,16 +2149,16 @@ def populate_info_dict(
         )
 
     if age_hist_distribution:
-        age_hist_distribution = "|".join(str(x) for x in age_hist_distribution)
+        age_hist_distribution = '|'.join(str(x) for x in age_hist_distribution)
 
     # Add age histogram data to info dict.
     vcf_info_dict.update(
         make_info_dict(
-            suffix=extra_suffix if extra_suffix else "",
+            suffix=extra_suffix if extra_suffix else '',
             label_delimiter=label_delimiter,
             bin_edges=bin_edges,
             age_hist_distribution=age_hist_distribution,
-            description_text=extra_description_text if extra_description_text else "",
+            description_text=extra_description_text if extra_description_text else '',
         ),
     )
 
@@ -2170,11 +2168,11 @@ def populate_info_dict(
             bin_edges,
             adj=True,
             drop_n_smaller_larger=True,
-            suffix=extra_suffix if extra_suffix else "",
-            description_text=extra_description_text if extra_description_text else "",
+            suffix=extra_suffix if extra_suffix else '',
+            description_text=extra_description_text if extra_description_text else '',
         ),
     )
-    if data_type == "joint":
+    if data_type == 'joint':
         vcf_info_dict.update(JOINT_FILTERS_INFO_DICT)
         return vcf_info_dict
 
@@ -2218,12 +2216,12 @@ def run_browser_vcf_data_download(
         for seq_type in ['exome', 'genome']
     }
 
-    for_joint = data_type == "joint"
+    for_joint = data_type == 'joint'
 
     validate_hts = {}
 
-    if data_type == "joint":
-        iter_data_types = ["exomes", "genomes", "joint"]
+    if data_type == 'joint':
+        iter_data_types = ['exomes', 'genomes', 'joint']
     else:
         iter_data_types = [data_type]
 
@@ -2247,39 +2245,39 @@ def run_browser_vcf_data_download(
         else:
             dt_ht = ht
 
-        logger.info("Preparing %s HT for validity checks and export...", dt)
+        logger.info(f'Preparing {dt} HT for validity checks and export...')
         # For joint validation: annotate filters from original exomes/genomes tables since
         # joint HT lacks filters after subsetting by select_type_from_joint_ht()
         dt_ht, rename_dict = prepare_ht_for_validation(
             dt_ht,
             data_type=dt,
             joint_included=joint_included,
-            freq_comparison_included=(dt == "joint"),
+            freq_comparison_included=(dt == 'joint'),
             for_joint_validation=for_joint,
             score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
         )
-        if data_type != "joint":
+        if data_type != 'joint':
             site_gt_check_expr = {
-                "monoallelic": dt_ht.info.monoallelic,
+                'monoallelic': dt_ht.info.monoallelic,
             }
         if for_joint:
             ordered_rename_dict = {key: rename_dict.get(key, key) for key in dt_ht.info.keys()}
             dt_ht = dt_ht.annotate(info=dt_ht.info.rename(ordered_rename_dict))
-            if dt != "joint":
+            if dt != 'joint':
                 dt_ht = dt_ht.annotate(
-                    info=dt_ht.info.annotate(**{f"{dt}_filters": dt_ht.filters}),
+                    info=dt_ht.info.annotate(**{f'{dt}_filters': dt_ht.filters}),
                 )
-                dt_ht = dt_ht.select("info")
+                dt_ht = dt_ht.select('info')
 
             dt_ht = dt_ht.select_globals(
-                **{f"{dt}_{f}": dt_ht[f] for f in dt_ht.globals},
+                **{f'{dt}_{f}': dt_ht[f] for f in dt_ht.globals},
             )
         validate_hts[dt] = dt_ht
 
     ht = validate_hts[data_type]
     if for_joint:
         in_joint_ht = set(ht.info.keys())
-        for dt in ["exomes", "genomes"]:
+        for dt in ['exomes', 'genomes']:
             info_expr = validate_hts[dt][ht.key].info
             info_expr = info_expr.select(
                 *[f for f in info_expr if f not in in_joint_ht],
@@ -2299,8 +2297,8 @@ def run_browser_vcf_data_download(
     if data_type != 'joint':
         ht = ht.annotate_globals(
             filtering_model=hl.struct(
-                filter_name="AS_VQSR",
-                score_name="AS_VQSLOD",
+                filter_name='AS_VQSR',
+                score_name='AS_VQSLOD',
                 snv_cutoff=hl.struct(
                     bin=score_cutoffs[data_type[:-1]]['snv']['min_score'],
                     min_score=score_cutoffs[data_type[:-1]]['snv']['min_score'],
@@ -2310,19 +2308,19 @@ def run_browser_vcf_data_download(
                     min_score=score_cutoffs[data_type[:-1]]['indel']['min_score'],
                 ),
                 snv_training_variables=[
-                    "AS_QD",
-                    "AS_MQRankSum",
-                    "AS_ReadPosRankSum",
-                    "AS_FS",
-                    "AS_SOR",
-                    "AS_MQ",
+                    'AS_QD',
+                    'AS_MQRankSum',
+                    'AS_ReadPosRankSum',
+                    'AS_FS',
+                    'AS_SOR',
+                    'AS_MQ',
                 ],
                 indel_training_variables=[
-                    "AS_QD",
-                    "AS_MQRankSum",
-                    "AS_ReadPosRankSum",
-                    "AS_FS",
-                    "AS_SOR",
+                    'AS_QD',
+                    'AS_MQRankSum',
+                    'AS_ReadPosRankSum',
+                    'AS_FS',
+                    'AS_SOR',
                 ],
             ),
         )
@@ -2335,7 +2333,7 @@ def run_browser_vcf_data_download(
 
     if not for_joint:
         # v4 Genomes drops subsets from VCF
-        subsets = SUBSETS["exomes"] if data_type == "exomes" else []
+        subsets = SUBSETS['exomes'] if data_type == 'exomes' else []
         header_dict = prepare_vcf_header_dict(
             ht,
             validated_ht=validated_ht,
@@ -2352,8 +2350,8 @@ def run_browser_vcf_data_download(
             joint_included=joint_included,
         )
     else:
-        header_dict = {"filter": make_vcf_filter_dict(joint=True), "info": {}}  # type: ignore[dict-item]
-        for dt in ["exomes", "genomes", "joint"]:
+        header_dict = {'filter': make_vcf_filter_dict(joint=True), 'info': {}}  # type: ignore[dict-item]
+        for dt in ['exomes', 'genomes', 'joint']:
             dt_ht = select_type_from_joint_ht(ht, dt)
             temp_header_dict = prepare_vcf_header_dict(
                 dt_ht,
@@ -2368,15 +2366,15 @@ def run_browser_vcf_data_download(
                 age_hist_distribution=hl.eval(dt_ht.age_distribution.bin_freq),
                 subset_list=[dt],
                 pops=GEN_ANC_GROUPS[dt],  # type: ignore[arg-type]
-                data_type="joint",
+                data_type='joint',
                 joint_included=joint_included,
-                freq_comparison_included=(dt == "joint"),
+                freq_comparison_included=(dt == 'joint'),
                 extra_suffix=dt,
-                extra_description_text=f" in {dt} dataset",
+                extra_description_text=f' in {dt} dataset',
             )
-            header_dict["info"].update(temp_header_dict)  # type: ignore[arg-type]
+            header_dict['info'].update(temp_header_dict)  # type: ignore[arg-type]
 
-    with hl.hadoop_open(output_path(f'{contig}_{data_type}_header_dict.pkl', category='tmp'), "wb") as p:
+    with hl.hadoop_open(output_path(f'{contig}_{data_type}_header_dict.pkl', category='tmp'), 'wb') as p:
         pickle.dump(header_dict, p, protocol=pickle.HIGHEST_PROTOCOL)
 
     ht = validated_ht
@@ -2384,13 +2382,13 @@ def run_browser_vcf_data_download(
     if contig:
         ht = hl.filter_intervals(
             ht,
-            [hl.parse_locus_interval(contig, reference_genome="GRCh38")],
+            [hl.parse_locus_interval(contig, reference_genome='GRCh38')],
         )
 
     ht, new_row_annots = format_validated_ht_for_export(ht, data_type=data_type)
 
-    ordered_vcf_info_dict = {f: header_dict["info"][f] for f in list(ht.info) if f in header_dict["info"]}
-    header_dict.update({"info": ordered_vcf_info_dict})
+    ordered_vcf_info_dict = {f: header_dict['info'][f] for f in list(ht.info) if f in header_dict['info']}
+    header_dict.update({'info': ordered_vcf_info_dict})
 
     hl.export_vcf(
         ht,
