@@ -2184,7 +2184,6 @@ def populate_info_dict(
 def run_browser_vcf_data_download(
     ht_path: hl.Table,
     data_type: str,
-    header_dict_pkl_path: str,
     contig: str | None,
     vcf_outpath: str,
     vqsr_ht_path: str | None = None,
