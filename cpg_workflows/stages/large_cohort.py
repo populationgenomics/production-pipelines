@@ -1044,7 +1044,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                     data_type,
                     chrom,
                     str(vcf_outpath),
-                    str(outputs[chrom.replace('_vcf', '_tbi')]),
+                    str(outputs[chrom]),
                     str(vqsr_ht_path) if vqsr_ht_path else None,
                     str(exome_freq_ht_path) if exome_freq_ht_path else None,
                     str(genome_freq_ht_path) if genome_freq_ht_path else None,
