@@ -1005,9 +1005,52 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         seq_type = config_retrieve(['workflow', 'sequencing_type'], default='exome')
         chroms = [f'chr{i}' for i in range(1, 23)]
         return {
-            **{f'{chrom}_vcf': prefix / f'{seq_type}_{chrom}_variants.vcf.bgz' for chrom in chroms},
-            **{f'{chrom}_tbi': prefix / f'{seq_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
+            **{chrom: prefix / f'{seq_type}_{chrom}_variants.vcf.bgz' for chrom in chroms},
+            **{chrom: prefix / f'{seq_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        pass
+        from cpg_workflows.large_cohort.scripts import browser_vcf_release
+
+        data_type: str = config_retrieve(['large_cohort', 'data_download', 'data_type'], default='exomes')
+
+        ht_to_export_path: str = config_retrieve(['large_cohort', 'data_download', 'ht_to_export'], default=None)
+
+        exome_freq_ht_path = config_retrieve(['large_cohort', 'data_download', 'frequencies_exome'], default=None)
+        genome_freq_ht_path = config_retrieve(['large_cohort', 'data_download', 'frequencies_genome'], default=None)
+        vqsr_ht_path = config_retrieve(['large_cohort', 'data_download', 'loadvqsr'], default=None)
+
+        if data_type == 'joint':
+            assert (
+                exome_freq_ht_path is not None and genome_freq_ht_path is not None
+            ), 'Both exome and genome frequency HT paths must be provided for joint data download.'
+
+        if data_type == 'exomes' or data_type == 'genomes':
+            assert vqsr_ht_path is not None, 'VQSR HT path must be provided for exome or genome data download.'
+
+        jobs = []
+        outputs = self.expected_outputs(cohort)
+        for chrom, vcf_outpath in outputs.items():
+            j = get_batch().new_job(
+                f'PrepareBrowserVcfDataDownload_{chrom}_{data_type}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(image_path('cpg_workflows'))
+            j.command(
+                query_command(
+                    browser_vcf_release,
+                    browser_vcf_release.run_browser_vcf_data_download.__name__,
+                    ht_to_export_path,
+                    data_type,
+                    chrom,
+                    str(vcf_outpath),
+                    str(outputs[chrom.replace('_vcf', '_tbi')]),
+                    str(vqsr_ht_path) if vqsr_ht_path else None,
+                    str(exome_freq_ht_path) if exome_freq_ht_path else None,
+                    str(genome_freq_ht_path) if genome_freq_ht_path else None,
+                    setup_gcp=True,
+                ),
+            )
+            jobs.append(j)
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

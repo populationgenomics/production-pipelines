@@ -6,10 +6,12 @@ from copy import deepcopy
 from pprint import pprint
 from typing import Dict, List, Optional, Set, Tuple
 
+from matplotlib import category
+
 import hail as hl
 
 from cpg_utils.config import config_retrieve
-from cpg_utils.hail_batch import genome_build
+from cpg_utils.hail_batch import genome_build, output_path
 from cpg_workflows.large_cohort.browser_prepare import _freq_index_key, process_score_cutoffs
 from cpg_workflows.utils import can_reuse
 from gnomad.utils.filtering import add_filters_expr
@@ -2200,10 +2202,9 @@ def populate_info_dict(
     return vcf_info_dict
 
 
-def main(
+def run_browser_vcf_data_download(
     ht_path: hl.Table,
     data_type: str,
-    validated_ht_outpath: str,
     header_dict_pkl_path: str,
     contig: str | None,
     vcf_outpath: str,
@@ -2310,13 +2311,12 @@ def main(
 
     ht = get_joint_filters(ht)
 
-    logger.info(f'Checkpointing validated_ht to {validated_ht_outpath}...')
-    validated_ht = ht.checkpoint(validated_ht_outpath, overwrite=True)
+    logger.info(f'Checkpointing validated_ht to {output_path(f"{contig}_{data_type}_validated.ht", category="tmp")}...')
+    validated_ht = ht.checkpoint(output_path(f"{contig}_{data_type}_validated.ht", category="tmp"), overwrite=True)
 
     ht = hl.read_table(ht_path)
     # Our VQSR features match gnomAD's filtering_model structure, but cutoff values
-    # aren't available in frequency tables - they're added during browser prepare. So
-    # adding them here.
+    # aren't available in frequency tables - they're added during browser prepare. So adding them here.
     # Only applicable to genomes and exomes, not joint
     if data_type != 'joint':
         ht = ht.annotate_globals(
@@ -2398,7 +2398,7 @@ def main(
             )
             header_dict["info"].update(temp_header_dict)  # type: ignore[arg-type]
 
-    with hl.hadoop_open(header_dict_pkl_path, "wb") as p:
+    with hl.hadoop_open(output_path(f'{contig}_{data_type}_header_dict.pkl', category='tmp'), "wb") as p:
         pickle.dump(header_dict, p, protocol=pickle.HIGHEST_PROTOCOL)
 
     ht = validated_ht
