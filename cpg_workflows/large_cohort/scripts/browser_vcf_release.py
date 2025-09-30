@@ -1863,50 +1863,29 @@ def make_hist_bin_edges_expr(
 
     edges_dict = {}
 
-    # `age_hists` is not a struct in our exomes and genomes tables. `age_hist_het` and `age_hist_hom` are
+    # NOTE: `age_hists` is not a struct in our exomes and genomes tables. `age_hist_het` and `age_hist_hom` are
     # separate top-level structs not under `histograms`
     # NOTE: I think `ann_with_hists` is redundant for our exomes, genomes, and joint tables, since `histograms` is a top-level struct
-    print(f'for_joint: {for_joint}')
-    hist_idx = ht if not for_joint else ht.histograms.age_hists
-
-    if for_joint:
-        if include_age_hists:
-            for call_type in ["het", "hom"]:
-                if ann_with_hists:
-                    bin_edges = (
-                        ht.filter(
-                            hl.is_defined(
-                                ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
-                            ),
-                        )[ann_with_hists]
-                        .histograms.age_hists[f"age_hist_{call_type}"]
-                        .bin_edges.take(1)[0]
-                    )
-                else:
+    if include_age_hists:
+        for call_type in ["het", "hom"]:
+            if ann_with_hists:
+                bin_edges = (
+                    ht.filter(
+                        hl.is_defined(
+                            ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                        ),
+                    )[ann_with_hists]
+                    .histograms.age_hists[f"age_hist_{call_type}"]
+                    .bin_edges.take(1)[0]
+                )
+            else:
+                if for_joint:
                     bin_edges = (
                         ht.filter(
                             hl.is_defined(
                                 ht.histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
                             ),
                         )
-                        .histograms.age_hists[f"age_hist_{call_type}"]
-                        .bin_edges.take(1)[0]
-                    )
-
-                if bin_edges:
-                    edges_dict[f"{prefix}{call_type}"] = "|".join(
-                        map(lambda x: f"{x:.1f}", bin_edges),
-                    )
-    else:
-        if include_age_hists:
-            for call_type in ["het", "hom"]:
-                if ann_with_hists:
-                    bin_edges = (
-                        ht.filter(
-                            hl.is_defined(
-                                ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
-                            ),
-                        )[ann_with_hists]
                         .histograms.age_hists[f"age_hist_{call_type}"]
                         .bin_edges.take(1)[0]
                     )
@@ -1919,10 +1898,10 @@ def make_hist_bin_edges_expr(
                         f"age_hist_{call_type}"
                     ].bin_edges.take(1)[0]
 
-                if bin_edges:
-                    edges_dict[f"{prefix}{call_type}"] = "|".join(
-                        map(lambda x: f"{x:.1f}", bin_edges),
-                    )
+            if bin_edges:
+                edges_dict[f"{prefix}{call_type}"] = "|".join(
+                    map(lambda x: f"{x:.1f}", bin_edges),
+                )
 
     for hist in hists:
         # Parse hists calculated on both raw and adj-filtered data
