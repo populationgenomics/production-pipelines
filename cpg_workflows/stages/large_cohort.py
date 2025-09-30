@@ -1014,7 +1014,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
 
         data_type: str = config_retrieve(['large_cohort', 'data_download', 'data_type'], default='exomes')
 
-        ht_to_export_path: str = config_retrieve(['large_cohort', 'data_download', 'ht_to_export'], default=None)
+        freq_ht_path: str = config_retrieve(['large_cohort', 'data_download', 'ht_to_export'], default=None)
 
         exome_freq_ht_path = config_retrieve(['large_cohort', 'data_download', 'frequencies_exome'], default=None)
         genome_freq_ht_path = config_retrieve(['large_cohort', 'data_download', 'frequencies_genome'], default=None)
@@ -1040,7 +1040,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                 query_command(
                     browser_vcf_release,
                     browser_vcf_release.run_browser_vcf_data_download.__name__,
-                    ht_to_export_path,
+                    freq_ht_path,
                     data_type,
                     chrom,
                     str(vcf_outpath),
