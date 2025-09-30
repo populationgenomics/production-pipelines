@@ -47,32 +47,32 @@ SUBSETS = {
 IN_SILICO_ANNOTATIONS_INFO_DICT = None
 VRS_FIELDS_DICT = None
 GEN_ANC_NAMES = {
-    'csa': 'Central/South Asian',
-    'eas': 'East Asian',
-    'eur': 'European',
-    'fil': 'Filipino',
+    'CSA': 'Central/South Asian',
+    'EAS': 'East Asian',
+    'EUR': 'European',
+    'FIL': 'Filipino',
 }
 FAF_GEN_ANC_GROUPS = {
-    "v1": ["csa", "eas", "eur", "fil"],
+    "v1": ["CSA", "EAS", "EUR", "FIL"],
 }
 GEN_ANC_GROUPS = {
     "genomes": [
-        "csa",
-        "eas",
-        "eur",
-        "fil",
+        "CSA",
+        "EAS",
+        "EUR",
+        "FIL",
     ],
     "exomes": [
-        "csa",
-        "eas",
-        "eur",
-        "fil",
+        "CSA",
+        "EAS",
+        "EUR",
+        "FIL",
     ],
 }
 GEN_ANC_GROUPS["joint"] = list(set(GEN_ANC_GROUPS["exomes"]) | set(GEN_ANC_GROUPS["genomes"]))
 GEN_ANC_GROUPS = {d: {pop: GEN_ANC_NAMES[pop] for pop in pops} for d, pops in GEN_ANC_GROUPS.items()}  # type: ignore
 FAF_GEN_ANC_GROUPS = {
-    "v1": ['csa', 'eas', 'eur', 'fil'],
+    "v1": ['CSA', 'EAS', 'EUR', 'FIL'],
 }
 JOINT_FILTERS_INFO_DICT = {
     "exomes_filters": {"Description": "Filters' values from the exomes dataset."},
@@ -103,16 +103,17 @@ JOINT_REGION_FLAGS_INFO_DICT = {
         ),
     },
     "outside_capture_region": {
+        # NOTE: Ask Josh what probeset so we can be more specific
         "Description": "Variant falls outside of the OurDNA exome capture regions.",
     },
     "outside_calling_region": {
         "Description": ("Variant falls outside of the OurDNA exome capture regions plus 150 bp" " padding."),
     },
     "not_called_in_exomes": {
-        "Description": "Variant was not called in the gnomAD exomes.",
+        "Description": "Variant was not called in the OurDNA exomes.",
     },
     "not_called_in_genomes": {
-        "Description": "Variant was not called in the gnomAD genomes.",
+        "Description": "Variant was not called in the OurDNA genomes.",
     },
 }
 
@@ -130,7 +131,7 @@ SORT_ORDER = [
 ]
 
 JOINT_REGION_FLAG_FIELDS = [
-    "fail_interval_qc",
+    # "fail_interval_qc",
     "outside_capture_region",
     "outside_calling_region",
     "not_called_in_exomes",
@@ -140,7 +141,7 @@ REGION_FLAG_FIELDS_FLAT = ["lcr", "non_par", "segdup"]  # "nonpar" and "decoy" a
 REGION_FLAG_FIELDS = {
     "exomes": REGION_FLAG_FIELDS_FLAT
     + [
-        "fail_interval_qc",
+        # "fail_interval_qc",
         "outside_capture_region",
         "outside_calling_region",
     ],
@@ -184,13 +185,11 @@ AS_VQSR_FIELDS = ["AS_culprit", "AS_VQSLOD"]
 
 VQSR_FIELDS = AS_VQSR_FIELDS + ["NEGATIVE_TRAIN_SITE", "POSITIVE_TRAIN_SITE"]
 
-# NOTE: These fields are not in our genome/exome frequency tables - they come from vqsr_ht.allele_info
+# These fields are not in our genome/exome frequency tables - they come from vqsr_ht.allele_info
 ALLELE_TYPE_FIELDS_FLAT = [
     "allele_type",
     "has_star",
     "n_alt_alleles",
-    # NOTE: "original_alleles" possibly needs commenting out
-    "original_alleles",
     "variant_type",
     "was_mixed",
 ]
@@ -384,37 +383,6 @@ INFO_DICT = {
         "Description": ("Allele-specific forward/reverse read counts for strand bias tests"),
     },
 }
-"""
-Dictionary used during VCF export to export row (variant) annotations.
-"""
-
-JOINT_REGION_FLAGS_INFO_DICT = {
-    "fail_interval_qc": {
-        "Description": (
-            "Less than 85 percent of samples meet 20X coverage if variant is in"
-            " autosomal or PAR regions or 10X coverage for non-PAR regions of"
-            " chromosomes X and Y."
-        ),
-    },
-    "outside_ukb_capture_region": {
-        "Description": "Variant falls outside of the UK Biobank exome capture regions.",
-    },
-    "outside_broad_capture_region": {
-        "Description": "Variant falls outside of the Broad exome capture regions.",
-    },
-    "outside_ukb_calling_region": {
-        "Description": ("Variant falls outside of the UK Biobank exome capture regions plus 150 bp" " padding."),
-    },
-    "outside_broad_calling_region": {
-        "Description": ("Variant falls outside of the Broad exome capture regions plus 150 bp" " padding."),
-    },
-    "not_called_in_exomes": {
-        "Description": "Variant was not called in the gnomAD exomes.",
-    },
-    "not_called_in_genomes": {
-        "Description": "Variant was not called in the gnomAD genomes.",
-    },
-}
 
 
 def adjust_vcf_incompatible_types(
@@ -572,9 +540,6 @@ def format_validated_ht_for_export(
             if dt in special_items:
                 new_vcf_info_reorder.append(special_items[dt])
         vcf_info_reorder = new_vcf_info_reorder
-    else:
-        # NOTE: Genomes and exomes tables have 'popmax' instead of 'grpmax'
-        vcf_info_reorder[vcf_info_reorder.index('grpmax')] = 'popmax'
 
     ht = ht.annotate(
         info=ht.info.select(*vcf_info_reorder, *ht.info.drop(*vcf_info_reorder)),
@@ -592,9 +557,7 @@ def select_type_from_joint_ht(ht: hl.Table, data_type: str) -> hl.Table:
     :return: Joint HT with fields relevant to `data_type`.
     """
     global_fields = [f"{data_type}_globals"]
-    # NOTE: our joint table does not have region_flags field. Unsure of what the flow on effects are
-    # row_fields = [data_type, "region_flags"]
-    row_fields = [data_type]
+    row_fields = [data_type, "region_flags"]
     if data_type == "joint":
         row_fields.append("freq_comparison_stats")
     ht = ht.select_globals(*global_fields)
@@ -661,33 +624,10 @@ def unfurl_nested_annotations(
 
     # This creates fields like grpmax, AC_grpmax_non_ukb...
     logger.info("Adding grpmax data...")
-    # NOTE: In the Frequencies stage of our pipeline we use the `pop_max_expr()` function, while gnomad v4 seems to have
-    # changed their labelling and now uses the structurally identical `grpmax_expr()`. The only difference is that
-    # `pop_max_expr` looks for entries with keys {"group", "pop"} while `grpmax_expr` looks for entries with keys {"group", "gen_anc"}
-    # NOTE: Additionally, our exomes and genomes frequency tables us `ht.popmax` while our joint table uses `ht.grpmax`
+    # Our tables use popmax (exomes/genomes) vs grpmax (joint) with "pop" vs "gen_anc" keys respectively.
+    # Our pipeline uses pop_max_expr() with {"group", "pop"} keys, while gnomAD v4 uses the equivalent
+    # grpmax_expr() with {"group", "gen_anc"} keys.
     grpmax_idx = ht.grpmax if for_joint_validation else ht.popmax
-
-    # NOTE: Our "exomes" and "genomes" data types have the same grpmax structure with no subsets, so no need to differentiate between them
-    # if data_type == "exomes" and not for_joint_validation:
-    #     grpmax_dict = {}
-    #     for s in grpmax_idx.keys():
-    #         grpmax_dict.update(
-    #             {f"grpmax{'_'+s if s != 'gnomad' else ''}": grpmax_idx[s].gen_anc}
-    #         )
-    #         grpmax_dict.update(
-    #             {
-    #                 f"{f if f != 'homozygote_count' else 'nhomalt'}_grpmax{'_'+s if s != 'gnomad' else ''}": grpmax_idx[
-    #                     s
-    #                 ][
-    #                     f
-    #                 ]
-    #                 for f in grpmax_idx[s].keys()
-    #                 if f != "gen_anc"
-    #             }
-    #         )
-    # else:
-    # NOTE: We use `pop` instead of `gen_anc`
-    # grpmax_dict = {"grpmax": grpmax_idx.gen_anc}
     grpmax_dict = {"grpmax": grpmax_idx.pop}
     grpmax_rename = {f: f if f != "homozygote_count" else "nhomalt" for f in grpmax_idx.keys() if f != "pop"}
     grpmax_dict.update(
@@ -722,14 +662,7 @@ def unfurl_nested_annotations(
 
     logger.info("Unfurling fafmax data...")
     fafmax_idx = ht.fafmax
-    # NOTE: Our exome data does not have sub-fields such as 'gnomad' and 'non_ukb' so the first if-statement isn't needed
-    # if data_type == "exomes" and not for_joint_validation:
-    #     fafmax_dict = {
-    #         f"fafmax_{f}{'_'+s if s != 'gnomad' else ''}": fafmax_idx[s][f]
-    #         for s in fafmax_idx.keys()
-    #         for f in fafmax_idx[s].keys()
-    #     }
-    # else:
+
     fafmax_dict = {f"fafmax_{f}": fafmax_idx[f] for f in fafmax_idx.keys()}
     if for_joint_validation:
         rename_dict.update(
@@ -754,8 +687,7 @@ def unfurl_nested_annotations(
 
     logger.info("Unfurling age hists...")
     age_hists = ["age_hist_het", "age_hist_hom"]
-    # NOTE: "age_hist_het" and "age_hist_hom" are top-level fields in our genome and exomes frequency tables. They get nested later on.
-    hist_idx = ht.histograms.age_hists if data_type == 'joint' else ht
+    hist_idx = ht.histograms.age_hists if for_joint_validation else ht
     for hist in age_hists:
         for f in hist_idx[hist].keys():
             expr_dict[f"{hist}_{f}"] = hl.delimit(hist_idx[hist][f], delimiter="|") if "bin" in f else hist_idx[hist][f]
@@ -803,10 +735,7 @@ def unfurl_nested_annotations(
                 key = f"CTT_{f}_{k}"
                 expr = ht.freq_comparison_stats.contingency_table_test[i][f]
                 expr_dict[key] = expr
-        # NOTE: The joint frequency table we want is the one that is checkpointed during browser prepare.
-        # Browser prepare checkpoints exome and genome only frequency tables as well but
-        # those go through more stringent formatting during the stage before they are checkpointed,
-        # so we use the ones output by Frequencies stage for them.
+
         logger.info("Unfurling Cochran-Mantel-Haenszel test results...")
         expr_dict["CMH_chisq"] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.chisq
         expr_dict["CMH_p_value"] = ht.freq_comparison_stats.cochran_mantel_haenszel_test.p_value
@@ -839,7 +768,6 @@ def make_info_expr(
     if for_joint_validation:
         data_type = "joint"
 
-    # NOTE: Check region flags for joint table are properly formatted i.e. `"fail_interval_qc"`
     if "region_flags" in t.row:
         # Add region_flag to info dict
         for field in REGION_FLAG_FIELDS[data_type]:
@@ -856,31 +784,15 @@ def make_info_expr(
         # NOTE: VQSR results are nested in the info struct (and not "vqsr_results") and are also
         # quasi-AS not true-AS in our release tables.
         # We also moved the info fields to `release_ht_info` field.
-        # vcf_info_dict[field] = t["vqsr_results"][f"{field}"]
         vcf_info_dict[field] = t.release_ht_info[f"{field}"]
 
     # Add allele_info fields to info dict
     for field in ALLELE_TYPE_FIELDS[data_type]:
         vcf_info_dict[field] = t["allele_info"][f"{field}"]
 
-    # NOTE: We don't have in_silico_predictors yet
-    #     # Add in silico annotations to info dict
-    #     insilico_idx = t.in_silico_predictors
-    #     for field in INSILICO_FIELDS:
-    #         if field == "cadd":
-    #             vcf_info_dict[f"{field}_raw_score"] = insilico_idx[field]["raw_score"]
-    #             vcf_info_dict[f"{field}_phred"] = insilico_idx[field]["phred"]
-    #         else:
-    #             vcf_info_dict[field] = insilico_idx[field]
-
-    #     # Add VRS annotations to info dict
-    #     for field in VRS_FIELDS_DICT:
-    #         vcf_info_dict[field] = t["release_ht_info"]["vrs"][field]
-
     # Add vep annotations to info dict
     vcf_info_dict["vep"] = t["vep"]
 
-    # NOTE: Check if this gets properly added ti info_dict
     # Add monoallelic field to info dict
     vcf_info_dict["monoallelic"] = t["monoallelic"]
 
@@ -1036,6 +948,25 @@ def process_vep_csq_header(vep_csq_header: str = VEP_CSQ_HEADER) -> str:
     return vep_csq_header
 
 
+def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
+    inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
+
+    filters = {
+        "InbreedingCoeff": ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        "AS_lowqual": ht.AS_lowqual,
+        "AS_VQSR": hl.is_missing(ht.info["AS_VQSLOD"]),
+    }
+    # NOTE: `score_cutoffs` are accessed during browser prep, need to read in stage output.
+    snv_indel_expr = {'snv': hl.is_snp(ht.alleles[0], ht.alleles[1])}
+    snv_indel_expr['indel'] = ~snv_indel_expr['snv']
+    if score_cutoffs is not None:
+        for var_type, score_cut in score_cutoffs.items():
+            filters['AS_VQSR'] = filters['AS_VQSR'] | (
+                snv_indel_expr[var_type] & (ht.info.AS_VQSLOD < score_cut.min_score)
+            )
+    return ht.annotate(filters=add_filters_expr(filters=filters))
+
+
 def prepare_ht_for_validation(
     ht: hl.Table,
     data_type: str = "exomes",
@@ -1143,7 +1074,7 @@ def prepare_ht_for_validation(
             filters_expr = hl.empty_set(hl.tstr)
         ht = ht.select("info", filters=filters_expr)
     else:
-        # NOTE: Our frequencies tables do not have a `filters` field. This is only annotated during browser prep. Doing it here.
+        # Our frequencies tables do not have a `filters` field. This is only annotated during browser prep. Doing it here.
         inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
         ac = _freq(ht, subset=None).AC
         filters = {
@@ -1153,7 +1084,6 @@ def prepare_ht_for_validation(
             "AS_VQSR": hl.is_missing(ht.info["AS_VQSLOD"]),
         }
         # NOTE: `score_cutoffs` are accessed during browser prep, need to read in stage output.
-        # NOTE: Could just annotate from browser hail table instead: to discuss!
         snv_indel_expr = {'snv': hl.is_snp(ht.alleles[0], ht.alleles[1])}
         snv_indel_expr['indel'] = ~snv_indel_expr['snv']
         if score_cutoffs is not None:
@@ -1181,6 +1111,11 @@ def get_joint_filters(ht: hl.Table) -> hl.Table:
     :param ht: Input Table.
     :return: Table with joint filters transformed from exomes and genomes filters.
     """
+    # NOTE: I'm not sure if gnomAD uses AC0 as a filter in the joint release. If AC0 is
+    # used in genomes or exomes, then it should be added to the logic below. Currently,
+    # AC0 is not included in the joint release filters and should possibly be a separate
+    # item in the filters list based on ac = ht.joint.grpmax.AC
+    # Or is it ht.joint.freq.AC?
     exomes_filters = ht.info.exomes_filters
     genomes_filters = ht.info.genomes_filters
     ht = ht.annotate(
@@ -1307,7 +1242,7 @@ def prepare_vcf_header_dict(
     bin_edges: Dict[str, str],
     age_hist_distribution: str,
     subset_list: List[str],
-    pops: Dict[str, str],  # NOTE: Pretty sure this is the wrong type-hint, should be List[str]
+    pops: Dict[str, str],
     data_type: str = "exomes",
     joint_included: bool = False,
     freq_comparison_included: bool = False,
@@ -1443,14 +1378,12 @@ def populate_subset_info_dict(
     vcf_info_dict = {}
     # Remove unnecessary pop names from FAF_GEN_ANC_GROUPS dict depending on data type
     # and version of FAF_GEN_ANC_GROUPS.
-    # NOTE: Hardcoding faf_pops_version to be "v1"
+    # Hardcoding faf_pops_version to be "v1"
     faf_pops_version = 'v1'
     faf_pops_transformed = {pop: GEN_ANC_NAMES[pop] for pop in faf_pops[faf_pops_version]}
 
     # Add FAF fields to dict.
-    # NOTE: This creates a dict with 'gen_anc' as one of the keys. We may want this to be 'pop' instead.
     faf_label_groups = create_label_groups(
-        # NOTE: CHECK THIS LOGIC OF PASSING IN KEYS OF FAF POPS DICT
         gen_ancs=list(faf_pops_transformed.keys()),
         sexes=sexes,
         all_groups=["adj"],
@@ -1504,7 +1437,6 @@ def populate_subset_info_dict(
         ),
     )
     if freq_comparison_included:
-        # NOTE: CHECK THIS LOGIC OF PASSING IN KEYS OF FAF POPS DICT
         ctt_label_groups = create_label_groups(gen_ancs=list(pops.keys()), sexes=sexes)
         for label_group in ctt_label_groups:
             vcf_info_dict.update(
@@ -1907,6 +1839,7 @@ def make_hist_bin_edges_expr(
     label_delimiter: str = "_",
     data_type: str = "exomes",
     include_age_hists: bool = True,
+    for_joint: bool = False,
 ) -> Dict[str, str]:
     """
     Create dictionaries containing variant histogram annotations and their associated bin edges, formatted into a string separated by pipe delimiters.
@@ -1928,36 +1861,66 @@ def make_hist_bin_edges_expr(
 
     edges_dict = {}
 
-    # NOTE: `age_hists` is not a struct in our exomes and genomes tables. `age_hist_het` and `age_hist_hom` are
+    # `age_hists` is not a struct in our exomes and genomes tables. `age_hist_het` and `age_hist_hom` are
     # separate top-level structs not under `histograms`
     # NOTE: I think `ann_with_hists` is redundant for our exomes, genomes, and joint tables, since `histograms` is a top-level struct
-    hist_idx = ht if data_type != 'joint' else ht.histograms.age_hists
+    print(f'for_joint: {for_joint}')
+    hist_idx = ht if not for_joint else ht.histograms.age_hists
 
-    if include_age_hists:
-        for call_type in ["het", "hom"]:
-            if ann_with_hists:
-                bin_edges = (
-                    ht.filter(
+    if for_joint:
+        if include_age_hists:
+            for call_type in ["het", "hom"]:
+                if ann_with_hists:
+                    bin_edges = (
+                        ht.filter(
+                            hl.is_defined(
+                                ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                            ),
+                        )[ann_with_hists]
+                        .histograms.age_hists[f"age_hist_{call_type}"]
+                        .bin_edges.take(1)[0]
+                    )
+                else:
+                    bin_edges = (
+                        ht.filter(
+                            hl.is_defined(
+                                ht.histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                            ),
+                        )
+                        .histograms.age_hists[f"age_hist_{call_type}"]
+                        .bin_edges.take(1)[0]
+                    )
+
+                if bin_edges:
+                    edges_dict[f"{prefix}{call_type}"] = "|".join(
+                        map(lambda x: f"{x:.1f}", bin_edges),
+                    )
+    else:
+        if include_age_hists:
+            for call_type in ["het", "hom"]:
+                if ann_with_hists:
+                    bin_edges = (
+                        ht.filter(
+                            hl.is_defined(
+                                ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                            ),
+                        )[ann_with_hists]
+                        .histograms.age_hists[f"age_hist_{call_type}"]
+                        .bin_edges.take(1)[0]
+                    )
+                else:
+                    bin_edges = ht.filter(
                         hl.is_defined(
-                            ht[ann_with_hists].histograms.age_hists[f"age_hist_{call_type}"].bin_edges,
+                            ht[f"age_hist_{call_type}"].bin_edges,
                         ),
-                    )[ann_with_hists]
-                    .histograms.age_hists[f"age_hist_{call_type}"]
-                    .bin_edges.take(1)[0]
-                )
-            else:
-                bin_edges = ht.filter(
-                    hl.is_defined(
-                        hist_idx[f"age_hist_{call_type}"].bin_edges,
-                    ),
-                )[
-                    f"age_hist_{call_type}"
-                ].bin_edges.take(1)[0]
+                    )[
+                        f"age_hist_{call_type}"
+                    ].bin_edges.take(1)[0]
 
-            if bin_edges:
-                edges_dict[f"{prefix}{call_type}"] = "|".join(
-                    map(lambda x: f"{x:.1f}", bin_edges),
-                )
+                if bin_edges:
+                    edges_dict[f"{prefix}{call_type}"] = "|".join(
+                        map(lambda x: f"{x:.1f}", bin_edges),
+                    )
 
     for hist in hists:
         # Parse hists calculated on both raw and adj-filtered data
@@ -2234,13 +2197,6 @@ def populate_info_dict(
         vcf_info_dict.update(JOINT_FILTERS_INFO_DICT)
         return vcf_info_dict
 
-    # NOTE: We don't have these
-    # Add in silico prediction annotations to info_dict.
-    #     vcf_info_dict.update(in_silico_dict)
-
-    #     # Add VRS annotations to info_dict.
-    #     vcf_info_dict.update(vrs_fields_dict)
-
     return vcf_info_dict
 
 
@@ -2252,8 +2208,16 @@ def main(
     contig: str | None,
     vcf_outpath: str,
     vqsr_ht_path: str | None = None,
+    exome_freq_ht_path: str | None = None,
+    genome_freq_ht_path: str | None = None,
 ):
+    """
+    Export gnomAD frequency data to VCF format with appropriate header information.
 
+    NOTE: For joint data export, uses the processed joint table from browser prepare
+    rather than the raw joint frequencies table. For exomes/genomes, uses the
+    original frequencies stage output.
+    """
     ht = hl.read_table(ht_path)
 
     if vqsr_ht_path and data_type != 'joint':
@@ -2274,11 +2238,6 @@ def main(
             )
             for seq_type in ['exome', 'genome']
         }
-    # NOTE: No longer needed
-    # if data_type == 'joint':
-    #     ht = reshape_to_gnomad_schema(ht)
-    #     logger.info(f'Checkpointing reformated_ht to {reformated_ht_outpath}...')
-    #     ht = ht.checkpoint(reformated_ht_outpath, overwrite=True)
 
     for_joint = data_type == "joint"
 
@@ -2289,6 +2248,20 @@ def main(
     else:
         iter_data_types = [data_type]
 
+    # Pre-add filter fields for joint.exomes.filters and joint.genomes.filters from
+    # exomes_freq_ht and genomes_freq_ht respectively. Except for AC0
+    if for_joint and (exome_freq_ht_path is not None) and (genome_freq_ht_path is not None):
+        exomes_freq_ht = hl.read_table(exome_freq_ht_path)
+        genomes_freq_ht = hl.read_table(genome_freq_ht_path)
+        exomes_freq_ht = get_filters_expr(ht=exomes_freq_ht, score_cutoffs=score_cutoffs['exome'])
+        genomes_freq_ht = get_filters_expr(ht=genomes_freq_ht, score_cutoffs=score_cutoffs['genome'])
+
+        # Annotate back the filters to the joint.exomes.filters and joint.genomes.filters
+        ht = ht.annotate(
+            exomes=ht.exomes.annotate(filters=exomes_freq_ht[ht.key].filters),
+            genomes=ht.genomes.annotate(filters=genomes_freq_ht[ht.key].filters),
+        )
+
     for dt in iter_data_types:
         if for_joint:
             dt_ht = select_type_from_joint_ht(ht, dt)
@@ -2296,6 +2269,8 @@ def main(
             dt_ht = ht
 
         logger.info("Preparing %s HT for validity checks and export...", dt)
+        # For joint validation: annotate filters from original exomes/genomes tables since
+        # joint HT lacks filters after subsetting by select_type_from_joint_ht()
         dt_ht, rename_dict = prepare_ht_for_validation(
             dt_ht,
             data_type=dt,
@@ -2307,8 +2282,6 @@ def main(
         if data_type != "joint":
             site_gt_check_expr = {
                 "monoallelic": dt_ht.info.monoallelic,
-                # NOTE: We do not have "only_het" annotation in our tables
-                # "only_het": dt_ht.info.only_het,
             }
         if for_joint:
             ordered_rename_dict = {key: rename_dict.get(key, key) for key in dt_ht.info.keys()}
@@ -2335,23 +2308,16 @@ def main(
             ht = ht.annotate(info=ht.info.annotate(**info_expr))
             ht = ht.annotate_globals(**validate_hts[dt].index_globals())
 
-    # NOTE: I think we need to read filters to the joint frequency table
-    # at the moment in `reshape_to_gnomad_schema` I am just adding an empty set for filters
-    # because it's not a thing in the `joint_freq_ht`.
-    # Inside `extract_freq_info()` of a `joint_frequencies.py` script we don't add
-    # the filters present in either exome or genome to the joint table...
     ht = get_joint_filters(ht)
 
     logger.info(f'Checkpointing validated_ht to {validated_ht_outpath}...')
     validated_ht = ht.checkpoint(validated_ht_outpath, overwrite=True)
 
     ht = hl.read_table(ht_path)
-    # NOTE: In our vqsr stage we have AS_SPECIFIC_FEATURES, INDEL_SPECIFIC_FEATURES, AND SNV_SPECIFIC_FEATURES. These features are used to train the model.
-    # gnomAD annotates the global field `filtering_model.snv_training_variables` and `filtering_model.indel_training_variables` with these.
-    # Additionally, the `filtering_model.filter_name` is `"AS_VQSR"` and the `filtering_model.score_name` is `"AS_VQSLOD"`. Which are the same as us as well.
-    # However, `filtering_model.snv_cutoff.bin`, `filtering_model.snv_cutoff.min_score`, `filtering_model.indel_cutoff.bin`, and `filtering_model.indel_cutoff.min_score`
-    # aren't annotated until browser prepare so will need to re-annotate them here. Same for inbreeding_coeff_cutoff.
-    # NOTE: Only applicable to genomes and exomes, not joint
+    # Our VQSR features match gnomAD's filtering_model structure, but cutoff values
+    # aren't available in frequency tables - they're added during browser prepare. So
+    # adding them here.
+    # Only applicable to genomes and exomes, not joint
     if data_type != 'joint':
         ht = ht.annotate_globals(
             filtering_model=hl.struct(
@@ -2408,7 +2374,6 @@ def main(
             joint_included=joint_included,
         )
     else:
-        # NOTE: should `variant_qc_filter` parameter in `make_vcf_filter_dict()` be "AS_VQSR"??
         header_dict = {"filter": make_vcf_filter_dict(joint=True), "info": {}}  # type: ignore[dict-item]
         for dt in ["exomes", "genomes", "joint"]:
             dt_ht = select_type_from_joint_ht(ht, dt)
@@ -2420,6 +2385,7 @@ def main(
                     dt_ht,
                     data_type=data_type,
                     include_age_hists=True,
+                    for_joint=for_joint,
                 ),
                 age_hist_distribution=hl.eval(dt_ht.age_distribution.bin_freq),
                 subset_list=[dt],
@@ -2455,5 +2421,3 @@ def main(
         # append_to_header=append_to_vcf_header_path(data_type=data_type),
         tabix=True,
     )
-
-    pass
