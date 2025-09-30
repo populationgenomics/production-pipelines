@@ -2205,18 +2205,18 @@ def run_browser_vcf_data_download(
         vqsr_ht = hl.read_table(vqsr_ht_path)
         ht = ht.annotate(allele_info=vqsr_ht[ht.key].allele_info)
 
-        score_cutoffs = {
-            seq_type: process_score_cutoffs(
-                snv_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'snp_bin_threshold_{seq_type}']),
-                indel_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'indel_bin_threshold_{seq_type}']),
-                aggregated_bin_ht_path=config_retrieve(
-                    ['large_cohort', 'browser', f'aggregated_bin_ht_path_{seq_type}'],
-                ),
-                snv_bin_id=config_retrieve(['large_cohort', 'browser', f'snp_bin_id_{seq_type}'], 'bin'),
-                indel_bin_id=config_retrieve(['large_cohort', 'browser', f'indel_bin_id_{seq_type}'], 'bin'),
-            )
-            for seq_type in ['exome', 'genome']
-        }
+    score_cutoffs = {
+        seq_type: process_score_cutoffs(
+            snv_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'snp_bin_threshold_{seq_type}']),
+            indel_bin_cutoff=config_retrieve(['large_cohort', 'browser', f'indel_bin_threshold_{seq_type}']),
+            aggregated_bin_ht_path=config_retrieve(
+                ['large_cohort', 'browser', f'aggregated_bin_ht_path_{seq_type}'],
+            ),
+            snv_bin_id=config_retrieve(['large_cohort', 'browser', f'snp_bin_id_{seq_type}'], 'bin'),
+            indel_bin_id=config_retrieve(['large_cohort', 'browser', f'indel_bin_id_{seq_type}'], 'bin'),
+        )
+        for seq_type in ['exome', 'genome']
+    }
 
     for_joint = data_type == "joint"
 
