@@ -69,13 +69,13 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             """,
         )
         b.write_output(
-            j.output['gvcf.gz'],
+            j.output,
             f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
         )
-        b.write_output(
-            j.output['gvcf.gz.tbi'],
-            f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}.tbi',
-        )
+        # b.write_output(
+        #     j.output['gvcf.gz.tbi'],
+        #     f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}.tbi',
+        # )
 
 
 if __name__ == '__main__':
