@@ -3,6 +3,7 @@ from google.cloud import storage
 
 import hail as hl
 
+from cpg_utils import to_path
 from cpg_utils.hail_batch import get_batch, image_path, init_batch
 
 
@@ -32,6 +33,10 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
     print(f"Found {len(gvcf_pairs)} GVCFs")
 
     for gvcf, tbi in gvcf_pairs:
+        output_path = to_path(f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}')
+        if output_path.exists():
+            print(f"Skipping {gvcf}, output already exists")
+            continue
         print(f"Processing {gvcf}")
         # create job
         j = b.new_bash_job(
