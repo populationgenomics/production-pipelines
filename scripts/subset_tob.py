@@ -40,7 +40,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             f'Subset {gvcf} tob-wgs gvcfs to chrM only',
             attributes={'tool': 'bcftools'},
         )
-        j.image(image_path('bcftools', '1.22-1'))
+        j.image(image_path('bcftools'))
 
         # read in the gvcf files
         inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
