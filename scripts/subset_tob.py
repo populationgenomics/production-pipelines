@@ -3,8 +3,6 @@ from google.cloud import storage
 
 import hail as hl
 
-from cpg_utils import Path
-from cpg_utils.config import output_path
 from cpg_utils.hail_batch import get_batch, image_path, init_batch
 
 
@@ -75,10 +73,6 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             j.output,
             f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
         )
-        # b.write_output(
-        #     j.output['gvcf.gz.tbi'],
-        #     f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}.tbi',
-        # )
 
         b.run(wait=False)
 
