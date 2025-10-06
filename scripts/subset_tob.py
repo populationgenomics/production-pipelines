@@ -40,7 +40,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             f'Subset {gvcf} tob-wgs gvcfs to chrM only',
             attributes={'tool': 'bcftools'},
         )
-        j.image(image_path('bcftools'))
+        j.image(image_path('bcftools', '1.22-1'))
 
         # read in the gvcf files
         inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
@@ -48,8 +48,8 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
         # declare output files
         j.declare_resource_group(
             output={
-                'gvcf.gz': '{root}.chrM.hard.gvcf.gz',
-                'gvcf.gz.tbi': '{root}.chrM.hard.gvcf.gz.tbi',
+                'gvcf.gz': '{root}.chrM.hard-filtered.gvcf.gz',
+                'gvcf.gz.csi': '{root}.chrM.hard-filtered.gvcf.gz.csi',
             },
         )
 
