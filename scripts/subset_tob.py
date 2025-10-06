@@ -78,7 +78,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
 
         b.write_output(
             j.output,
-            output_path,
+            str(output_path),
         )
 
         b.run(wait=False)
