@@ -73,11 +73,11 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             """,
         )
 
-        print(f"Writing to {output_chrm_gvcf_dir.rstrip('/')}/{gvcf.rsplit('/',1)[1].replace('hard','chrM.hard')}")
+        print(f"Writing to {output_path}")
 
         b.write_output(
             j.output,
-            f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
+            output_path,
         )
 
         b.run(wait=False)
