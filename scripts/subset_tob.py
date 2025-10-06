@@ -68,6 +68,9 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             ls -l $(dirname "$OUT_VCF")
             """,
         )
+
+        print(f"Writing to {output_chrm_gvcf_dir.rstrip('/')}/{gvcf.rsplit('/',1)[1].replace('hard','chrM.hard')}")
+
         b.write_output(
             j.output,
             f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
@@ -76,6 +79,8 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
         #     j.output['gvcf.gz.tbi'],
         #     f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}.tbi',
         # )
+
+        b.run(wait=False)
 
 
 if __name__ == '__main__':
