@@ -34,6 +34,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
     print(f"Found {len(gvcf_pairs)} GVCFs")
 
     for gvcf, tbi in gvcf_pairs:
+        print(f"Processing {gvcf}")
         # create job
         j = b.new_bash_job(
             f'Subset {gvcf} tob-wgs gvcfs to chrM only',
@@ -41,6 +42,10 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
         )
         j.image(image_path('bcftools'))
 
+        # read in the gvcf files
+        inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
+
+        # declare output files
         j.declare_resource_group(
             output={
                 'gvcf.gz': '{root}.chrM.hard.gvcf.gz',
@@ -48,9 +53,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             },
         )
 
-        # read in the gvcf files
-        inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
-
+        # subset to chrM
         j.command(
             f"""
             set -euxo pipefail
