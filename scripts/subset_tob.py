@@ -39,6 +39,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             attributes={'tool': 'bcftools'},
         )
         j.image(image_path('bcftools'))
+        j.storage('15Gi')
 
         # read in the gvcf files
         inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
