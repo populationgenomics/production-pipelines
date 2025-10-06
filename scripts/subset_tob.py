@@ -4,7 +4,8 @@ from google.cloud import storage
 import hail as hl
 
 from cpg_utils import to_path
-from cpg_utils.hail_batch import get_batch, image_path, init_batch
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import get_batch, init_batch
 
 
 @click.command()
