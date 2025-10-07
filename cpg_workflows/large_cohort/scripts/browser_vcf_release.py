@@ -289,12 +289,6 @@ INFO_DICT = {
         'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
     'segdup': {'Description': 'Variant falls within a segmental duplication region'},
-    'outside_ukb_capture_region': {
-        'Description': 'Variant falls outside of UK Biobank exome capture regions.',
-    },
-    'outside_broad_capture_region': {
-        'Description': 'Variant falls outside of Broad exome capture regions.',
-    },
     'rf_positive_label': {
         'Description': ('Variant was labelled as a positive example for training of random forest' ' model'),
     },
