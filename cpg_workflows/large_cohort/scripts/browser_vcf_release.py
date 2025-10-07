@@ -188,7 +188,7 @@ ALLELE_TYPE_FIELDS = {
 
 HISTS = ['gq_hist_alt', 'gq_hist_all', 'dp_hist_alt', 'dp_hist_all', 'ab_hist_alt']
 
-CURRENT_VEP_VERSION = '105'  # it's actually 110
+CURRENT_VEP_VERSION = '110'
 VEP_CSQ_FIELDS = {
     '101': 'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|VARIANT_CLASS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|LoF|LoF_filter|LoF_flags|LoF_info',
     '105': 'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|FLAGS|VARIANT_CLASS|SYMBOL_SOURCE|HGNC_ID|CANONICAL|MANE_SELECT|MANE_PLUS_CLINICAL|TSL|APPRIS|CCDS|ENSP|UNIPROT_ISOFORM|SOURCE|SIFT|PolyPhen|DOMAINS|miRNA|HGVS_OFFSET|PUBMED|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|TRANSCRIPTION_FACTORS|LoF|LoF_filter|LoF_flags|LoF_info',
@@ -1824,7 +1824,6 @@ def make_hist_bin_edges_expr(
 
     # NOTE: `age_hists` is not a struct in our exomes and genomes tables. `age_hist_het` and `age_hist_hom` are
     # separate top-level structs not under `histograms`
-    # NOTE: I think `ann_with_hists` is redundant for our exomes, genomes, and joint tables, since `histograms` is a top-level struct
     if include_age_hists:
         for call_type in ['het', 'hom']:
             if ann_with_hists:
