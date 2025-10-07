@@ -3,7 +3,9 @@ from google.cloud import storage
 
 import hail as hl
 
-from cpg_utils.hail_batch import get_batch, image_path, init_batch
+from cpg_utils import to_path
+from cpg_utils.config import image_path
+from cpg_utils.hail_batch import get_batch, init_batch
 
 
 @click.command()
@@ -24,8 +26,19 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
     prefix = path_prefix
 
     blobs = client.list_blobs(bucket_name, prefix=prefix)
-
-    gvcf_files = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".gvcf.gz")]
+    # list_blobs(prefix=...) returns EVERY object whose name starts with that prefix,
+    # including those in the chrm/ subdirectory. We must exclude previously produced outputs.
+    gvcf_files: list[str] = []
+    for blob in blobs:
+        name = blob.name
+        # Skip anything in the output subdirectory
+        if name.startswith(f'{prefix.rstrip("/")}/chrm/'):
+            continue
+        if not name.endswith('.gvcf.gz'):
+            continue
+        if 'chrM.hard' in name or 'chrM.hard-filtered' in name:
+            continue
+        gvcf_files.append(f'gs://{bucket_name}/{name}')
 
     gvcf_pairs = [(g, g + ".tbi") for g in gvcf_files]
 
@@ -39,6 +52,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             attributes={'tool': 'bcftools'},
         )
         j.image(image_path('bcftools'))
+        j.storage('15Gi')
 
         # read in the gvcf files
         inputs = b.read_input_group(gvcf=gvcf, tbi=tbi)
@@ -67,14 +81,14 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             """,
         )
 
-        print(f"Writing to {output_chrm_gvcf_dir.rstrip('/')}/{gvcf.rsplit('/',1)[1].replace('hard','chrM.hard')}")
+        print(f'Writing to {output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}')
 
         b.write_output(
             j.output,
             f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
         )
 
-        b.run(wait=False)
+    b.run(wait=False)
 
 
 if __name__ == '__main__':
