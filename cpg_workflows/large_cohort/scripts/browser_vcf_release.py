@@ -193,7 +193,6 @@ ALLELE_TYPE_FIELDS = {
 
 HISTS = ['gq_hist_alt', 'gq_hist_all', 'dp_hist_alt', 'dp_hist_all', 'ab_hist_alt']
 
-# NOTE: ASSUMING VEP_CSQ_FIELDS HAVEN'T CHANGED IN VERSION 110
 CURRENT_VEP_VERSION = '105'  # it's actually 110
 VEP_CSQ_FIELDS = {
     '101': 'Allele|Consequence|IMPACT|SYMBOL|Gene|Feature_type|Feature|BIOTYPE|EXON|INTRON|HGVSc|HGVSp|cDNA_position|CDS_position|Protein_position|Amino_acids|Codons|ALLELE_NUM|DISTANCE|STRAND|VARIANT_CLASS|MINIMISED|SYMBOL_SOURCE|HGNC_ID|CANONICAL|TSL|APPRIS|CCDS|ENSP|SWISSPROT|TREMBL|UNIPARC|GENE_PHENO|SIFT|PolyPhen|DOMAINS|HGVS_OFFSET|MOTIF_NAME|MOTIF_POS|HIGH_INF_POS|MOTIF_SCORE_CHANGE|LoF|LoF_filter|LoF_flags|LoF_info',
@@ -235,14 +234,6 @@ INDEL_ALLELE_SPECIFIC_FEATURES = ALLELE_SPECIFIC_FEATURES
 INFO_DICT = {
     'FS': {
         'Description': 'Phred-scaled p-value of Fisher"s exact test for strand bias',
-    },
-    'InbreedingCoeff': {
-        'Number': 'A',
-        'Description': (
-            'Inbreeding coefficient, the excess heterozygosity at a variant site,'
-            ' computed as 1 - (the number of heterozygous genotypes)/(the number of'
-            ' heterozygous genotypes expected under Hardy-Weinberg equilibrium)'
-        ),
     },
     'inbreeding_coeff': {
         'Number': 'A',
