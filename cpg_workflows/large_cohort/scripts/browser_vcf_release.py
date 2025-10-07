@@ -901,11 +901,17 @@ def process_vep_csq_header(vep_csq_header: str = VEP_CSQ_HEADER) -> str:
     return vep_csq_header
 
 
+def _freq(ds, *args, **kwargs):
+    return ds.freq[ds.freq_index_dict[_freq_index_key(*args, **kwargs)]]
+
+
 def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
     inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
 
+    ac = _freq(ht, subset=None).AC
     filters = {
         'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        'AC0': ac == 0,
         'AS_lowqual': ht.AS_lowqual,
         'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
     }
@@ -1015,9 +1021,6 @@ def prepare_ht_for_validation(
             vep_csq_header=process_vep_csq_header(VEP_CSQ_HEADER),
             freq_entries_to_remove=(freq_entries_to_remove if freq_entries_to_remove else hl.empty_set(hl.tstr)),
         )
-
-    def _freq(ds, *args, **kwargs):
-        return ds.freq[ds.freq_index_dict[_freq_index_key(*args, **kwargs)]]
 
     # Select relevant fields for VCF export
     if for_joint_validation:
