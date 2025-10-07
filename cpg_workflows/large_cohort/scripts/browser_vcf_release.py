@@ -285,9 +285,6 @@ INFO_DICT = {
     },
     'decoy': {'Description': 'Variant falls within a reference decoy region'},
     'lcr': {'Description': 'Variant falls within a low complexity region'},
-    'nonpar': {
-        'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
-    },
     'non_par': {
         'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
