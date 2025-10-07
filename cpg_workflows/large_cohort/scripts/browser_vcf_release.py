@@ -2220,7 +2220,7 @@ def run_browser_vcf_data_download(
             joint_included=joint_included,
             freq_comparison_included=(dt == 'joint'),
             for_joint_validation=for_joint,
-            score_cutoffs=score_cutoffs[data_type[:-1]],  # de-pluralise
+            score_cutoffs=score_cutoffs[data_type[:-1]] if not for_joint else None,  # de-pluralise
         )
 
         if for_joint:
@@ -2355,7 +2355,7 @@ def run_browser_vcf_data_download(
 
     hl.export_vcf(
         ht,
-        f'{contig}_{vcf_outpath}',
+        vcf_outpath,
         metadata=header_dict,
         # append_to_header=append_to_vcf_header_path(data_type=data_type),
         tabix=True,
