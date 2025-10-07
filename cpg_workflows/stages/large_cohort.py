@@ -989,3 +989,72 @@ class PrepareBrowserTable(CohortStage):
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class PrepareBrowserVcfDataDownload(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        data_download_config = config_retrieve(['large_cohort', 'output_versions', 'data_download'], default={})
+        browser_vcf_version = data_download_config.get('version', None)
+        if browser_vcf_version is None:
+            raise ValueError(
+                'large_cohort.output_versions.data_download.version must be set in config for PrepareBrowserVcfDataDownload stage',
+            )
+        browser_vcf_version = slugify(browser_vcf_version)
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
+        data_type: str = data_download_config.get('data_type', 'exomes')
+        chroms = data_download_config.get('chroms', [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM'])
+        return {
+            **{chrom: prefix / data_type / f'{chrom}_variants.vcf.bgz' for chrom in chroms},
+            # **{chrom: prefix / f'{data_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort.scripts import browser_vcf_release
+
+        data_download_config = config_retrieve(['large_cohort', 'output_versions', 'data_download'], default={})
+        data_type: str = data_download_config.get('data_type', 'exomes')
+
+        freq_ht_path: str = data_download_config.get('ht_to_export', None)
+
+        exome_freq_ht_path: str = data_download_config.get('frequencies_exome', None)
+        genome_freq_ht_path: str = data_download_config.get('frequencies_genome', None)
+        vqsr_ht_path: str = data_download_config.get('vqsr_ht', None)
+
+        if data_type == 'joint':
+            assert (
+                exome_freq_ht_path is not None and genome_freq_ht_path is not None
+            ), 'Both exome and genome frequency HT paths must be provided for joint data download.'
+
+        if data_type == 'exomes' or data_type == 'genomes':
+            assert vqsr_ht_path is not None, 'VQSR HT path must be provided for exome or genome data download.'
+
+        joint_included: bool = data_download_config.get('joint_included', False)
+
+        jobs = []
+        outputs = self.expected_outputs(cohort)
+        for chrom, vcf_outpath in outputs.items():
+            j = get_batch().new_job(
+                f'PrepareBrowserVcfDataDownload_{chrom}_{data_type}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(image_path('cpg_workflows'))
+            j.command(
+                query_command(
+                    browser_vcf_release,
+                    browser_vcf_release.run_browser_vcf_data_download.__name__,
+                    freq_ht_path,
+                    data_type,
+                    chrom,
+                    str(vcf_outpath),
+                    joint_included,
+                    str(vqsr_ht_path) if vqsr_ht_path else None,
+                    str(exome_freq_ht_path) if exome_freq_ht_path else None,
+                    str(genome_freq_ht_path) if genome_freq_ht_path else None,
+                    setup_gcp=True,
+                ),
+            )
+            jobs.append(j)
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)
