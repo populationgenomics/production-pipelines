@@ -2248,7 +2248,7 @@ def run_browser_vcf_data_download(
             ht = ht.annotate(info=ht.info.annotate(**info_expr))
             ht = ht.annotate_globals(**validate_hts[dt].index_globals())
 
-    ht = get_joint_filters(ht)
+        ht = get_joint_filters(ht)
 
     logger.info(f'Checkpointing validated_ht to {output_path(f"{contig}_{data_type}_validated.ht", category="tmp")}...')
     validated_ht = ht.checkpoint(output_path(f"{contig}_{data_type}_validated.ht", category="tmp"), overwrite=True)
