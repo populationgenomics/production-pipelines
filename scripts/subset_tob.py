@@ -26,8 +26,19 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
     prefix = path_prefix
 
     blobs = client.list_blobs(bucket_name, prefix=prefix)
-
-    gvcf_files = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".gvcf.gz")]
+    # list_blobs(prefix=...) returns EVERY object whose name starts with that prefix,
+    # including those in the chrm/ subdirectory. We must exclude previously produced outputs.
+    gvcf_files: list[str] = []
+    for blob in blobs:
+        name = blob.name
+        # Skip anything in the output subdirectory
+        if name.startswith(f'{prefix.rstrip("/")}/chrm/'):
+            continue
+        if not name.endswith('.gvcf.gz'):
+            continue
+        if 'chrM.hard' in name or 'chrM.hard-filtered' in name:
+            continue
+        gvcf_files.append(f'gs://{bucket_name}/{name}')
 
     gvcf_pairs = [(g, g + ".tbi") for g in gvcf_files]
 
@@ -77,7 +88,7 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
         )
 
-        b.run(wait=False)
+    b.run(wait=False)
 
 
 if __name__ == '__main__':
