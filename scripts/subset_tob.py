@@ -34,10 +34,6 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
     print(f"Found {len(gvcf_pairs)} GVCFs")
 
     for gvcf, tbi in gvcf_pairs:
-        output_path = to_path(f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}')
-        if output_path.exists():
-            print(f"Skipping {gvcf}, output already exists")
-            continue
         print(f"Processing {gvcf}")
         # create job
         j = b.new_bash_job(
@@ -74,11 +70,11 @@ def main(bucket: str, path_prefix: str, output_chrm_gvcf_dir: str):
             """,
         )
 
-        print(f"Writing to {output_path}")
+        print(f'Writing to {output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}')
 
         b.write_output(
             j.output,
-            str(output_path),
+            f'{output_chrm_gvcf_dir.rstrip("/")}/{gvcf.rsplit("/",1)[1].replace("hard","chrM.hard")}',
         )
 
         b.run(wait=False)
