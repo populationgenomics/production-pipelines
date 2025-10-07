@@ -1005,12 +1005,12 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         browser_vcf_version = slugify(browser_vcf_version)
 
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
-        seq_type = config_retrieve(['workflow', 'sequencing_type'], default='exome')
+        data_type = config_retrieve(['large_cohort', 'output_versions', 'data_download_data_type'], default='exomes')
         # chroms = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         chroms = ['chr22']  # FIXME testing only
         return {
-            **{chrom: prefix / f'{seq_type}_{chrom}_variants.vcf.bgz' for chrom in chroms},
-            # **{chrom: prefix / f'{seq_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
+            **{chrom: prefix / data_type / f'{chrom}_variants.vcf.bgz' for chrom in chroms},
+            # **{chrom: prefix / f'{data_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
