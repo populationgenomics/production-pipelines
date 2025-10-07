@@ -995,7 +995,7 @@ class PrepareBrowserTable(CohortStage):
 class PrepareBrowserVcfDataDownload(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         browser_vcf_version = config_retrieve(
-            ['large_cohort', 'output_versions', 'data_download'],
+            ['large_cohort', 'output_versions', 'data_download', 'version'],
             default=None,
         )
         if browser_vcf_version is None:
@@ -1005,7 +1005,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         browser_vcf_version = slugify(browser_vcf_version)
 
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
-        data_type = config_retrieve(['large_cohort', 'output_versions', 'data_download_data_type'], default='exomes')
+        data_type: str = config_retrieve(['large_cohort', 'data_download', 'data_type'], default='exomes')
         # chroms = [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM']
         chroms = ['chr22']  # FIXME testing only
         return {
