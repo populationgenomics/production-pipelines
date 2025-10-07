@@ -97,15 +97,7 @@ INFO_VCF_AS_PIPE_DELIMITED_FIELDS = [
 ]
 
 JOINT_REGION_FLAGS_INFO_DICT = {
-    'fail_interval_qc': {
-        'Description': (
-            'Less than 85 percent of samples meet 20X coverage if variant is in'
-            ' autosomal or PAR regions or 10X coverage for non-PAR regions of'
-            ' chromosomes X and Y.'
-        ),
-    },
     'outside_capture_region': {
-        # NOTE: Ask Josh what probeset so we can be more specific
         'Description': 'Variant falls outside of the OurDNA exome capture regions.',
     },
     'outside_calling_region': {
@@ -133,7 +125,6 @@ SORT_ORDER = [
 ]
 
 JOINT_REGION_FLAG_FIELDS = [
-    # 'fail_interval_qc',
     'outside_capture_region',
     'outside_calling_region',
     'not_called_in_exomes',
@@ -143,7 +134,6 @@ REGION_FLAG_FIELDS_FLAT = ['lcr', 'non_par', 'segdup']  # 'nonpar' and 'decoy' a
 REGION_FLAG_FIELDS = {
     'exomes': REGION_FLAG_FIELDS_FLAT
     + [
-        # 'fail_interval_qc',
         'outside_capture_region',
         'outside_calling_region',
     ],
@@ -310,13 +300,6 @@ INFO_DICT = {
         'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
     'segdup': {'Description': 'Variant falls within a segmental duplication region'},
-    'fail_interval_qc': {
-        'Description': (
-            'Less than 85 percent of samples meet 20X coverage if variant is in'
-            ' autosomal or PAR regions or 10X coverage for non-PAR regions of'
-            ' chromosomes X and Y.'
-        ),
-    },
     'outside_ukb_capture_region': {
         'Description': 'Variant falls outside of UK Biobank exome capture regions.',
     },
