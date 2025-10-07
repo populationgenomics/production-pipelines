@@ -994,13 +994,16 @@ class PrepareBrowserTable(CohortStage):
 @stage()
 class PrepareBrowserVcfDataDownload(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
-        if browser_vcf_version := config_retrieve(
+        browser_vcf_version = config_retrieve(
             ['large_cohort', 'output_versions', 'preparebrowservcfdata'],
             default=None,
-        ):
-            browser_vcf_version = slugify(browser_vcf_version)
+        )
+        if browser_vcf_version is None:
+            raise ValueError(
+                'large_cohort.output_versions.preparebrowservcfdata must be set in config for PrepareBrowserVcfDataDownload stage',
+            )
+        browser_vcf_version = slugify(browser_vcf_version)
 
-        browser_vcf_version = browser_vcf_version or get_workflow().output_version
         prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
         seq_type = config_retrieve(['workflow', 'sequencing_type'], default='exome')
         chroms = [f'chr{i}' for i in range(1, 23)]
