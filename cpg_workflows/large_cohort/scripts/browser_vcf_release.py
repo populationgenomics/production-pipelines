@@ -167,10 +167,6 @@ AS_FIELDS = [
     'AS_SB_TABLE',
     'AS_SOR',
     'AS_VarDP',
-    # 'InbreedingCoeff',
-    # NOTE: Figure out if our inbreed_coeff is site-level or AS. Also, should it be
-    # inside the info field. At the moment we lose it during the above code.
-    # 'inbreeding_coeff',
 ]
 AS_VQSR_FIELDS = ['AS_culprit', 'AS_VQSLOD']
 
