@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
-joint_included = False
 LEN_COMP_GLOBAL_ROWS = {
     'freq': ['freq_meta', 'freq_index_dict', 'freq_meta_sample_count'],
     'faf': ['faf_meta', 'faf_index_dict'],
@@ -2150,6 +2149,7 @@ def run_browser_vcf_data_download(
     data_type: str,
     contig: str,
     vcf_outpath: str,
+    joint_included: bool = False,
     vqsr_ht_path: str | None = None,
     exome_freq_ht_path: str | None = None,
     genome_freq_ht_path: str | None = None,

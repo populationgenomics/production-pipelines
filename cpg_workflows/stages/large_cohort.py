@@ -995,12 +995,12 @@ class PrepareBrowserTable(CohortStage):
 class PrepareBrowserVcfDataDownload(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         browser_vcf_version = config_retrieve(
-            ['large_cohort', 'output_versions', 'preparebrowservcfdata'],
+            ['large_cohort', 'output_versions', 'data_download'],
             default=None,
         )
         if browser_vcf_version is None:
             raise ValueError(
-                'large_cohort.output_versions.preparebrowservcfdata must be set in config for PrepareBrowserVcfDataDownload stage',
+                'large_cohort.output_versions.data_download must be set in config for PrepareBrowserVcfDataDownload stage',
             )
         browser_vcf_version = slugify(browser_vcf_version)
 
@@ -1031,6 +1031,8 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         if data_type == 'exomes' or data_type == 'genomes':
             assert vqsr_ht_path is not None, 'VQSR HT path must be provided for exome or genome data download.'
 
+        joint_included = config_retrieve(['large_cohort', 'data_download', 'joint_included'], default=False)
+
         jobs = []
         outputs = self.expected_outputs(cohort)
         for chrom, vcf_outpath in outputs.items():
@@ -1047,6 +1049,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                     data_type,
                     chrom,
                     str(vcf_outpath),
+                    joint_included,
                     str(vqsr_ht_path) if vqsr_ht_path else None,
                     str(exome_freq_ht_path) if exome_freq_ht_path else None,
                     str(genome_freq_ht_path) if genome_freq_ht_path else None,
