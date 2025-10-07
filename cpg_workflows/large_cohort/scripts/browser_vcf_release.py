@@ -230,14 +230,6 @@ INFO_DICT = {
     'FS': {
         'Description': 'Phred-scaled p-value of Fisher"s exact test for strand bias',
     },
-    'inbreeding_coeff': {
-        'Number': 'A',
-        'Description': (
-            'Inbreeding coefficient, the excess heterozygosity at a variant site,'
-            ' computed as 1 - (the number of heterozygous genotypes)/(the number of'
-            ' heterozygous genotypes expected under Hardy-Weinberg equilibrium)'
-        ),
-    },
     'MQ': {
         'Description': ('Root mean square of the mapping quality of reads across all samples'),
     },
@@ -1186,7 +1178,7 @@ def make_vcf_filter_dict(
                     ' < 20; DP < 10; and AB < 0.2 for het calls)'
                 ),
             },
-            'InbreedingCoeff': {
+            'inbreeding_coeff': {
                 'Description': f'Inbreeding coefficient < {inbreeding_cutoff}',
             },
             'PASS': {'Description': 'Passed all variant filters'},
