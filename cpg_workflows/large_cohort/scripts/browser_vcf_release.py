@@ -152,9 +152,9 @@ SITE_FIELDS_FLAT = [
     'VarDP',
 ]
 SITE_FIELDS = {
-    'exomes': SITE_FIELDS_FLAT + ['sibling_singleton'],
+    'exomes': SITE_FIELDS_FLAT,
     'genomes': SITE_FIELDS_FLAT,
-    'joint': SITE_FIELDS_FLAT + ['sibling_singleton'],
+    'joint': SITE_FIELDS_FLAT,
 }
 AS_FIELDS = [
     'AS_FS',
@@ -2134,6 +2134,63 @@ def populate_info_dict(
     return vcf_info_dict
 
 
+def adjust_interval_padding(ht: hl.Table, padding: int) -> hl.Table:
+    """
+    Adjust interval padding in HT.
+
+    .. warning::
+
+        This function can lead to overlapping intervals, so it is not recommended for
+        most applications. For example, it can be used to filter a variant list to all
+        variants within the returned interval list, but would not work for getting an
+        aggregate statistic for each interval if the desired output is independent
+        statistics.
+
+    :param ht: HT to adjust.
+    :param padding: Padding to use.
+    :return: HT with adjusted interval padding.
+    """
+    return ht.key_by(
+        interval=hl.locus_interval(
+            ht.interval.start.contig,
+            ht.interval.start.position - padding,
+            ht.interval.end.position + padding,
+            # Include the end of the intervals to capture all variants.
+            reference_genome=ht.interval.start.dtype.reference_genome,
+            includes_end=True,
+        ),
+    )
+
+
+def add_capture_region_flags(ht: hl.Table) -> hl.Table:
+    capture_intervals_paths: list[str] = config_retrieve(['large_cohort', 'browser', 'capture_intervals'])
+    capture_tables = [
+        hl.import_locus_intervals(str(path), reference_genome=genome_build()) for path in capture_intervals_paths
+    ]
+    if len(capture_intervals_paths) > 1:
+        # Deduplicate keys, keeping exactly one row for each unique key (key='interval').
+        capture_intervals_ht = hl.Table.union(*capture_tables)
+    else:
+        capture_intervals_ht = capture_tables[0]
+
+    calling_intervals_path = config_retrieve(['large_cohort', 'browser', 'calling_intervals'])
+    calling_interval_padding = config_retrieve(['large_cohort', 'browser', 'calling_interval_padding'], default=150)
+    calling_intervals_ht = hl.import_locus_intervals(str(calling_intervals_path), reference_genome=genome_build())
+
+    intervals: list[tuple[str, hl.Table]] = [
+        ('calling', adjust_interval_padding(calling_intervals_ht, calling_interval_padding)),
+    ] + [
+        ('capture', capture_intervals_ht),
+    ]
+
+    new_flags = {
+        **{f"outside_{c}_region": hl.is_missing(i[ht.locus]) for c, i in intervals},
+    }
+
+    ht = ht.annotate(region_flags=ht.region_flags.annotate(**new_flags))
+    return ht
+
+
 def run_browser_vcf_data_download(
     ht_path: hl.Table,
     data_type: str,
@@ -2158,6 +2215,10 @@ def run_browser_vcf_data_download(
         # Annotating back allele_info to have allele_info fields in info dict
         vqsr_ht = hl.read_table(vqsr_ht_path)
         ht = ht.annotate(allele_info=vqsr_ht[ht.key].allele_info)
+
+    if data_type == 'exomes':
+        # annotate capture and calling regions to ht.region_flags
+        ht = add_capture_region_flags(ht)
 
     score_cutoffs = {
         seq_type: process_score_cutoffs(
