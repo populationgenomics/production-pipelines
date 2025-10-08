@@ -1013,6 +1013,20 @@ class PrepareBrowserVcfDataDownload(CohortStage):
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
         from cpg_workflows.large_cohort.scripts import browser_vcf_release
 
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
         data_download_config = config_retrieve(['large_cohort', 'output_versions', 'data_download'], default={})
         data_type: str = data_download_config.get('data_type', 'exomes')
 
@@ -1053,6 +1067,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                     str(exome_freq_ht_path) if exome_freq_ht_path else None,
                     str(genome_freq_ht_path) if genome_freq_ht_path else None,
                     setup_gcp=True,
+                    init_batch_args=init_batch_args,
                 ),
             )
             jobs.append(j)
