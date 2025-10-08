@@ -152,9 +152,9 @@ SITE_FIELDS_FLAT = [
     'VarDP',
 ]
 SITE_FIELDS = {
-    'exomes': SITE_FIELDS_FLAT + ['sibling_singleton'],
+    'exomes': SITE_FIELDS_FLAT,
     'genomes': SITE_FIELDS_FLAT,
-    'joint': SITE_FIELDS_FLAT + ['sibling_singleton'],
+    'joint': SITE_FIELDS_FLAT,
 }
 AS_FIELDS = [
     'AS_FS',
