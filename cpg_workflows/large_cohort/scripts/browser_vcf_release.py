@@ -48,32 +48,44 @@ SUBSETS = {
 IN_SILICO_ANNOTATIONS_INFO_DICT = None
 VRS_FIELDS_DICT = None
 GEN_ANC_NAMES = {
-    'CSA': 'Central/South Asian',
-    'EAS': 'East Asian',
+    'AFR': 'African / African American / African Caribbean',
+    'AMR': 'Central & South American',
+    'CSA': 'Central / South Asian',
+    'EAS': 'East & Southeast Asian',
     'EUR': 'European',
     'FIL': 'Filipino',
+    'MID': 'Middle Eastern / North African',
+    'NA': 'Unclassified',
 }
 FAF_GEN_ANC_GROUPS = {
-    'v1': ['CSA', 'EAS', 'EUR', 'FIL'],
+    'v1': ['AFR', 'AMR', 'CSA', 'EAS', 'EUR', 'FIL', 'MID', 'NA'],
 }
 GEN_ANC_GROUPS = {
     'genomes': [
+        'AFR',
+        'AMR',
         'CSA',
         'EAS',
         'EUR',
         'FIL',
+        'MID',
+        'NA',
     ],
     'exomes': [
+        'AFR',
+        'AMR',
         'CSA',
         'EAS',
         'EUR',
         'FIL',
+        'MID',
+        'NA',
     ],
 }
 GEN_ANC_GROUPS['joint'] = list(set(GEN_ANC_GROUPS['exomes']) | set(GEN_ANC_GROUPS['genomes']))
 GEN_ANC_GROUPS = {d: {pop: GEN_ANC_NAMES[pop] for pop in pops} for d, pops in GEN_ANC_GROUPS.items()}  # type: ignore
 FAF_GEN_ANC_GROUPS = {
-    'v1': ['CSA', 'EAS', 'EUR', 'FIL'],
+    'v1': ['AFR', 'AMR', 'CSA', 'EAS', 'EUR', 'FIL', 'MID', 'NA'],
 }
 JOINT_FILTERS_INFO_DICT = {
     'exomes_filters': {'Description': "Filters' values from the exomes dataset."},
