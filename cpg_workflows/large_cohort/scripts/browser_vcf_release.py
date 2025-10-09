@@ -355,6 +355,11 @@ INFO_DICT = {
         'Number': '.',
         'Description': ('Allele-specific forward/reverse read counts for strand bias tests'),
     },
+    # Hard coding this one due to `grpmax` not being a genetic ancestry to iterate over
+    'faf95_grpmax': {
+        'Number': 'A',
+        'Description': 'Filtering allele frequency (using Poisson 95% CI) for the genetic ancestry group with the maximum allele',
+    },
 }
 
 
