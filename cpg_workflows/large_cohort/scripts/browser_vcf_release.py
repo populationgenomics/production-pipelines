@@ -112,7 +112,7 @@ JOINT_REGION_FLAGS_INFO_DICT = {
         'Description': 'Variant falls outside of the OurDNA exome capture regions.',
     },
     'outside_calling_region': {
-        'Description': ('Variant falls outside of the OurDNA exome capture regions plus 150 bp' ' padding.'),
+        'Description': ('Variant falls outside of the OurDNA exome capture regions plus 150 bp padding.'),
     },
     'not_called_in_exomes': {
         'Description': 'Variant was not called in the OurDNA exomes.',
@@ -288,6 +288,12 @@ INFO_DICT = {
         'Description': ('Variant (on sex chromosome) falls outside a pseudoautosomal region'),
     },
     'segdup': {'Description': 'Variant falls within a segmental duplication region'},
+    'outside_capture_region': {
+        'Description': 'Variant falls outside of the OurDNA exome capture regions.',
+    },
+    'outside_calling_region': {
+        'Description': ('Variant falls outside of the OurDNA exome capture regions plus 150 bp padding.'),
+    },
     'rf_positive_label': {
         'Description': ('Variant was labelled as a positive example for training of random forest' ' model'),
     },
