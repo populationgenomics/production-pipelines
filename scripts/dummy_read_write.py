@@ -22,6 +22,7 @@ def main(input_file: str, output_file: str):
     localised_file = batch_instance.read_input(input_file)
 
     job = batch_instance.new_bash_job('The Job')
+    job.storage('50GiB')
     job.command(f'ls {localised_file}')
 
     batch_instance.write_output(localised_file, output_file)
