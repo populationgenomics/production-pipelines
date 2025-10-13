@@ -26,6 +26,8 @@ def main(input_file: str, output_file: str):
 
     batch_instance.write_output(localised_file, output_file)
 
+    batch_instance.run(wait=False)
+
 
 if __name__ == "__main__":
     parser = ArgumentParser()
