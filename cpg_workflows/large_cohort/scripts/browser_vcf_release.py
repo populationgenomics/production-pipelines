@@ -2223,6 +2223,7 @@ def add_capture_region_flags(ht: hl.Table) -> hl.Table:
 def repartition_frequencies_table(
     ht_path: str,
     data_type: str,
+    new_path: str,
 ):
     """
     Repartition the genomes and joint frequency table.
@@ -2232,16 +2233,11 @@ def repartition_frequencies_table(
     If data_type is genome or joint, check if can_reuse, otherwise
     repartition and checkpoint to temp. Return path to this table
     """
-    if data_type == "exome":
-        return ht_path
+    if can_reuse(new_path):
+        logger.info(f'Reusing existing repartitioned {data_type} frequencies table')
     else:
-        ht_path_repartition = output_path(f"{data_type}_repartitioned.ht", category="tmp")
-        if can_reuse(ht_path_repartition):
-            logger.info(f'Reusing existing repartitioned {data_type} frequencies table')
-        else:
-            logger.info(f'Repartitioning {data_type} frequencies table')
-            freq_table = hl.read_table(ht_path).repartition(n=10000).checkpoint(ht_path_repartition, overwrite=True)
-        return ht_path_repartition
+        logger.info(f'Repartitioning {data_type} frequencies table')
+        hl.read_table(ht_path).repartition(n=10000).checkpoint(new_path, overwrite=True)
 
 
 def run_browser_vcf_data_download(
