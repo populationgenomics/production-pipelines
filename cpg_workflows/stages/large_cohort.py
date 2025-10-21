@@ -1052,7 +1052,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         if data_type == 'exomes':
             prejob = None
         else:
-            ht_path_repartitioned  = output_path(f"{data_type}_repartitioned.ht", category="tmp")
+            ht_path_repartitioned = output_path(f"{data_type}_repartitioned.ht", category="tmp")
             prejob = get_batch().new_job(
                 f'RepartitionFrequenciesTable_{data_type}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
