@@ -2253,8 +2253,7 @@ def run_browser_vcf_data_download(
     rather than the raw joint frequencies table. For exomes/genomes, uses the
     original frequencies stage output.
     """
-    ht = hl.read_table(ht_path).repartition(n = 10000).checkpoint(output_path(f"{contig}_{data_type}_validated.ht", category="tmp"), overwrite=True)
-    validated_ht = ht.checkpoint(output_path(f"{contig}_{data_type}_validated.ht", category="tmp"), overwrite=True)
+    ht = hl.read_table(ht_path)
 
     if vqsr_ht_path and data_type != 'joint':
         # genomes and exomes frequency tables have allele_info dropped
