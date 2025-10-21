@@ -1047,6 +1047,24 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         joint_included: bool = data_download_config.get('joint_included', False)
 
         jobs = []
+
+        prejob = get_batch().new_job(
+            f'RepartitionFrequenciesTable_{data_type}',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        prejob.image(image_path('cpg_workflows'))
+        prejob.command(
+            query_command(
+                browser_vcf_release,
+                browser_vcf_release.repartition_frequencies_table.__name__,
+                freq_ht_path,
+                data_type,
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+        jobs.append(prejob)
+
         outputs = self.expected_outputs(cohort)
         for chrom, vcf_outpath in outputs.items():
             j = get_batch().new_job(
@@ -1058,7 +1076,7 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                 query_command(
                     browser_vcf_release,
                     browser_vcf_release.run_browser_vcf_data_download.__name__,
-                    freq_ht_path,
+                    prejob.ofile,
                     data_type,
                     chrom,
                     str(vcf_outpath),
