@@ -2225,15 +2225,25 @@ def repartition_frequencies_table(
     data_type: str,
 ):
     """
-    Repartition the genomes frequency table.
-    # TODO fix this readme
+    Repartition the genomes and joint frequency table.
+
+    If data_type is exome, no need to repartition, return existing path to
+    frequencies table.
+    If data_type is genome or joint, check if can_reuse, otherwise
+    repartition and checkpoint to temp. Return path to this table
     """
     if data_type == "exome":
-        return(ht_path)
+        ht_path_repartition = ht_path
+        return(ht_path_repartition)
     else:
-        repartitioned_path = output_path(f"{data_type}_repartitioned.ht", category="tmp")
-        freq_table = hl.read_table(ht_path).repartition(n = 10000).checkpoint(repartitioned_path, overwrite=True)
-        return(repartitioned_path)
+        ht_path_repartition = output_path(f"{data_type}_repartitioned.ht", category="tmp")
+        if can_reuse(ht_path_repartition):
+            logger.info(f'Reusing existing repartitioned {data_type} frequencies table')
+        else:
+            logger.info(f'Repartitioning {data_type} frequencies table')
+            freq_table = hl.read_table(ht_path).repartition(n = 10000).checkpoint(ht_path_repartition, overwrite=True)
+
+        return ht_path_repartition
 
 
 def run_browser_vcf_data_download(
