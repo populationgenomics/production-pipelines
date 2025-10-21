@@ -1207,6 +1207,12 @@ def make_vcf_filter_dict(
             'inbreeding_coeff': {
                 'Description': f'Inbreeding coefficient < {inbreeding_cutoff}',
             },
+            'AS_lowqual': {
+                'Description': (
+                    'Whether the variant falls below a low quality threshold and was '
+                'excluded from the OurDNA dataset'
+                ),
+            },
             'PASS': {'Description': 'Passed all variant filters'},
             variant_qc_filter: variant_qc_filter_dict[variant_qc_filter],
         }
