@@ -933,7 +933,7 @@ def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
 
     ac = _freq(ht, subset=None).AC
     filters = {
-        'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        'inbreeding_coeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         'AC0': ac == 0,
         'AS_lowqual': ht.AS_lowqual,
         'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
@@ -1057,7 +1057,7 @@ def prepare_ht_for_validation(
         inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
         ac = _freq(ht, subset=None).AC
         filters = {
-            'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+            'inbreeding_coeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
             'AC0': ac == 0,
             'AS_lowqual': ht.AS_lowqual,
             'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
