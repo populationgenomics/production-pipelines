@@ -1210,7 +1210,7 @@ def make_vcf_filter_dict(
             'AS_lowqual': {
                 'Description': (
                     'Whether the variant falls below a low quality threshold and was '
-                'excluded from the OurDNA dataset'
+                    'excluded from the OurDNA dataset'
                 ),
             },
             'PASS': {'Description': 'Passed all variant filters'},
