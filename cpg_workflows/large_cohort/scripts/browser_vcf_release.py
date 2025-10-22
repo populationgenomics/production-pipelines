@@ -2226,12 +2226,9 @@ def repartition_frequencies_table(
     new_path: str,
 ):
     """
-    Repartition the genomes and joint frequency table.
-
-    If data_type is exome, no need to repartition, return existing path to
-    frequencies table.
-    If data_type is genome or joint, check if can_reuse, otherwise
-    repartition and checkpoint to temp. Return path to this table
+    Repartition the genomes and joint frequency tables, this method is not required for Exomes.
+    
+    First use can_reuse to check if the new data path exists. If not repartition and checkpoint.
     """
     if can_reuse(new_path):
         logger.info(f'Reusing existing repartitioned {data_type} frequencies table')
