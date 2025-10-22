@@ -6,7 +6,7 @@ from numpy import require
 from requests import get
 
 from cpg_utils import Path, to_path
-from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path, output_path
 from cpg_utils.hail_batch import get_batch, query_command
 from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.large_cohort.combiner import combiner
@@ -1047,13 +1047,38 @@ class PrepareBrowserVcfDataDownload(CohortStage):
         joint_included: bool = data_download_config.get('joint_included', False)
 
         jobs = []
+
+        # only schedule a repartition job if this is a genome. For exomes use the original HT path
+        if data_type == 'exomes':
+            prejob = None
+        else:
+            ht_path_repartitioned = output_path(f"{data_type}_repartitioned.ht", category="tmp")
+            prejob = get_batch().new_job(
+                f'RepartitionFrequenciesTable_{data_type}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            prejob.image(workflow_config['driver_image'])
+            prejob.command(
+                query_command(
+                    browser_vcf_release,
+                    browser_vcf_release.repartition_frequencies_table.__name__,
+                    freq_ht_path,
+                    data_type,
+                    ht_path_repartitioned,
+                    setup_gcp=True,
+                    init_batch_args=init_batch_args,
+                ),
+            )
+            freq_ht_path = ht_path_repartitioned
+            jobs.append(prejob)
+
         outputs = self.expected_outputs(cohort)
         for chrom, vcf_outpath in outputs.items():
             j = get_batch().new_job(
                 f'PrepareBrowserVcfDataDownload_{chrom}_{data_type}',
                 (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
             )
-            j.image(image_path('cpg_workflows'))
+            j.image(workflow_config['driver_image'])
             j.command(
                 query_command(
                     browser_vcf_release,
@@ -1070,6 +1095,10 @@ class PrepareBrowserVcfDataDownload(CohortStage):
                     init_batch_args=init_batch_args,
                 ),
             )
+
+            if prejob:
+                j.depends_on(prejob)
+
             jobs.append(j)
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

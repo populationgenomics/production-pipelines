@@ -933,7 +933,7 @@ def get_filters_expr(ht: hl.Table, score_cutoffs: dict) -> hl.Table:
 
     ac = _freq(ht, subset=None).AC
     filters = {
-        'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+        'inbreeding_coeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
         'AC0': ac == 0,
         'AS_lowqual': ht.AS_lowqual,
         'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
@@ -1057,7 +1057,7 @@ def prepare_ht_for_validation(
         inbreeding_coeff_cutoff = config_retrieve(['large_cohort', 'browser', 'inbreeding_coeff_cutoff'])
         ac = _freq(ht, subset=None).AC
         filters = {
-            'InbreedingCoeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
+            'inbreeding_coeff': ht.inbreeding_coeff[0] < inbreeding_coeff_cutoff,
             'AC0': ac == 0,
             'AS_lowqual': ht.AS_lowqual,
             'AS_VQSR': hl.is_missing(ht.info['AS_VQSLOD']),
@@ -1206,6 +1206,12 @@ def make_vcf_filter_dict(
             },
             'inbreeding_coeff': {
                 'Description': f'Inbreeding coefficient < {inbreeding_cutoff}',
+            },
+            'AS_lowqual': {
+                'Description': (
+                    'Whether the variant falls below a low quality threshold and was '
+                    'excluded from the OurDNA dataset'
+                ),
             },
             'PASS': {'Description': 'Passed all variant filters'},
             variant_qc_filter: variant_qc_filter_dict[variant_qc_filter],
@@ -2212,6 +2218,23 @@ def add_capture_region_flags(ht: hl.Table) -> hl.Table:
 
     ht = ht.annotate(region_flags=ht.region_flags.annotate(**new_flags))
     return ht
+
+
+def repartition_frequencies_table(
+    ht_path: str,
+    data_type: str,
+    new_path: str,
+):
+    """
+    Repartition the genomes and joint frequency tables, this method is not required for Exomes.
+
+    First use can_reuse to check if the new data path exists. If not repartition and checkpoint.
+    """
+    if can_reuse(new_path):
+        logger.info(f'Reusing existing repartitioned {data_type} frequencies table')
+    else:
+        logger.info(f'Repartitioning {data_type} frequencies table')
+        hl.read_table(ht_path).repartition(n=10000).checkpoint(new_path, overwrite=True)
 
 
 def run_browser_vcf_data_download(
