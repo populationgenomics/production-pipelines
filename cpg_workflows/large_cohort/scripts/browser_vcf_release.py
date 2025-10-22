@@ -2227,7 +2227,7 @@ def repartition_frequencies_table(
 ):
     """
     Repartition the genomes and joint frequency tables, this method is not required for Exomes.
-    
+
     First use can_reuse to check if the new data path exists. If not repartition and checkpoint.
     """
     if can_reuse(new_path):
