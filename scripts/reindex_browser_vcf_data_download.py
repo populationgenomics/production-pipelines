@@ -32,7 +32,7 @@ def main(data_type: str, bucket_name: str):
     bucket = client.bucket(bucket_name)
     blobs = bucket.list_blobs(prefix=path_prefix)
 
-    paths = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".vcf.gz")]
+    paths = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".vcf.bgz")]
 
     b = get_batch()
     for path in paths:
