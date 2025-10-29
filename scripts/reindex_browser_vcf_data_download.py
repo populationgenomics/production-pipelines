@@ -27,7 +27,13 @@ def main(data_type: str, bucket_name: str):
     This script reindexes browser VCF data download files.
     """
 
-    path_prefix = f'large_cohort/browser_data_download/v1-1/{data_type}'
+    PREFIX_ROOT = {
+        'exomes': 'exome/large_cohort/browser_data_download/v1-1/exomes',
+        'genomes': 'large_cohort/browser_data_download/v1-1/genomes',
+        'joint': 'large_cohort/browser_data_download/v1-1/joint',
+    }
+
+    path_prefix = PREFIX_ROOT[data_type]
     client = storage.Client()
     bucket = client.bucket(bucket_name)
     blobs = bucket.list_blobs(prefix=path_prefix)
