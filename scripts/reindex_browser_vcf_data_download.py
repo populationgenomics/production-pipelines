@@ -32,12 +32,12 @@ def main(data_type: str, bucket_name: str):
     bucket = client.bucket(bucket_name)
     blobs = bucket.list_blobs(prefix=path_prefix)
 
-    paths = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".vcf.gz")]
+    paths = [f"gs://{bucket_name}/{b.name}" for b in blobs if b.name.endswith(".vcf.bgz")]
 
     b = get_batch()
     for path in paths:
         base = path.rsplit('/', 1)[1]
-        output_path = path.replace('.vcf.gz', '.vcf.gz.csi')
+        output_path = path.replace('.vcf.bgz', '.vcf.bgz.csi')
         reindex_j = b.new_bash_job(f'Reindex browser VCF data download files for {path}')
         reindex_j.image(image_path('bcftools_121', '1.21-1'))
         reindex_j.storage('50Gi')
