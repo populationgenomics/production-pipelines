@@ -36,7 +36,7 @@ def main(data_type: str, bucket_name: str):
 
     b = get_batch()
     for path in paths:
-        base = path.rsplit('/', 1)[1]
+        input_file = b.read_input(path)
         output_path = path.replace('.vcf.bgz', '.vcf.bgz.csi')
         reindex_j = b.new_bash_job(f'Reindex browser VCF data download files for {path}')
         reindex_j.image(image_path('bcftools_121', '1.21-1'))
@@ -44,9 +44,8 @@ def main(data_type: str, bucket_name: str):
         reindex_j.command(
             f"""
 set -euxo pipefail
-IN="{base}"
-gsutil -m cp "{path}" $BATCH_TMPDIR/
-bcftools index -f -c "$BATCH_TMPDIR/$IN" -o ${reindex_j.out_idx}
+IN="{input_file}"
+bcftools index -f -c "$IN" -o {reindex_j.out_idx}
 """,
         )
         b.write_output(reindex_j.out_idx, output_path)
