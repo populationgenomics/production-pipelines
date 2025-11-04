@@ -240,6 +240,8 @@ def _populate_alignment_inputs(
     """
     Populate sequencing inputs for a sequencing group
     """
+    # We don't have assay information anymore
+    return None
     assays: list[Assay] = []
 
     for assay in entry.get('assays', []):
