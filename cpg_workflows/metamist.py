@@ -5,10 +5,9 @@ Helpers to communicate with the metamist database.
 import logging
 import pprint
 import traceback
-from collections.abc import Callable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, Callable, Optional
 
 from gql.transport.exceptions import TransportServerError
 from tenacity import (
@@ -498,7 +497,8 @@ class Metamist:
             return None
         else:
             logging.info(
-                f'Created Analysis(id={aid}, type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
+                f'Created Analysis(id={aid}, type={type_}, status={status}, '
+                f'output={str(output)}) in {metamist_proj}',
             )
             return aid
 
@@ -535,7 +535,7 @@ class Metamist:
         if not completed_analysis:
             logging.warning(
                 f'Not found completed analysis {label} for '
-                f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups"}',
+                f'{f"sequencing group {sequencing_group_ids}" if len(sequencing_group_ids) == 1 else f"{len(sequencing_group_ids)} sequencing_groups" }',
             )
         elif not completed_analysis.output:
             logging.error(f'Found a completed analysis {label}, but the "output" field does not exist or empty')
@@ -550,7 +550,8 @@ class Metamist:
                 found_output_fpath = None
             elif not exists(found_output_fpath):
                 logging.error(
-                    f'Found a completed analysis {label}, but the "output" file {found_output_fpath} does not exist',
+                    f'Found a completed analysis {label}, '
+                    f'but the "output" file {found_output_fpath} does not exist',
                 )
                 found_output_fpath = None
 
@@ -562,7 +563,8 @@ class Metamist:
         # can't reuse, need to invalidate
         if completed_analysis:
             logging.warning(
-                f'Invalidating the analysis {label} by setting the status to "failure", and resubmitting the analysis.',
+                f'Invalidating the analysis {label} by setting the status to "failure", '
+                f'and resubmitting the analysis.',
             )
             self.update_analysis(completed_analysis, status=AnalysisStatus.FAILED)
 
@@ -690,7 +692,8 @@ def parse_reads(  # pylint: disable=too-many-return-statements
         location = reads_data[0]['location']
         if not (location.endswith('.cram') or location.endswith('.bam')):
             raise MetamistError(
-                f'{sequencing_group_id}: ERROR: expected the file to have an extension .cram or .bam, got: {location}',
+                f'{sequencing_group_id}: ERROR: expected the file to have an extension '
+                f'.cram or .bam, got: {location}',
             )
         if get_config()['workflow']['access_level'] == 'test':
             location = location.replace('-main-upload/', '-test-upload/')
