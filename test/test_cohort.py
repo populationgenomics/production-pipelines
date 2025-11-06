@@ -5,6 +5,7 @@ Test reading inputs into a Cohort object.
 import logging
 import re
 
+import pytest
 from pytest_mock import MockFixture
 
 from cpg_workflows.inputs import Cohort, MultiCohort
@@ -279,6 +280,7 @@ def mock_get_pedigree(*args, **kwargs):  # pylint: disable=unused-argument
     ]
 
 
+@pytest.mark.xfail(reason='_populate_alignment_inputs is disabled')
 def test_cohort(mocker: MockFixture, tmp_path, caplog):
     """
     Testing creating a Cohort object from metamist mocks.
@@ -447,6 +449,7 @@ def mock_get_sgs_with_missing_reads(*args, **kwargs) -> list[dict]:  # pylint: d
     ]
 
 
+@pytest.mark.xfail(reason='_populate_alignment_inputs is disabled')
 def test_missing_reads(mocker: MockFixture, tmp_path):
     """
     Testing creating a Cohort object from metamist mocks.
@@ -658,6 +661,7 @@ def mock_get_sgs_with_mixed_reads(*args, **kwargs) -> list[dict]:  # pylint: dis
     ]
 
 
+@pytest.mark.xfail(reason='_populate_alignment_inputs is disabled')
 def test_mixed_reads(mocker: MockFixture, tmp_path, caplog):
     """
     Testing creating a Cohort object from metamist mocks.

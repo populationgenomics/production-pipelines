@@ -128,7 +128,8 @@ def _populate_cohort(cohort: Cohort, sgs_by_dataset_for_cohort, read_pedigree: b
             if reported_sex := entry['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            _populate_alignment_inputs(sequencing_group, entry)
+            # Don't have assay information anymore --- IGNORE ---
+            # _populate_alignment_inputs(sequencing_group, entry)
 
     if not cohort.get_datasets():
         raise MetamistError('No datasets populated')
@@ -194,7 +195,8 @@ def deprecated_create_cohort() -> MultiCohort:
             if reported_sex := entry['sample']['participant'].get('reportedSex'):
                 sequencing_group.pedigree.sex = Sex.parse(reported_sex)
 
-            _populate_alignment_inputs(sequencing_group, entry)
+            # Don't have assay information anymore --- IGNORE ---
+            # _populate_alignment_inputs(sequencing_group, entry)
 
             # add the same SG Object directly to the MultiCohort level Dataset
             # this object exists in both the MC.Cohort and MC.Dataset
@@ -232,6 +234,7 @@ def _combine_assay_meta(assays: list[Assay]) -> dict:
     return assays_meta
 
 
+# Don't have assay information anymore --- IGNORE ---
 def _populate_alignment_inputs(
     sequencing_group: SequencingGroup,
     entry: dict,
