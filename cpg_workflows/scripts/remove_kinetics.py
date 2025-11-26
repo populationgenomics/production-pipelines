@@ -20,9 +20,10 @@ def main(bucket: str, path_prefix: str, output_dir: str):
     ubam_files: list[str] = []
     for blob in blobs:
         name = blob.name
-        if name.endswith('.ubam'):
+        # ubams have the same file extension as a regular bam
+        if name.endswith('.bam'):
             ubam_files.append(f'gs://{bucket_name}/{prefix}/{name}')
-    print(f"Found {len(ubam_files)} ubams")
+    print(f"Found {len(ubam_files)} bams")
 
     # Initialise Hail Batch
     init_batch(
