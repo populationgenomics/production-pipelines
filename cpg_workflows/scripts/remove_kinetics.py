@@ -21,6 +21,9 @@ def main(bucket: str, path_prefix: str, output_dir: str):
     for blob in blobs:
         name = blob.name
         # ubams have the same file extension as a regular bam
+        # We deliberately skip files with no_kinetics.bam suffix to avoid re-processing
+        if name.endswith('no_kinetics.bam'):
+            continue
         if name.endswith('.bam'):
             ubam_files.append(f'gs://{bucket_name}/{name}')
     print(f"Found {ubam_files} bams")
