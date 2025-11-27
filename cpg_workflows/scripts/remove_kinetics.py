@@ -49,8 +49,8 @@ def main(bucket: str, path_prefix: str, output_dir: str):
             """,
         )
 
-        print(f'Writing output to {output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '.no_kinetics.bam'))
-        b.write_output(j.output, f'{output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '.no_kinetics.bam'))
+        print(f'Writing output to {output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '_no_kinetics_bam'))
+        b.write_output(j.output, f'{output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '_no_kinetics_bam'))
 
     b.run(wait=True)
 
