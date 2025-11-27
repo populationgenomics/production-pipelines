@@ -22,7 +22,7 @@ def main(bucket: str, path_prefix: str, output_dir: str):
         name = blob.name
         # ubams have the same file extension as a regular bam
         if name.endswith('.bam'):
-            ubam_files.append(f'gs://{bucket_name}/{prefix}/{name}')
+            ubam_files.append(f'gs://{bucket_name}/{name}')
     print(f"Found {len(ubam_files)} bams")
 
     # Initialise Hail Batch
