@@ -21,9 +21,12 @@ def main(bucket: str, path_prefix: str, output_dir: str):
     for blob in blobs:
         name = blob.name
         # ubams have the same file extension as a regular bam
+        # We deliberately skip files with no_kinetics.bam suffix to avoid re-processing
+        if name.endswith('no_kinetics.bam'):
+            continue
         if name.endswith('.bam'):
             ubam_files.append(f'gs://{bucket_name}/{name}')
-    print(f"Found {len(ubam_files)} bams")
+    print(f"Found {ubam_files} bams")
 
     # Initialise Hail Batch
     init_batch(
@@ -49,7 +52,8 @@ def main(bucket: str, path_prefix: str, output_dir: str):
             """,
         )
 
-        b.write_output(j.output, f'{output_dir}/{ubam_path.split("/")[-1]}'.replace('.ubam', '.no_kinetics.ubam'))
+        print(f'Writing output to {output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '.no_kinetics.bam'))
+        b.write_output(j.output, f'{output_dir}/{ubam_path.split("/")[-1]}'.replace('.bam', '.no_kinetics.bam'))
 
     b.run(wait=True)
 
