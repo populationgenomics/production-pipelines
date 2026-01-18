@@ -138,7 +138,7 @@ class CramQC(SequencingGroupStage):
         return self.make_outputs(sequencing_group, data=self.expected_outputs(sequencing_group), jobs=jobs)
 
 
-@stage(required_stages=[CramQC])
+@stage(required_stages=[CramQC], analysis_type='qc', analysis_keys=['html', 'samples', 'pairs', 'expected_ped'])
 class SomalierPedigree(DatasetStage):
     """
     Checks pedigree from CRAM fingerprints.
@@ -212,7 +212,7 @@ class SomalierPedigree(DatasetStage):
             return self.make_outputs(dataset, skipped=True)
 
 
-@stage(required_stages=[CramQC, SomalierPedigree], analysis_type='qc', analysis_keys=['json'])
+@stage(required_stages=[CramQC, SomalierPedigree], analysis_type='qc', analysis_keys=['html', 'json'])
 class CramMultiQC(DatasetStage):
     """
     Run MultiQC to aggregate CRAM QC stats.
