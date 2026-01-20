@@ -253,30 +253,26 @@ class AncestryPlots(CohortStage):
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort.ancestry_plots import run
-        from cpg_workflows.large_cohort.dataproc_utils import dataproc_job
+        from cpg_workflows.large_cohort import ancestry_plots
 
-        j = dataproc_job(
-            job_name=self.__class__.__name__,
-            function=run,
-            function_path_args=dict(
-                out_path_pattern=self.out_prefix / self.out_fname_pattern,
-                sample_qc_ht_path=inputs.as_path(cohort, Ancestry, key='sample_qc_ht'),
-                scores_ht_path=inputs.as_path(cohort, Ancestry, key='scores'),
-                eigenvalues_ht_path=inputs.as_path(cohort, Ancestry, key='eigenvalues'),
-                loadings_ht_path=inputs.as_path(cohort, Ancestry, key='loadings'),
-                inferred_pop_ht_path=inputs.as_path(
-                    cohort,
-                    Ancestry,
-                    key='inferred_pop',
-                ),
-                relateds_to_drop_ht_path=inputs.as_path(
-                    cohort,
-                    Relatedness,
-                    key='relateds_to_drop',
-                ),
+        j = get_batch().new_job(
+            'Ancestry Plots',
+            (self.get_job_attrs() or {}) | {'tool': 'hail query'},
+        )
+        j.image(image_path('cpg_workflows'))
+        j.command(
+            query_command(
+                ancestry_plots,
+                ancestry_plots.run.__name__,
+                str(self.out_prefix / self.out_fname_pattern),
+                str(inputs.as_path(cohort, Ancestry, 'sample_qc_ht')),
+                str(inputs.as_path(cohort, Ancestry, 'scores')),
+                str(inputs.as_path(cohort, Ancestry, 'eigenvalues')),
+                str(inputs.as_path(cohort, Ancestry, 'loadings')),
+                str(inputs.as_path(cohort, Ancestry, 'inferred_pop')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                setup_gcp=True,
             ),
-            depends_on=inputs.get_jobs(cohort),
         )
         return self.make_outputs(cohort, self.expected_outputs(cohort), [j])
 
