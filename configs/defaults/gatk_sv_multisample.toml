@@ -46,7 +46,7 @@ n_RD_genotype_bins = 100000
 run_module_metrics = false
 
 [resource_overrides.FilterGenotypes]
-run_qc = false
+run_qc = true
 
 [references.gatk_sv]
 clustering_track_names = ["SR", "SD", "RM"]
