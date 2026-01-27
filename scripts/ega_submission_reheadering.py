@@ -75,8 +75,15 @@ def main(
             f"""
             set -e
 
+            # Explanation of sed commands:
+            # 1. /^@RG/   -> On Read Group lines: Replace specific CPG ID with EGA ID
+            # 2. /^[^@]/  -> On Body lines (not starting with @): Replace specifically the 'RG:Z:' tag
+            # 3. /^@PG/   -> On Program History lines: Redact ANY CPG-like ID (e.g., CPGXXXXXX) with 'REDACTED'
+
             samtools view -h -T "{ref_fasta.base}" "{input_cram_reads.cram}" \\
-            | sed "s/{cpg_id}/{ega_id}/g" \\
+            | sed -e '/^@RG/ s/{cpg_id}/{ega_id}/g' \\
+                  -e '/^[^@]/ s/RG:Z:{cpg_id}/RG:Z:{ega_id}/g' \\
+                  -e '/^@PG/ s/CPG[0-9]*/REDACTED/g' \\
             | samtools view -C -T "{ref_fasta.base}" --no-PG -o "{j.output_cram.cram}"
 
             samtools index "{j.output_cram.cram}" "{j.output_cram['cram.crai']}"
