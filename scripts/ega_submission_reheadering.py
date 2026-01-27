@@ -77,7 +77,7 @@ def main(
 
             samtools view -h -T "{ref_fasta.base}" "{input_cram_reads.cram}" \\
             | sed "s/{cpg_id}/{ega_id}/g" \\
-            | samtools view -C -T "{ref_fasta.base}" -o "{j.output_cram.cram}"
+            | samtools view -C -T "{ref_fasta.base}" --no-PG -o "{j.output_cram.cram}"
 
             samtools index "{j.output_cram.cram}" "{j.output_cram['cram.crai']}"
             """,
