@@ -30,10 +30,12 @@ logger.setLevel(logging.INFO)
     help='Path to CSV mapping CPG sequencing group IDs to CRAM file paths.',
 )
 @click.option('--output-dir', type=str, required=True, help='Directory to write reheadered CRAM files.')
+@click.option('--dry-run', is_flag=True, help='If set, the batch will not be run.')
 def main(
     tenk10k_sgid_mapping_path: str,
     cpg_id_cram_mapping_path: str,
     output_dir: str,
+    dry_run: bool,
 ):
     init_batch()
     b = get_batch()
@@ -84,7 +86,7 @@ def main(
         b.write_output(j.output_cram, out_path_base)
         jobs.append(j)
 
-    b.run(wait=False)
+    b.run(wait=False, dry_run=dry_run)
 
 
 if __name__ == '__main__':
