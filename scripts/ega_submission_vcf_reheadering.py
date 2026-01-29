@@ -1,12 +1,15 @@
 from operator import index
+from pydoc import cli
+from turtle import up
 from typing import TYPE_CHECKING
+from urllib import request
 
 import click
 import pandas as pd
 
 from cpg_utils import to_path
 from cpg_utils.config import image_path
-from cpg_utils.hail_batch import fasta_res_group, get_batch, init_batch
+from cpg_utils.hail_batch import get_batch, init_batch
 from cpg_workflows.jobs import vcf
 
 if TYPE_CHECKING:
@@ -32,6 +35,12 @@ if TYPE_CHECKING:
     help='Path to CSV containing VCF paths that are from Anna\'s common/rare VCFs.',
 )
 @click.option('--output-dir', type=str, required=True, help='Directory to write reheadered CRAM files.')
+@click.option(
+    '--billing-project',
+    type=str,
+    required=True,
+    help='Billing project for uploading to Requester Pays bucket.',
+)
 @click.option('--dry-run', is_flag=True, help='If set, the batch will not be run.')
 def main(
     tenk10k_sgid_mapping_path: str,
@@ -39,13 +48,14 @@ def main(
     tr_vcf_path_csv: str,
     com_rare_vcf_path_csv: str,
     output_dir: str,
+    billing_project: str,
     dry_run: bool,
 ):
     if tr_vcf_path_csv and not tr_vcfs:
         raise ValueError('If --tr-vcf-path-csv is provided, --tr-vcfs must also be set.')
 
     init_batch()
-    b = get_batch()
+    b = get_batch(requester_pays_project=billing_project)
 
     # read mapping files
     tenk10k_sgid_mapping = pd.read_csv(tenk10k_sgid_mapping_path)
@@ -113,7 +123,6 @@ EOF
         )
 
         b.write_output(j.output_vcf, out_path_base)
-
         jobs.append(j)
 
     b.run(wait=False, dry_run=dry_run)
