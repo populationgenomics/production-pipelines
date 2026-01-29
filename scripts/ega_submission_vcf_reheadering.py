@@ -90,7 +90,7 @@ def main(
 
         j.declare_resource_group(
             # can't use f-strings here due to hail batch parsing
-            output_vcf={'vcf': '{root}.vcf.gz', 'vcf.csi': '{root}.vcf.gz.' + index_ext},
+            output_vcf={'vcf': '{root}.vcf.gz', 'index': '{root}.vcf.gz.' + index_ext},
         )
 
         j.command(
