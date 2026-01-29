@@ -97,23 +97,17 @@ def main(
             f"""
             set -e
 
-            # 1. Create the master mapping file (OldName NewName)
             cat <<EOF > rename_map.txt
 {mapping_block}
 EOF
 
-            # 2. Extract just the OldNames to create the subset list
             awk '{{print $1}}' rename_map.txt > subset_list.txt
 
-            # 3. The Pipeline: Subset -> Filter -> Reheader -> Write
-            # -Ou : Output uncompressed BCF (fastest for piping)
-            # --threads 4 : Speed up the compression at the end
-
+            # Subset -> Filter -> Reheader -> Write
             bcftools view -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
             | bcftools view -c 1 -a -Ou \\
             | bcftools reheader -s rename_map.txt --output "{j.output_vcf.vcf}"
 
-            # 4. Index the final result
             bcftools index {index_flag} "{j.output_vcf.vcf}"
             """,
         )
