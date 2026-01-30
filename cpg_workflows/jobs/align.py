@@ -48,7 +48,6 @@ class MarkDupTool(Enum):
     """
 
     PICARD = 'picard'
-    BIOBAMBAM = 'biobambam'
     NO_MARKDUP = 'no_markdup'
 
 
@@ -283,7 +282,6 @@ def align(
         output_path=output_path,
         sorted_bam_path=sorted_bam_path,
         out_markdup_metrics_path=out_markdup_metrics_path,
-        align_cmd_out_fmt=output_fmt,
         overwrite=overwrite,
     )
     if md_j and md_j != merge_or_align_j:
@@ -585,12 +583,10 @@ def finalise_alignment(
     output_path: CramPath | None = None,
     sorted_bam_path: Path | None = None,
     out_markdup_metrics_path: Path | None = None,
-    align_cmd_out_fmt: str = 'sam',
     overwrite: bool = False,
 ) -> Job | None:
     """
-    For `MarkDupTool.BIOBAMBAM`, adds bamsormadup command piped to the existing job.
-    For `MarkDupTool.PICARD`, creates a new job, as Picard can't read from stdin.
+    `MarkDupTool.PICARD`, creates a new job, as Picard can't read from stdin.
     """
 
     reference = fasta_res_group(b)
@@ -598,31 +594,10 @@ def finalise_alignment(
     nthreads = STANDARD.request_resources(nthreads=requested_nthreads).get_nthreads()
 
     md_j = None
-    if markdup_tool == MarkDupTool.BIOBAMBAM:
-        j.declare_resource_group(  # type: ignore
-            output_cram={
-                'cram': '{root}.cram',
-                'cram.crai': '{root}.cram.crai',
-            },
-        )
-        assert isinstance(j.output_cram, hb.ResourceGroup)
-        align_cmd = f"""\
-        {align_cmd.strip()} \\
-        | bamsormadup inputformat={align_cmd_out_fmt} threads={min(nthreads, 6)} \\
-        SO=coordinate M={j.markdup_metrics} outputformat=sam \\
-        tmpfile=$(dirname {j.output_cram.cram})/bamsormadup-tmp \\
-        | samtools view -@{min(nthreads, 6) - 1} -T {reference.base} \\
-        -Ocram -o {j.output_cram.cram}
-
-        samtools index -@{nthreads - 1} {j.output_cram.cram} \\
-        {j.output_cram["cram.crai"]}
-        """.strip()
-        md_j = j
-    else:
-        align_cmd = align_cmd.strip()
-        if not stdout_is_sorted:
-            align_cmd += f' {sort_cmd(nthreads)}'
-        align_cmd += f' > {j.sorted_bam}'
+    align_cmd = align_cmd.strip()
+    if not stdout_is_sorted:
+        align_cmd += f' {sort_cmd(nthreads)}'
+    align_cmd += f' > {j.sorted_bam}'
 
     if not can_reuse(sorted_bam_path):
         j.command(command(align_cmd, monitor_space=True))  # type: ignore
