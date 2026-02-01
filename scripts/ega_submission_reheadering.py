@@ -30,22 +30,23 @@ logger.setLevel(logging.INFO)
     help='Path to CSV mapping CPG sequencing group IDs to CRAM file paths.',
 )
 @click.option('--output-dir', type=str, required=True, help='Directory to write reheadered CRAM files.')
-@click.option(
-    '--billing-project',
-    type=str,
-    required=True,
-    help='Billing project for uploading to Requester Pays bucket.',
-)
+# @click.option(
+#     '--billing-project',
+#     type=str,
+#     required=True,
+#     help='Billing project for uploading to Requester Pays bucket.',
+# )
 @click.option('--dry-run', is_flag=True, help='If set, the batch will not be run.')
 def main(
     tenk10k_sgid_mapping_path: str,
     cpg_id_cram_mapping_path: str,
     output_dir: str,
-    billing_project: str,
+    # billing_project: str,
     dry_run: bool,
 ):
     init_batch()
-    b = get_batch(requester_pays_project=billing_project)
+    b = get_batch()
+    # b = get_batch(requester_pays_project=billing_project)
     ref_fasta = fasta_res_group(b)
 
     tenk10k_sgid_mapping = pd.read_csv(tenk10k_sgid_mapping_path)
