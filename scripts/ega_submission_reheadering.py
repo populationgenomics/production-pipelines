@@ -69,8 +69,9 @@ def main(
         )
         j = b.new_bash_job(name=f'reheader_{incram}_to_{out_path_base}.cram')
         j.image(image_path('samtools'))
-        j.storage('200Gi')
-        j.memory('8Gi')
+        j.storage('100Gi')
+        j.memory('4Gi')
+        j.cpu(4)
 
         j.declare_resource_group(
             output_cram={
@@ -87,12 +88,11 @@ def main(
             # 2. /^@RG/   -> On Read Group lines: Replace specific CPG ID with EGA ID
             # 3. /^[^@]/  -> On Body lines (not starting with @): Replace specifically the 'RG:Z:' tag
 
-            samtools view -h -T "{ref_fasta.base}" "{input_cram_reads.cram}" \\
+            samtools view -h -@ 1 -T "{ref_fasta.base}" "{input_cram_reads.cram}" \\
             | sed -e '/^@PG/d' \\
                   -e '/^@RG/ s/{cpg_id}/{ega_id}/g' \\
                   -e '/^[^@]/ s/RG:Z:{cpg_id}/RG:Z:{ega_id}/g' \\
-            | samtools view -C -T "{ref_fasta.base}" --no-PG -o "{j.output_cram.cram}"
-
+            | samtools view -C -@ 3 -T "{ref_fasta.base}" --no-PG -o "{j.output_cram.cram}"
             samtools index "{j.output_cram.cram}" "{j.output_cram['cram.crai']}"
             """,
         )
