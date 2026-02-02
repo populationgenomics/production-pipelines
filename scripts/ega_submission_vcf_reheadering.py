@@ -97,6 +97,7 @@ def main(
         j.image(image_path('bcftools'))
         j.storage('100Gi')
         j.memory('4Gi')
+        j.cpu(4)
 
         j.declare_resource_group(
             # can't use f-strings here due to hail batch parsing
@@ -114,9 +115,9 @@ EOF
             awk '{{print $1}}' rename_map.txt > subset_list.txt
 
             # Subset -> Filter -> Reheader -> Write
-            bcftools view -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
+            bcftools view -@ 1 -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
             | bcftools view -c 1 -a -Ou \\
-            | bcftools reheader -s rename_map.txt --output "{j.output_vcf.vcf}"
+            | bcftools reheader -@ 3 -s rename_map.txt --output "{j.output_vcf.vcf}"
 
             bcftools index {index_flag} "{j.output_vcf.vcf}"
             """,
