@@ -32,6 +32,7 @@ def run(
     sample_qc_ht_path: str,
     relateds_to_drop_ht_path: str,
     vqsr_ht_path: str,
+    vep_ht_path: str,
     out_ht_path: str,
 ):
     if can_reuse(out_ht_path):
@@ -44,9 +45,10 @@ def run(
     sample_qc_ht = hl.read_table(str(sample_qc_ht_path))
     relateds_to_drop_ht = hl.read_table(str(relateds_to_drop_ht_path))
     vqsr_ht = hl.read_table(str(vqsr_ht_path))
+    vep_ht = hl.read_table(str(vep_ht_path))
 
     logging.info('Generating frequency annotations...')
-    freq_ht = frequency_annotations(vds, sample_qc_ht, relateds_to_drop_ht, vqsr_ht)
+    freq_ht = frequency_annotations(vds, sample_qc_ht, relateds_to_drop_ht, vqsr_ht, vep_ht)
     logging.info(f'Writing out frequency data to {out_ht_path}...')
     freq_ht.write(str(out_ht_path), overwrite=True)
 
@@ -56,6 +58,7 @@ def frequency_annotations(
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
     vqsr_ht: hl.Table,
+    vep_ht: hl.Table,
 ) -> hl.Table:
     """
     Generate frequency annotations (AF, AC, AN, InbreedingCoeff)
@@ -104,6 +107,9 @@ def frequency_annotations(
     logging.info('VQSR filters...')
     mt = mt.annotate_rows(site_vqsr_filters=vqsr_ht[mt.row_key].filters)
     mt = mt.annotate_rows(as_vqsr_filters=vqsr_ht[mt.row_key].info.AS_FilterStatus)
+
+    logging.info('Adding VEP annotations...')
+    mt = mt.annotate_rows(vep=vep_ht[mt.row_key].vep)
 
     logging.info('Region flags...')
     mt = mt.annotate_rows(

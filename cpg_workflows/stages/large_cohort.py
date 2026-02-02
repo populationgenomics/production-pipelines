@@ -1,12 +1,17 @@
 import json
+from logging import config
 from typing import TYPE_CHECKING, Any, Final, Tuple
 
+from numpy import require
+from requests import get
+
 from cpg_utils import Path, to_path
-from cpg_utils.config import config_retrieve, get_config, image_path
+from cpg_utils.config import config_retrieve, get_config, image_path, output_path
 from cpg_utils.hail_batch import get_batch, query_command
+from cpg_workflows.jobs.vep import add_vep_jobs
 from cpg_workflows.large_cohort.combiner import combiner
 from cpg_workflows.targets import Cohort
-from cpg_workflows.utils import slugify
+from cpg_workflows.utils import get_all_fragments_from_manifest, slugify
 from cpg_workflows.workflow import (
     CohortStage,
     StageInput,
@@ -21,6 +26,8 @@ if TYPE_CHECKING:
     from hailtop.batch.job import PythonJob
 
 HAIL_QUERY: Final = 'hail query'
+
+SHARD_MANIFEST = 'shard-manifest.txt'
 
 
 # TODO, update analysis_meta here to pull the gvcf.type, and store this in metamist.
@@ -180,12 +187,17 @@ class Relatedness(CohortStage):
 @stage(required_stages=[SampleQC, DenseSubset, Relatedness])
 class Ancestry(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if ancestry_version := config_retrieve(['large_cohort', 'output_versions', 'ancestry'], default=None):
+            ancestry_version = slugify(ancestry_version)
+
+        ancestry_version = ancestry_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ancestry_version / 'ancestry'
         return dict(
-            scores=get_workflow().prefix / 'ancestry' / 'scores.ht',
-            eigenvalues=get_workflow().prefix / 'ancestry' / 'eigenvalues.ht',
-            loadings=get_workflow().prefix / 'ancestry' / 'loadings.ht',
-            inferred_pop=get_workflow().prefix / 'ancestry' / 'inferred_pop.ht',
-            sample_qc_ht=get_workflow().prefix / 'ancestry' / 'sample_qc_ht.ht',
+            scores=prefix / 'scores.ht',
+            eigenvalues=prefix / 'eigenvalues.ht',
+            loadings=prefix / 'loadings.ht',
+            inferred_pop=prefix / 'inferred_pop.ht',
+            sample_qc_ht=prefix / 'sample_qc_ht.ht',
         )
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -292,6 +304,10 @@ class MakeSiteOnlyVcf(CohortStage):
             / site_only_version
             / 'quasi_siteonly.vcf.bgz.tbi',
             'ht': cohort.analysis_dataset.prefix() / get_workflow().name / site_only_version / 'siteonly.ht',
+            'corrected_mt': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / site_only_version
+            / 'filtered_and_corrected.mt',
             'pre_adjusted': cohort.analysis_dataset.prefix()
             / get_workflow().name
             / site_only_version
@@ -329,6 +345,7 @@ class MakeSiteOnlyVcf(CohortStage):
                 str(self.expected_outputs(cohort)['as']),
                 str(self.expected_outputs(cohort)['quasi']),
                 str(self.expected_outputs(cohort)['ht']),
+                str(self.expected_outputs(cohort)['corrected_mt']),
                 str(self.expected_outputs(cohort)['pre_adjusted']),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
@@ -471,7 +488,104 @@ class LoadVqsr(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr])
+@stage(required_stages=[LoadVqsr])
+class ConvertSiteOnlyHTToVcfShards(CohortStage):
+    """
+    Convert the site-only HT to VCF shards.
+    This is used to create the VCF fragments for the VEP stage.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        """
+        The output is a directory with the VCF fragments.
+        """
+        if ht_to_vcf_version := config_retrieve(['large_cohort', 'output_versions', 'ht_to_vcf_version'], default=None):
+            ht_to_vcf_version = slugify(ht_to_vcf_version)
+
+        ht_to_vcf_version = ht_to_vcf_version or get_workflow().output_version
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / ht_to_vcf_version
+        return {
+            # this will be the write path for fragments of sites-only VCF (header-per-shard)
+            'hps_vcf_dir': prefix / 'site_only.vqsr.vcf.bgz',
+            # this will be the file which contains the name of all fragments (header-per-shard)
+            'hps_shard_manifest': prefix / 'site_only.vqsr.vcf.bgz' / SHARD_MANIFEST,
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import convert_siteonly_ht_to_vcf_shards
+
+        j = get_batch().new_job(
+            'ConvertSiteOnlyHTToVcfShards',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(config_retrieve(['workflow', 'driver_image']))
+
+        j.command(
+            query_command(
+                convert_siteonly_ht_to_vcf_shards,
+                convert_siteonly_ht_to_vcf_shards.run.__name__,
+                str(inputs.as_path(cohort, LoadVqsr)),
+                str(self.expected_outputs(cohort)['hps_vcf_dir'].parent / 'repartitioned'),
+                str(self.expected_outputs(cohort)['hps_vcf_dir']),
+                setup_gcp=True,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage(required_stages=[ConvertSiteOnlyHTToVcfShards])
+class LCAnnotateFragmentedVcfWithVep(CohortStage):
+    """
+    Annotate VCF with VEP.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        """
+        Should this be in tmp? We'll never use it again maybe?
+        """
+        if vep_version := config_retrieve(['large_cohort', 'output_versions', 'vep'], default=None):
+            vep_version = slugify(vep_version)
+
+        vep_version = vep_version or get_workflow().output_version
+
+        return cohort.analysis_dataset.prefix() / get_workflow().name / vep_version / 'vep.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        output = self.expected_outputs(cohort)
+        manifest_file: Path = inputs.as_path(
+            target=cohort,
+            stage=ConvertSiteOnlyHTToVcfShards,
+            key='hps_shard_manifest',
+        )
+
+        if not manifest_file.exists():
+            raise ValueError(
+                f'Manifest file {str(manifest_file)} does not exist, '
+                f'run the large_cohort workflow with workflows.last_stages=[ConvertSiteOnlyHTToVcfShards]',
+            )
+
+        with open(manifest_file, 'r') as f:
+            manifest = f.read().strip().splitlines()
+
+        input_vcfs = [to_path(manifest_file.parent / vcf) for vcf in manifest]
+
+        if len(input_vcfs) == 0:
+            raise ValueError(f'No VCFs in {manifest_file}')
+
+        vep_jobs = add_vep_jobs(
+            b=get_batch(),
+            input_vcfs=input_vcfs,
+            tmp_prefix=self.tmp_prefix / 'tmp',
+            scatter_count=len(input_vcfs),
+            out_path=output,
+            job_attrs=self.get_job_attrs(),
+        )
+
+        return self.make_outputs(cohort, data=output, jobs=vep_jobs)
+
+
+@stage(required_stages=[Combiner, Relatedness, Ancestry, LoadVqsr, LCAnnotateFragmentedVcfWithVep])
 class Frequencies(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if frequencies_version := config_retrieve(['large_cohort', 'output_versions', 'frequencies'], default=None):
@@ -507,6 +621,7 @@ class Frequencies(CohortStage):
                 str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
                 str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
                 str(inputs.as_path(cohort, LoadVqsr)),
+                str(inputs.as_path(cohort, LCAnnotateFragmentedVcfWithVep)),
                 str(self.expected_outputs(cohort)),
                 init_batch_args=init_batch_args,
                 setup_gcp=True,
@@ -516,122 +631,140 @@ class Frequencies(CohortStage):
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
 
 
-@stage(required_stages=[Combiner])
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
 class GenerateCoverageTable(CohortStage):
     def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
             coverage_version = slugify(coverage_version)
 
-        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
         coverage_version = coverage_version or get_workflow().output_version
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / coverage_version
+
         return {
-            f'index_{idx}': cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / coverage_version
-            / 'split_coverage_tables'
-            / f'coverage_{idx}.ht'
-            for idx in range(1, scatter_count + 1)
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
+            'coverage_ht': prefix / f'{sequencing_type}_coverage.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.jobs.picard import get_intervals
-        from cpg_workflows.large_cohort import generate_coverage_table
-
-        coverage_jobs = []
-
-        b = get_batch()
-
-        outputs: dict[str, Path] = self.expected_outputs(cohort)
-
-        scatter_count = config_retrieve(['workflow', 'scatter_count'], default=50)
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
 
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
 
         # Memory parameters
         for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
-            if workflow_config.get(config_key):
-                init_batch_args[batch_key] = 'highmem'
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
         # Cores parameter
         for key in ['driver_cores', 'worker_cores']:
-            if workflow_config.get(key):
-                init_batch_args[key] = workflow_config[key]
-
-        # get_intervals() detects 'genome' or 'exome' intervals based on workflow.sequencing_type
-        for idx in range(1, scatter_count + 1):
-            coverage_table_j = get_batch().new_job(
-                f'GenerateCoverageTable_{idx}',
-                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
-            )
-            coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
-
-            if scatter_count == 1:
-                interval_list_path = config_retrieve(['workflow', 'intervals_path'], default=None)
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
             else:
-                intervals_j, intervals = get_intervals(
-                    b=b,
-                    scatter_count=scatter_count,
-                    source_intervals_path=config_retrieve(['workflow', 'intervals_path'], default=None),
-                    output_prefix=self.tmp_prefix / f'coverage_intervals_{scatter_count}',
-                )
-                coverage_jobs.append(intervals_j)
+                init_batch_args[key] = workflow_config.get(key)
 
-            coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
-            coverage_table_j.command(
-                query_command(
-                    generate_coverage_table,
-                    generate_coverage_table.run.__name__,
-                    str(inputs.as_path(cohort, Combiner, key='vds')),
-                    str(
-                        (
-                            interval_list_path
-                            if scatter_count == 1
-                            else self.tmp_prefix / f'coverage_intervals_{scatter_count}' / f'{idx}.interval_list'
-                        ),
-                    ),
-                    str(outputs[f'index_{idx}']),
-                    setup_gcp=True,
-                    init_batch_args=init_batch_args,
-                ),
-            )
+        coverage_table_j = get_batch().new_job(
+            'GenerateCoverageTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        coverage_table_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+        coverage_table_j.spot(config_retrieve(['workflow', 'preemptible_driver'], False))
 
-            coverage_jobs.append(coverage_table_j)
-
-        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=coverage_jobs)
-
-
-@stage(required_stages=[GenerateCoverageTable])
-class MergeCoverageTables(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        return (
-            cohort.analysis_dataset.prefix()
-            / get_workflow().name
-            / coverage_version
-            / 'merged_coverage'
-            / 'merged_coverage.ht'
+        coverage_table_j.image(config_retrieve(['workflow', 'driver_image']))
+        coverage_table_j.command(
+            query_command(
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_coverage.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
+                str(self.expected_outputs(cohort)['coverage_ht']),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
         )
 
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[coverage_table_j])
+
+
+@stage(required_stages=[Combiner, Ancestry, Relatedness])
+class GenerateAlleleNumberTable(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        if an_version := config_retrieve(['large_cohort', 'output_versions', 'allele_number'], default=None):
+            an_version = slugify(an_version)
+
+        an_version = an_version or get_workflow().output_version
+        sequencing_type = config_retrieve(['workflow', 'sequencing_type'])
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / an_version
+
+        return {
+            'group_membership_ht': prefix / f'{sequencing_type}_group_membership.ht',
+            'an_ht': prefix / f'{sequencing_type}_allele_number.ht',
+        }
+
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
-        from cpg_workflows.large_cohort import generate_coverage_table
+        from cpg_workflows.large_cohort import compute_stats_for_all_sites
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
+        allele_number_j = get_batch().new_job(
+            'GenerateAlleleNumber',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        allele_number_j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+        allele_number_j.spot(config_retrieve(['workflow', 'preemptible_driver'], False))
+
+        allele_number_j.image(config_retrieve(['workflow', 'driver_image']))
+        allele_number_j.command(
+            query_command(
+                compute_stats_for_all_sites,
+                compute_stats_for_all_sites.run_an_calculation.__name__,
+                str(inputs.as_path(cohort, Combiner, key='vds')),
+                str(inputs.as_path(cohort, Ancestry, key='sample_qc_ht')),
+                str(inputs.as_path(cohort, Relatedness, key='relateds_to_drop')),
+                str(self.expected_outputs(cohort)['group_membership_ht']),
+                str(self.expected_outputs(cohort)['an_ht']),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[allele_number_j])
+
+
+@stage(required_stages=[LoadVqsr])
+class VariantBinnedSummaries(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if var_binned_version := config_retrieve(
+            ['large_cohort', 'output_versions', 'var_binned_summaries'],
+            default=None,
+        ):
+            var_binned_version = slugify(var_binned_version)
+
+        var_binned_version = var_binned_version or get_workflow().output_version
+        return cohort.analysis_dataset.prefix() / get_workflow().name / var_binned_version / 'binned_summary.ht'
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import variant_binned_summaries
 
         j = get_batch().new_job(
-            'MergeCoverageTables',
+            'VariantBinnedSummaries',
             (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
         )
         j.image(image_path('cpg_workflows'))
-        j.storage('50Gi')
-
-        if coverage_version := config_retrieve(['large_cohort', 'output_versions', 'coverage'], default=None):
-            coverage_version = slugify(coverage_version)
-
-        coverage_version = coverage_version or get_workflow().output_version
-        tmp_path = (
-            cohort.analysis_dataset.prefix(category='tmp') / get_workflow().name / coverage_version / 'merged_coverage'
-        )
 
         init_batch_args: dict[str, str | int] = {}
         workflow_config = config_retrieve('workflow')
@@ -645,15 +778,140 @@ class MergeCoverageTables(CohortStage):
             if workflow_config.get(key):
                 init_batch_args[key] = workflow_config[key]
 
+        happy_vcf_path = config_retrieve(['large_cohort', 'happy_vcf_path'])
+        n_bins = config_retrieve(['large_cohort', 'n_bins'], default=100)  # FIXME default also set in function
+        fam_stats_ht_path = config_retrieve(['large_cohort', 'fam_stats_ht_path'], default=None)
+        use_truth_sample_concordance = config_retrieve(['large_cohort', 'use_truth_sample_concordance'], default=True)
+
         j.command(
             query_command(
-                generate_coverage_table,
-                generate_coverage_table.merge_coverage_tables.__name__,
-                [str(v) for v in inputs.as_dict(cohort, GenerateCoverageTable).values()],
+                variant_binned_summaries,
+                variant_binned_summaries.create_binned_summary.__name__,
+                str(inputs.as_path(cohort, LoadVqsr)),
+                str(happy_vcf_path),
                 str(self.expected_outputs(cohort)),
-                str(tmp_path),
+                n_bins,
+                fam_stats_ht_path,
+                use_truth_sample_concordance,
                 setup_gcp=True,
                 init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class JointFrequencyTable(CohortStage):
+    """
+    Generate a joint frequency table for genome and exome variants.
+    This stage outputs the frequency table in Hail Table format.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if joint_freq_version := config_retrieve(['large_cohort', 'output_versions', 'joint_frequency'], default=None):
+            joint_freq_version = slugify(joint_freq_version)
+        joint_freq_version = joint_freq_version or get_workflow().output_version
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / joint_freq_version
+        return {
+            'joint_freq': prefix / 'joint_frequency.ht',
+            'contingency_ht': prefix / 'contingency_table_test.ht',
+            'cmh_ht': prefix / 'cmh.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import joint_frequencies
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
+        j = get_batch().new_job(
+            'JointFrequencyTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        j.memory(init_batch_args['worker_memory']).cpu(init_batch_args['worker_cores'])
+
+        genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+        genome_all_sites_path = config_retrieve(['large_cohort', 'output_versions', 'genome_all_sites'], default=None)
+        exome_all_sites_path = config_retrieve(['large_cohort', 'output_versions', 'exome_all_sites'], default=None)
+
+        j.command(
+            query_command(
+                joint_frequencies,
+                joint_frequencies.run.__name__,
+                str(genome_freq_ht),
+                str(exome_freq_ht),
+                str(genome_all_sites_path),
+                str(exome_all_sites_path),
+                str(self.expected_outputs(cohort)['joint_freq']),
+                str(self.expected_outputs(cohort)['contingency_ht']),
+                str(self.expected_outputs(cohort)['cmh_ht']),
+                setup_gcp=True,
+                init_batch_args=init_batch_args,
+            ),
+        )
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class GenerateGeneTable(CohortStage):
+    """
+    Generate a release-ready gene table of genome and exome variants.
+    This stage also outputs an intermediate transcripts table for PrepareBrowserTable stage.
+    """
+
+    def expected_outputs(self, cohort: Cohort) -> Path:
+        if gene_table_version := config_retrieve(['large_cohort', 'output_versions', 'gene_table'], default=None):
+            gene_table_version = slugify(gene_table_version)
+
+        gene_table_version = gene_table_version or get_workflow().output_version
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / gene_table_version
+        return {
+            'gene_table': prefix / 'gene_table.ht',
+            'transcripts_grch38_base': prefix / 'transcripts_grch38_base.ht',
+            'mane_select_transcripts': prefix / 'mane_select_transcripts.ht',
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort import generate_gene_table
+
+        j = get_batch().new_job(
+            'GenerateGeneTable',
+            (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+        )
+        j.image(image_path('cpg_workflows'))
+
+        genome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        exome_freq_ht = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
+
+        j.command(
+            query_command(
+                generate_gene_table,
+                generate_gene_table.run.__name__,
+                str(genome_freq_ht),
+                str(exome_freq_ht),
+                str(self.tmp_prefix / 'browser'),
+                str(self.expected_outputs(cohort)['transcripts_grch38_base']),
+                str(self.expected_outputs(cohort)['mane_select_transcripts']),
+                str(self.expected_outputs(cohort)['gene_table']),
+                setup_gcp=True,
             ),
         )
 
@@ -663,7 +921,7 @@ class MergeCoverageTables(CohortStage):
 # @stage(required_stages=[Frequencies])
 @stage()
 class PrepareBrowserTable(CohortStage):
-    def expected_outputs(self, cohort: Cohort) -> Path:
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
         if browser_version := config_retrieve(['large_cohort', 'output_versions', 'preparebrowsertable'], default=None):
             browser_version = slugify(browser_version)
 
@@ -678,6 +936,10 @@ class PrepareBrowserTable(CohortStage):
             / get_workflow().name
             / browser_version
             / 'genome_variants.ht',
+            'joint_freq': cohort.analysis_dataset.prefix()
+            / get_workflow().name
+            / browser_version
+            / 'joint_freq_release.ht',
         }
 
     def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
@@ -691,6 +953,20 @@ class PrepareBrowserTable(CohortStage):
 
         exome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_exome'], default=None)
         genome_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'frequencies_genome'], default=None)
+        transcripts_grch38_base_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'transcripts_grch38_base'],
+            default=None,
+        )
+        mane_select_transcripts_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'mane_select_transcripts'],
+            default=None,
+        )
+        joint_freq_ht_path = config_retrieve(['large_cohort', 'output_versions', 'joint_frequency'], default=None)
+        contingency_ht_path = config_retrieve(
+            ['large_cohort', 'output_versions', 'contingency_table_test'],
+            default=None,
+        )
+        chm_ht_path = config_retrieve(['large_cohort', 'output_versions', 'cmh'], default=None)
 
         j.command(
             query_command(
@@ -699,11 +975,130 @@ class PrepareBrowserTable(CohortStage):
                 # hard-coding Frequencies tables for now
                 exome_freq_ht_path,
                 genome_freq_ht_path,
+                str(joint_freq_ht_path),
+                str(contingency_ht_path),
+                str(chm_ht_path),
                 str(self.expected_outputs(cohort)['browser']),
                 str(self.expected_outputs(cohort)['exome_variants']),
                 str(self.expected_outputs(cohort)['genome_variants']),
+                str(self.expected_outputs(cohort)['joint_freq']),
+                transcripts_grch38_base_path,
+                mane_select_transcripts_path,
                 setup_gcp=True,
             ),
         )
 
         return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[j])
+
+
+@stage()
+class PrepareBrowserVcfDataDownload(CohortStage):
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        data_download_config = config_retrieve(['large_cohort', 'output_versions', 'data_download'], default={})
+        browser_vcf_version = data_download_config.get('version', None)
+        if browser_vcf_version is None:
+            raise ValueError(
+                'large_cohort.output_versions.data_download.version must be set in config for PrepareBrowserVcfDataDownload stage',
+            )
+        browser_vcf_version = slugify(browser_vcf_version)
+
+        prefix = cohort.analysis_dataset.prefix() / get_workflow().name / browser_vcf_version
+        data_type: str = data_download_config.get('data_type', 'exomes')
+        chroms = data_download_config.get('chroms', [f'chr{i}' for i in range(1, 23)] + ['chrX', 'chrY', 'chrM'])
+        return {
+            **{chrom: prefix / data_type / f'{chrom}_variants.vcf.bgz' for chrom in chroms},
+            # **{chrom: prefix / f'{data_type}_{chrom}_variants.vcf.bgz.tbi' for chrom in chroms},
+        }
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput | None:
+        from cpg_workflows.large_cohort.scripts import browser_vcf_release
+
+        init_batch_args: dict[str, str | int] = {}
+        workflow_config = config_retrieve('workflow')
+
+        # Memory parameters
+        for config_key, batch_key in [('highmem_workers', 'worker_memory'), ('highmem_drivers', 'driver_memory')]:
+            init_batch_args[batch_key] = 'standard' if not workflow_config.get(config_key) else 'highmem'
+        # Cores parameter
+        for key in ['driver_cores', 'worker_cores']:
+            # Default to 1 core for worker_cores if not specified
+            if key == 'worker_cores' and not workflow_config.get('worker_cores'):
+                init_batch_args[key] = 1
+            else:
+                init_batch_args[key] = workflow_config.get(key)
+
+        data_download_config = config_retrieve(['large_cohort', 'output_versions', 'data_download'], default={})
+        data_type: str = data_download_config.get('data_type', 'exomes')
+
+        freq_ht_path: str = data_download_config.get('ht_to_export', None)
+
+        exome_freq_ht_path: str = data_download_config.get('frequencies_exome', None)
+        genome_freq_ht_path: str = data_download_config.get('frequencies_genome', None)
+        vqsr_ht_path: str = data_download_config.get('vqsr_ht', None)
+
+        if data_type == 'joint':
+            assert (
+                exome_freq_ht_path is not None and genome_freq_ht_path is not None
+            ), 'Both exome and genome frequency HT paths must be provided for joint data download.'
+
+        if data_type == 'exomes' or data_type == 'genomes':
+            assert vqsr_ht_path is not None, 'VQSR HT path must be provided for exome or genome data download.'
+
+        joint_included: bool = data_download_config.get('joint_included', False)
+
+        jobs = []
+
+        # only schedule a repartition job if this is a genome. For exomes use the original HT path
+        if data_type == 'exomes':
+            prejob = None
+        else:
+            ht_path_repartitioned = output_path(f"{data_type}_repartitioned.ht", category="tmp")
+            prejob = get_batch().new_job(
+                f'RepartitionFrequenciesTable_{data_type}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            prejob.image(workflow_config['driver_image'])
+            prejob.command(
+                query_command(
+                    browser_vcf_release,
+                    browser_vcf_release.repartition_frequencies_table.__name__,
+                    freq_ht_path,
+                    data_type,
+                    ht_path_repartitioned,
+                    setup_gcp=True,
+                    init_batch_args=init_batch_args,
+                ),
+            )
+            freq_ht_path = ht_path_repartitioned
+            jobs.append(prejob)
+
+        outputs = self.expected_outputs(cohort)
+        for chrom, vcf_outpath in outputs.items():
+            j = get_batch().new_job(
+                f'PrepareBrowserVcfDataDownload_{chrom}_{data_type}',
+                (self.get_job_attrs() or {}) | {'tool': HAIL_QUERY},
+            )
+            j.image(workflow_config['driver_image'])
+            j.command(
+                query_command(
+                    browser_vcf_release,
+                    browser_vcf_release.run_browser_vcf_data_download.__name__,
+                    freq_ht_path,
+                    data_type,
+                    chrom,
+                    str(vcf_outpath),
+                    joint_included,
+                    str(vqsr_ht_path) if vqsr_ht_path else None,
+                    str(exome_freq_ht_path) if exome_freq_ht_path else None,
+                    str(genome_freq_ht_path) if genome_freq_ht_path else None,
+                    setup_gcp=True,
+                    init_batch_args=init_batch_args,
+                ),
+            )
+
+            if prejob:
+                j.depends_on(prejob)
+
+            jobs.append(j)
+
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=jobs)

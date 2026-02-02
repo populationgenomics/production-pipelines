@@ -30,9 +30,15 @@ from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, Validati
 from cpg_workflows.stages.large_cohort import (
     AncestryPlots,
     Frequencies,
+    GenerateAlleleNumberTable,
+    GenerateCoverageTable,
+    GenerateGeneTable,
+    JointFrequencyTable,
+    LCAnnotateFragmentedVcfWithVep,
     LoadVqsr,
-    MergeCoverageTables,
     PrepareBrowserTable,
+    PrepareBrowserVcfDataDownload,
+    VariantBinnedSummaries,
 )
 from cpg_workflows.stages.mito import MitoReport
 from cpg_workflows.stages.outrider import Outrider
@@ -102,7 +108,13 @@ WORKFLOWS: dict[str, list[StageDecorator]] = {
         GvcfMultiQC,
         CramMultiQC,
         CohortCramMultiQC,
-        MergeCoverageTables,
+        GenerateCoverageTable,
+        GenerateAlleleNumberTable,
+        LCAnnotateFragmentedVcfWithVep,
+        JointFrequencyTable,
+        GenerateGeneTable,
+        VariantBinnedSummaries,
+        PrepareBrowserVcfDataDownload,
     ],
     'prepare_browser_table': [
         PrepareBrowserTable,

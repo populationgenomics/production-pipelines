@@ -52,11 +52,6 @@ GET_SEQUENCING_GROUPS_QUERY = gql(
                             meta
                         }
                     }
-                    assays {
-                        id
-                        meta
-                        type
-                    }
                 }
             }
         }
@@ -86,11 +81,6 @@ GET_SEQUENCING_GROUPS_BY_COHORT_QUERY = gql(
                         reportedSex
                         meta
                     }
-                }
-                assays {
-                    id
-                    meta
-                    type
                 }
             }
         }

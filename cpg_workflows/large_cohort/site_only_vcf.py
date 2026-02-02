@@ -168,6 +168,7 @@ def run(
     out_as_vcf_path: str,
     out_quasi_vcf_path: str,
     out_ht_path: str,
+    out_corrected_mt_path: str,
     out_ht_pre_vcf_adjusted_path: str,
 ):
     if jar_spec := config_retrieve(['workflow', 'jar_spec_revision'], False):
@@ -182,13 +183,14 @@ def run(
         sample_qc_ht=sample_qc_ht,
         relateds_to_drop_ht=relateds_to_drop_ht,
         out_ht_path=out_ht_path,
+        out_corrected_mt_path=out_corrected_mt_path,
         out_ht_pre_vcf_adjusted_path=out_ht_pre_vcf_adjusted_path,
     )
     logging.info(f'Writing AS VCF to {out_as_vcf_path} and quasi-AS VCF to {out_quasi_vcf_path}')
     assert to_path(out_as_vcf_path).suffix == '.bgz'
     assert to_path(out_quasi_vcf_path).suffix == '.bgz'
-    hl.export_vcf(as_info_ht, str(out_as_vcf_path), tabix=True)
     hl.export_vcf(quasi_info_ht, str(out_quasi_vcf_path), tabix=True)
+    hl.export_vcf(as_info_ht, str(out_as_vcf_path), tabix=True)
 
 
 def build_info_ht(ht: hl.Table, extra_field: str) -> hl.Table:
@@ -219,6 +221,7 @@ def vds_to_site_only_ht(
     sample_qc_ht: hl.Table,
     relateds_to_drop_ht: hl.Table,
     out_ht_path: str,
+    out_corrected_mt_path: str,
     out_ht_pre_vcf_adjusted_path: str,
 ) -> hl.Table:
     """
@@ -227,31 +230,34 @@ def vds_to_site_only_ht(
     if can_reuse(out_ht_path):
         return hl.read_table(str(out_ht_path))
 
-    # Passing un-densified MatrixTable to default_compute_info
-    mt = vds.variant_data
+    if can_reuse(out_ht_pre_vcf_adjusted_path):
+        info_ht = hl.read_table(out_ht_pre_vcf_adjusted_path)
+    else:
+        if can_reuse(out_corrected_mt_path):
+            correct_mt = hl.read_matrix_table(out_corrected_mt_path)
+        else:
+            # Passing un-densified MatrixTable to default_compute_info
+            mt = vds.variant_data
 
-    mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
-    mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
+            mt = mt.filter_cols(hl.len(sample_qc_ht[mt.col_key].filters) > 0, keep=False)
+            mt = mt.filter_cols(hl.is_defined(relateds_to_drop_ht[mt.col_key]), keep=False)
 
-    # Compute and checkpoint the allele specific info annotations after recomputing
-    # AS_QUALapprox from LPL, and fixing the length of AS_SB_TABLE, AS_RAW_MQ,
-    # AS_RAW_ReadPosRankSum and AS_RAW_MQRankSum.
-    mt = mt.annotate_rows(alt_alleles_range_array=hl.range(1, hl.len(mt.alleles)))
-    correct_mt = mt.annotate_entries(
-        gvcf_info=mt.gvcf_info.annotate(
-            AS_QUALapprox=recompute_as_qualapprox_from_lpl(mt),
-            **correct_as_annotations(mt),
-        ),
-    )
+            # Compute and checkpoint the allele specific info annotations after recomputing
+            # AS_QUALapprox from LPL, and fixing the length of AS_SB_TABLE, AS_RAW_MQ,
+            # AS_RAW_ReadPosRankSum and AS_RAW_MQRankSum.
+            mt = mt.annotate_rows(alt_alleles_range_array=hl.range(1, hl.len(mt.alleles)))
+            correct_mt = mt.annotate_entries(
+                gvcf_info=mt.gvcf_info.annotate(
+                    AS_QUALapprox=recompute_as_qualapprox_from_lpl(mt),
+                    **correct_as_annotations(mt),
+                ),
+            )
 
-    correct_mt = _filter_rows_and_add_tags(correct_mt)
-    # TODO: Figure out the right output pathing function for this checkpoint
-    correct_mt = correct_mt.checkpoint(
-        dataset_path('MakeSiteOnly/corrected.mt', category='tmp'),
-        overwrite=True,
-    )
-    info_ht: hl.Table = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
-    info_ht = info_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
+            correct_mt = _filter_rows_and_add_tags(correct_mt)
+            correct_mt = correct_mt.checkpoint(out_corrected_mt_path, overwrite=True)
+
+        info_ht = _create_info_ht(correct_mt, n_partitions=mt.n_partitions())
+        info_ht = info_ht.checkpoint(out_ht_pre_vcf_adjusted_path, overwrite=True)
 
     # AS_info and site_info are stored in the info_ht.info struct.
     # Separate info_ht.info fields into AC_info, AS_info, quasi_info, and site_info.

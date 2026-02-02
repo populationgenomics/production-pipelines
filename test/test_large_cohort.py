@@ -297,6 +297,7 @@ def test_site_only(mocker: MockFixture, tmp_path: Path):
         out_as_vcf_path=str(tmp_path / 'as_siteonly.vcf.bgz'),
         out_quasi_vcf_path=str(tmp_path / 'quasi_siteonly.vcf.bgz'),
         out_ht_path=str(tmp_path / 'siteonly.ht'),
+        out_corrected_mt_path=str(tmp_path / 'filtered_and_corrected.mt'),
         out_ht_pre_vcf_adjusted_path=str(tmp_path / 'siteonly_pre_vcf_adjusted.ht'),
     )
 
