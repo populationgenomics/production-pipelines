@@ -3,9 +3,6 @@
 import click
 from google.cloud import storage
 
-from hailtop.batch import ResourceGroup
-from hailtop.batch.job import Job
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_gcp_project, image_path
 from cpg_utils.hail_batch import Batch, command, get_batch
