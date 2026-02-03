@@ -115,9 +115,9 @@ EOF
             awk '{{print $1}}' rename_map.txt > subset_list.txt
 
             # Subset -> Filter -> Reheader -> Write
-            bcftools view -@ 1 -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
-            | bcftools view -c 1 -a -Ou \\
-            | bcftools reheader -@ 3 -s rename_map.txt --output "{j.output_vcf.vcf}"
+            bcftools view --no-version --threads 1 -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
+            | bcftools view --no-version -c 1 -a -Ou \\
+            | bcftools reheader -threads 3 -s rename_map.txt --output "{j.output_vcf.vcf}"
 
             bcftools index {index_flag} "{j.output_vcf.vcf}"
             """,
