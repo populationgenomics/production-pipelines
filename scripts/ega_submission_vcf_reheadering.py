@@ -85,7 +85,7 @@ def main(
     jobs: list[Job] = []
     for i, vcf_path in enumerate(path_df['vcf_path'].tolist()):
 
-        out_path_base = str(to_path(output_dir) / f'{to_path(vcf_path).name}_reheadered')
+        out_path_base = str(to_path(output_dir) / f'{to_path(vcf_path).stem.split(".")[0]}')
 
         # Define Input
         input_vcf = b.read_input_group(
@@ -99,10 +99,16 @@ def main(
         j.memory('4Gi')
         j.cpu(4)
 
-        j.declare_resource_group(
-            # can't use f-strings here due to hail batch parsing
-            output_vcf={'vcf': '{root}.vcf.gz', 'index': '{root}.vcf.gz.' + index_ext},
-        )
+        if tr_vcfs:
+            j.declare_resource_group(
+                # can't use f-strings here due to hail batch parsing
+                output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'},
+            )
+        else:
+            j.declare_resource_group(
+                # can't use f-strings here due to hail batch parsing
+                output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.csi': '{root}.vcf.bgz.csi'},
+            )
 
         j.command(
             f"""
@@ -118,9 +124,9 @@ EOF
             bcftools view --no-version --threads 1 -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
             | bcftools view --no-version -c 1 -a -Ou \\
             | bcftools reheader -s rename_map.txt \\
-            | bcftools view --no-version --threads 3 -Oz -o "{j.output_vcf.vcf}"
+            | bcftools view --no-version --threads 3 -Oz -o "{j.output_vcf['vcf.bgz']}"
 
-            bcftools index {index_flag} "{j.output_vcf.vcf}"
+            bcftools index {index_flag} "{j.output_vcf['vcf.bgz']}"
             """,
         )
 
