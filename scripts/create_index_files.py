@@ -3,9 +3,6 @@
 import click
 from google.cloud import storage
 
-from hailtop.batch import ResourceGroup
-from hailtop.batch.job import Job
-
 from cpg_utils import Path, to_path
 from cpg_utils.config import get_gcp_project, image_path
 from cpg_utils.hail_batch import Batch, command, get_batch
@@ -44,6 +41,7 @@ def find_files_to_index(
 def index_with_samtools(
     b: Batch,
     input_files: list[tuple[str, str]],
+    disk_size: str | None,
 ):
     """
     Index bam or cram files using samtools.
@@ -53,7 +51,10 @@ def index_with_samtools(
         j = b.new_bash_job(f'samtools index {file_to_index_path}')
         j.image(image_path('samtools'))
         # Set resource requirements
-        storage_gb = 20 if to_path(file_to_index_path).stat().st_size < 1e10 else 100
+        if disk_size:
+            storage_gb = int(disk_size)
+        else:
+            storage_gb = 20 if to_path(file_to_index_path).stat().st_size < 1e10 else 100
         nthreads = 8
         res = STANDARD.set_resources(
             j,
@@ -70,11 +71,12 @@ def index_with_samtools(
     '--input-path',
     help='Path to the input files',
 )
-def main(input_path: str):
+@click.option('--disk-size', help='Specify the disk size in gb')
+def main(input_path: str, disk_size: str | None):
     # Find all bam and cram files that need to be indexed
     files_to_index = find_files_to_index(to_path(input_path))
     # Index the files
-    index_with_samtools(get_batch(), files_to_index)
+    index_with_samtools(get_batch(), files_to_index, disk_size)
     get_batch().run()
 
 
