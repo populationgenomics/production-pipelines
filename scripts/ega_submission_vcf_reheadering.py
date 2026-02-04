@@ -102,12 +102,12 @@ def main(
         if tr_vcfs:
             j.declare_resource_group(
                 # can't use f-strings here due to hail batch parsing
-                output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.tbi': '{root}.vcf.bgz.tbi'},
+                output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.tbi': '{root}.vcf.gz.tbi'},
             )
         else:
             j.declare_resource_group(
                 # can't use f-strings here due to hail batch parsing
-                output_vcf={'vcf.bgz': '{root}.vcf.bgz', 'vcf.bgz.csi': '{root}.vcf.bgz.csi'},
+                output_vcf={'vcf.gz': '{root}.vcf.gz', 'vcf.gz.csi': '{root}.vcf.gz.csi'},
             )
 
         j.command(
@@ -124,9 +124,9 @@ EOF
             bcftools view --no-version --threads 1 -S subset_list.txt --force-samples "{input_vcf.vcf}" -Ou \\
             | bcftools view --no-version -c 1 -a -Ou \\
             | bcftools reheader -s rename_map.txt \\
-            | bcftools view --no-version --threads 3 -Oz -o "{j.output_vcf['vcf.bgz']}"
+            | bcftools view --no-version --threads 3 -Oz -o "{j.output_vcf['vcf.gz']}"
 
-            bcftools index {index_flag} "{j.output_vcf['vcf.bgz']}"
+            bcftools index {index_flag} "{j.output_vcf['vcf.gz']}"
             """,
         )
 
