@@ -64,7 +64,7 @@ def upload_metadata_to_release(dataset: str, billing_project: str | None):
     print(f'Uploaded SG mapping to gs://{os.path.join(release_bucket, upload_path)}')
 
 
-def copy_vcf_to_release(vcf: str, dataset: str, billing_project: str | None):
+def copy_vcf_to_release(vcf: str, dataset: str, billing_project: str):
     """Copies a specified vcf to the release bucket."""
 
     release_path = f'gs://cpg-{dataset}-release/{TODAY}/'
