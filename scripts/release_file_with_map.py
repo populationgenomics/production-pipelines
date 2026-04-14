@@ -69,7 +69,7 @@ def copy_vcf_to_release(vcf: str, dataset: str, billing_project: str):
 
     release_path = f'gs://cpg-{dataset}-release/{TODAY}/'
 
-    vcf_name = to_path(vcf)
+    vcf_name = to_path(vcf).name
 
     for ext in ['', '.tbi']:
 
