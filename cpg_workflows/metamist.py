@@ -461,7 +461,7 @@ class Metamist:
 
     def create_analysis(
         self,
-        output: Path | str,
+        outputs: dict[str, str | Path],
         type_: str | AnalysisType,
         status: str | AnalysisStatus,
         sequencing_group_ids: list[str],
@@ -478,10 +478,16 @@ class Metamist:
         if isinstance(status, AnalysisStatus):
             status = status.value
 
+        if len(outputs) == 1:
+            # If output is a single file, just use the string path
+            outputs = {'basename': str(next(iter(outputs.values())))}
+        else:
+            outputs = {k: {'basename': str(v)} for k, v in outputs.items()}
+
         am = models.Analysis(
             type=type_,
             status=models.AnalysisStatus(status),
-            output=str(output),
+            outputs=outputs,
             sequencing_group_ids=list(sequencing_group_ids),
             meta=meta or {},
         )
@@ -492,13 +498,13 @@ class Metamist:
         )
         if aid is None:
             logging.error(
-                f'Failed to create Analysis(type={type_}, status={status}, output={str(output)}) in {metamist_proj}',
+                f'Failed to create Analysis(type={type_}, status={status}, output={str(outputs)}) in {metamist_proj}',
             )
             return None
         else:
             logging.info(
                 f'Created Analysis(id={aid}, type={type_}, status={status}, '
-                f'output={str(output)}) in {metamist_proj}',
+                f'output={str(outputs)}) in {metamist_proj}',
             )
             return aid
 
@@ -576,7 +582,7 @@ class Metamist:
             )
             self.create_analysis(
                 type_=analysis_type,
-                output=expected_output_fpath,
+                outputs=expected_output_fpath,
                 status='completed',
                 sequencing_group_ids=sequencing_group_ids,
                 dataset=dataset or self.default_dataset,

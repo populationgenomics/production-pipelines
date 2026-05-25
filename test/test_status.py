@@ -146,10 +146,10 @@ def test_status_reporter(mocker: MockFixture, tmp_path):
     assert get_batch().job_by_tool['metamist']['job_n'] == len(get_multicohort().get_sequencing_groups()) * 2
 
 
-def _update_meta(output_path: str) -> dict[str, Any]:
+def _update_meta(output_paths: dict[str, str | Path]) -> dict[str, Any]:
     from cpg_utils import to_path
 
-    with to_path(output_path).open() as f:
+    with to_path(output_paths['output']).open() as f:
         return {'result': f.read().strip()}
 
 
