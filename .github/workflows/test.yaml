@@ -63,35 +63,3 @@ jobs:
         with:
           script: |
             core.setFailed('Unittests failed with rc = ${{ steps.runtests.outputs.rc }}')
-
-
-  sonarqube:
-    name: SonarQube scan
-    runs-on: ubuntu-latest
-    needs: test
-    environment: production
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev'
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # Shallow clones should be disabled for a better relevancy of analysis
-
-      # Download the coverage report artifact
-      - name: 'Download coverage and execution report'
-        uses: actions/download-artifact@v4
-        with:
-          pattern: '*-report'
-
-      # Perform the SonarQube scan
-      - uses: sonarsource/sonarqube-scan-action@master
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-
-      # Optional: Fail the job if Quality Gate is red
-      # If you wish to fail your job when the Quality Gate is red, uncomment the
-      # following lines. This would typically be used to fail a deployment.
-      # - uses: sonarsource/sonarqube-quality-gate-action@master
-      #   timeout-minutes: 5
-      #   env:
-      #     SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
