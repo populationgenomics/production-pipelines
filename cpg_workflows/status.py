@@ -8,13 +8,14 @@ from typing import Callable
 from hailtop.batch import Batch
 from hailtop.batch.job import Job
 
+from cpg_utils import Path
 from cpg_utils.config import get_config
 
 from .targets import Target
 
 
 def complete_analysis_job(
-    output: str,
+    outputs: dict[str, str | Path],
     analysis_type: str,
     sg_ids: list[str],
     project_name: str,
@@ -27,7 +28,8 @@ def complete_analysis_job(
     this will register the analysis outputs from a Stage
 
     Args:
-        output (str): path to the output file
+        outputs dict[str, str | path]: dict of output files,
+            where the keys are the output names and the values are the paths.
         analysis_type (str): metamist analysis type
         sg_ids (list[str]): all CPG IDs relevant to this target
         project_name (str): project/dataset name
@@ -39,11 +41,11 @@ def complete_analysis_job(
     from cpg_utils import to_path
     from cpg_workflows.metamist import AnalysisStatus, get_metamist
 
-    assert isinstance(output, str)
-    output_cloudpath = to_path(output)
+    assert isinstance(outputs, dict)
+    output_cloudpaths = {k: to_path(v) for k, v in outputs.items()}
 
     if update_analysis_meta is not None:
-        meta = meta | update_analysis_meta(output)
+        meta = meta | update_analysis_meta(outputs)
 
     # if SG IDs are listed in the meta, remove them
     # these are already captured in the sg_ids list
@@ -63,18 +65,15 @@ def complete_analysis_job(
     # we know that es indexes are registered names, not files/dirs
     # skip all relevant checks for this output type
     if analysis_type != 'es-index':
-        if not output_cloudpath.exists():
-            if tolerate_missing:
-                print(f"Output {output} doesn't exist, allowing silent return")
-                return
-            raise ValueError(f"Output {output} doesn't exist")
-
-        # add file size to meta
-        if not output_cloudpath.is_dir():
-            meta |= {'size': output_cloudpath.stat().st_size}
+        for k, output_cloudpath in output_cloudpaths.items():
+            if not output_cloudpath.exists():
+                if tolerate_missing:
+                    print(f"Output {output_cloudpath} doesn't exist, allowing silent return")
+                    return
+                raise ValueError(f"Output {k}: {output_cloudpath} doesn't exist")
 
     a_id = get_metamist().create_analysis(
-        output=output,
+        outputs=outputs,
         type_=analysis_type,
         status=AnalysisStatus('completed'),
         sequencing_group_ids=sg_ids,
@@ -82,11 +81,11 @@ def complete_analysis_job(
         meta=meta,
     )
     if a_id is None:
-        print(f'Creation of Analysis failed (type={analysis_type}, output={output}) in {project_name}')
+        print(f'Creation of Analysis failed (type={analysis_type}, outputs={outputs}) in {project_name}')
         # What Exception should we raise here?
         raise
     else:
-        print(f'Created Analysis(id={a_id}, type={analysis_type}, output={output}) in {project_name}')
+        print(f'Created Analysis(id={a_id}, type={analysis_type}, outputs={outputs}) in {project_name}')
 
 
 class StatusReporterError(Exception):
@@ -104,7 +103,7 @@ class StatusReporter(ABC):
     def create_analysis(
         self,
         b: Batch,
-        output: str,
+        outputs: dict[str, str | Path],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
@@ -130,7 +129,7 @@ class MetamistStatusReporter(StatusReporter):
     def create_analysis(
         self,
         b: Batch,
-        output: str,
+        outputs: dict[str, str | Path],
         analysis_type: str,
         target: Target,
         jobs: list[Job] | None = None,
@@ -153,14 +152,15 @@ class MetamistStatusReporter(StatusReporter):
 
         # find all relevant SG IDs
         sg_ids = target.get_sequencing_group_ids()
+        outputs_str = ', '.join(f'{k}: {str(v)}' for k, v in outputs.items())
         py_job = b.new_python_job(
-            f'Register analysis output {output}',
+            f'Register analysis outputs: {outputs_str}',
             job_attr or {} | {'tool': 'metamist'},
         )
         py_job.image(get_config()['workflow']['driver_image'])
         py_job.call(
             complete_analysis_job,
-            str(output),
+            outputs,
             analysis_type,
             sg_ids,
             project_name,
