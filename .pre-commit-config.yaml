@@ -36,5 +36,6 @@ repos:
     rev: "v1.9.0"
     hooks:
       - id: mypy
+        additional_dependencies: [cpg_utils, hail]
         args: [--pretty, --show-error-codes, --install-types, --non-interactive]
         exclude: '^gnomad_methods/'
