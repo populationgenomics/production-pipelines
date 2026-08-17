@@ -24,7 +24,13 @@ from cpg_workflows.stages.gatk_sv.gatk_sv_multisample import (
     SplitAnnotatedSvVcfByDataset,
 )
 from cpg_workflows.stages.gatk_sv.gatk_sv_single_sample import CreateSampleBatches
-from cpg_workflows.stages.gcnv import AnnotateCohortgCNV, AnnotateDatasetCNV, MtToEsCNV, SplitAnnotatedCnvVcfByDataset
+from cpg_workflows.stages.gcnv import (
+    AnnotateCohortgCNV,
+    AnnotateDatasetCNV,
+    GoAgain,
+    MtToEsCNV,
+    SplitAnnotatedCnvVcfByDataset,
+)
 from cpg_workflows.stages.gvcf_qc import GvcfMultiQC
 from cpg_workflows.stages.happy_validation import ValidationHappyOnVcf, ValidationMtToVcf
 from cpg_workflows.stages.large_cohort import (
@@ -67,6 +73,7 @@ from cpg_workflows.workflow import StageDecorator, run_workflow
 
 MIGRATED_WORKFLOWS = ['talos', 'clinvarbitration']
 WORKFLOWS: dict[str, list[StageDecorator]] = {
+    'goagain': [GoAgain],
     'clinvarbitration': [PackageForRelease],
     'talos': [MakePhenopackets, ValidateMOI, UploadTalosHtml, MinimiseOutputForSeqr],
     'talos_prep': [SquashMtIntoTarball],

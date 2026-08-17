@@ -59,6 +59,18 @@ class SetSGIDOrdering(CohortStage):
 
 
 @stage
+class GoAgain(CohortStage):
+    """foo"""
+
+    def expected_outputs(self, cohort: Cohort) -> dict[str, Path]:
+        return {'banana': self.prefix / 'foo.banna'}
+
+    def queue_jobs(self, cohort: Cohort, inputs: StageInput) -> StageOutput:
+        job = gcnv.go_again(self.get_stage_cohort_prefix(cohort))
+        return self.make_outputs(cohort, data=self.expected_outputs(cohort), jobs=[job])
+
+
+@stage
 class PrepareIntervals(MultiCohortStage):
     """
     Interval preparation steps that don't require the sample read counts:

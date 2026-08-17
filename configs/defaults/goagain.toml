@@ -1,0 +1,5 @@
+[workflow]
+name = 'goagain'
+driver_image = 'australia-southeast1-docker.pkg.dev/cpg-common/images-dev/cpg_workflows:jm-test-resubmit'
+
+[images]
