@@ -43,27 +43,38 @@ class Qc:
 
     func: Optional[Callable]
     outs: dict[str, QcOut | None]
+    name: str
     optional: bool = False
 
 
 def qc_functions() -> list[Qc]:
     """
-    QC functions and their outputs for MultiQC aggregation
+    QC functions and their outputs for MultiQC aggregation.
+
+    `cramqc/tools` restricts the set to the named tools, e.g. `tools = ['somalier']`
+    to produce only the somalier fingerprints. When unset, every tool runs. Because
+    `CramQC.expected_outputs` is derived from this list, a restricted run completes
+    once the selected tools' outputs exist, and a later unrestricted run queues the
+    remaining tools for every sequencing group. `CramMultiQC` aggregates whichever
+    tools are selected.
     """
     if config_retrieve(['workflow', 'skip_qc'], False):
         return []
 
     qcs = [
-        Qc(func=somalier.extract, outs={'somalier': None}),
+        Qc(name='somalier', func=somalier.extract, outs={'somalier': None}),
         Qc(
+            name='verifybamid',
             func=verifybamid,
             outs={'verify_bamid': QcOut('.verify-bamid.selfSM', 'verifybamid/selfsm')},
         ),
         Qc(
+            name='samtools_stats',
             func=samtools_stats,
             outs={'samtools_stats': QcOut('.samtools-stats', 'samtools/stats')},
         ),
         Qc(
+            name='picard_collect_metrics',
             func=picard_collect_metrics,
             outs={
                 'alignment_summary_metrics': QcOut('.alignment_summary_metrics', 'picard/alignment_metrics'),
@@ -82,6 +93,7 @@ def qc_functions() -> list[Qc]:
     if sequencing_type == 'genome':
         qcs.append(
             Qc(
+                name='picard_wgs_metrics',
                 func=picard_wgs_metrics,
                 outs={'picard_wgs_metrics': QcOut('.picard-wgs-metrics', 'picard/wgs_metrics')},
             ),
@@ -89,10 +101,21 @@ def qc_functions() -> list[Qc]:
     if sequencing_type == 'exome':
         qcs.append(
             Qc(
+                name='picard_hs_metrics',
                 func=picard_hs_metrics,
                 outs={'picard_hs_metrics': QcOut('.picard-hs-metrics', 'picard/hsmetrics')},
             ),
         )
+
+    if (selected := config_retrieve(['cramqc', 'tools'], None)) is not None:
+        available = [qc.name for qc in qcs]
+        if unknown := [name for name in selected if name not in available]:
+            raise ValueError(
+                f'Unknown tool(s) in cramqc/tools: {", ".join(unknown)}. '
+                f'Available for sequencing_type={sequencing_type}: {", ".join(available)}',
+            )
+        qcs = [qc for qc in qcs if qc.name in selected]
+
     return qcs
 
 
