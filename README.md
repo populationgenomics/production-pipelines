@@ -726,6 +726,19 @@ You can also force the pipeline to skip certain sequencing groups with `workflow
 CramQC = ['CPGXXXX']
 ```
 
+`CramQC` runs several tools per sequencing group. `cramqc/tools` restricts it to a
+subset, which is useful when you only need one of the outputs over a large cohort —
+`somalier` fingerprints, say, without the far more expensive picard metrics. When
+unset, every tool runs. Valid names are `somalier`, `verifybamid`, `samtools_stats`,
+`picard_collect_metrics`, and `picard_wgs_metrics` (genomes) or `picard_hs_metrics`
+(exomes); an unrecognised name raises. `workflow/skip_qc = true` remains the way to
+skip CRAM QC altogether.
+
+```toml
+[cramqc]
+tools = ['somalier']
+```
+
 ### Available stages
 
 To see available workflow stages, explore the `cpg_workflows/stages` folder. A stage wrappers for Hail Batch jobs that allow to glue them together into genomics workflows. `cpg_workflows` also provides helper functions that create Hail Batch jobs for different domain-specific applications, e.g. alignment, deduplication, QC, variant calling, creating calling intervals, running VQSR, creating ES index, etc. Those jobs can be called from the `queue_jobs` method of a stage, or in isolation, as they don't need to know about the stage they are called from, but only need a `Batch` object.
